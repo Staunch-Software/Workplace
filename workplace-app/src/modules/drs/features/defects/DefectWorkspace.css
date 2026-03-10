@@ -1,0 +1,166 @@
+.workspace-container {
+  display: flex;
+  height: calc(100vh - 60px); /* Subtract header height */
+  overflow: hidden;
+  background-color: white;
+}
+
+/* --- Pane Basics --- */
+.pane-context, 
+.pane-workflow, 
+.pane-collab {
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+}
+
+.pane-header {
+  padding: 15px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: #f8fafc;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* --- Pane 1: Context (20%) --- */
+.pane-context {
+  width: 20%;
+  background-color: #f8fafc;
+}
+
+.details-list {
+  padding: 15px;
+}
+
+.detail-item {
+  margin-bottom: 20px;
+}
+
+.detail-item label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+  display: block;
+  margin-bottom: 5px;
+}
+
+/* --- Pane 2: Workflow (50%) --- */
+.pane-workflow {
+  width: 50%;
+  background-color: white;
+}
+
+.task-tree {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.task-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.task-title {
+  display: block;
+  font-weight: 600;
+}
+
+.task-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* --- Pane 3: Collab (30%) --- */
+.pane-collab {
+  width: 30%;
+  border-right: none;
+  background-color: white;
+}
+
+.chat-thread {
+  flex: 1;
+  padding: 15px;
+  overflow-y: auto;
+  background-color: #f1f5f9;
+}
+
+.message {
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+}
+
+.message.shore { align-items: flex-start; }
+.message.vessel { align-items: flex-end; }
+
+.msg-bubble {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  max-width: 80%;
+}
+
+.message.shore .msg-bubble { background: white; border: 1px solid var(--border-color); }
+.message.vessel .msg-bubble { background: var(--color-accent); color: white; }
+
+.chat-input-area {
+  padding: 10px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  gap: 10px;
+}
+
+.chat-input-area input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+/* --- RESPONSIVE MEDIA QUERIES --- */
+
+/* Tablet (Portrait) - Switch to 2 Columns */
+@media (max-width: 1024px) {
+  .workspace-container {
+    flex-wrap: wrap;
+    overflow-y: auto; /* Enable scroll for whole page */
+  }
+
+  .pane-context {
+    width: 100%; /* Context goes to top */
+    flex-direction: row; /* Horizontal details */
+    height: auto;
+    border-bottom: 1px solid var(--border-color);
+    border-right: none;
+  }
+
+  .pane-workflow {
+    width: 60%;
+  }
+
+  .pane-collab {
+    width: 40%;
+  }
+}
+
+/* Mobile - Switch to Stacked (One Column) */
+@media (max-width: 768px) {
+  .workspace-container {
+    flex-direction: column;
+  }
+
+  .pane-context, .pane-workflow, .pane-collab {
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .chat-thread {
+    height: 300px; /* Fixed height for chat on mobile */
+  }
+}

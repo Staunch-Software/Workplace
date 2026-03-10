@@ -1,0 +1,117 @@
+.hm-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem;
+}
+
+.hm-welcome-header { margin-bottom: 2rem; }
+
+.hm-welcome-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  letter-spacing: -0.025em;
+  margin: 0;
+}
+
+.hm-welcome-header p {
+  color: var(--gray-500);
+  margin-top: 4px;
+  font-size: 0.95rem;
+}
+
+.hm-app-grid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 1.5rem;
+}
+
+@media (min-width: 640px)  { .hm-app-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .hm-app-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1280px) { .hm-app-grid { grid-template-columns: repeat(5, 1fr); } }
+
+@keyframes hmCardEntrance {
+  from { opacity: 0; transform: scale(0.97) translateY(16px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);    }
+}
+
+.hm-app-card {
+  background: var(--white);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  border: 1px solid var(--gray-100);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  text-align: center;
+  cursor: pointer;
+  transition: box-shadow 0.3s, border-color 0.3s, transform 0.3s;
+  animation: hmCardEntrance 0.5s ease-out forwards;
+  opacity: 0;
+}
+
+.hm-app-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.hm-icon-container {
+  width: 64px;
+  height: 64px;
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.3s, background 0.3s, color 0.3s;
+}
+
+.hm-app-card:hover .hm-icon-container {
+  transform: scale(1.1);
+  color: white !important;
+}
+
+.hm-app-card h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0;
+}
+
+.hm-app-description {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  margin-top: 8px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.hm-app-card:hover .hm-app-description {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hm-card-drs .hm-icon-container { background: #eff6ff; color: #2563eb; }
+.hm-card-drs:hover { border-color: rgba(37, 99, 235, 0.3); }
+.hm-card-drs:hover .hm-icon-container { background: #2563eb; }
+
+.hm-card-jira .hm-icon-container { background: rgba(0, 82, 204, 0.1); color: #0052cc; }
+.hm-card-jira:hover { border-color: rgba(0, 82, 204, 0.3); }
+.hm-card-jira:hover .hm-icon-container { background: #0052cc; }
+
+.hm-card-voyage .hm-icon-container { background: #ecfeff; color: #0891b2; }
+.hm-card-voyage:hover { border-color: rgba(8, 145, 178, 0.3); }
+.hm-card-voyage:hover .hm-icon-container { background: #0891b2; }
+
+.hm-card-lube .hm-icon-container { background: #fffbeb; color: #d97706; }
+.hm-card-lube:hover { border-color: rgba(217, 119, 6, 0.3); }
+.hm-card-lube:hover .hm-icon-container { background: #d97706; }
+
+.hm-card-engine .hm-icon-container { background: #ecfdf5; color: #059669; }
+.hm-card-engine:hover { border-color: rgba(5, 150, 105, 0.3); }
+.hm-card-engine:hover .hm-icon-container { background: #059669; }

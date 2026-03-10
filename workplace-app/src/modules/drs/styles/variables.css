@@ -1,0 +1,40 @@
+/* /src/styles/variables.css */
+:root {
+  /* Maritime Color Palette */
+  --color-primary: #0f172a;       /* Deep Navy */
+  --color-secondary: #334155;     /* Slate */
+  --color-accent: #0ea5e9;        /* Ocean Blue */
+  --color-danger: #ef4444;        /* Alert Red */
+  --color-warning: #f59e0b;       /* Safety Orange */
+  --color-success: #10b981;       /* Signal Green */
+  
+  --bg-body: #f1f5f9;
+  --bg-card: #ffffff;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+
+  /* Spacing */
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Breakpoints (Reference for media queries) */
+  --mobile: 768px;
+  --tablet: 1024px;
+}
+
+/* Standard Reset */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-body);
+  color: var(--text-main);
+  font-size: 14px;
+}
