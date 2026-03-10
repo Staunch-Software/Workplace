@@ -31,12 +31,13 @@ async def get_config_changes(
     Called by ALL offline modules (DRS, future modules) to sync config data.
     Shore always wins for config data.
     """
+    since_naive = since.replace(tzinfo=None)
     results = {}
 
     # --- USERS ---
     user_stmt = (
         select(User)
-        .where(User.updated_at > since)
+        .where(User.updated_at > since_naive)
         .options(selectinload(User.vessels))
     )
     users = (await db.execute(user_stmt)).scalars().all()
@@ -50,7 +51,7 @@ async def get_config_changes(
     results["users"] = serialized_users
 
     # --- VESSELS ---
-    vessel_stmt = select(Vessel).where(Vessel.updated_at > since)
+    vessel_stmt = select(Vessel).where(Vessel.updated_at > since_naive)
     vessels = (await db.execute(vessel_stmt)).scalars().all()
     results["vessels"] = [
         {c.name: getattr(v, c.name) for c in v.__table__.columns}
