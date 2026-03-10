@@ -4,8 +4,11 @@ from app.core.config import settings
 from app.api.v1.api import api_router
 from app.core.database_control import init_control_db
 
-# import models so SQLAlchemy registers them
+# Register ALL models
 import app.models.control.user
+import app.models.control.vessel
+import app.models.control.associations
+import app.models
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
