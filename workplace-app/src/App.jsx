@@ -8,7 +8,7 @@ import Home from './pages/Dashboard/Home';
 import Navbar from './components/Navbar';
 
 const DrsModule = lazy(() => import('./modules/drs/DrsModule'));
-const LubModule = lazy(() => import('./modules/lubeoil/LubModule'));
+const LubModule = lazy(() => import('./modules/lubeoil/Lubmodule'));
 const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
 
 function App() {
