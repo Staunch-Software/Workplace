@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 const apiDrs = axios.create({
-  baseURL: 'http://localhost:8001/api/v1', // drs-backend
+  // baseURL: 'http://localhost:8001/api/v1', // drs-backend
+  baseURL: 'http://52.172.91.85:8001/api/v1',
   headers: { 'Content-Type': 'application/json' },
 });
 

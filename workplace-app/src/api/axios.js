@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8003/api/v1', // workplace-backend
+  // baseURL: 'http://localhost:8003/api/v1', // workplace-backend
+  baseURL: 'http://52.172.91.85:8003/api/v1',
   headers: { 'Content-Type': 'application/json' },
 });
 
