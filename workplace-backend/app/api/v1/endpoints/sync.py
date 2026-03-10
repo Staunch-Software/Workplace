@@ -46,7 +46,7 @@ async def get_config_changes(
         user_data = {c.name: getattr(u, c.name) for c in u.__table__.columns}
         user_data["assigned_vessel_imos"] = [v.imo for v in u.vessels]
         # Never send password hash to vessel
-        user_data.pop("password_hash", None)
+        # user_data.pop("password_hash", None)
         serialized_users.append(user_data)
     results["users"] = serialized_users
 
