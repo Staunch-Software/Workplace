@@ -20,3 +20,9 @@ class ControlBase(DeclarativeBase):
 async def get_control_db() -> AsyncSession:
     async with AsyncSessionControl() as session:
         yield session
+
+
+# ✅ ADD THIS FUNCTION
+async def init_control_db():
+    async with engine_control.begin() as conn:
+        await conn.run_sync(ControlBase.metadata.create_all)
