@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Image as ImageIcon, Eye, Upload } from 'lucide-react';
 import ColumnCustomizationModal from '@drs/components/modals/ColumnCustomizationModal';
-import ShoreClosureModal from '@drs/components/modals/Shoreclosuremodal';
+import ShoreClosureModal from '@drs/components/modals/ShoreClosureModal';
 
 import { defectApi } from '@drs/services/defectApi';
 import { blobUploadService } from '@drs/services/blobUploadService';
