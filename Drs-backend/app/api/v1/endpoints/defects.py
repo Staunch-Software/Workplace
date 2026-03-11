@@ -1037,35 +1037,42 @@ async def import_defects(
 
                 if _should_sync():
                     sync_data.append({
-                        "entity_id": str(new_id),
+                        "entity_id": new_id,             # ✅ FIX 1: Pass UUID object, not string
                         "entity_type": "DEFECT",
-                        "action": "CREATE",
+                        "operation": "CREATE",           # ✅ FIX 2: Changed from "action" to "operation"
                         "payload": {
                             "id": str(new_id),
                             "vessel_imo": vessel.imo,
-                            "equipment": equip_str,
+                            "reported_by_id": str(current_user.id),  # ✅ FIX 3: Added missing DB columns
+                            "title": equip_str,
+                            "equipment_name": equip_str,             # ✅ Changed key from 'equipment'
                             "description": desc_str,
                             "priority": priority_enum.value,
                             "status": status_enum.value,
                             "defect_source": source_enum.value,
-                            "date": date_id.strftime("%Y-%m-%d"),
-                            "target_close_date": (
-                                date_dl.strftime("%Y-%m-%d") if date_dl else None
-                            ),
+                            "date_identified": date_id.isoformat() if date_id else None, # ✅ Use DB column name
+                            "target_close_date": date_dl.isoformat() if date_dl else None,
+                            "responsibility": "Engine Dept",
+                            "pr_status": "Not Set",
+                            "is_owner": is_owner_val,
+                            "is_deleted": False,
+                            "before_image_required": False,
+                            "after_image_required": False
                         },
                         "status": "PENDING",
                         "created_at": datetime.utcnow(),
                         "version": 1,
                         "origin": "VESSEL" if current_user.role == UserRole.VESSEL else "SHORE",
-                        "sync_scope": "DEFECT",  # ← ADD THIS
+                        "sync_scope": "DEFECT",
                     })
 
                 pr_aliases = ["PR Number", "PR No", "PR No.", "PR #", "PR Details"]
                 pr_val = next((row_data[a] for a in pr_aliases if row_data.get(a)), None)
                 if pr_val and str(pr_val).strip().lower() not in ["none", "nan", "", "null"]:
                     for pr_no in [p.strip() for p in str(pr_val).split(",") if p.strip()]:
+                        pr_id = uuid.uuid4()
                         pr_entries_data.append({
-                            "id": uuid.uuid4(),
+                            "id": pr_id,
                             "defect_id": new_id,
                             "pr_number": pr_no,
                             "pr_description": "Imported via Excel",
@@ -1073,6 +1080,27 @@ async def import_defects(
                             "is_deleted": False,
                             "created_at": datetime.utcnow(),
                         })
+                        
+                        # ✅ FIX 4: PR Entries were previously ignoring SyncQueue. Now added.
+                        if _should_sync():
+                            sync_data.append({
+                                "entity_id": pr_id,          # UUID object
+                                "entity_type": "PR_ENTRY",
+                                "operation": "CREATE",
+                                "payload": {
+                                    "id": str(pr_id),
+                                    "defect_id": str(new_id),
+                                    "pr_number": pr_no,
+                                    "pr_description": "Imported via Excel",
+                                    "created_by_id": str(current_user.id),
+                                    "is_deleted": False
+                                },
+                                "status": "PENDING",
+                                "created_at": datetime.utcnow(),
+                                "version": 1,
+                                "origin": "VESSEL" if current_user.role == UserRole.VESSEL else "SHORE",
+                                "sync_scope": "DEFECT",
+                            })
 
                 success_count += 1
 

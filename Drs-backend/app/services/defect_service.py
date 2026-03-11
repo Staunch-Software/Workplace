@@ -427,6 +427,7 @@ class DefectService:
             return None
 
         defect.is_deleted = True
+        defect.version = (defect.version or 0) + 1
         defect.updated_at = datetime.utcnow()
 
         if _should_sync():
@@ -435,7 +436,7 @@ class DefectService:
                 entity_type="DEFECT",
                 operation="DELETE",                 # renamed from action
                 payload={"id": str(defect.id), "is_deleted": True, "updated_at": datetime.utcnow().isoformat()},
-                version=1,
+                version=defect.version,
                 origin="VESSEL",
                 status="PENDING",
             ))
@@ -815,7 +816,7 @@ class DefectService:
                 entity_type="PR_ENTRY",
                 operation="DELETE",                 # renamed from action
                 payload={"id": str(pr_entry_id), "is_deleted": True, "updated_at": datetime.utcnow().isoformat()},
-                version=1,
+                version=pr_entry.version,
                 origin="VESSEL",
                 status="PENDING",
             ))

@@ -99,10 +99,10 @@ async def get_changes(
     db: AsyncSession = Depends(get_db)
 ):
     # --- FIX: Guarantee the incoming 'since' query is evaluated as UTC ---
-    # if since.tzinfo is None:
-    #     since = since.replace(tzinfo=timezone.utc)
-    # else:
-    #     since = since.astimezone(timezone.utc)
+    if since.tzinfo is None:
+        since = since.replace(tzinfo=timezone.utc)
+    else:
+        since = since.astimezone(timezone.utc)
 
     # 1. Define tables to check
     models = {
