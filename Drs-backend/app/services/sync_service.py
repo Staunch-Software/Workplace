@@ -23,26 +23,28 @@ SOFT_DELETE_MODELS = (Defect, Thread, Attachment, PrEntry, DefectImage)
 class SyncService:
     @staticmethod
     async def apply_snapshot(
-        db: AsyncSession,
-        model_class: Type[Base],
+        db: AsyncSession, 
+        model_class: Type[Base], 
         entity_id: Any,
-        incoming_version: int,
-        data: Dict[str, Any]
+        incoming_version: int, 
+        data: Dict[str, Any],
+        control_db: AsyncSession = None  # ✅ FIX 1: Added control_db parameter
     ):
         """
         Generic function to apply a sync snapshot.
-        1. Checks if entity exists.
-        2. If Not Exists -> INSERT.
-        3. If Exists -> Check Version -> UPDATE if incoming > current.
-        4. Sets origin='SYNC' to prevent echo loops.
+        ...
         """
         try:
             # --- NEW: SHORE-SIDE SANITIZER ---
             # If pushing a defect, ensure the reporter exists on Shore by Email
             if model_class == Defect and 'reported_by_id' in data:
+                
+                # ✅ FIX 2: Use control_db on Shore, fallback to db on Vessel
+                target_db = control_db if control_db else db
+                
                 # 1. Check if this ID exists on Shore
                 user_stmt = select(User).where(User.id == data['reported_by_id'])
-                user_exists = (await db.execute(user_stmt)).scalars().first()
+                user_exists = (await target_db.execute(user_stmt)).scalars().first()
 
                 # 2. If ID doesn't exist, the Vessel is using a "Seed ID".
                 # We must find the REAL Shore ID using the email.
