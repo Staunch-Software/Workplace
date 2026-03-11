@@ -806,6 +806,7 @@ class DefectService:
             return False
 
         pr_entry.is_deleted = True
+        pr_entry.version = (pr_entry.version or 0) + 1 
         pr_entry.updated_at = datetime.utcnow()
 
         if _should_sync():

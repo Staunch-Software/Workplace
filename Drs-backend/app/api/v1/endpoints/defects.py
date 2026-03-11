@@ -1055,6 +1055,9 @@ async def import_defects(
                         },
                         "status": "PENDING",
                         "created_at": datetime.utcnow(),
+                        "version": 1,
+                        "origin": "VESSEL" if current_user.role == UserRole.VESSEL else "SHORE",
+                        "sync_scope": "DEFECT",  # ← ADD THIS
                     })
 
                 pr_aliases = ["PR Number", "PR No", "PR No.", "PR #", "PR Details"]
