@@ -766,7 +766,7 @@ class DefectService:
         if not pr_entry or pr_entry.defect_id != defect_id:
             return None
 
-        update_payload = {}
+        update_payload = {"defect_id": str(defect_id),}
         if pr_update.pr_number is not None:
             pr_entry.pr_number = pr_update.pr_number
             update_payload["pr_number"] = pr_update.pr_number

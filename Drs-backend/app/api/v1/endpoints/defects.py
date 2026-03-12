@@ -89,7 +89,7 @@ from app.schemas.defect import (
 from app.core.blob_storage import (
     generate_write_sas_url,
     generate_read_sas_url,
-    get_container_client,          
+    get_container_client,
 )
 from app.api.deps import get_current_user
 from app.services.email_service import send_defect_email
@@ -247,7 +247,7 @@ async def get_defects(
         if not user_vessel_imos:
             raise HTTPException(status_code=403, detail="No vessels assigned")
         query = query.where(Defect.vessel_imo.in_(user_vessel_imos))
-            
+
     elif current_user.role == UserRole.SHORE:
         user_vessel_imos = [v.imo for v in current_user.vessels]
         if not user_vessel_imos:
@@ -351,19 +351,19 @@ async def export_defects(
             if not user_vessel_imos:
                 raise HTTPException(status_code=403, detail="No vessels assigned")
             query = query.where(Defect.vessel_imo.in_(user_vessel_imos))
-            
+
         elif current_user.role == UserRole.SHORE:
             user_vessel_imos = [v.imo for v in current_user.vessels]
             if not user_vessel_imos:
                 raise HTTPException(status_code=403, detail="No vessels assigned")
             query = query.where(Defect.vessel_imo.in_(user_vessel_imos))
-        
+
         # ADMIN users see all defects (no filtering)
 
         # ✅ FIXED: Multi-select filters using IN operator (exact match)
         if vessel_imo and len(vessel_imo) > 0:
             query = query.where(Defect.vessel_imo.in_(vessel_imo))
-            
+
         # ✅ FIXED: Equipment filter using IN operator (exact match)
         if equipment_name and len(equipment_name) > 0:
             query = query.where(Defect.equipment_name.in_(equipment_name))
@@ -508,13 +508,13 @@ async def export_defects(
                 if key == "date":
                     val = defect.date_identified.astimezone(IST).strftime("%Y-%m-%d") if defect.date_identified else "-"
                     ws1.write(row, col, val, center_fmt)
-                    
+
                 elif key == "deadline":
                     val = defect.target_close_date.astimezone(IST).strftime("%Y-%m-%d") if defect.target_close_date else "-"
                     ws1.write(row, col, val, center_fmt)
-                    
+
                 elif key == "closure_remarks":
-                    val = COLUMN_MAP[key][1](defect, 
+                    val = COLUMN_MAP[key][1](defect,
                                              i + 1)
                     ws1.write(row, col, val, text_fmt)  # Use text_fmt for wrapping
                 else:
@@ -596,15 +596,15 @@ async def export_defects(
                 buf, w, h = get_image_data(img_obj.blob_path)
                 if buf:
                     # ✅ THE FIX:
-                    # Container is 340px high. 
+                    # Container is 340px high.
                     # We force the image to fit inside a 310px box.
-                    container_h = 340 
+                    container_h = 340
                     container_w = 350 # Based on Column Width 50
                     max_target = 310
-                    
+
                     # Calculate scale so the largest side is 310px
                     scale = max_target / max(w, h)
-                    
+
                     # Calculate offsets to center the image within the container
                     x_off = (container_w - (w * scale)) / 2
                     y_off = (container_h - (h * scale)) / 2
@@ -626,8 +626,8 @@ async def export_defects(
                     except Exception as img_err:
                         logger.error(f"Failed to insert image: {img_err}")
                         ws2.write(row, col_idx, "Err", center_fmt)# Insert images
-                        
-                        
+
+
             place_image(5, before[0] if len(before) > 0 else None)
             place_image(6, before[1] if len(before) > 1 else None)
             place_image(7, after[0] if len(after) > 0 else None)
@@ -919,21 +919,22 @@ async def import_defects(
             except Exception:
                 return None
 
-        defects_data = []
-        pr_entries_data = []
-        sync_data = []
+        defects_to_insert = []
+        prs_to_insert = []
+        syncs_to_insert = []
+        
         success_count = 0
         errors = []
 
         for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
             try:
-                # ✅ FIX 1: Skip completely blank rows (Excel trailing empty rows)
+                # 1. Skip completely blank rows (Excel trailing empty rows)
                 if all(v is None or str(v).strip() == "" for v in row):
                     continue
 
                 row_data = dict(zip(headers, row))
 
-                # ✅ FIX 2: Also treat "none"/"None" string as missing
+                # 2. Treat "none"/"None" string as missing
                 missing_fields = [
                     f for f in required_columns
                     if row_data.get(f) is None
@@ -943,19 +944,12 @@ async def import_defects(
                 if missing_fields:
                     raise ValueError(f"Missing required field(s): {', '.join(missing_fields)}")
 
-                # Resolve vessel — ✅ control_db for shore lookup
+                # Resolve vessel
                 if current_user.role == UserRole.VESSEL:
                     vessel = current_user.vessels[0]
                 else:
-                    v_name = (
-                        str(row_data["Vessel Name"])
-                        .encode("ascii", "ignore")
-                        .decode()
-                        .strip()
-                    )
-                    v_res = await control_db.execute(  # ✅ control_db
-                        select(Vessel).where(Vessel.name.ilike(v_name))
-                    )
+                    v_name = str(row_data["Vessel Name"]).encode("ascii", "ignore").decode().strip()
+                    v_res = await control_db.execute(select(Vessel).where(Vessel.name.ilike(v_name)))
                     vessel = v_res.scalars().first()
                     if not vessel:
                         raise ValueError(f"Vessel '{v_name}' not found in database")
@@ -967,29 +961,11 @@ async def import_defects(
                 date_dl = parse_date(row_data["Deadline"])
 
                 validation_errors = []
-                if not source_enum:
-                    validation_errors.append(
-                        f"Invalid Defect Source: '{row_data.get('Defect Source')}' — "
-                        f"must be one of: {', '.join([e.value for e in DefectSource])}"
-                    )
-                if not priority_enum:
-                    validation_errors.append(
-                        f"Invalid Priority: '{row_data.get('Priority')}' — "
-                        f"must be one of: CRITICAL, HIGH, MEDIUM, LOW"
-                    )
-                if not status_enum:
-                    validation_errors.append(
-                        f"Invalid Status: '{row_data.get('Status')}' — "
-                        f"must be one of: OPEN, CLOSED, PENDING_CLOSURE"
-                    )
-                if not date_id:
-                    validation_errors.append(
-                        f"Invalid Report Date: '{row_data.get('Report Date')}' — use format YYYY-MM-DD"
-                    )
-                if not date_dl:
-                    validation_errors.append(
-                        f"Invalid Deadline: '{row_data.get('Deadline')}' — use format YYYY-MM-DD"
-                    )
+                if not source_enum: validation_errors.append(f"Invalid Source: {row_data.get('Defect Source')}")
+                if not priority_enum: validation_errors.append(f"Invalid Priority: {row_data.get('Priority')}")
+                if not status_enum: validation_errors.append(f"Invalid Status: {row_data.get('Status')}")
+                if not date_id: validation_errors.append("Invalid Report Date format")
+                if not date_dl: validation_errors.append("Invalid Deadline format")
                 if validation_errors:
                     raise ValueError(" | ".join(validation_errors))
 
@@ -1007,50 +983,55 @@ async def import_defects(
                     )
                 )
                 if dup_res.scalars().first():
-                    raise ValueError(
-                        "Duplicate: defect already exists for this vessel/equipment/description/date/source."
-                    )
+                    raise ValueError("Duplicate: defect already exists.")
 
                 new_id = uuid.uuid4()
                 is_owner_val = str(row_data.get("Owner", "")).strip().lower() == "owner"
 
-                defects_data.append({
-                    "id": new_id,
-                    "vessel_imo": vessel.imo,
-                    "reported_by_id": current_user.id,
-                    "title": equip_str,
-                    "equipment_name": equip_str,
-                    "description": desc_str,
-                    "defect_source": source_enum,
-                    "priority": priority_enum,
-                    "status": status_enum,
-                    "date_identified": date_id,
-                    "target_close_date": date_dl,
-                    "responsibility": "Engine Dept",
-                    "pr_status": "Not Set",
-                    "is_owner": is_owner_val,
-                    "is_deleted": False,
-                    "before_image_required": False,
-                    "after_image_required": False,
-                    "created_at": datetime.utcnow(),
-                })
+                # ✅ FIX 2: Create real ORM Objects (guarantees ID generation & defaults)
+                # In the Defect() constructor inside the loop, add version:
+                new_defect = Defect(
+                    id=new_id,
+                    vessel_imo=vessel.imo,
+                    reported_by_id=current_user.id,
+                    title=equip_str,
+                    equipment_name=equip_str,
+                    description=desc_str,
+                    defect_source=source_enum,
+                    priority=priority_enum,
+                    status=status_enum,
+                    date_identified=date_id,
+                    target_close_date=date_dl,
+                    responsibility="Engine Dept",
+                    pr_status="Not Set",
+                    is_owner=is_owner_val,
+                    is_deleted=False,
+                    before_image_required=False,
+                    after_image_required=False,
+                    version=1,                    # ← ADD THIS
+                    origin="VESSEL" if _should_sync() else "SHORE",  # ← ADD THIS
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )   
+                
+                defects_to_insert.append(new_defect)
 
                 if _should_sync():
-                    sync_data.append({
-                        "entity_id": new_id,             # ✅ FIX 1: Pass UUID object, not string
-                        "entity_type": "DEFECT",
-                        "operation": "CREATE",           # ✅ FIX 2: Changed from "action" to "operation"
-                        "payload": {
+                    syncs_to_insert.append(SyncQueue(
+                        entity_id=new_id,
+                        entity_type="DEFECT",
+                        operation="CREATE",
+                        payload={
                             "id": str(new_id),
                             "vessel_imo": vessel.imo,
-                            "reported_by_id": str(current_user.id),  # ✅ FIX 3: Added missing DB columns
+                            "reported_by_id": str(current_user.id),
                             "title": equip_str,
-                            "equipment_name": equip_str,             # ✅ Changed key from 'equipment'
+                            "equipment_name": equip_str,
                             "description": desc_str,
+                            "defect_source": source_enum.value,
                             "priority": priority_enum.value,
                             "status": status_enum.value,
-                            "defect_source": source_enum.value,
-                            "date_identified": date_id.isoformat() if date_id else None, # ✅ Use DB column name
+                            "date_identified": date_id.isoformat() if date_id else None,
                             "target_close_date": date_dl.isoformat() if date_dl else None,
                             "responsibility": "Engine Dept",
                             "pr_status": "Not Set",
@@ -1059,35 +1040,36 @@ async def import_defects(
                             "before_image_required": False,
                             "after_image_required": False
                         },
-                        "status": "PENDING",
-                        "created_at": datetime.utcnow(),
-                        "version": 1,
-                        "origin": "VESSEL" if current_user.role == UserRole.VESSEL else "SHORE",
-                        "sync_scope": "DEFECT",
-                    })
+                        status="PENDING",
+                        origin="VESSEL" if current_user.role == UserRole.VESSEL else "SHORE",
+                        sync_scope="DEFECT",
+                        version=1
+                    ))
 
                 pr_aliases = ["PR Number", "PR No", "PR No.", "PR #", "PR Details"]
                 pr_val = next((row_data[a] for a in pr_aliases if row_data.get(a)), None)
                 if pr_val and str(pr_val).strip().lower() not in ["none", "nan", "", "null"]:
                     for pr_no in [p.strip() for p in str(pr_val).split(",") if p.strip()]:
                         pr_id = uuid.uuid4()
-                        pr_entries_data.append({
-                            "id": pr_id,
-                            "defect_id": new_id,
-                            "pr_number": pr_no,
-                            "pr_description": "Imported via Excel",
-                            "created_by_id": current_user.id,
-                            "is_deleted": False,
-                            "created_at": datetime.utcnow(),
-                        })
+                        prs_to_insert.append(PrEntry(
+                            id=pr_id,
+                            defect_id=new_id,
+                            pr_number=pr_no,
+                            pr_description="Imported via Excel",
+                            created_by_id=current_user.id,
+                            is_deleted=False,
+                            version=1,                      # ← ADD THIS
+                            origin="SHORE",  
+                            created_at=datetime.utcnow(),
+                            updated_at=datetime.utcnow(),
+                        ))
                         
-                        # ✅ FIX 4: PR Entries were previously ignoring SyncQueue. Now added.
                         if _should_sync():
-                            sync_data.append({
-                                "entity_id": pr_id,          # UUID object
-                                "entity_type": "PR_ENTRY",
-                                "operation": "CREATE",
-                                "payload": {
+                            syncs_to_insert.append(SyncQueue(
+                                entity_id=pr_id,
+                                entity_type="PR_ENTRY",
+                                operation="CREATE",
+                                payload={
                                     "id": str(pr_id),
                                     "defect_id": str(new_id),
                                     "pr_number": pr_no,
@@ -1095,25 +1077,20 @@ async def import_defects(
                                     "created_by_id": str(current_user.id),
                                     "is_deleted": False
                                 },
-                                "status": "PENDING",
-                                "created_at": datetime.utcnow(),
-                                "version": 1,
-                                "origin": "VESSEL" if current_user.role == UserRole.VESSEL else "SHORE",
-                                "sync_scope": "DEFECT",
-                            })
+                                status="PENDING",
+                                origin="VESSEL" if current_user.role == UserRole.VESSEL else "SHORE",
+                                sync_scope="DEFECT",
+                                version=1
+                            ))
 
                 success_count += 1
 
             except Exception as row_error:
                 errors.append({"row": row_idx, "error": str(row_error)})
                 if not skip_errors:
-                    # ✅ FIX 3: detail must be a string, not a dict
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Row {row_idx}: {str(row_error)}",
-                    )
+                    raise HTTPException(status_code=400, detail=f"Row {row_idx}: {str(row_error)}")
 
-        if not defects_data:
+        if not defects_to_insert:
             return {
                 "status": "failure",
                 "message": "Import completed — no valid rows found",
@@ -1123,16 +1100,15 @@ async def import_defects(
                 "errors": errors,
             }
 
-        chunk_size = 1000
         try:
-            for i in range(0, len(defects_data), chunk_size):
-                await db.execute(insert(Defect), defects_data[i:i + chunk_size])
-            if pr_entries_data:
-                for i in range(0, len(pr_entries_data), chunk_size):
-                    await db.execute(insert(PrEntry), pr_entries_data[i:i + chunk_size])
-            if sync_data:
-                for i in range(0, len(sync_data), chunk_size):
-                    await db.execute(insert(SyncQueue), sync_data[i:i + chunk_size])
+            # ✅ FIX 3: Safe ORM commit instead of bulk raw insert
+            if defects_to_insert:
+                db.add_all(defects_to_insert)
+            if prs_to_insert:
+                db.add_all(prs_to_insert)
+            if syncs_to_insert:
+                db.add_all(syncs_to_insert)
+                
             await db.commit()
             logger.info(f"✅ Bulk import successful: {success_count} defects committed")
         except Exception as e:
@@ -1141,9 +1117,9 @@ async def import_defects(
             raise HTTPException(status_code=500, detail="Database error during bulk commit.")
 
         # Send notifications per affected vessel — ✅ control_db for vessel lookup
-        affected_vessels = list(set(d["vessel_imo"] for d in defects_data))
+        affected_vessels = list(set(d.vessel_imo for d in defects_to_insert))
         for v_imo in affected_vessels:
-            v_count = sum(1 for d in defects_data if d["vessel_imo"] == v_imo)
+            v_count = sum(1 for d in defects_to_insert if d.vessel_imo == v_imo)
             try:
                 vessel_obj = await control_db.get(Vessel, v_imo)  # ✅ control_db
                 vessel_name = vessel_obj.name if vessel_obj else v_imo

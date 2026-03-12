@@ -81,7 +81,7 @@ class Defect(Base):
     # )
     # closed_by = relationship("User", foreign_keys=[closed_by_id])
     threads = relationship("Thread", back_populates="defect", cascade="all, delete-orphan")
-    pr_entries = relationship("PrEntry", back_populates="defect", cascade="all, delete-orphan")
+    pr_entries = relationship("PrEntry", back_populates="defect", cascade="save-update, merge")
     
     # ✅ THIS WAS MISSING - Add this relationship to fix the error!
     images = relationship("DefectImage", back_populates="defect", cascade="all, delete-orphan")

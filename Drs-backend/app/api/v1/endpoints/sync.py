@@ -14,6 +14,7 @@ from app.models.defect import Defect, Thread, Attachment, PrEntry, DefectImage
 # Import all syncable models
 from app.models.defect import Defect, Thread, Attachment, PrEntry, DefectImage
 from app.models.tasks import Task, Notification, LiveFeed
+from app.core.database_control import get_control_db
 
 router = APIRouter()
 
@@ -31,10 +32,10 @@ async def verify_sync_key(api_key: str = Security(sync_api_key_header)):
   # await SyncService.apply_snapshot(db, Defect, payload.entity_id, payload.version, payload.data)
  #   return {"status": "processed", "id": payload.entity_id}
 @router.post("/defect", status_code=status.HTTP_200_OK, dependencies=[Depends(verify_sync_key)])
-async def sync_defect(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
+async def sync_defect(payload: SyncPayload, db: AsyncSession = Depends(get_db), control_db: AsyncSession = Depends(get_control_db)):
     """Apply Defect Snapshot"""
     try:
-        await SyncService.apply_snapshot(db, Defect, payload.entity_id, payload.version, payload.data)
+        await SyncService.apply_snapshot(db, Defect, payload.entity_id, payload.version, payload.data, control_db=control_db)
         return {"status": "processed", "id": payload.entity_id}
     except Exception as e:
         # THIS LINE IS CRITICAL: It forces the error into the logs

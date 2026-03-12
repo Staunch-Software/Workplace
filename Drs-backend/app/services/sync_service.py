@@ -39,20 +39,16 @@ class SyncService:
             # If pushing a defect, ensure the reporter exists on Shore by Email
             if model_class == Defect and 'reported_by_id' in data:
                 
-                # ✅ FIX 2: Use control_db on Shore, fallback to db on Vessel
-                target_db = control_db if control_db else db
-                
-                # 1. Check if this ID exists on Shore
-                user_stmt = select(User).where(User.id == data['reported_by_id'])
-                user_exists = (await target_db.execute(user_stmt)).scalars().first()
-
-                # 2. If ID doesn't exist, the Vessel is using a "Seed ID".
-                # We must find the REAL Shore ID using the email.
-                if not user_exists:
-                    print(f"⚠️ ID {data['reported_by_id']} not found. Attempting email lookup...")
-                    # We assume the vessel sent the email in the payload or we skip
-                    # If your sync payload doesn't have email, we need to add it to Vessel DefectService
-            # --- END SANITIZER ---
+                try:
+                    if control_db is None:
+                        logger.warning("⚠️ control_db not provided — skipping reporter validation")
+                    else:
+                        user_stmt = select(User).where(User.id == data['reported_by_id'])
+                        user_exists = (await control_db.execute(user_stmt)).scalars().first()
+                        if not user_exists:
+                            logger.warning(f"⚠️ reported_by_id {data['reported_by_id']} not found — syncing anyway")
+                except Exception as e:
+                    logger.warning(f"⚠️ User lookup failed — continuing sync: {e}")
 
             # --- FIX START: Extract Link Data before cleaning ---
             assigned_vessel_imos = None
@@ -289,28 +285,22 @@ class SyncService:
 
             CONFIG_MODELS = (User, Vessel)
             if isinstance(model_class, type) and issubclass(model_class, CONFIG_MODELS):
+                target = control_db if control_db else db   # ✅ User/Vessel use control_db
                 if not existing_entity:
-                    logger.info(f"📥 CONFIG INSERT: {model_class.__tablename__} {entity_id}")
                     instance = model_class(**clean_data)
-                    db.add(instance)
+                    target.add(instance)
                 else:
-                    logger.info(f"🔄 CONFIG UPDATE (SHORE WINS): {model_class.__tablename__} {entity_id}")
                     for key, value in clean_data.items():
                         if hasattr(existing_entity, key):
                             setattr(existing_entity, key, value)
-                await db.flush()
-                # Handle vessel links for users
+                await target.flush()
                 if assigned_vessel_imos is not None and model_class == User:
-                    await db.execute(
-                        delete(user_vessel_link).where(user_vessel_link.c.user_id == instance.id if not existing_entity else existing_entity.id)
-                    )
+                    user_id = instance.id if not existing_entity else existing_entity.id
+                    await target.execute(delete(user_vessel_link).where(user_vessel_link.c.user_id == user_id))
                     if assigned_vessel_imos:
-                        new_links = [
-                            {"user_id": instance.id if not existing_entity else existing_entity.id, "vessel_imo": imo}
-                            for imo in assigned_vessel_imos
-                        ]
-                        await db.execute(insert(user_vessel_link), new_links)
-                await db.commit()
+                        new_links = [{"user_id": user_id, "vessel_imo": imo} for imo in assigned_vessel_imos]
+                        await target.execute(insert(user_vessel_link), new_links)
+                await target.commit()
                 return
 
             if not existing_entity:
@@ -406,26 +396,7 @@ class SyncService:
             # Flush to ensure the instance has an ID and is attached to session
             await db.flush()
 
-            # --- FIX START: Apply Vessel Links ---
-            # This runs for both Insert and Update cases if we have data
-            # --- FIX: Direct Table Manipulation (Bypasses ORM MissingGreenlet error) ---
-            if assigned_vessel_imos is not None and model_class == User:
-                # 1. Delete ALL existing links for this user
-                await db.execute(
-                    delete(user_vessel_link).where(user_vessel_link.c.user_id == instance.id)
-                )
-
-                # 2. Insert NEW links (if any provided)
-                if assigned_vessel_imos:
-                    # Prepare list of dicts for bulk insert
-                    new_links = [
-                        {"user_id": instance.id, "vessel_imo": imo}
-                        for imo in assigned_vessel_imos
-                    ]
-                    # Execute bulk insert
-                    await db.execute(insert(user_vessel_link), new_links)
-
-                    logger.info(f"🔗 Linked User {instance.email} to {len(new_links)} vessels")
+            
             # --- END FIX ---
 
             # 4. Commit Transaction
@@ -447,6 +418,7 @@ class SyncService:
         valid_columns = model_class.__table__.columns.keys()
         for key, value in data.items():
             if key not in valid_columns: continue
+            if value is None:  continue
 
             # --- FIX: Character Encoding Sanitizer ---
             if isinstance(value, str):
