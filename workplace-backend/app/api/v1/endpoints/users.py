@@ -11,6 +11,8 @@ from app.models.control.vessel import Vessel
 from app.schemas.user import UserCreate, UserUpdate, UserOut, UserDetail
 import uuid
 from pydantic import BaseModel
+from app.core.security import verify_password
+from typing import Optional
 
 router = APIRouter()
 
@@ -65,19 +67,6 @@ async def create_user(
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    try:
-        await send_welcome_email(
-            to_email=payload.email,
-            full_name=payload.full_name,
-            password=payload.password,
-            role=payload.role,
-            assigned_vessels=payload.assigned_vessels if hasattr(payload, 'assigned_vessels') else [],
-            permissions=payload.permissions,
-            created_by=admin.full_name,
-        )
-    except Exception as e:
-        logger.error(f"Welcome email failed: {e}")
-
     return user
 
 
@@ -105,10 +94,14 @@ async def update_user(
     return user
 
 
+class AssignVesselsPayload(BaseModel):
+    vessel_imos: list[str]
+    plain_password: Optional[str] = None
+
 @router.put("/users/{user_id}/vessels", response_model=UserDetail)
 async def assign_vessels(
     user_id: uuid.UUID,
-    vessel_imos: list[str],
+    payload: AssignVesselsPayload,
     db: AsyncSession = Depends(get_control_db),
     admin: User = Depends(get_current_admin),
 ):
@@ -120,7 +113,7 @@ async def assign_vessels(
         raise HTTPException(status_code=404, detail="User not found")
 
     vessels_result = await db.execute(
-        select(Vessel).where(Vessel.imo.in_(vessel_imos))
+        select(Vessel).where(Vessel.imo.in_(payload.vessel_imos))
     )
     vessels = vessels_result.scalars().all()
 
@@ -128,6 +121,21 @@ async def assign_vessels(
     user.updated_at = datetime.utcnow()
     await db.commit()
     await db.refresh(user)
+
+    # Only send welcome email on new user creation (when password is provided)
+    if payload.plain_password:
+        try:
+            await send_welcome_email(
+                to_email=user.email,
+                full_name=user.full_name,
+                password=payload.plain_password,
+                role=user.role,
+                assigned_vessels=[v.name for v in vessels],
+                permissions=user.permissions,
+                created_by=admin.full_name,
+            )
+        except Exception as e:
+            logger.error(f"Welcome email failed: {e}")
 
     return UserDetail(
         id=user.id,
@@ -192,3 +200,28 @@ async def update_own_job_title(
     user.updated_at = datetime.utcnow()
     await db.commit()
     return {"message": "Job title updated successfully"}
+
+# ADD after the job-title endpoint:
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+@router.post("/users/me/change-password")
+async def change_password(
+    payload: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_control_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(User).where(User.id == current_user.id))
+    user = result.scalar_one_or_none()
+
+    if not verify_password(payload.old_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    if len(payload.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    user.password_hash = hash_password(payload.new_password)
+    user.updated_at = datetime.utcnow()
+    await db.commit()
+    return {"message": "Password changed successfully"}

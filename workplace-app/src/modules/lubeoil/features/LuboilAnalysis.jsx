@@ -4021,8 +4021,8 @@ const LuboilAnalysis = () => {
                                                 ? "Select the vessel"
                                                 : selectedVesselsFilter.length ===
                                                     availableVessels.length
-                                                    ? "âœ“ All Vessels"
-                                                    : `âœ“ ${selectedVesselsFilter.length} Selected`}
+                                                    ? " All Vessels"
+                                                    : ` ${selectedVesselsFilter.length} Selected`}
                                         </span>
                                         <ChevronDown size={14} />
                                     </button>
@@ -4870,7 +4870,7 @@ const LuboilAnalysis = () => {
                                         }}
                                     >
                                         <p style={{ margin: 0, fontSize: "1.1rem" }}>
-                                            ðŸ‘† Select one or more vessels above to view Fleet Analysis
+                                             Select one or more vessels above to view Fleet Analysis
                                             Matrix
                                         </p>
                                     </div>

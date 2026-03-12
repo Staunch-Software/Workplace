@@ -51,7 +51,7 @@ export default function CreateUser() {
         try {
             const res = await createUser({ ...form, permissions, can_self_assign_vessels: canSelfAssign, });
             if (selectedVessels.length > 0) {
-                await assignVessels(res.data.id, selectedVessels);
+                await assignVessels(res.data.id, selectedVessels, form.password);
             }
             navigate("/admin/users");
         } catch (err) {

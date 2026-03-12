@@ -7,8 +7,11 @@ export const createUser = (payload) => api.post('/users', payload);
 
 export const updateUser = (id, payload) => api.patch(`/users/${id}`, payload);
 
-export const assignVessels = (id, vessel_imos) =>
-  api.put(`/users/${id}/vessels`, vessel_imos);
+export const assignVessels = (id, vessel_imos, plainPassword = null) =>
+  api.put(`/users/${id}/vessels`, {
+    vessel_imos: vessel_imos,
+    plain_password: plainPassword,
+  });
 
 // ── Vessels ────────────────────────────────────────────
 export const getVessels = () => api.get('/vessels');

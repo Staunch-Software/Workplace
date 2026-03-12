@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Building2, Search, Shield, LogOut, ChevronDown, Ship, X, Check } from "lucide-react";
+import { Building2, Search, Shield, LogOut, ChevronDown, Ship, X, Check, KeyRound } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
@@ -14,6 +14,31 @@ const Navbar = () => {
     const [selectedImos, setSelectedImos] = useState([]);
     const [saving, setSaving] = useState(false);
     const dropdownRef = useRef(null);
+
+    const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+    const [cpForm, setCpForm] = useState({ old_password: '', new_password: '', confirm: '' });
+    const [cpError, setCpError] = useState('');
+    const [cpSuccess, setCpSuccess] = useState(false);
+    const [cpLoading, setCpLoading] = useState(false);
+
+    const handleChangePassword = async () => {
+        setCpError('');
+        if (cpForm.new_password !== cpForm.confirm) { setCpError('Passwords do not match'); return; }
+        if (cpForm.new_password.length < 8) { setCpError('Minimum 8 characters'); return; }
+        setCpLoading(true);
+        try {
+            await api.post('/users/me/change-password', {
+                old_password: cpForm.old_password,
+                new_password: cpForm.new_password,
+            });
+            setCpSuccess(true);
+            setTimeout(() => { setChangePasswordOpen(false); setCpSuccess(false); setCpForm({ old_password: '', new_password: '', confirm: '' }); }, 2000);
+        } catch (err) {
+            setCpError(err.response?.data?.detail || 'Failed to change password');
+        } finally {
+            setCpLoading(false);
+        }
+    };
 
     useEffect(() => {
         const handler = (e) => {
@@ -135,6 +160,9 @@ const Navbar = () => {
                                             <Ship size={15} /> My Vessels
                                         </button>
                                     )}
+                                    <button className="dropdown-item" onClick={() => { setDropdownOpen(false); setChangePasswordOpen(true); }}>
+                                        <KeyRound size={15} /> Change Password
+                                    </button>
 
                                     <button className="dropdown-item danger" onClick={handleLogout}>
                                         <LogOut size={15} /> Logout
@@ -204,6 +232,42 @@ const Navbar = () => {
                                 {saving ? 'Saving...' : 'Save Changes'}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {changePasswordOpen && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: 'var(--white)', borderRadius: 16, width: 420, padding: 32, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--gray-900)' }}>Change Password</h2>
+                            <button onClick={() => { setChangePasswordOpen(false); setCpError(''); setCpForm({ old_password: '', new_password: '', confirm: '' }); }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-400)' }}><X size={20} /></button>
+                        </div>
+                        {cpSuccess ? (
+                            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                                <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>✅</div>
+                                <p style={{ color: 'var(--gray-700)', fontWeight: 600 }}>Password changed successfully!</p>
+                            </div>
+                        ) : (
+                            <>
+                                {['old_password', 'new_password', 'confirm'].map((field, i) => (
+                                    <div key={field} style={{ marginBottom: 14 }}>
+                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--gray-600)', display: 'block', marginBottom: 4 }}>
+                                            {['Current Password', 'New Password', 'Confirm New Password'][i]}
+                                        </label>
+                                        <input type="password" value={cpForm[field]}
+                                            onChange={e => setCpForm({ ...cpForm, [field]: e.target.value })}
+                                            style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--gray-300)', fontSize: '0.875rem', boxSizing: 'border-box' }} />
+                                    </div>
+                                ))}
+                                {cpError && <p style={{ color: '#ef4444', fontSize: '0.8rem', marginBottom: 12 }}>{cpError}</p>}
+                                <button onClick={handleChangePassword} disabled={cpLoading}
+                                    style={{ width: '100%', padding: '10px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem' }}>
+                                    {cpLoading ? 'Saving...' : 'Update Password'}
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
             )}

@@ -18,6 +18,7 @@ const Login = () => {
   const [password, setPassword]   = useState('');
   const [error, setError]         = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const { login }    = useAuth();
   const navigate     = useNavigate();
@@ -30,7 +31,7 @@ const Login = () => {
     setError('');
     setIsLoading(true);
 
-    const result = await login(username, password);
+    const result = await login(username, password, rememberMe);
     setIsLoading(false);
 
     if (result.success) {
@@ -184,7 +185,7 @@ const Login = () => {
 
             <div className="form-options">
               <label className="checkbox-label">
-                <input type="checkbox" disabled={isLoading} />
+                <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} disabled={isLoading} />
                 Remember me
               </label>
               <a href="#" className="forgot-link">Forgot password?</a>

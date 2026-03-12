@@ -18,9 +18,8 @@ export const AuthProvider = ({ children }) => {
 
     // ── Rehydrate session on page refresh ──────────────────────
     useEffect(() => {
-        const storedUser = localStorage.getItem('platform_user');
-        const storedToken = localStorage.getItem('platform_token');
-
+        const storedUser = localStorage.getItem('platform_user') || sessionStorage.getItem('platform_user');
+        const storedToken = localStorage.getItem('platform_token') || sessionStorage.getItem('platform_token');
         if (storedUser && storedToken) {
             setUser(JSON.parse(storedUser));
         }
@@ -97,15 +96,16 @@ export const AuthProvider = ({ children }) => {
     // }
     // };
 
-    const login = async (email, password) => {
+    const login = async (email, password, rememberMe = false) => {
         try {
             const res = await axios.post("/login/access-token", {
                 username: email,
                 password: password,
             });
             const userData = res.data;
-            localStorage.setItem("platform_token", userData.access_token);
-            localStorage.setItem("platform_user", JSON.stringify(userData));
+            const storage = rememberMe ? localStorage : sessionStorage;
+            storage.setItem("platform_token", userData.access_token);
+            storage.setItem("platform_user", JSON.stringify(userData));
             setUser(userData);
             return { success: true, role: userData.role };
         } catch (error) {
@@ -119,6 +119,8 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         localStorage.removeItem('platform_user');
         localStorage.removeItem('platform_token');
+        sessionStorage.removeItem('platform_user');
+        sessionStorage.removeItem('platform_token');
     };
 
     return (
