@@ -26,8 +26,11 @@ class Settings(BaseSettings):
     JIRA_EMAIL: str = ""
     JIRA_PASSWORD: str = ""
     JIRA_PROJECT_KEY: str = "OZLR"
-    JIRA_COOKIES_PATH: str = "C:/tmp/jira-cookies.json"
-    JIRA_SCREENSHOT_DIR: str = "C:/tmp"
+    # JIRA_COOKIES_PATH: str = "C:/tmp/jira-cookies.json"
+    # JIRA_SCREENSHOT_DIR: str = "C:/tmp"
+
+    JIRA_COOKIES_PATH: str = "/opt/workplace/Workplace/jira-backend/automation/jira-cookies.json"
+    JIRA_SCREENSHOT_DIR: str = "/opt/workplace/Workplace/jira-backend/automation/screenshots"
 
     # Azure Blob Storage
     AZURE_STORAGE_CONNECTION_STRING: str = ""

@@ -144,7 +144,14 @@ import os as _os_jira
 # condition where all refreshes fail. This lock serializes them: the first
 # request does the refresh, the rest wait and then reuse the fresh cookies.
 _cookie_refresh_lock = asyncio.Lock()
-COOKIES_PATH = Path(_os_jira.environ.get("JIRA_COOKIES_PATH", "C:/tmp/jira-cookies.json"))
+# COOKIES_PATH = Path(_os_jira.environ.get("JIRA_COOKIES_PATH", "C:/tmp/jira-cookies.json"))
+
+BASE_DIR = Path(__file__).resolve().parents[1] / "automation"
+
+COOKIES_PATH = Path(_os_jira.environ.get(
+    "JIRA_COOKIES_PATH",
+    BASE_DIR / "jira-cookies.json"
+))
 
 # URL patterns that are actual attachment content (not icons or API endpoints)
 VALID_ATTACHMENT_PATTERNS = [

@@ -52,8 +52,19 @@ from core.config import settings
 # On Linux: set JIRA_COOKIES_PATH=/tmp/jira-cookies.json in your environment.
 # Both playwright_service.py and jira.py read from this same path.
 import os as _os
-COOKIES_PATH   = Path(_os.environ.get("JIRA_COOKIES_PATH", "C:/tmp/jira-cookies.json"))
-SCREENSHOT_DIR = Path(_os.environ.get("JIRA_SCREENSHOT_DIR", "C:/tmp"))
+# COOKIES_PATH   = Path(_os.environ.get("JIRA_COOKIES_PATH", "C:/tmp/jira-cookies.json"))
+# SCREENSHOT_DIR = Path(_os.environ.get("JIRA_SCREENSHOT_DIR", "C:/tmp"))
+BASE_DIR = Path(__file__).resolve().parent
+
+COOKIES_PATH = Path(_os.environ.get(
+    "JIRA_COOKIES_PATH",
+    BASE_DIR / "jira-cookies.json"
+))
+
+SCREENSHOT_DIR = Path(_os.environ.get(
+    "JIRA_SCREENSHOT_DIR",
+    BASE_DIR / "screenshots"
+))
 COOKIES_PATH.parent.mkdir(parents=True, exist_ok=True)
 SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
