@@ -1,0 +1,236 @@
+/* ─── Page Layout ─────────────────────────────────────────── */
+.ct-page {
+  min-height: 100vh;
+  background: #f9fafb;
+}
+
+.ct-main {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+/* ─── Breadcrumb ──────────────────────────────────────────── */
+.ct-breadcrumb {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 16px;
+}
+
+.ct-breadcrumb-btn {
+  color: #2563eb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+/* ─── Page Heading ────────────────────────────────────────── */
+.ct-heading {
+  margin-bottom: 24px;
+}
+
+.ct-brand {
+  color: #E8610A;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.ct-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin: 4px 0 4px;
+}
+
+.ct-subtitle {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* ─── Priority Selection ──────────────────────────────────── */
+.ct-priority-label {
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 12px;
+}
+
+.ct-priority-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ct-priority-btn {
+  text-align: left;
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: box-shadow 0.2s;
+  border-width: 1px;
+  border-style: solid;
+}
+
+.ct-priority-btn:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Critical */
+.ct-priority-btn--Critical {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+.ct-priority-btn--Critical .ct-priority-btn-title {
+  color: #dc2626;
+}
+
+/* Major */
+.ct-priority-btn--Major {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+.ct-priority-btn--Major .ct-priority-btn-title {
+  color: #f97316;
+}
+
+/* Minor */
+.ct-priority-btn--Minor {
+  background: #fefce8;
+  border-color: #fef08a;
+}
+.ct-priority-btn--Minor .ct-priority-btn-title {
+  color: #ca8a04;
+}
+
+.ct-priority-btn-title {
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.ct-priority-btn-desc {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* ─── Form Card ───────────────────────────────────────────── */
+.ct-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 24px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* ─── Selected Priority Banner ────────────────────────────── */
+.ct-selected-priority {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 24px;
+}
+
+.ct-selected-priority-name {
+  color: #1d4ed8;
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+
+.ct-selected-priority-desc {
+  font-size: 12px;
+  color: #3b82f6;
+  margin: 0;
+}
+
+.ct-change-btn {
+  color: #2563eb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+/* ─── Form Fields ─────────────────────────────────────────── */
+.ct-field {
+  margin-bottom: 16px;
+}
+
+.ct-field--last {
+  margin-bottom: 20px;
+}
+
+.ct-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.ct-required {
+  color: #dc2626;
+}
+
+.ct-input,
+.ct-textarea,
+.ct-select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  background: white;
+  font-family: inherit;
+}
+
+.ct-textarea {
+  resize: vertical;
+}
+
+/* ─── Error Message ───────────────────────────────────────── */
+.ct-error {
+  background: #fef2f2;
+  color: #dc2626;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* ─── Form Actions ────────────────────────────────────────── */
+.ct-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.ct-submit-btn {
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #2563eb;
+}
+
+.ct-submit-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.ct-cancel-btn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  font-weight: 500;
+}

@@ -1,0 +1,233 @@
+/* ─── Page Layout ─────────────────────────────────────────── */
+.vd-page {
+  min-height: 100vh;
+  background: #F7F8FA;
+}
+
+.vd-main {
+  max-width: 1024px;
+  margin: 0 auto;
+  padding: 32px 16px;
+}
+@media (min-width: 640px) {
+  .vd-main { padding-left: 24px; padding-right: 24px; }
+}
+
+/* ─── Top Bar ─────────────────────────────────────────────── */
+.vd-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.vd-topbar-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: -0.02em;
+}
+
+.vd-topbar-sub {
+  font-size: 14px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.vd-raise-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #E8610A;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  white-space: nowrap;
+}
+.vd-raise-btn:hover { background: #d05608; }
+
+.vd-raise-btn-icon { width: 16px; height: 16px; }
+
+/* ─── Tabs ────────────────────────────────────────────────── */
+.vd-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.vd-tab {
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  border: 1px solid transparent;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.vd-tab--active {
+  background: #1A3C5E;
+  color: white;
+  border-color: #1A3C5E;
+}
+
+.vd-tab--inactive {
+  background: white;
+  color: #4b5563;
+  border-color: #e5e7eb;
+}
+.vd-tab--inactive:hover { background: #f9fafb; }
+
+/* ─── Table Card ──────────────────────────────────────────── */
+.vd-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  overflow: hidden;
+}
+
+.vd-table-scroll { overflow-x: auto; }
+
+.vd-table {
+  width: 100%;
+  font-size: 14px;
+  text-align: left;
+  border-collapse: collapse;
+}
+
+.vd-table thead {
+  background: rgba(249,250,251,0.8);
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.vd-th {
+  padding: 14px 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.vd-table tbody { }
+
+.vd-table tbody tr {
+  border-bottom: 1px solid #f9fafb;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.vd-table tbody tr:last-child { border-bottom: none; }
+.vd-table tbody tr:hover { background: rgba(239,246,255,0.4); }
+
+.vd-td { padding: 16px 20px; }
+
+/* ─── Reference cell ──────────────────────────────────────── */
+.vd-ref {
+  font-family: monospace;
+  font-weight: 600;
+  color: #2563eb;
+  white-space: nowrap;
+}
+.vd-table tbody tr:hover .vd-ref { text-decoration: underline; }
+
+.vd-ref-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #fb923c;
+  font-size: 12px;
+  font-style: italic;
+  font-family: inherit;
+  font-weight: 400;
+}
+
+.vd-pending-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fb923c;
+  animation: vd-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes vd-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+/* ─── Summary cell ────────────────────────────────────────── */
+.vd-summary {
+  color: #1f2937;
+  max-width: 320px;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ─── Module cell ─────────────────────────────────────────── */
+.vd-module { color: #6b7280; }
+
+/* ─── Skeleton rows ───────────────────────────────────────── */
+.vd-skeleton-cell {
+  height: 16px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  animation: vd-pulse 1.5s ease-in-out infinite;
+}
+
+/* ─── Empty state ─────────────────────────────────────────── */
+.vd-empty {
+  padding: 64px 20px;
+  text-align: center;
+}
+
+.vd-empty-icon {
+  width: 40px;
+  height: 40px;
+  color: #e5e7eb;
+  margin: 0 auto 12px;
+}
+
+.vd-empty-text { font-size: 14px; color: #9ca3af; }
+
+/* ─── Pagination ──────────────────────────────────────────── */
+.vd-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-top: 1px solid #f3f4f6;
+  background: rgba(249,250,251,0.6);
+}
+
+.vd-pagination-info { font-size: 12px; color: #9ca3af; }
+.vd-pagination-info strong { color: #4b5563; }
+
+.vd-pagination-btns {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vd-page-btn {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #4b5563;
+  background: white;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.vd-page-btn:hover:not(:disabled) { background: #f3f4f6; }
+.vd-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }

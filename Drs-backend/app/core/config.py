@@ -50,14 +50,14 @@ class Settings(BaseSettings):
 
     # --- NETWORK / SYNC ---
     # The URL of the Cloud Backend to check connectivity
-    CLOUD_HEALTH_URL: str = "https://drs.ozellar.com/health"
+    CLOUD_HEALTH_URL: str = "https://workplace.ozellar.com/drs/health"
     # Timeout in seconds for network checks (Maritime connections are slow, but we need fast fail)
     NETWORK_TIMEOUT_SECONDS: float = 3.0
     # How often to check network when waiting (in seconds)
     SYNC_RETRY_INTERVAL: int = 10
 
     # --- SYNC SETTINGS ---
-    CLOUD_BASE_URL: str = "https://drs.ozellar.com/api/v1" # Base API for sync
+    CLOUD_BASE_URL: str = "https://workplace.ozellar.com/drs/api/v1" # Base API for sync
     WORKPLACE_BASE_URL: str = "https://workplace.ozellar.com/api/v1"
     MAX_SYNC_RETRIES: int = 5
     CONFIG_SYNC_INTERVAL: int = 86400  

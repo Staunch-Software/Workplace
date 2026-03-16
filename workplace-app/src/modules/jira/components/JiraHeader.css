@@ -1,0 +1,282 @@
+/* JiraHeader.css */
+
+.jh-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  padding: 0 16px;
+  background: #1A3C5E;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+/* LEFT */
+.jh-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 9-dot button */
+/* .jh-nine-dot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background 0.15s;
+  color: rgba(255,255,255,0.6);
+} */
+
+.jh-nine-dot:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+.jh-dot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 5px);
+  gap: 3px;
+}
+
+.jh-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.8;
+}
+
+.jh-nine-dot:hover .jh-dot { opacity: 1; }
+
+.jh-nine-dot {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background 0.15s;
+  color: rgba(255,255,255,0.6);
+  position: relative;
+}
+
+.jh-nine-dot:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+.jh-chevron {
+  flex-shrink: 0;
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  transition: opacity 0.15s, width 0.15s;
+}
+
+.jh-nine-dot:hover .jh-chevron {
+  opacity: 1;
+  width: 18px;
+}
+
+/* .jh-chevron {
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.jh-nine-dot:hover .jh-chevron { transform: translateX(-2px); } */
+
+/* Brand */
+.jh-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255,255,255,0.15);
+  margin-left: 4px;
+}
+
+.jh-brand-logo {
+  color: #E8610A;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.jh-brand-sub {
+  color: rgba(255,255,255,0.5);
+  font-size: 13px;
+}
+
+/* RIGHT */
+.jh-right {
+  display: flex;
+  align-items: center;
+}
+
+/* User button */
+.jh-user-wrap { position: relative; }
+
+.jh-user-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px 8px;
+  border-radius: 8px;
+  transition: background 0.15s;
+  color: #fff;
+}
+
+.jh-user-btn:hover,
+.jh-user-btn.active {
+  background: rgba(255,255,255,0.1);
+}
+
+.jh-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #E8610A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.jh-user-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+}
+
+.jh-user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.95);
+}
+
+.jh-user-role {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+}
+
+/* Dropdown */
+.jh-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 240px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  overflow: hidden;
+  z-index: 200;
+}
+
+/* Profile header inside dropdown */
+.jh-dropdown-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.jh-avatar-lg {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #1A3C5E;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.jh-dropdown-profile-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.jh-dropdown-profile-info strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jh-dropdown-profile-info span {
+  font-size: 11px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.jh-role-pill {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  width: fit-content;
+}
+
+/* Divider */
+.jh-divider {
+  height: 1px;
+  background: #f3f4f6;
+  margin: 0;
+}
+
+/* Dropdown items */
+.jh-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 0.1s;
+  text-align: left;
+}
+
+.jh-dropdown-item:hover {
+  background: #f9fafb;
+  color: #111827;
+}
+
+.jh-dropdown-item svg { flex-shrink: 0; }
+
+.jh-dropdown-logout { color: #dc2626; }
+.jh-dropdown-logout:hover { background: #fef2f2; color: #b91c1c; }

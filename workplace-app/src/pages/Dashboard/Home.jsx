@@ -75,7 +75,7 @@ const Home = () => {
     }
 
     if (appId === 'jira') {
-      window.open('https://your-jira-url.com', '_blank');
+      window.open('/jira', '_blank');
     }
 
     if (appId === 'voyage') {

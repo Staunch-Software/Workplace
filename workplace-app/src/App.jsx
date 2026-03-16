@@ -9,6 +9,7 @@ import Navbar from './components/Navbar';
 
 const DrsModule = lazy(() => import('./modules/drs/DrsModule'));
 const LubModule = lazy(() => import('./modules/lubeoil/Lubmodule'));
+const JiraModule = lazy(() => import('./modules/jira/JiraModule'));
 const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
 
 function App() {
@@ -73,6 +74,14 @@ function App() {
           <Route path="/lub/*" element={
             <ProtectedRoute allowedRoles={['SHORE', 'ADMIN', 'VESSEL']}>
               <LubModule />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/jira/*" element={
+            <ProtectedRoute allowedRoles={['SHORE', 'ADMIN', 'VESSEL']}>
+              <Suspense fallback={<div className="p-10 text-center">Loading JIRA...</div>}>
+                <JiraModule />
+              </Suspense>
             </ProtectedRoute>
           } />
 
