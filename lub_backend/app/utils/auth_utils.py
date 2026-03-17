@@ -169,7 +169,7 @@ def verify_application_jwt(token: str) -> Dict[str, Any]:
     try:
         payload = jwt.decode(
             token,
-            settings.SECRET_KEY,
+            settings.SECRET_KEY or settings.APP_JWT_SECRET,
             algorithms=["HS256"],
             options={"verify_iss": False}
         )
@@ -180,7 +180,7 @@ def verify_application_jwt(token: str) -> Dict[str, Any]:
             "id": payload.get("sub"),
             "email": payload.get("email", payload.get("sub", "")),
             "name": payload.get("full_name", payload.get("email", "")),
-            "roles": ["admin"] if role == "ADMIN" else ["user"],
+            "roles": ["admin"] if role in ("ADMIN", "SUPERUSER") else ["user"],
             "access_type": role,
             "permissions": payload.get("permissions", {}),
             "organization_id": 1,

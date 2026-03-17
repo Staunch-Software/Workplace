@@ -216,9 +216,10 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
 
                 # 1. EXTRACT VESSEL NAME
                 # Strategy A: "Report Summary" Header (AM TARANG style)
-                v_match = re.search(r"Report Summary\s*\n\s*(.*?) -", p1_text, re.IGNORECASE)
+                v_match = re.search(r"Report Summary\s*\n\s*(.*?)\s+-\s+(\d{5,})", p1_text, re.IGNORECASE)
                 if v_match:
                     full_report['metadata']['vessel_name'] = v_match.group(1).strip()
+                    full_report['metadata']['vessel_code'] = v_match.group(2).strip()
 
                 # Strategy B: Fallback — "Name - 5+ Digit Code" on any line
                 if not full_report['metadata']['vessel_name']:
@@ -262,6 +263,7 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
                     "name": None,
                     "status": "Unknown",
                     "summary_error": None,
+                    "lube_analyst_code": None,
                     "alerts": [],
                     "diagnosis": None,
                     "sample_info": {
@@ -309,7 +311,23 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
                             fallback.group(1).strip(),
                             full_report['metadata']['vessel_name']
                         )
-
+                la_match = (
+                    re.search(r"LubeAnalyst Code\s+(\d{6,}[A-Z0-9]*)", text) or
+                    re.search(r"LubeAnalyst Code\s*\n\s*(\d{6,}[A-Z0-9]*)", text) or
+                    re.search(r"LubeAnalyst Code\s*\n.*?\n\s*(\d{6,}[A-Z0-9]*)", text, re.DOTALL)
+                )
+                if la_match:
+                    machine['lube_analyst_code'] = la_match.group(1).strip()
+                    logger.info(f"   🔑 Lube Analyst Code: {machine['lube_analyst_code']}")
+                else:
+                    # Last resort: find any 6-digit code followed by letters near the header
+                    header_section = text[:500]
+                    fallback = re.search(r"\b(\d{6}[A-Z]\d{2})\b", header_section)
+                    if fallback:
+                        machine['lube_analyst_code'] = fallback.group(1).strip()
+                        logger.info(f"   🔑 Lube Analyst Code (fallback): {machine['lube_analyst_code']}")
+                    else:
+                        logger.warning(f"   ⚠️ No Lube Analyst Code found on page {i}")
                 # ── 2. EXTRACT STATUS & DIAGNOSIS ─────────────────────────
                 header_text = text[:1000]
                 if re.search(r"\bAction\b", header_text, re.IGNORECASE):

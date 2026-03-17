@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional, List
-from app.database import get_db
-from app.user import User
+from app.core.database_control import get_control_db as get_db
+from app.models.control.user import User
 from datetime import datetime
 from sqlalchemy.orm import Session
 import bcrypt
