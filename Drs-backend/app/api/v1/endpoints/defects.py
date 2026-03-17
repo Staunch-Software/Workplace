@@ -314,6 +314,7 @@ async def export_defects(
     visible_columns: str | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    control_db: AsyncSession = Depends(get_control_db),
 ):
     """
     ✅ PRODUCTION-READY Excel Export with ALL fixes:
@@ -420,6 +421,11 @@ async def export_defects(
         # Execute query
         result = await db.execute(query)
         defects = result.scalars().all()
+        vessel_imos = list(set(d.vessel_imo for d in defects))
+        vessel_result = await control_db.execute(
+            select(Vessel).where(Vessel.imo.in_(vessel_imos))
+        )
+        vessel_map = {v.imo: v.name for v in vessel_result.scalars().all()}
 
         # Filter by PR Number (post-query filter for complex join)
         if pr_number:
@@ -500,7 +506,7 @@ async def export_defects(
             vessel_name = defect.vessel_imo
 
             ws1.write(row, 0, i + 1, center_fmt)
-            ws1.write(row, 1, vessel_name, text_fmt)
+            ws1.write(row, 1, vessel_map.get(defect.vessel_imo, defect.vessel_imo), text_fmt)
 
             col = 2
             for key in column_keys:
@@ -570,7 +576,7 @@ async def export_defects(
             )
             # Write text columns
             ws2.write(row, 0, i + 1, center_fmt)        # Col 0: S.No
-            ws2.write(row, 1, vessel_name, text_fmt)     # Col 1: Vessel
+            ws2.write(row, 1, vessel_map.get(defect.vessel_imo, defect.vessel_imo), text_fmt)     # Col 1: Vessel     # Col 1: Vessel
             ws2.write(row, 2, report_date, center_fmt)   # Col 2: Report Date
             ws2.write(row, 3, defect.equipment_name, text_fmt)
             ws2.write(row, 4, defect.description, text_fmt)

@@ -128,6 +128,7 @@ async def send_welcome_email(
             "Login with your credentials provided above",
             "<strong>Change your password immediately</strong> upon first login",
             "Explore your assigned modules",
+            "You can manage and update your assigned vessels anytime from your profile",
         ]
         getting_started_steps = ""
         for i, step in enumerate(steps, 1):

@@ -7,7 +7,7 @@ const axiosLub = axios.create({
 });
 
 axiosLub.interceptors.request.use((config) => {
-  const token = localStorage.getItem('platform_token');
+  const token = localStorage.getItem('platform_token') || sessionStorage.getItem('platform_token');
   if (token) config.headers['Authorization'] = `Bearer ${token}`;
   return config;
 });
