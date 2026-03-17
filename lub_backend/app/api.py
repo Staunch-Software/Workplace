@@ -73,29 +73,46 @@ def get_allowed_vessel_imos(db, current_user):
     from app.core.database_control import SessionControl
     from app.models.control.user import User
     from app.models.control.vessel import Vessel as ControlVessel
+    import uuid
 
     roles_list = current_user.get("roles", [])
     role = (roles_list[0] if roles_list else "user")
     role_upper = role.upper()
 
+    logger.info(f"🔍 current_user payload: {current_user}")
+    logger.info(f"🔍 roles_list: {roles_list}, role: {role}, role_upper: {role_upper}")
+
     control_db = SessionControl()
     try:
         if role_upper in ("ADMIN", "SUPERUSER"):
             all_vessels = control_db.query(ControlVessel.imo).all()
-            return [v[0] for v in all_vessels], role
+            imos = [v[0] for v in all_vessels]
+            logger.info(f"✅ Admin path — vessels: {imos}")
+            return imos, role
 
-        user_id = current_user.get("sub")
+        user_id = current_user.get("sub") or current_user.get("id")
+        logger.info(f"🔍 user_id from token: {user_id}")
+
         if not user_id:
+            logger.error("❌ No user_id found in token")
             return [], role
 
-        db_user = control_db.query(User).filter(
-            User.id == user_id
-        ).first()
+        try:
+            db_user = control_db.query(User).filter(
+                User.id == uuid.UUID(str(user_id))
+            ).first()
+        except Exception as e:
+            logger.error(f"❌ UUID conversion failed: {e}")
+            return [], role
 
+        logger.info(f"🔍 db_user found: {db_user}")
         if not db_user:
+            logger.error(f"❌ No user found in control DB for id: {user_id}")
             return [], role
 
-        return [v.imo for v in db_user.vessels], role
+        imos = [v.imo for v in db_user.vessels]
+        logger.info(f"✅ User vessels: {imos}")
+        return imos, role
     finally:
         control_db.close()
 
@@ -1127,21 +1144,21 @@ async def get_luboil_fleet_overview(
                         cooldown_overdue = datetime.utcnow() - timedelta(days=15)
                         
                         existing_alert = db.query(LuboilEvent).filter(
-                            LuboilEvent.imo == v.imo_number,
+                            LuboilEvent.imo == v.imo,
                             LuboilEvent.equipment_code == code,
                             LuboilEvent.event_type == "SCHEDULE_ALERT",
                             LuboilEvent.created_at >= cooldown_overdue
                         ).first()
 
                         if not existing_alert:
-                            clean_v_name = format_vessel_name(v.vessel_name)
+                            clean_v_name = format_vessel_name(v.name)
                             line_1 = f"SCHEDULE ALERT ({target_priority}) - {clean_v_name.upper()}" 
                             status_text = "CRITICAL OVERDUE (>60 days)" if target_priority == "CRITICAL" else "OVERDUE (>30 days)"
                             line_2 = f"{eq.ui_label} is now {status_text} (Overdue by {excess_days} days)."
                             line_3 = f"Report Date: {latest_sample.sample_date} | Status: {latest_sample.status}"
                             
                             db.add(LuboilEvent(
-                                vessel_name=v.vessel_name,
+                                vessel_name=v.name,
                                 imo=v.imo,
                                 machinery_name=eq.ui_label,
                                 equipment_code=code,
@@ -1159,20 +1176,20 @@ async def get_luboil_fleet_overview(
                         cooldown_resample = datetime.utcnow() - timedelta(days=15)
                         
                         existing_resample = db.query(LuboilEvent).filter(
-                            LuboilEvent.imo == v.imo_number,
+                            LuboilEvent.imo == v.imo,
                             LuboilEvent.equipment_code == code,
                             LuboilEvent.event_type == "RESAMPLE_REMINDER",
                             LuboilEvent.created_at >= cooldown_resample
                         ).first()
 
                         if not existing_resample:
-                            clean_v_name = format_vessel_name(v.vessel_name)
+                            clean_v_name = format_vessel_name(v.name)
                             line_1 = f"ðŸ”„ RESAMPLE REMINDER - {clean_v_name.upper()}"
                             line_2 = f"A mandatory resampling for {eq.ui_label} is still PENDING."
                             line_3 = f"Last Report: {latest_sample.sample_date} | Instruction: Provide follow-up sample."
                             
                             db.add(LuboilEvent(
-                                vessel_name=v.vessel_name,
+                                vessel_name=v.name,
                                 imo=v.imo,
                                 machinery_name=eq.ui_label,
                                 equipment_code=code,
