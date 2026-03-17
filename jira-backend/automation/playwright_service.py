@@ -256,10 +256,10 @@ async def _do_login(page, email: str, password: str, base_url: str) -> bool:
     # Email
     print("[Jira] Entering email...")
     try:
-        await page.wait_for_selector('#user-email', timeout=15000)
-        await page.fill('#user-email', email)
+        await page.wait_for_selector('input#user-email', timeout=15000)
+        await page.fill('input#user-email', email)
         await page.wait_for_timeout(500)
-        btn = await page.query_selector('#login-button')
+        btn = await page.query_selector('button#login-button')
         if btn:
             await btn.click()
         else:
@@ -273,10 +273,10 @@ async def _do_login(page, email: str, password: str, base_url: str) -> bool:
     # Password
     print("[Jira] Entering password...")
     try:
-        await page.wait_for_selector('#user-password', timeout=15000)
-        await page.fill('#user-password', password)
+        await page.wait_for_selector('input#user-password', timeout=15000)
+        await page.fill('input#user-password', password)
         await page.wait_for_timeout(500)
-        btn2 = await page.query_selector('#login-button')
+        btn2 = await page.query_selector('button#login-button')
         if btn2:
             await btn2.click()
         else:

@@ -38,7 +38,7 @@ async def detect_vessel_from_text(text: str) -> str | None:
     vessel_names = []
     try:
         from db.database import SessionLocal
-        from models.schema import Vessel
+        from models.control import Vessel
         from sqlalchemy import select
         async with SessionLocal() as session:
             rows = (await session.execute(select(Vessel.name).where(Vessel.isActive == True))).fetchall()
