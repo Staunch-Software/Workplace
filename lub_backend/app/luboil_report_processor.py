@@ -10,7 +10,7 @@ from datetime import datetime
 from app.luboil_pdf_extractor import extract_lube_oil_report_data
 
 # Import models
-from app.luboil_model import LuboilReport, LuboilSample, LuboilEquipmentType, LuboilNameMapping
+from app.luboil_model import LuboilReport, LuboilSample, LuboilEquipmentType, LuboilNameMapping, LuboilVesselConfig
 from app.core.database_control import SessionControl
 from app.models.control.vessel import Vessel as ControlVessel
 # from app.luboil_model import LuboilReport, LuboilSample, LuboilEquipmentType, LuboilNameMapping
@@ -216,8 +216,12 @@ def save_luboil_report(
 
     vessel_imo = str(vessel.imo)
     vessel_display_name = vessel.name
+    vessel_code = meta.get('vessel_code')
 
-    logger.info(f"Matched Vessel: {vessel_display_name} (IMO: {vessel_imo})")
+    # Always use actual IMO for config lookup — not Shell code
+    config_imo = vessel_imo
+
+    logger.info(f"Matched Vessel: {vessel_display_name} (IMO: {vessel_imo}, Shell Code: {vessel_code})")
 
     # 3. PREPARE MASTER LIST FOR MATCHING
     all_equipment = session.query(LuboilEquipmentType).all()
@@ -256,21 +260,45 @@ def save_luboil_report(
         clean_name = re.sub(r'\s+-\s+\d+.*$', '', raw_name).strip()
 
         # Resolve Equipment Code
-        mapping = session.query(LuboilNameMapping).filter(
-            LuboilNameMapping.lab_raw_string == clean_name
-        ).first()
+        equipment_code = None
+        lube_analyst_code = machine.get("lube_analyst_code")
 
-        if mapping:
-            equipment_code = mapping.equipment_code
-        else:
-            equipment_code = find_smart_match(clean_name, equipment_candidates)
-            if equipment_code:
-                try:
-                    new_map = LuboilNameMapping(lab_raw_string=clean_name, equipment_code=equipment_code)
-                    session.add(new_map)
-                    session.flush() 
-                except:
-                    session.rollback() 
+        # ── PRIORITY 1: Match by Lube Analyst Code via VesselConfig ──
+        logger.info(f"🔍 Looking up: config_imo='{config_imo}', lube_analyst_code='{lube_analyst_code}'")
+        if lube_analyst_code and config_imo:
+            config_match = session.query(LuboilVesselConfig).filter(
+                LuboilVesselConfig.imo_number == config_imo,
+                LuboilVesselConfig.lab_analyst_code == lube_analyst_code
+            ).first()
+            logger.info(f"🔍 Config match result: {config_match}")
+            if config_match:
+                equipment_code = config_match.equipment_code
+                logger.info(f"✅ VesselConfig Match: '{lube_analyst_code}' → '{equipment_code}'")
+            else:
+                logger.warning(f"⚠️ Lube Analyst Code '{lube_analyst_code}' not found in config, falling back to name matching")
+                # FALLBACK: Try cached name mapping first
+                mapping = session.query(LuboilNameMapping).filter(
+                    LuboilNameMapping.lab_raw_string == clean_name
+                ).first()
+                if mapping:
+                    equipment_code = mapping.equipment_code
+                    logger.info(f"✅ Name Mapping fallback: '{clean_name}' → '{equipment_code}'")
+                else:
+                    # LAST RESORT: Smart name matching
+                    equipment_code = find_smart_match(clean_name, equipment_candidates)
+                    if equipment_code:
+                        try:
+                            new_map = LuboilNameMapping(
+                                lab_raw_string=clean_name,
+                                equipment_code=equipment_code
+                            )
+                            session.add(new_map)
+                            session.flush()
+                        except:
+                            session.rollback()
+                        logger.info(f"✅ Smart match fallback: '{clean_name}' → '{equipment_code}'")
+                    else:
+                        logger.warning(f"⚠️ No match found for: '{clean_name}' — saving with null equipment_code")
 
         # --- SMART MERGE CHECK ---
         # Check if this specific machinery sample already exists in this report

@@ -745,13 +745,11 @@ const LuboilAnalysis = () => {
     };
 
     const downloadSingleReport = (report) => {
-        const link = document.createElement("a");
-        link.href = report.report_url || report.url;
-        link.setAttribute("download", `Report_${report.report_date}.pdf`);
-        link.setAttribute("target", "_blank");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        if (!report.report_url) {
+            alert("No report URL available.");
+            return;
+        }
+        window.open(report.report_url, "_blank");
     };
     const availableVessels = useMemo(() => {
         if (!normalizedTable.rows) return [];
@@ -828,7 +826,7 @@ const LuboilAnalysis = () => {
              */
             const vesselRemarks =
                 selectedCell.data.resolution_remarks || "Resolution details provided.";
-            const resolutionMsg = `[${timestamp}] âœ… RESOLUTION ACCEPTED & CLOSED BY ${user.full_name}: ${vesselRemarks}`;
+            const resolutionMsg = `[${timestamp}]  RESOLUTION ACCEPTED & CLOSED BY ${user.full_name}: ${vesselRemarks}`;
 
             const payload = {
                 sample_id: selectedCell.data.sample_id,
@@ -995,7 +993,7 @@ const LuboilAnalysis = () => {
             const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
 
             // This is the formatted string for the Chat History
-            const resolutionMsg = `[${timestamp}] âœ… ISSUE CLOSED BY ${user.full_name}: ${closeRemarksText}`;
+            const resolutionMsg = `[${timestamp}]  ISSUE CLOSED BY ${user.full_name}: ${closeRemarksText}`;
 
             // 2. Upload file if one was selected
             if (selectedCloseFile) {
@@ -1114,8 +1112,8 @@ const LuboilAnalysis = () => {
 
         // This message triggers the Live Feed
         const systemMsg = targetState
-            ? `[${timestamp}] ðŸ”„ <b>${user.full_name}</b> Requested a MANDATORY RESAMPLE for this equipment.`
-            : `[${timestamp}] ðŸ”„ <b>${user.full_name}</b> Cancelled the mandatory resampling request.`;
+            ? `[${timestamp}]  <b>${user.full_name}</b> Requested a MANDATORY RESAMPLE for this equipment.`
+            : `[${timestamp}]  <b>${user.full_name}</b> Cancelled the mandatory resampling request.`;
 
         try {
             const payload = {
@@ -1537,7 +1535,6 @@ const LuboilAnalysis = () => {
                                         minWidth: "20px",
                                     }}
                                 >
-                                    â€¢
                                 </span>
                                 <span style={{ color: "#475569", lineHeight: "1.6" }}>
                                     {trimmedPart}
@@ -1707,8 +1704,8 @@ const LuboilAnalysis = () => {
 
         // 2. Dynamic message based on whether we are enabling or disabling
         const systemMsg = targetState
-            ? `[${timestamp}] ðŸ“¸ <b>${user.full_name}</b> Made the image/file mandatory.`
-            : `[${timestamp}]  ðŸ“¸<b>${user.full_name}</b> Made the image/file optional(no need)`;
+            ? `[${timestamp}]  <b>${user.full_name}</b> Made the image/file mandatory.`
+            : `[${timestamp}]  <b>${user.full_name}</b> Made the image/file optional(no need)`;
 
         try {
             const payload = {
@@ -2892,7 +2889,7 @@ const LuboilAnalysis = () => {
                                         isMandatory ||
                                         statusChangeDetected
                                     ) {
-                                        dotTooltip += `\nðŸ“ Contains Activity:`;
+                                        dotTooltip += `\n Contains Activity:`;
                                         if (hasNotes) dotTooltip += `\n - Communication Notes`;
                                         if (hasEvidence) dotTooltip += `\n - Attached Evidence`;
                                         if (isMandatory) dotTooltip += `\n - Image Upload Required`;
@@ -3171,7 +3168,7 @@ const LuboilAnalysis = () => {
                     else { setViewMode("matrix"); }
                 }}
                 user={user}
-                onRegisterVessel={() => alert("Register Vessel â€” coming soon")}
+                onRegisterVessel={() => alert("Register Vessel coming soon")}
             />
             {viewMode === "matrix" && (
                 <div
@@ -4788,13 +4785,13 @@ const LuboilAnalysis = () => {
                                                                                                     color: "#334155",
                                                                                                 }}
                                                                                             >
-                                                                                                {new Date(
-                                                                                                    report.report_date,
-                                                                                                ).toLocaleDateString("en-GB", {
-                                                                                                    day: "2-digit",
-                                                                                                    month: "short",
-                                                                                                    year: "numeric",
-                                                                                                })}
+                                                                                                {report.report_date
+                                                                                                    ? new Date(report.report_date).toLocaleDateString("en-GB", {
+                                                                                                        day: "2-digit",
+                                                                                                        month: "short",
+                                                                                                        year: "numeric",
+                                                                                                    })
+                                                                                                    : "Unknown Date"}
                                                                                             </span>
                                                                                         </label>
                                                                                     ))
@@ -6267,7 +6264,7 @@ const LuboilAnalysis = () => {
                                         fontWeight: "600",
                                     }}
                                 >
-                                    â€” {selectedCell.machinery}
+                                     {selectedCell.machinery}
                                 </span>
                                 <div
                                     style={{
@@ -6710,11 +6707,14 @@ const LuboilAnalysis = () => {
                                                 >
                                                     {/* ROLE-BASED IMAGE REQUIREMENT TOGGLE */}
                                                     {(() => {
+                                                        const _userData = user?.user || user;
+                                                        const _userAccess = (_userData?.access_type || _userData?.accessType || "").toUpperCase();
+                                                        const _userRole = (_userData?.role || "").toUpperCase();
                                                         const isShore =
-                                                            user?.access_type === "SHORE" ||
-                                                            user?.role === "admin" ||
-                                                            user?.role === "superuser" ||
-                                                            user?.role === "shore";
+                                                            _userAccess === "SHORE" ||
+                                                            _userRole === "ADMIN" ||
+                                                            _userRole === "SUPERUSER" ||
+                                                            _userRole === "SHORE";
 
                                                         const isImageRequired =
                                                             selectedCell.data.is_image_required;
@@ -7901,7 +7901,7 @@ const LuboilAnalysis = () => {
                                                                                     __html: msg.message,
                                                                                 }}
                                                                             />{" "}
-                                                                            â€¢ {msg.date}
+                                                                            {msg.date}
                                                                         </span>
                                                                     </div>
                                                                 );
@@ -8343,7 +8343,7 @@ const LuboilAnalysis = () => {
                                                                                             color: "#64748b",
                                                                                         }}
                                                                                     >
-                                                                                        {u.job_title || "User"} â€¢{" "}
+                                                                                        {u.job_title || "User"} {" "}
                                                                                         {u.role}
                                                                                     </span>
                                                                                 </div>
@@ -8360,7 +8360,7 @@ const LuboilAnalysis = () => {
                                                                         fontWeight: "800",
                                                                     }}
                                                                 >
-                                                                    ðŸ”’ INTERNAL NOTE (SHORE ONLY)
+                                                                     INTERNAL NOTE (SHORE ONLY)
                                                                 </div>
                                                             )}
 

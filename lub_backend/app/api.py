@@ -330,37 +330,34 @@ async def get_luboil_reports(
 
         # Fetch samples joined with report info (Source preserved exactly)
         results = db.query(
-            LuboilSample.sample_date,
-            LuboilSample.machinery_name,
-            LuboilSample.status,
             LuboilReport.report_id,
             LuboilReport.file_name,
             LuboilReport.report_url,
-            LuboilReport.report_date 
-        ).join(
-            LuboilReport, LuboilSample.report_id == LuboilReport.report_id
-        ).filter(LuboilReport.imo_number == str(imo_number
-        )).order_by(
-            desc(LuboilSample.sample_date)
+            LuboilReport.report_date
+        ).filter(
+            LuboilReport.imo_number == str(imo_number)
+        ).order_by(
+            desc(LuboilReport.report_date)
         ).limit(20).all()
 
         data = []
+        seen_ids = set()
         for r in results:
-            # GENERATE SECURE SAS URL (Source preserved exactly)
+            if r.report_id in seen_ids:
+                continue
+            seen_ids.add(r.report_id)
+
             secure_url = None
             if r.report_url:
                 secure_url = generate_sas_url(r.report_url)
 
             data.append({
-                "sample_date": r.sample_date.isoformat() if r.sample_date else None,
                 "report_date": r.report_date.isoformat() if r.report_date else None,
-                "machinery_name": r.machinery_name,
-                "status": r.status,
                 "report_id": r.report_id,
                 "file_name": r.file_name,
-                "report_url": secure_url 
+                "report_url": secure_url
             })
-        
+
         return data
 
     except HTTPException as he:
@@ -747,12 +744,15 @@ async def update_luboil_remarks(
         if request.is_image_required is not None or request.is_resampling_required is not None:
             # If this was a fresh toggle (not part of a close/open)
             if not feed_msg:
-                line_1 = f"ðŸ“¸ REQUIREMENT UPDATED - {vessel.name}"
-                line_2 = f"Requirements updated for {request.machinery_name}."
-                line_3 = f"Image: {'Required' if sample.is_image_required else 'Optional'} | Resample: {'Required' if sample.is_resampling_required else 'Optional'}"
-                feed_msg = f"{line_1}\n{line_2}\n{line_3}"
-                feed_priority = "WARNING"
-                feed_event_type = "MANDATORY" # Matches your Frontend filter
+                try:
+                    line_1 = f"REQUIREMENT UPDATED - {vessel.name}"
+                    line_2 = f"Requirements updated for {request.machinery_name}."
+                    line_3 = f"Image: {'Required' if sample.is_image_required else 'Optional'} | Resample: {'Required' if sample.is_resampling_required else 'Optional'}"
+                    feed_msg = f"{line_1}\n{line_2}\n{line_3}"
+                    feed_priority = "WARNING"
+                    feed_event_type = "MANDATORY"
+                except Exception as req_err:
+                    logger.error(f"Failed to build requirement feed message: {req_err}")
 
 
         if request.status_change_msg:
@@ -763,87 +763,152 @@ async def update_luboil_remarks(
         # NOTIFICATION & MY FEED TRIGGER LOGIC (CONFLICT-FREE)
         # =========================================================
         sender_id = userData.get('id') if isinstance(userData, dict) else getattr(userData, 'id', None)
-        sender_name = userData.get('full_name', 'User') if isinstance(userData, dict) else getattr(userData, 'full_name', 'User')
+        sender_name = (
+            userData.get('full_name') or 
+            userData.get('name') or 
+            userData.get('username') or
+            'User'
+        ) if isinstance(userData, dict) else (
+            getattr(userData, 'full_name', None) or 
+            getattr(userData, 'name', None) or 
+            getattr(userData, 'username', None) or 
+            'User'
+        )
         
+        if not sender_name or sender_name == 'User':
+            try:
+                _name_ctrl = SessionControl()
+                try:
+                    from app.models.control.user import User as ControlUser
+                    import uuid
+                    _u = _name_ctrl.query(ControlUser).filter(
+                        ControlUser.id == uuid.UUID(str(sender_id))
+                    ).first()
+                    if _u:
+                        sender_name = (
+                            _u.full_name or
+                            _u.username or
+                            _u.first_name or
+                            'User'
+                        )
+                        logger.info(f"Resolved sender_name from DB: {sender_name}")
+                    else:
+                        logger.warning(f"No user found in control DB for id: {sender_id}")
+                finally:
+                    _name_ctrl.close()
+            except Exception as name_err:
+                logger.error(f"Could not fetch sender name: {name_err}", exc_info=True)
+
         def get_new_message_line(text):
             if not text: return ""
             lines = text.strip().split('\n')
             return lines[-1] if lines else ""
 
         processed_uids = set()
-        context_data = [
-            {'text': get_new_message_line(request.internal_remarks), 'side': 'SHORE'},
-            {'text': get_new_message_line(request.office_remarks), 'side': 'VESSEL'}, 
-            {'text': get_new_message_line(request.officer_remarks), 'side': 'SHORE'}  
-        ]
+        try:
+            context_data = [
+                {'text': get_new_message_line(request.internal_remarks), 'side': 'SHORE'},
+                {'text': get_new_message_line(request.office_remarks), 'side': 'VESSEL'}, 
+                {'text': get_new_message_line(request.officer_remarks), 'side': 'SHORE'}  
+            ]
 
-        for entry in context_data:
-            if not entry['text'] or '@' not in entry['text']: continue
-            mention_parts = entry['text'].split('@')
-            for part in mention_parts[1:]:
-                words = part.split()
-                if not words: continue
-                matched_user = None
-                for length in range(min(len(words), 4), 0, -1):
-                    potential_full_name = " ".join(words[:length]).rstrip('.,!?;:')
-                    _ctrl = SessionControl()
-                    user_query = _ctrl.query(User).filter(User.full_name == potential_full_name, User.id != sender_id)
-                    if entry['side'] == 'SHORE':
-                        user_match = user_query.filter(User.role == 'SHORE').first()
-                    else:
-                        user_match = user_query.filter(User.role == 'VESSEL', User.vessels.any(Vessel.imo == str(vessel.imo))).first()
-                    if not user_match:
-                        user_match = user_query.filter(User.vessels.any(Vessel.imo == str(vessel.imo))).first()
-                        if not user_match: user_match = user_query.first()
-                    if user_match:
-                        matched_user = user_match
-                        break 
-                _ctrl.close()
-                if matched_user and matched_user.id != sender_id and matched_user.id not in processed_uids:
-                    db.add(Notification(recipient_id=matched_user.id, sender_name=sender_name, message=f"{sender_name} mentioned you in {request.machinery_name} ({vessel.name})", notification_type="mention", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
-                    try:
-                        line_1 = f"YOU WERE MENTIONED BY {sender_name.upper()}"
-                        msg_snippet = entry['text'].split(': ')[1] if ': ' in entry['text'] else entry['text']
-                        line_2 = f"{sender_name} tagged you in a comment for {request.machinery_name}."
-                        line_3 = f"Comment: \"{msg_snippet[:100]}...\" | Vessel: {vessel.name}"
-                        db.add(LuboilEvent(vessel_name=vessel.name, imo=str(vessel.imo), machinery_name=sample.machinery_name, equipment_code=request.machinery_name, event_type="MENTION", recipient_id=matched_user.id, priority="INFO", message=f"{line_1}\n{line_2}\n{line_3}", sample_id=sample.sample_id, created_at=datetime.utcnow()))
-                    except Exception: pass
-                    processed_uids.add(matched_user.id)
+            for entry in context_data:
+                if not entry['text'] or '@' not in entry['text']: continue
+                mention_parts = entry['text'].split('@')
+                for part in mention_parts[1:]:
+                    words = part.split()
+                    if not words: continue
+                    matched_user = None
+                    for length in range(min(len(words), 4), 0, -1):
+                        potential_full_name = " ".join(words[:length]).rstrip('.,!?;:')
+                        _ctrl = SessionControl()
+                        try:
+                            user_query = _ctrl.query(User).filter(User.full_name == potential_full_name, User.id != sender_id)
+                            if entry['side'] == 'SHORE':
+                                user_match = user_query.filter(User.role == 'SHORE').first()
+                            else:
+                                user_match = user_query.filter(User.role == 'VESSEL', User.vessels.any(Vessel.imo == str(vessel.imo))).first()
+                            if not user_match:
+                                user_match = user_query.filter(User.vessels.any(Vessel.imo == str(vessel.imo))).first()
+                                if not user_match: user_match = user_query.first()
+                            if user_match:
+                                matched_user = user_match
+                        finally:
+                            _ctrl.close()
+                        if matched_user:
+                            break
+                    if matched_user and matched_user.id != sender_id and matched_user.id not in processed_uids:
+                        db.add(Notification(recipient_id=matched_user.id, sender_name=sender_name, message=f"{sender_name} mentioned you in {request.machinery_name} ({vessel.name})", notification_type="mention", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
+                        try:
+                            line_1 = f"YOU WERE MENTIONED BY {sender_name.upper()}"
+                            msg_snippet = entry['text'].split(': ')[1] if ': ' in entry['text'] else entry['text']
+                            line_2 = f"{sender_name} tagged you in a comment for {request.machinery_name}."
+                            line_3 = f"Comment: \"{msg_snippet[:100]}...\" | Vessel: {vessel.name}"
+                            db.add(LuboilEvent(vessel_name=vessel.name, imo=str(vessel.imo), machinery_name=sample.machinery_name, equipment_code=request.machinery_name, event_type="MENTION", recipient_id=matched_user.id, priority="INFO", message=f"{line_1}\n{line_2}\n{line_3}", sample_id=sample.sample_id, created_at=datetime.utcnow()))
+                        except Exception: pass
+                        processed_uids.add(matched_user.id)
+
+        except Exception as mention_err:
+            logger.error(f"Mention processing failed (non-fatal): {mention_err}", exc_info=True)
 
         # WORKFLOW NOTIFICATIONS (Approval/Decisions)
-        if approval_notif_msg:
-            # If Vessel user requested -> Notify Shore
-            if not is_shore_user:
-                assigned_shore = db.query(User).filter(User.role == "SHORE", User.vessels.any(Vessel.imo == str(vessel.imo))).all()
-                for staff in assigned_shore:
-                    db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=approval_notif_msg, notification_type="status_change", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
-            # If Shore user accepted/declined -> Notify Vessel
-            else:
-                assigned_vessel = db.query(User).filter(User.role == "VESSEL", User.vessels.any(Vessel.imo == str(vessel.imo))).all()
-                for staff in assigned_vessel:
-                    db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=approval_notif_msg, notification_type="status_change", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
+        # WORKFLOW NOTIFICATIONS (Approval/Decisions)
+        _notif_ctrl = SessionControl()
+        try:
+            if approval_notif_msg:
+                if not is_shore_user:
+                    assigned_shore = _notif_ctrl.query(User).filter(
+                        User.role == "SHORE",
+                        User.vessels.any(Vessel.imo == str(vessel.imo))
+                    ).all()
+                    for staff in assigned_shore:
+                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=approval_notif_msg, notification_type="status_change", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
+                else:
+                    assigned_vessel = _notif_ctrl.query(User).filter(
+                        User.role == "VESSEL",
+                        User.vessels.any(Vessel.imo == str(vessel.imo))
+                    ).all()
+                    for staff in assigned_vessel:
+                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=approval_notif_msg, notification_type="status_change", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
 
-        if request.is_image_required is True:
-            vessel_staff = db.query(User).filter(User.role == "VESSEL", User.vessels.any(Vessel.imo == str(vessel.imo))).all()
-            for staff in vessel_staff:
-                if staff.id != sender_id:
-                    db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=f"ðŸ“¸ Mandatory Image requested: {request.machinery_name} ({vessel.name})", notification_type="mandatory", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
+            if request.is_image_required is True:
+                vessel_staff = _notif_ctrl.query(User).filter(
+                    User.role == "VESSEL",
+                    User.vessels.any(Vessel.imo == str(vessel.imo))
+                ).all()
+                for staff in vessel_staff:
+                    if str(staff.id) != str(sender_id):
+                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=f"Mandatory Image requested: {request.machinery_name} ({vessel.name})", notification_type="mandatory", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
 
-        if request.is_resampling_required is True:
-            vessel_staff = db.query(User).filter(User.role == "VESSEL", User.vessels.any(Vessel.imo == str(vessel.imo))).all()
-            for staff in vessel_staff:
-                if staff.id != sender_id:
-                    db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=f"ðŸ”„ Mandatory Resample requested: {request.machinery_name} ({vessel.name})", notification_type="mandatory", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
+            if request.is_resampling_required is True:
+                vessel_staff = _notif_ctrl.query(User).filter(
+                    User.role == "VESSEL",
+                    User.vessels.any(Vessel.imo == str(vessel.imo))
+                ).all()
+                for staff in vessel_staff:
+                    if str(staff.id) != str(sender_id):
+                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=f"Mandatory Resample requested: {request.machinery_name} ({vessel.name})", notification_type="mandatory", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
+        except Exception as notif_err:
+            logger.error(f"Notification dispatch failed (non-fatal): {notif_err}", exc_info=True)
+        finally:
+            _notif_ctrl.close()
 
         # Live Feed Commitment
         if feed_msg:
             try:
                 db.add(LuboilEvent(
-                    vessel_name=vessel.name, imo=str(vessel.imo), machinery_name=sample.machinery_name or request.machinery_name,
-                    equipment_code=request.machinery_name, event_type=feed_event_type, priority=feed_priority,
-                    message=feed_msg, sample_id=sample.sample_id, created_at=datetime.utcnow()
+                    vessel_name=vessel.name,
+                    imo=str(vessel.imo),
+                    machinery_name=sample.machinery_name or request.machinery_name,
+                    equipment_code=request.machinery_name,
+                    event_type=feed_event_type,
+                    priority=feed_priority,
+                    message=feed_msg,
+                    sample_id=sample.sample_id,
+                    created_at=datetime.utcnow()
                 ))
-            except Exception: pass
+            except Exception as feed_err:
+                logger.error(f"Live feed commit failed (non-fatal): {feed_err}", exc_info=True)
 
         db.commit()
 
@@ -1436,9 +1501,9 @@ async def download_reports_zip(
                         filename = f"{clean_vname}_AE_Report_{r.report_month}.pdf"
 
                     elif request.engine_type == 'lubeOil':
-                        # Custom naming for Lube Oil using IMO and Sample Date
-                        v_name = r.vessel.name if r.vessel else f"IMO_{r.imo_number}"
-                        filename = f"{v_name}_LubeReport_{r.report_date}.pdf"
+                            v_name = f"IMO_{r.imo_number}"
+                            report_date_str = r.report_date.strftime("%Y-%m-%d") if r.report_date else "unknown"
+                            filename = f"{v_name}_LubeReport_{report_date_str}.pdf"
                     
                     zip_file.writestr(filename, file_bytes)
                 except Exception as e:
