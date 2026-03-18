@@ -89,9 +89,9 @@ const Home = () => {
 
   const allApps = [
     { id: 'drs', permKey: 'drs', name: 'DRS', desc: 'Defect Reporting System', icon: <FileText size={32} />, class: 'hm-card-drs', delay: '0s' },
-    { id: 'jira', permKey: 'jira', name: 'JIRA', desc: 'Issue & Project Tracking', icon: <Trello size={32} />, class: 'hm-card-jira', delay: '0.1s' },
+    { id: 'jira', permKey: 'jira', name: 'SmartPAL JIRA Portal', desc: 'Ticket Tracking for SmartPAL Portal', icon: <Trello size={32} />, class: 'hm-card-jira', delay: '0.1s' },
     { id: 'voyage', permKey: 'voyage', name: 'Voyage Performance', desc: 'Analytics & Tracking', icon: <Ship size={32} />, class: 'hm-card-voyage', delay: '0.2s' },
-    { id: 'lube', permKey: 'lubeoil', name: 'Lubeoil Analysis', desc: 'Sample Tracking', icon: <Droplet size={32} />, class: 'hm-card-lube', delay: '0.3s' },
+    { id: 'lube', permKey: 'lubeoil', name: 'Lubeoil Analysis', desc: 'Shore Analysis Portal', icon: <Droplet size={32} />, class: 'hm-card-lube', delay: '0.3s' },
     { id: 'engine', permKey: 'engine_performance', name: 'Engine Performance', desc: 'Metrics & Health', icon: <Activity size={32} />, class: 'hm-card-engine', delay: '0.4s' },
   ];
 

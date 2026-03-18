@@ -2,12 +2,12 @@
 
 /* ── VARIABLES ── */
 :root {
-  --navy-dark:  #0f172a;
-  --navy-mid:   #1e3a5f;
-  --navy-light: #2563eb;
-  --accent:     #3b82f6;
+  --navy-dark:  #1a0f00;
+  --navy-mid:   #cc5500;
+  --navy-light: #e8620a;
+  --accent:     #da7756;
   --white:      #ffffff;
-  --gray-50:    #f8fafc;
+  --gray-50:    #fff8f5;
   --gray-400:   #94a3b8;
   --gray-600:   #475569;
   --error:      #ef4444;
@@ -57,7 +57,7 @@ body, html {
 .bg-animation {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(59,130,246,0.1) 0%, transparent 50%);
+  background: radial-gradient(circle at 50% 50%, rgba(218,119,86,0.15) 0%, transparent 50%);
   background-size: 200% 200%;
   animation: pulse 15s ease infinite;
   pointer-events: none;
@@ -173,6 +173,14 @@ body, html {
   color: var(--navy-mid);
 }
 
+.brand-logo {
+  display: block;
+  height: 64px;
+  width: auto;
+  margin: 0 auto 1.5rem;
+  object-fit: contain;
+}
+
 .login-title {
   font-size: 1.875rem;
   font-weight: 700;
@@ -231,7 +239,7 @@ body, html {
 
 .form-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+  box-shadow: 0 0 0 3px rgba(218,119,86,0.15);
 }
 
 .form-input:focus ~ .input-icon {

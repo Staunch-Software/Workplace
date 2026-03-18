@@ -13,7 +13,7 @@ const EngineIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="
 
 const MODULE_LIST = [
     { id: "drs", name: "Defect Reporting System", Icon: DrsIcon },
-    { id: "jira", name: "JIRA Integration", Icon: JiraIcon },
+    { id: "jira", name: "SmartPAL JIRA", Icon: JiraIcon },
     { id: "voyage", name: "Voyage Management", Icon: VoyageIcon },
     { id: "lubeoil", name: "Lubeoil Analysis", Icon: LubeIcon },
     { id: "engine_performance", name: "Engine Performance", Icon: EngineIcon },

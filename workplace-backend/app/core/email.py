@@ -130,6 +130,8 @@ async def send_welcome_email(
             "Explore your assigned modules",
             "You can manage and update your assigned vessels anytime from your profile",
         ]
+        if role.upper() == "VESSEL":
+            steps.append("The old DRS has been moved to the Workplace platform. Kindly use this link going forward and discontinue use of the old system.")
         getting_started_steps = ""
         for i, step in enumerate(steps, 1):
             getting_started_steps += f"""

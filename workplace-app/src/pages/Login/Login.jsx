@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import './Login.css';
+import ozellarLogo from '../../assets/ozellar-marine-global-logo.gif';
 
 const Login = () => {
   // ── YOUR EXISTING STATE & LOGIC (unchanged) ──
@@ -120,6 +121,11 @@ const Login = () => {
               <path d="M12 22V8"/>
               <path d="M5 12H2a10 10 0 0 0 20 0h-3"/>
             </svg>
+            <img
+              src={ozellarLogo}
+              alt="Ozellar Marine"
+              className="brand-logo"
+            />
             <h2 className="login-title">Welcome back</h2>
             <p className="login-subtitle">Sign in to your account</p>
           </div>
