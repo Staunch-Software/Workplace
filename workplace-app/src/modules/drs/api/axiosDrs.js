@@ -8,7 +8,7 @@ const apiDrs = axios.create({
 });
 
 apiDrs.interceptors.request.use((config) => {
-  const token = localStorage.getItem('platform_token');
+  const token = localStorage.getItem('platform_token') || sessionStorage.getItem('platform_token');
   if (token) config.headers['Authorization'] = `Bearer ${token}`;
   return config;
 }, (error) => Promise.reject(error));

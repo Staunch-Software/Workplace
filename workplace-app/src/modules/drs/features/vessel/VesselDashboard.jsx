@@ -1828,8 +1828,14 @@ const VesselDashboard = () => {
 
         case 'OVERDUE':
           return prev.deadline_status === 'OVERDUE'
-            ? { ...prev, deadline_status: '' }
-            : { ...prev, deadline_status: 'OVERDUE', status: '', priority: '' };
+            ? { ...prev, deadline_status: '', status: '' }
+            : {
+              ...prev,
+              deadline_status: 'OVERDUE',
+              status: 'OPEN',   // ← add this
+              priority: '',
+              pending_closure: ''
+            };
 
         case 'CLOSED':
           return prev.status === 'CLOSED'
@@ -1906,7 +1912,9 @@ const VesselDashboard = () => {
 
 
   const overdueCount = defects.filter(
-    d => getDeadlineStatus(d.target_close_date) === 'OVERDUE'
+    d => getDeadlineStatus(d.target_close_date) === 'OVERDUE' &&
+      d.status !== 'CLOSED' &&
+      d.status !== 'PENDING_CLOSURE'
   ).length;
 
   const totalActiveColumns = useMemo(() => {

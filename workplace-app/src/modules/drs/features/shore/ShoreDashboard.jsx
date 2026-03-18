@@ -1330,6 +1330,10 @@ const ShoreDashboard = () => {
     queryFn: () => defectApi.getVessels()
   });
 
+  const vessels = (user?.role === 'ADMIN' || user?.role === 'SUPERADMIN')
+    ? allVessels
+    : allVessels.filter(v => user?.assigned_vessels?.includes(v.imo_number));
+
 
   const [filters, setFilters] = useState({
     date_identified_from: '',
@@ -1565,7 +1569,9 @@ const ShoreDashboard = () => {
   const closedCount = defects.filter(d => d.status === 'CLOSED').length;
 
   const overdueCount = defects.filter(
-    d => getDeadlineStatus(d.target_close_date) === 'OVERDUE'
+    d => getDeadlineStatus(d.target_close_date) === 'OVERDUE' &&
+      d.status !== 'CLOSED' &&
+      d.status !== 'PENDING_CLOSURE'
   ).length;
   const pendingClosureCount = defects.filter(d => d.status === 'PENDING_CLOSURE').length;
 
@@ -1930,8 +1936,14 @@ const ShoreDashboard = () => {
 
         case 'OVERDUE':
           return prev.deadline_status === 'OVERDUE'
-            ? { ...prev, deadline_status: '' }
-            : { ...prev, deadline_status: 'OVERDUE', status: '', priority: '', pending_closure: '' };
+            ? { ...prev, deadline_status: '', status: '' }
+            : {
+              ...prev,
+              deadline_status: 'OVERDUE',
+              status: 'OPEN',   // ← add this
+              priority: '',
+              pending_closure: ''
+            };
 
         case 'PENDING_CLOSURE':
           return prev.pending_closure
@@ -2089,7 +2101,7 @@ const ShoreDashboard = () => {
     />
   );
 
-    const handleTextSort = (field) => {
+  const handleTextSort = (field) => {
     setFilters(prev => {
       const current = prev.text_sort;
       const nextDir = current.field === field
@@ -3221,7 +3233,7 @@ const ShoreDashboard = () => {
                         style={{ width: '100%' }}
                       >
                         <option value="">Select Vessel...</option>
-                        {allVessels.map((v) => (
+                        {vessels.map((v) => (
                           <option key={v.imo_number} value={v.imo_number}>
                             {v.name}
                           </option>
