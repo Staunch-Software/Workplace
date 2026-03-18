@@ -1,0 +1,46 @@
+2025-10-26 14:53:41,835 | __main__             | INFO     | Logging initialized. Log file: logs\ship_performance_20251026_145341.log
+2025-10-26 14:53:41,837 | __main__             | INFO     | Processing Main Engine Excel file: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\ae_shop_trail.xlsx
+2025-10-26 14:53:41,838 | __main__             | INFO     | Configuration:
+2025-10-26 14:53:41,838 | __main__             | INFO     |   Database: postgresql+psycopg2://aepms_deepa_login:****@20.244.0.96:5432/aepms_db
+2025-10-26 14:53:41,838 | __main__             | INFO     |   Log Level: INFO
+2025-10-26 14:53:41,839 | __main__             | INFO     |   Data Directory: data
+2025-10-26 14:53:41,841 | __main__             | INFO     | Validating Main Engine Excel file...
+2025-10-26 14:53:41,842 | __main__             | ERROR    | Excel file not found: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\ae_shop_trail.xlsx
+2025-10-26 14:53:41,842 | __main__             | WARNING  | ME file invalid, continuing with AE data only
+2025-10-26 14:53:41,842 | __main__             | INFO     | Initializing database connection...
+2025-10-26 14:53:49,890 | app.database         | INFO     | ✅ Database connection successful!
+2025-10-26 14:53:49,892 | app.database         | INFO     | PostgreSQL version: PostgreSQL 16.10 (Ubuntu 16.10-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0, 64-bit
+2025-10-26 14:53:49,893 | app.database         | INFO     | Database: aepms_db
+2025-10-26 14:53:49,893 | app.database         | INFO     | User: aepms_deepa_login
+2025-10-26 14:53:50,650 | app.database         | INFO     | ✅ All tables created successfully!
+2025-10-26 14:53:52,806 | app.database         | INFO     | ✅ Migration applied: added column csr_power_kw to vessel_info
+2025-10-26 14:53:52,920 | app.database         | INFO     | ✅ Migration applied: added comment for csr_power_kw
+2025-10-26 14:53:53,097 | app.database         | INFO     | ✅ Migration applied: added column barred_speed_rpm_start to vessel_info
+2025-10-26 14:53:53,673 | app.database         | INFO     | ✅ Migration applied: added comment for barred_speed_rpm_start
+2025-10-26 14:53:53,709 | app.database         | INFO     | ✅ Migration applied: added column barred_speed_rpm_end to vessel_info
+2025-10-26 14:53:53,748 | app.database         | INFO     | ✅ Migration applied: added comment for barred_speed_rpm_end
+2025-10-26 14:53:53,990 | app.database         | INFO     | ✅ Migration applied: widened barometric_pressure_mmh2o to numeric(8,3)
+2025-10-26 14:53:54,099 | app.database         | INFO     | ✅ Migration applied: added fo_consumption_mt_hr to monthly_report_header
+2025-10-26 14:53:54,521 | app.database         | INFO     | ✅ Migration applied: added fuel_injection_pump_index_mm to monthly_report_header
+2025-10-26 14:53:54,919 | app.database         | INFO     | ✅ Migration applied: added exh_temp_cylinder_outlet_ave_c to monthly_report_header
+2025-10-26 14:53:55,089 | app.database         | INFO     | ✅ Migration applied: vessel_info.vessel_id set to NULLABLE
+2025-10-26 14:53:55,863 | app.database         | INFO     | ✅ Migration applied: added permissions column to users
+2025-10-26 14:53:56,001 | app.database         | INFO     | ✅ Migration applied: added password_hash column to users
+2025-10-26 14:53:56,108 | app.database         | INFO     | ✅ Migration applied: added created_by column to users
+2025-10-26 14:54:09,961 | app.database         | INFO     | 📊 Current table row counts:
+2025-10-26 14:54:09,964 | app.database         | INFO     |   vessel_info: 8 rows
+2025-10-26 14:54:09,965 | app.database         | INFO     |   shop_trial_session: 8 rows
+2025-10-26 14:54:09,965 | app.database         | INFO     |   monthly_report_header: 2 rows
+2025-10-26 14:54:09,966 | app.database         | INFO     |   baseline_performance_data: 0 rows
+2025-10-26 14:54:09,967 | app.database         | INFO     |   shop_trial_performance_data: 54 rows
+2025-10-26 14:54:09,967 | app.database         | INFO     |   monthly_report_details_jsonb: 2 rows
+2025-10-26 14:54:09,972 | app.database         | INFO     |   monthly_iso_performance_data: 2 rows
+2025-10-26 14:54:09,976 | app.database         | INFO     |   generator_monthly_report_details_jsonb: 2 rows
+2025-10-26 14:54:09,977 | app.database         | INFO     |   generator_monthly_report_header: 2 rows
+2025-10-26 14:54:09,977 | app.database         | INFO     |   vessel_generator: 16 rows
+2025-10-26 14:54:09,979 | app.database         | INFO     |   generator_performance_graph_data: 2 rows
+2025-10-26 14:54:09,979 | app.database         | INFO     |   role_permissions: 4 rows
+2025-10-26 14:54:09,979 | app.database         | INFO     |   organizations: 2 rows
+2025-10-26 14:54:09,980 | app.database         | INFO     |   users: 2 rows
+2025-10-26 14:54:09,980 | app.database         | INFO     |   generator_baseline_data: 20 rows
+2025-10-26 14:54:09,981 | __main__             | ERROR    | No data was successfully loaded

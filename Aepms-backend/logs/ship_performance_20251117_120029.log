@@ -1,0 +1,17 @@
+2025-11-17 12:00:29,915 | __main__             | INFO     | Logging initialized. Log file: logs\ship_performance_20251117_120029.log
+2025-11-17 12:00:29,915 | __main__             | INFO     | Processing Main Engine Excel file: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\Engine_Performance_Data.xlsx
+2025-11-17 12:00:29,916 | __main__             | INFO     | Processing Auxiliary Engine Excel file: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\AE_Shop_Trail.xlsx
+2025-11-17 12:00:29,916 | __main__             | INFO     | Configuration:
+2025-11-17 12:00:29,916 | __main__             | INFO     |   Database: postgresql+psycopg2://Deepa:****@localhost:5432/Aepms_deepa_login
+2025-11-17 12:00:29,916 | __main__             | INFO     |   Log Level: INFO
+2025-11-17 12:00:29,916 | __main__             | INFO     |   Data Directory: data
+2025-11-17 12:00:29,916 | __main__             | INFO     | Validating Main Engine Excel file...
+2025-11-17 12:00:29,917 | __main__             | INFO     | Excel file validated: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\Engine_Performance_Data.xlsx (41,746 bytes)
+2025-11-17 12:00:29,917 | __main__             | INFO     | Validating Auxiliary Engine Excel file...
+2025-11-17 12:00:29,917 | __main__             | ERROR    | Excel file not found: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\AE_Shop_Trail.xlsx
+2025-11-17 12:00:29,917 | __main__             | WARNING  | AE Excel validation failed. Continuing with ME data only.
+2025-11-17 12:00:29,917 | __main__             | INFO     | Initializing database connection...
+2025-11-17 12:00:30,020 | app.database         | ERROR    | ❌ Database connection failed: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: FATAL:  sorry, too many clients already
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-11-17 12:00:30,021 | __main__             | ERROR    | Failed to initialize database

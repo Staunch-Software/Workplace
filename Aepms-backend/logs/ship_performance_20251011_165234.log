@@ -1,0 +1,59 @@
+2025-10-11 16:52:34,196 | __main__             | INFO     | Logging initialized. Log file: logs\ship_performance_20251011_165234.log
+2025-10-11 16:52:34,198 | __main__             | INFO     | Processing Auxiliary Engine Excel file: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\ae_shop_trial.xlsx
+2025-10-11 16:52:34,198 | __main__             | INFO     | Configuration:
+2025-10-11 16:52:34,199 | __main__             | INFO     |   Database: postgresql+psycopg2://Deepa:****@localhost:5432/Aepms_deepa_login
+2025-10-11 16:52:34,200 | __main__             | INFO     |   Log Level: INFO
+2025-10-11 16:52:34,200 | __main__             | INFO     |   Data Directory: data
+2025-10-11 16:52:34,201 | __main__             | INFO     | Validating Auxiliary Engine Excel file...
+2025-10-11 16:52:34,227 | __main__             | INFO     | Excel file validated: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\ae_shop_trial.xlsx (23,330 bytes)
+2025-10-11 16:52:34,227 | __main__             | INFO     | Initializing database connection...
+2025-10-11 16:52:34,293 | app.database         | INFO     | ✅ Database connection successful!
+2025-10-11 16:52:34,294 | app.database         | INFO     | PostgreSQL version: PostgreSQL 16.10, compiled by Visual C++ build 1944, 64-bit
+2025-10-11 16:52:34,294 | app.database         | INFO     | Database: Aepms_deepa_login
+2025-10-11 16:52:34,296 | app.database         | INFO     | User: Deepa
+2025-10-11 16:52:34,315 | app.database         | INFO     | ✅ All tables created successfully!
+2025-10-11 16:52:34,392 | app.database         | INFO     | ✅ Migration applied: widened barometric_pressure_mmh2o to numeric(8,3)
+2025-10-11 16:52:34,395 | app.database         | INFO     | ✅ Migration applied: added fo_consumption_mt_hr to monthly_report_header
+2025-10-11 16:52:34,397 | app.database         | INFO     | ✅ Migration applied: added fuel_injection_pump_index_mm to monthly_report_header
+2025-10-11 16:52:34,399 | app.database         | INFO     | ✅ Migration applied: added exh_temp_cylinder_outlet_ave_c to monthly_report_header
+2025-10-11 16:52:34,400 | app.database         | INFO     | ✅ Migration applied: vessel_info.vessel_id set to NULLABLE
+2025-10-11 16:52:34,402 | app.database         | INFO     | ✅ Migration applied: added permissions column to users
+2025-10-11 16:52:34,404 | app.database         | INFO     | ✅ Migration applied: added password_hash column to users
+2025-10-11 16:52:34,406 | app.database         | INFO     | ✅ Migration applied: added created_by column to users
+2025-10-11 16:52:34,598 | app.database         | INFO     | 📊 Current table row counts:
+2025-10-11 16:52:34,599 | app.database         | INFO     |   role_permissions: 4 rows
+2025-10-11 16:52:34,599 | app.database         | INFO     |   vessel_info: 8 rows
+2025-10-11 16:52:34,600 | app.database         | INFO     |   shop_trial_session: 8 rows
+2025-10-11 16:52:34,600 | app.database         | INFO     |   monthly_report_header: 1 rows
+2025-10-11 16:52:34,600 | app.database         | INFO     |   baseline_performance_data: 0 rows
+2025-10-11 16:52:34,600 | app.database         | INFO     |   organizations: 2 rows
+2025-10-11 16:52:34,600 | app.database         | INFO     |   users: 4 rows
+2025-10-11 16:52:34,602 | app.database         | INFO     |   shop_trial_performance_data: 54 rows
+2025-10-11 16:52:34,604 | app.database         | INFO     |   monthly_report_details_jsonb: 1 rows
+2025-10-11 16:52:34,604 | app.database         | INFO     |   monthly_iso_performance_data: 1 rows
+2025-10-11 16:52:34,604 | app.database         | INFO     |   vessel_generator: 0 rows
+2025-10-11 16:52:34,604 | app.database         | INFO     |   generator_baseline_data: 0 rows
+2025-10-11 16:52:34,604 | app.database         | INFO     |   generator_monthly_report_header: 0 rows
+2025-10-11 16:52:34,605 | app.database         | INFO     |   generator_monthly_report_details_jsonb: 0 rows
+2025-10-11 16:52:34,605 | app.database         | INFO     |   generator_performance_graph_data: 0 rows
+2025-10-11 16:52:34,605 | __main__             | INFO     | Extracting Auxiliary Engine data from Excel file...
+2025-10-11 16:52:34,962 | app.ae_excel_loader  | INFO     | Loaded AE Excel file: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\ae_shop_trial.xlsx
+2025-10-11 16:52:34,976 | app.ae_excel_loader  | WARNING  | Skipping generator row: missing IMO/engine_no/designation
+2025-10-11 16:52:34,980 | app.ae_excel_loader  | WARNING  | Skipping generator row: missing IMO/engine_no/designation
+2025-10-11 16:52:34,981 | app.ae_excel_loader  | WARNING  | Skipping generator row: missing IMO/engine_no/designation
+2025-10-11 16:52:34,982 | app.ae_excel_loader  | WARNING  | Skipping generator row: missing IMO/engine_no/designation
+2025-10-11 16:52:34,983 | app.ae_excel_loader  | WARNING  | Skipping generator row: missing IMO/engine_no/designation
+2025-10-11 16:52:34,984 | app.ae_excel_loader  | WARNING  | Skipping generator row: missing IMO/engine_no/designation
+2025-10-11 16:52:34,995 | app.ae_excel_loader  | INFO     | AE extraction: 10 generators, 20 baseline records
+2025-10-11 16:52:34,996 | __main__             | INFO     | Auxiliary Engine data extraction summary:
+2025-10-11 16:52:34,999 | __main__             | INFO     |   vessel_generators: 10 records
+2025-10-11 16:52:34,999 | __main__             | INFO     |   generator_baseline_data: 20 records
+2025-10-11 16:52:35,000 | __main__             | INFO     | Loading Auxiliary Engine data into PostgreSQL database...
+2025-10-11 16:52:35,001 | app.ae_data_loader   | INFO     | Starting AE data loading...
+2025-10-11 16:52:35,014 | app.ae_data_loader   | INFO     | Preloaded: 8 vessels, 0 generators, 0 baseline records
+2025-10-11 16:52:35,024 | app.ae_data_loader   | INFO     | Loading 10 generators...
+2025-10-11 16:52:35,048 | app.ae_data_loader   | INFO     | Generators loaded: 10 inserted, 0 updated
+2025-10-11 16:52:35,051 | app.ae_data_loader   | INFO     | Loading 20 baseline records...
+2025-10-11 16:52:35,067 | app.ae_data_loader   | INFO     | Baseline loaded: 20 inserted, 0 updated
+2025-10-11 16:52:35,070 | app.ae_data_loader   | INFO     | AE data loading completed
+2025-10-11 16:52:35,087 | __main__             | INFO     | Data loading pipeline completed successfully! Processed 30 records

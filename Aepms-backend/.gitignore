@@ -1,0 +1,10 @@
+"__pycache__/" 
+"*.pyc" 
+"debug_*/" 
+"*.pdf" 
+"*.json" 
+# Python virtual environments
+venv/
+.venv/
+.env
+*.pyc

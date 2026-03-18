@@ -1,0 +1,9 @@
+2025-10-11 16:39:08,674 | __main__             | INFO     | Logging initialized. Log file: logs\ship_performance_20251011_163908.log
+2025-10-11 16:39:08,675 | __main__             | INFO     | Processing Main Engine Excel file: D:\Ozellar Project\Aepms-backend\iso-performance-backend\Engine_Performance_Data.xlsx
+2025-10-11 16:39:08,675 | __main__             | INFO     | Processing Auxiliary Engine Excel file: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\ae_shop_trial.xlsx
+2025-10-11 16:39:08,675 | __main__             | INFO     | Configuration:
+2025-10-11 16:39:08,675 | __main__             | INFO     |   Database: postgresql+psycopg2://Deepa:****@localhost:5432/Aepms_deepa_login
+2025-10-11 16:39:08,676 | __main__             | INFO     |   Log Level: INFO
+2025-10-11 16:39:08,676 | __main__             | INFO     |   Data Directory: data
+2025-10-11 16:39:08,676 | __main__             | INFO     | Validating Main Engine Excel file...
+2025-10-11 16:39:08,676 | __main__             | ERROR    | Excel file not found: D:\Ozellar Project\Aepms-backend\iso-performance-backend\Engine_Performance_Data.xlsx

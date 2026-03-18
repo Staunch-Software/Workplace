@@ -1,0 +1,61 @@
+2025-10-14 04:00:46,538 | __main__             | INFO     | Logging initialized. Log file: logs\ship_performance_20251014_040046.log
+2025-10-14 04:00:46,538 | __main__             | INFO     | Processing Main Engine Excel file: D:\Ozellar Project\Aepms-backend\iso-performance-backend\Engine_Performance_Data.xlsx
+2025-10-14 04:00:46,538 | __main__             | INFO     | Processing Auxiliary Engine Excel file: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\ae_shop_trial.xlsx
+2025-10-14 04:00:46,539 | __main__             | INFO     | Configuration:
+2025-10-14 04:00:46,539 | __main__             | INFO     |   Database: postgresql+psycopg2://Deepa:****@localhost:5432/Aepms_deepa_login
+2025-10-14 04:00:46,545 | __main__             | INFO     |   Log Level: INFO
+2025-10-14 04:00:46,545 | __main__             | INFO     |   Data Directory: data
+2025-10-14 04:00:46,545 | __main__             | INFO     | Validating Main Engine Excel file...
+2025-10-14 04:00:46,546 | __main__             | ERROR    | Excel file not found: D:\Ozellar Project\Aepms-backend\iso-performance-backend\Engine_Performance_Data.xlsx
+2025-10-14 04:00:46,546 | __main__             | WARNING  | ME file invalid, continuing with AE data only
+2025-10-14 04:00:46,546 | __main__             | INFO     | Validating Auxiliary Engine Excel file...
+2025-10-14 04:00:46,547 | __main__             | INFO     | Excel file validated: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\ae_shop_trial.xlsx (22,978 bytes)
+2025-10-14 04:00:46,547 | __main__             | INFO     | Initializing database connection...
+2025-10-14 04:00:46,631 | app.database         | INFO     | ✅ Database connection successful!
+2025-10-14 04:00:46,631 | app.database         | INFO     | PostgreSQL version: PostgreSQL 16.10, compiled by Visual C++ build 1944, 64-bit
+2025-10-14 04:00:46,631 | app.database         | INFO     | Database: Aepms_deepa_login
+2025-10-14 04:00:46,632 | app.database         | INFO     | User: Deepa
+2025-10-14 04:00:46,640 | app.database         | INFO     | ✅ All tables created successfully!
+2025-10-14 04:00:46,670 | app.database         | INFO     | ✅ Migration applied: widened barometric_pressure_mmh2o to numeric(8,3)
+2025-10-14 04:00:46,671 | app.database         | INFO     | ✅ Migration applied: added fo_consumption_mt_hr to monthly_report_header
+2025-10-14 04:00:46,672 | app.database         | INFO     | ✅ Migration applied: added fuel_injection_pump_index_mm to monthly_report_header
+2025-10-14 04:00:46,672 | app.database         | INFO     | ✅ Migration applied: added exh_temp_cylinder_outlet_ave_c to monthly_report_header
+2025-10-14 04:00:46,672 | app.database         | INFO     | ✅ Migration applied: vessel_info.vessel_id set to NULLABLE
+2025-10-14 04:00:46,673 | app.database         | INFO     | ✅ Migration applied: added permissions column to users
+2025-10-14 04:00:46,673 | app.database         | INFO     | ✅ Migration applied: added password_hash column to users
+2025-10-14 04:00:46,673 | app.database         | INFO     | ✅ Migration applied: added created_by column to users
+2025-10-14 04:00:46,738 | app.database         | INFO     | 📊 Current table row counts:
+2025-10-14 04:00:46,738 | app.database         | INFO     |   role_permissions: 4 rows
+2025-10-14 04:00:46,739 | app.database         | INFO     |   vessel_info: 8 rows
+2025-10-14 04:00:46,739 | app.database         | INFO     |   vessel_generator: 0 rows
+2025-10-14 04:00:46,739 | app.database         | INFO     |   generator_baseline_data: 0 rows
+2025-10-14 04:00:46,739 | app.database         | INFO     |   shop_trial_session: 8 rows
+2025-10-14 04:00:46,739 | app.database         | INFO     |   monthly_report_header: 0 rows
+2025-10-14 04:00:46,739 | app.database         | INFO     |   baseline_performance_data: 0 rows
+2025-10-14 04:00:46,739 | app.database         | INFO     |   organizations: 2 rows
+2025-10-14 04:00:46,739 | app.database         | INFO     |   users: 1 rows
+2025-10-14 04:00:46,739 | app.database         | INFO     |   generator_monthly_report_header: 0 rows
+2025-10-14 04:00:46,740 | app.database         | INFO     |   shop_trial_performance_data: 54 rows
+2025-10-14 04:00:46,740 | app.database         | INFO     |   monthly_report_details_jsonb: 0 rows
+2025-10-14 04:00:46,740 | app.database         | INFO     |   monthly_iso_performance_data: 0 rows
+2025-10-14 04:00:46,740 | app.database         | INFO     |   generator_monthly_report_details_jsonb: 0 rows
+2025-10-14 04:00:46,740 | app.database         | INFO     |   generator_performance_graph_data: 0 rows
+2025-10-14 04:00:46,740 | __main__             | INFO     | Extracting Auxiliary Engine data from Excel file...
+2025-10-14 04:00:46,886 | app.ae_excel_loader  | INFO     | Loaded AE Excel file: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\ae_shop_trial.xlsx
+2025-10-14 04:00:46,893 | app.ae_excel_loader  | WARNING  | Skipping generator row: missing IMO/engine_no/designation
+2025-10-14 04:00:46,893 | app.ae_excel_loader  | WARNING  | Skipping generator row: missing IMO/engine_no/designation
+2025-10-14 04:00:46,893 | app.ae_excel_loader  | WARNING  | Skipping generator row: missing IMO/engine_no/designation
+2025-10-14 04:00:46,893 | app.ae_excel_loader  | WARNING  | Skipping generator row: missing IMO/engine_no/designation
+2025-10-14 04:00:46,898 | app.ae_excel_loader  | INFO     | AE extraction: 12 generators, 20 baseline records
+2025-10-14 04:00:46,898 | __main__             | INFO     | Auxiliary Engine data extraction summary:
+2025-10-14 04:00:46,899 | __main__             | INFO     |   vessel_generators: 12 records
+2025-10-14 04:00:46,899 | __main__             | INFO     |   generator_baseline_data: 20 records
+2025-10-14 04:00:46,899 | __main__             | INFO     | Loading Auxiliary Engine data into PostgreSQL database...
+2025-10-14 04:00:46,899 | app.ae_data_loader   | INFO     | Starting AE data loading...
+2025-10-14 04:00:46,903 | app.ae_data_loader   | INFO     | Preloaded: 8 vessels, 0 generators, 0 baseline records
+2025-10-14 04:00:46,904 | app.ae_data_loader   | INFO     | Loading 12 generators...
+2025-10-14 04:00:46,915 | app.ae_data_loader   | INFO     | Generators loaded: 12 inserted, 0 updated
+2025-10-14 04:00:46,916 | app.ae_data_loader   | INFO     | Loading 20 baseline records...
+2025-10-14 04:00:46,920 | app.ae_data_loader   | INFO     | Baseline loaded: 20 inserted, 0 updated
+2025-10-14 04:00:46,920 | app.ae_data_loader   | INFO     | AE data loading completed
+2025-10-14 04:00:46,921 | __main__             | INFO     | Data loading pipeline completed successfully! Processed 32 records

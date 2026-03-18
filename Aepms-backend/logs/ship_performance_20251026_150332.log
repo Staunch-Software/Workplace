@@ -1,0 +1,60 @@
+2025-10-26 15:03:32,576 | __main__             | INFO     | Logging initialized. Log file: logs\ship_performance_20251026_150332.log
+2025-10-26 15:03:32,577 | __main__             | INFO     | Processing Main Engine Excel file: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\ae_shop_trial.xlsx
+2025-10-26 15:03:32,577 | __main__             | INFO     | Configuration:
+2025-10-26 15:03:32,577 | __main__             | INFO     |   Database: postgresql+psycopg2://aepms_deepa_login:****@20.244.0.96:5432/aepms_db
+2025-10-26 15:03:32,578 | __main__             | INFO     |   Log Level: INFO
+2025-10-26 15:03:32,578 | __main__             | INFO     |   Data Directory: data
+2025-10-26 15:03:32,580 | __main__             | INFO     | Validating Main Engine Excel file...
+2025-10-26 15:03:32,581 | __main__             | INFO     | Excel file validated: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\ae_shop_trial.xlsx (22,870 bytes)
+2025-10-26 15:03:32,581 | __main__             | INFO     | Initializing database connection...
+2025-10-26 15:03:35,369 | app.database         | INFO     | ✅ Database connection successful!
+2025-10-26 15:03:35,369 | app.database         | INFO     | PostgreSQL version: PostgreSQL 16.10 (Ubuntu 16.10-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0, 64-bit
+2025-10-26 15:03:35,369 | app.database         | INFO     | Database: aepms_db
+2025-10-26 15:03:35,369 | app.database         | INFO     | User: aepms_deepa_login
+2025-10-26 15:03:37,828 | app.database         | INFO     | ✅ All tables created successfully!
+2025-10-26 15:03:39,907 | app.database         | INFO     | ✅ Migration applied: added column csr_power_kw to vessel_info
+2025-10-26 15:03:40,082 | app.database         | INFO     | ✅ Migration applied: added comment for csr_power_kw
+2025-10-26 15:03:40,763 | app.database         | INFO     | ✅ Migration applied: added column barred_speed_rpm_start to vessel_info
+2025-10-26 15:03:41,441 | app.database         | INFO     | ✅ Migration applied: added comment for barred_speed_rpm_start
+2025-10-26 15:03:41,470 | app.database         | INFO     | ✅ Migration applied: added column barred_speed_rpm_end to vessel_info
+2025-10-26 15:03:41,787 | app.database         | INFO     | ✅ Migration applied: added comment for barred_speed_rpm_end
+2025-10-26 15:03:41,981 | app.database         | INFO     | ✅ Migration applied: widened barometric_pressure_mmh2o to numeric(8,3)
+2025-10-26 15:03:42,084 | app.database         | INFO     | ✅ Migration applied: added fo_consumption_mt_hr to monthly_report_header
+2025-10-26 15:03:42,184 | app.database         | INFO     | ✅ Migration applied: added fuel_injection_pump_index_mm to monthly_report_header
+2025-10-26 15:03:42,277 | app.database         | INFO     | ✅ Migration applied: added exh_temp_cylinder_outlet_ave_c to monthly_report_header
+2025-10-26 15:03:42,378 | app.database         | INFO     | ✅ Migration applied: vessel_info.vessel_id set to NULLABLE
+2025-10-26 15:03:42,492 | app.database         | INFO     | ✅ Migration applied: added permissions column to users
+2025-10-26 15:03:42,683 | app.database         | INFO     | ✅ Migration applied: added password_hash column to users
+2025-10-26 15:03:42,775 | app.database         | INFO     | ✅ Migration applied: added created_by column to users
+2025-10-26 15:03:50,377 | app.database         | INFO     | 📊 Current table row counts:
+2025-10-26 15:03:50,378 | app.database         | INFO     |   vessel_info: 8 rows
+2025-10-26 15:03:50,378 | app.database         | INFO     |   shop_trial_session: 8 rows
+2025-10-26 15:03:50,379 | app.database         | INFO     |   monthly_report_header: 2 rows
+2025-10-26 15:03:50,379 | app.database         | INFO     |   baseline_performance_data: 0 rows
+2025-10-26 15:03:50,380 | app.database         | INFO     |   shop_trial_performance_data: 54 rows
+2025-10-26 15:03:50,380 | app.database         | INFO     |   monthly_report_details_jsonb: 2 rows
+2025-10-26 15:03:50,380 | app.database         | INFO     |   monthly_iso_performance_data: 2 rows
+2025-10-26 15:03:50,381 | app.database         | INFO     |   generator_monthly_report_details_jsonb: 2 rows
+2025-10-26 15:03:50,382 | app.database         | INFO     |   generator_monthly_report_header: 2 rows
+2025-10-26 15:03:50,382 | app.database         | INFO     |   vessel_generator: 16 rows
+2025-10-26 15:03:50,382 | app.database         | INFO     |   generator_performance_graph_data: 2 rows
+2025-10-26 15:03:50,382 | app.database         | INFO     |   role_permissions: 4 rows
+2025-10-26 15:03:50,383 | app.database         | INFO     |   organizations: 2 rows
+2025-10-26 15:03:50,383 | app.database         | INFO     |   users: 2 rows
+2025-10-26 15:03:50,383 | app.database         | INFO     |   generator_baseline_data: 20 rows
+2025-10-26 15:03:50,383 | __main__             | INFO     | Extracting Main Engine data from Excel file...
+2025-10-26 15:03:50,727 | app.excel_loader     | INFO     | Loaded Excel file with 2 sheets: ['vessel_generators', 'generator_baseline_data']
+2025-10-26 15:03:50,727 | app.excel_loader     | INFO     | Processing sheet: vessel_generators
+2025-10-26 15:03:50,728 | app.excel_loader     | WARNING  | Unknown sheet type: vessel_generators
+2025-10-26 15:03:50,728 | app.excel_loader     | INFO     | Processing sheet: generator_baseline_data
+2025-10-26 15:03:50,728 | app.excel_loader     | WARNING  | Unknown sheet type: generator_baseline_data
+2025-10-26 15:03:50,728 | app.excel_loader     | INFO     | Extraction summary: {'vessels': 0, 'sessions': 0, 'performance_data': 0, 'crank_deflections': 0, 'bearing_temperatures': 0, 'monthly_headers': 0, 'monthly_details': 0}
+2025-10-26 15:03:50,728 | __main__             | INFO     | Main Engine data extraction summary:
+2025-10-26 15:03:50,728 | __main__             | INFO     |   vessels: 0 records
+2025-10-26 15:03:50,728 | __main__             | INFO     |   sessions: 0 records
+2025-10-26 15:03:50,728 | __main__             | INFO     |   performance_data: 0 records
+2025-10-26 15:03:50,728 | __main__             | INFO     |   crank_deflections: 0 records
+2025-10-26 15:03:50,728 | __main__             | INFO     |   bearing_temperatures: 0 records
+2025-10-26 15:03:50,728 | __main__             | INFO     |   monthly_headers: 0 records
+2025-10-26 15:03:50,729 | __main__             | INFO     |   monthly_details: 0 records
+2025-10-26 15:03:50,729 | __main__             | WARNING  | No Main Engine data was extracted from the Excel file

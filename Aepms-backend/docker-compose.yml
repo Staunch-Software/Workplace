@@ -1,0 +1,43 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  db:
+    image: timescale/timescaledb-postgis:latest-pg14 # Or a specific version
+    restart: always
+    environment:
+      POSTGRES_DB: aepms_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql # Run SQL script on first start
+    ports:
+      - "5432:5432" # Expose DB port
+    healthcheck: # Ensure DB is ready before backend starts
+      test: ["CMD-SHELL", "pg_isready -U user -d aepms_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: . # Build from current directory (iso-performance-backend)
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://user:password@db:5432/aepms_db
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION_NAME: ${AWS_REGION_NAME}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+    volumes:
+      - .:/app # Mount backend code for live reloading
+      - ./data:/app/data # Mount data folder for scripts
+    ports:
+      - "8000:8000" # Expose FastAPI port
+    depends_on:
+      db:
+        condition: service_healthy # Wait for DB to be healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload # --reload for dev
+
+volumes:
+  db_data:

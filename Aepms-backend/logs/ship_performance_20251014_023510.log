@@ -1,0 +1,66 @@
+2025-10-14 02:35:10,134 | __main__             | INFO     | Logging initialized. Log file: logs\ship_performance_20251014_023510.log
+2025-10-14 02:35:10,135 | __main__             | INFO     | Processing Main Engine Excel file: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\Engine_Performance_Data.xlsx
+2025-10-14 02:35:10,136 | __main__             | INFO     | Configuration:
+2025-10-14 02:35:10,136 | __main__             | INFO     |   Database: postgresql+psycopg2://aepms_deepa_login:****@20.244.0.96:5432/aepms_db
+2025-10-14 02:35:10,137 | __main__             | INFO     |   Log Level: INFO
+2025-10-14 02:35:10,137 | __main__             | INFO     |   Data Directory: data
+2025-10-14 02:35:10,138 | __main__             | INFO     | Validating Main Engine Excel file...
+2025-10-14 02:35:10,139 | __main__             | INFO     | Excel file validated: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\Engine_Performance_Data.xlsx (41,461 bytes)
+2025-10-14 02:35:10,139 | __main__             | INFO     | Initializing database connection...
+2025-10-14 02:35:10,566 | app.database         | INFO     | ✅ Database connection successful!
+2025-10-14 02:35:10,567 | app.database         | INFO     | PostgreSQL version: PostgreSQL 16.10 (Ubuntu 16.10-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0, 64-bit
+2025-10-14 02:35:10,567 | app.database         | INFO     | Database: aepms_db
+2025-10-14 02:35:10,568 | app.database         | INFO     | User: aepms_deepa_login
+2025-10-14 02:35:10,988 | app.database         | INFO     | ✅ All tables created successfully!
+2025-10-14 02:35:11,236 | app.database         | INFO     | ✅ Migration applied: widened barometric_pressure_mmh2o to numeric(8,3)
+2025-10-14 02:35:11,304 | app.database         | INFO     | ✅ Migration applied: added fo_consumption_mt_hr to monthly_report_header
+2025-10-14 02:35:11,372 | app.database         | INFO     | ✅ Migration applied: added fuel_injection_pump_index_mm to monthly_report_header
+2025-10-14 02:35:11,443 | app.database         | INFO     | ✅ Migration applied: added exh_temp_cylinder_outlet_ave_c to monthly_report_header
+2025-10-14 02:35:11,515 | app.database         | INFO     | ✅ Migration applied: vessel_info.vessel_id set to NULLABLE
+2025-10-14 02:35:11,583 | app.database         | INFO     | ✅ Migration applied: added permissions column to users
+2025-10-14 02:35:11,654 | app.database         | INFO     | ✅ Migration applied: added password_hash column to users
+2025-10-14 02:35:11,727 | app.database         | INFO     | ✅ Migration applied: added created_by column to users
+2025-10-14 02:35:12,611 | app.database         | INFO     | 📊 Current table row counts:
+2025-10-14 02:35:12,612 | app.database         | INFO     |   vessel_info: 0 rows
+2025-10-14 02:35:12,612 | app.database         | INFO     |   shop_trial_session: 0 rows
+2025-10-14 02:35:12,612 | app.database         | INFO     |   monthly_report_header: 0 rows
+2025-10-14 02:35:12,613 | app.database         | INFO     |   baseline_performance_data: 0 rows
+2025-10-14 02:35:12,614 | app.database         | INFO     |   shop_trial_performance_data: 0 rows
+2025-10-14 02:35:12,614 | app.database         | INFO     |   monthly_report_details_jsonb: 0 rows
+2025-10-14 02:35:12,615 | app.database         | INFO     |   monthly_iso_performance_data: 0 rows
+2025-10-14 02:35:12,615 | app.database         | INFO     |   generator_monthly_report_details_jsonb: 0 rows
+2025-10-14 02:35:12,616 | app.database         | INFO     |   generator_monthly_report_header: 0 rows
+2025-10-14 02:35:12,617 | app.database         | INFO     |   vessel_generator: 0 rows
+2025-10-14 02:35:12,617 | app.database         | INFO     |   generator_performance_graph_data: 0 rows
+2025-10-14 02:35:12,618 | app.database         | INFO     |   role_permissions: 4 rows
+2025-10-14 02:35:12,618 | app.database         | INFO     |   organizations: 2 rows
+2025-10-14 02:35:12,619 | app.database         | INFO     |   users: 1 rows
+2025-10-14 02:35:12,619 | app.database         | INFO     |   generator_baseline_data: 0 rows
+2025-10-14 02:35:12,620 | __main__             | INFO     | Extracting Main Engine data from Excel file...
+2025-10-14 02:35:13,103 | app.excel_loader     | INFO     | Loaded Excel file with 5 sheets: ['vessel_info', 'shop_trial_session', 'shop_trial_performance_data', 'monthly_report_header', 'monthly_report_details_jsonb']
+2025-10-14 02:35:13,103 | app.excel_loader     | INFO     | Processing sheet: vessel_info
+2025-10-14 02:35:13,110 | app.excel_loader     | INFO     | Processing sheet: shop_trial_session
+2025-10-14 02:35:13,116 | app.excel_loader     | INFO     | Processing sheet: shop_trial_performance_data
+2025-10-14 02:35:13,148 | app.excel_loader     | INFO     | Processing sheet: monthly_report_header
+2025-10-14 02:35:13,153 | app.excel_loader     | INFO     | Processing sheet: monthly_report_details_jsonb
+2025-10-14 02:35:13,156 | app.excel_loader     | INFO     | Extraction summary: {'vessels': 8, 'sessions': 8, 'performance_data': 54, 'crank_deflections': 0, 'bearing_temperatures': 0, 'monthly_headers': 0, 'monthly_details': 0}
+2025-10-14 02:35:13,158 | __main__             | INFO     | Main Engine data extraction summary:
+2025-10-14 02:35:13,158 | __main__             | INFO     |   vessels: 8 records
+2025-10-14 02:35:13,158 | __main__             | INFO     |   sessions: 8 records
+2025-10-14 02:35:13,158 | __main__             | INFO     |   performance_data: 54 records
+2025-10-14 02:35:13,160 | __main__             | INFO     |   crank_deflections: 0 records
+2025-10-14 02:35:13,160 | __main__             | INFO     |   bearing_temperatures: 0 records
+2025-10-14 02:35:13,161 | __main__             | INFO     |   monthly_headers: 0 records
+2025-10-14 02:35:13,161 | __main__             | INFO     |   monthly_details: 0 records
+2025-10-14 02:35:13,161 | __main__             | INFO     | Loading Main Engine data into PostgreSQL database...
+2025-10-14 02:35:13,162 | app.data_loader      | INFO     | Starting optimized data loading process...
+2025-10-14 02:35:13,162 | app.data_loader      | INFO     | Pre-loading existing data for efficient processing...
+2025-10-14 02:35:13,300 | app.data_loader      | INFO     | Pre-loaded: 0 vessels, 0 sessions, 0 monthly headers
+2025-10-14 02:35:13,300 | app.data_loader      | INFO     | Loading 8 vessels...
+2025-10-14 02:35:13,550 | app.data_loader      | INFO     | Vessel loading completed: 8 inserted, 0 updated
+2025-10-14 02:35:13,551 | app.data_loader      | INFO     | Loading 8 sessions...
+2025-10-14 02:35:13,954 | app.data_loader      | INFO     | Session loading completed: 8 inserted, 0 updated
+2025-10-14 02:35:13,955 | app.data_loader      | INFO     | Loading 54 performance records...
+2025-10-14 02:35:15,332 | app.data_loader      | INFO     | Performance data loading completed: 54 inserted, 0 updated
+2025-10-14 02:35:15,333 | app.data_loader      | INFO     | Optimized data loading completed successfully
+2025-10-14 02:35:15,339 | __main__             | INFO     | Data loading pipeline completed successfully! Processed 70 records

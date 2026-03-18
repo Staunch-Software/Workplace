@@ -1,0 +1,698 @@
+{
+  "vesselname": {
+    "value": "GCL GANGA",
+    "unit": null
+  },
+  "imo": {
+    "value": 9481697,
+    "unit": null
+  },
+  "date": {
+    "value": "2025-06-14",
+    "unit": null
+  },
+  "propellerpitch": {
+    "value": "4830",
+    "unit": "mm"
+  },
+  "enginetype": {
+    "value": "6S60MC-C",
+    "unit": null
+  },
+  "maxpmaxdeviation": {
+    "value": "2.55",
+    "unit": "%"
+  },
+  "maxpcompdeviation": {
+    "value": "1.68",
+    "unit": "%"
+  },
+  "unitexhtempdeviation": {
+    "value": "3.8",
+    "unit": "\u00b0C"
+  },
+  "fuelpumpmarkdeviation": {
+    "value": "0.67",
+    "unit": "%"
+  },
+  "vitindexdeviation": {
+    "value": "0.52",
+    "unit": "%"
+  },
+  "minjcwtempinlet": {
+    "value": "81",
+    "unit": "\u00b0C"
+  },
+  "maxjcwtempoutlet": {
+    "value": "85",
+    "unit": "\u00b0C"
+  },
+  "mincyloilfeedratesetting": {
+    "value": "0.9",
+    "unit": "kg/MWh"
+  },
+  "maxcyloilfeedratesetting": {
+    "value": "0.9",
+    "unit": "kg/MWh"
+  },
+  "maxmeaneffectiveprdeviation": {
+    "value": "0.85",
+    "unit": "%"
+  },
+  "memcr": {
+    "value": "13650",
+    "unit": "kW"
+  },
+  "mcrrpm": {
+    "value": "105",
+    "unit": "RPM"
+  },
+  "enginerunhrs": {
+    "value": "59043",
+    "unit": "hours"
+  },
+  "enginemaker": {
+    "value": "STX MAN B&W",
+    "unit": null
+  },
+  "model": {
+    "value": "6S60MC-C 8.1(TIER 2)",
+    "unit": null
+  },
+  "load": {
+    "value": "62.10256410256411",
+    "unit": "%"
+  },
+  "eplimplemented": {
+    "value": true,
+    "unit": null
+  },
+  "shipcondition": {
+    "value": "Loaded",
+    "unit": null
+  },
+  "displacement": {
+    "value": "125135",
+    "unit": "MT"
+  },
+  "maxpowerlimitkwafterepl": {
+    "value": "11495",
+    "unit": "kW"
+  },
+  "draftf": {
+    "value": "13.62",
+    "unit": "m"
+  },
+  "drafta": {
+    "value": "13.62",
+    "unit": "m"
+  },
+  "trim": {
+    "value": "0",
+    "unit": "mtr"
+  },
+  "egbpressuredrop": {
+    "value": "1",
+    "unit": "mmH2O"
+  },
+  "loadindicator": {
+    "value": "90",
+    "unit": null
+  },
+  "engineindicatedpowerkw": {
+    "value": "9188",
+    "unit": "kW"
+  },
+  "effectivepower": {
+    "value": "8477",
+    "unit": "kW"
+  },
+  "shaftpower": {
+    "value": "8582",
+    "unit": "kW"
+  },
+  "scavengetemp": {
+    "value": "42",
+    "unit": "\u00b0C"
+  },
+  "scavengepr": {
+    "value": "1.8",
+    "unit": "bar"
+  },
+  "windforce": {
+    "value": "5 - Fresh Breeze",
+    "unit": null
+  },
+  "Seastate": {
+    "value": "4 - Moderate",
+    "unit": null
+  },
+  "maxloadlimitafterepl": {
+    "value": "84.77",
+    "unit": "%"
+  },
+  "weather": {
+    "value": "Overcast",
+    "unit": null
+  },
+  "barometricpressure": {
+    "value": "1010",
+    "unit": "mbar"
+  },
+  "seawatertemp": {
+    "value": "31",
+    "unit": "\u00b0C"
+  },
+  "engineroomtemp": {
+    "value": "40",
+    "unit": "\u00b0C"
+  },
+  "location": {
+    "value": "AT SEA",
+    "unit": null
+  },
+  "rpm": {
+    "value": "90.16666666666667",
+    "unit": "RPM"
+  },
+  "speedgpskn": {
+    "value": "13.6",
+    "unit": "knots"
+  },
+  "speedlogkn": {
+    "value": "12.6",
+    "unit": "knots"
+  },
+  "speedbypitchkn": {
+    "value": "14.10923326133909",
+    "unit": "knots"
+  },
+  "slip%": {
+    "value": "10.70",
+    "unit": "%"
+  },
+  "measuredby": {
+    "value": "MURALITHARAN.T",
+    "unit": null
+  },
+  "chiefengineersign": {
+    "value": "A.J.A.SOBEN",
+    "unit": null
+  },
+  "fograde": {
+    "value": "VLS HFO",
+    "unit": null
+  },
+  "shipname": {
+    "value": "GCL GANGA",
+    "unit": null
+  },
+  "density@15c": {
+    "value": "925.8",
+    "unit": "kg/m\u00b3"
+  },
+  "viscocity@50c": {
+    "value": "152.5",
+    "unit": "cSt"
+  },
+  "fopressurebar": {
+    "value": "6.3",
+    "unit": "bar"
+  },
+  "fotempatengine": {
+    "value": "109",
+    "unit": "\u00b0C"
+  },
+  "correcteddensityfo": {
+    "value": "881.014425",
+    "unit": "kg/m\u00b3"
+  },
+  "sfoc": {
+    "value": "179.31",
+    "unit": "g/kWH"
+  },
+  "cyloilconsumptionltrs/day": {
+    "value": "193",
+    "unit": "liters/day"
+  },
+  "scylocactualg/kwh": {
+    "value": "0.8471403012071881",
+    "unit": "g/kWh"
+  },
+  "lopressureeng": {
+    "value": "2.5",
+    "unit": "bar"
+  },
+  "lo temperatureengineinlet": {
+    "value": "46",
+    "unit": "\u00b0C"
+  },
+  "thrustbearinglotemp": {
+    "value": "60",
+    "unit": "\u00b0C"
+  },
+  "turbochargerrpm#1": {
+    "value": "10960",
+    "unit": "RPM"
+  },
+  "exhaustgastempt/cinlet#1": {
+    "value": "395",
+    "unit": "\u00b0C"
+  },
+  "exhaustgastempt/coutlet#1": {
+    "value": "250",
+    "unit": "\u00b0C"
+  },
+  "turbochargerairinlettemp#1": {
+    "value": "40",
+    "unit": "\u00b0C"
+  },
+  "pressuredropacrosst/cfilter#1": {
+    "value": "67",
+    "unit": "mmH2O"
+  },
+  "lopresst/cinlet#1": {
+    "value": "2.2",
+    "unit": "bar"
+  },
+  "lotempt/cinlet#1": {
+    "value": "46",
+    "unit": "\u00b0C"
+  },
+  "lotempt/coutlet#1": {
+    "value": "62",
+    "unit": "\u00b0C"
+  },
+  "cwtempaircoolerinlet#1": {
+    "value": "36",
+    "unit": "\u00b0C"
+  },
+  "tempaircoolerinlet#1": {
+    "value": "120",
+    "unit": "\u00b0C"
+  },
+  "cwtempaircooleroutlet#1": {
+    "value": "49",
+    "unit": "\u00b0C"
+  },
+  "tempaircooleroutlet#1": {
+    "value": "41",
+    "unit": "\u00b0C"
+  },
+  "pressdropacrossaircooler#1": {
+    "value": "57",
+    "unit": "mmWG"
+  },
+  "pmaxaverage": {
+    "value": "125.25",
+    "unit": "bar"
+  },
+  "pcompaverage": {
+    "value": "98.88333333333334",
+    "unit": "bar"
+  },
+  "meaneffectivepraverage": {
+    "value": "14.950000000000001",
+    "unit": "bar"
+  },
+  "indicatedpoweraverage": {
+    "value": "1531.3333333333333",
+    "unit": "kW"
+  },
+  "exhausttempaverage": {
+    "value": "280.5",
+    "unit": "\u00b0C"
+  },
+  "pumpmark/fuelindexaverage": {
+    "value": "72.33333333333333",
+    "unit": null
+  },
+  "vitindexaverage": {
+    "value": "3.216666666666667",
+    "unit": null
+  },
+  "jcwtempinletaverage": {
+    "value": "81",
+    "unit": "\u00b0C"
+  },
+  "jcwtempoutletaverage": {
+    "value": "85",
+    "unit": "\u00b0C"
+  },
+  "pcotempoutletaverage": {
+    "value": "54",
+    "unit": "\u00b0C"
+  },
+  "pmax#1": {
+    "value": "122.8",
+    "unit": "bar"
+  },
+  "pmax#2": {
+    "value": "125.8",
+    "unit": "bar"
+  },
+  "pmax#3": {
+    "value": "123.7",
+    "unit": "bar"
+  },
+  "pmax#4": {
+    "value": "125.9",
+    "unit": "bar"
+  },
+  "pmax#5": {
+    "value": "127.8",
+    "unit": "bar"
+  },
+  "pmax#6": {
+    "value": "125.5",
+    "unit": "bar"
+  },
+  "pcomp#1": {
+    "value": "97.2",
+    "unit": "bar"
+  },
+  "pcomp#2": {
+    "value": "99.4",
+    "unit": "bar"
+  },
+  "pcomp#3": {
+    "value": "98.7",
+    "unit": "bar"
+  },
+  "pcomp#4": {
+    "value": "100.4",
+    "unit": "bar"
+  },
+  "pcomp#5": {
+    "value": "98.4",
+    "unit": "bar"
+  },
+  "pcomp#6": {
+    "value": "99.2",
+    "unit": "bar"
+  },
+  "timestart": {
+    "value": "08:30:00",
+    "unit": "HH:MM"
+  },
+  "timefinish": {
+    "value": "09:30:00",
+    "unit": "HH:MM"
+  },
+  "revolutioncounterstart": {
+    "value": "68051004",
+    "unit": "revolutions"
+  },
+  "revolutioncounterfinish": {
+    "value": "68056414",
+    "unit": "revolutions"
+  },
+  "reportmonth": {
+    "value": "2025-06-01",
+    "unit": null
+  },
+  "meaneffectivepr#1": {
+    "value": "15.1",
+    "unit": "bar"
+  },
+  "meaneffectivepr#2": {
+    "value": "14.1",
+    "unit": "bar"
+  },
+  "meaneffectivepr#3": {
+    "value": "14.9",
+    "unit": "bar"
+  },
+  "meaneffectivepr#4": {
+    "value": "15.1",
+    "unit": "bar"
+  },
+  "meaneffectivepr#5": {
+    "value": "15.8",
+    "unit": "bar"
+  },
+  "meaneffectivepr#6": {
+    "value": "14.7",
+    "unit": "bar"
+  },
+  "indicatedpower#1": {
+    "value": "1549",
+    "unit": "kW"
+  },
+  "indicatedpower#2": {
+    "value": "1432",
+    "unit": "kW"
+  },
+  "indicatedpower#3": {
+    "value": "1531",
+    "unit": "kW"
+  },
+  "indicatedpower#4": {
+    "value": "1554",
+    "unit": "kW"
+  },
+  "indicatedpower#5": {
+    "value": "1605",
+    "unit": "kW"
+  },
+  "indicatedpower#6": {
+    "value": "1517",
+    "unit": "kW"
+  },
+  "exhausttemp#1": {
+    "value": "284",
+    "unit": "\u00b0C"
+  },
+  "exhausttemp#2": {
+    "value": "280",
+    "unit": "\u00b0C"
+  },
+  "exhausttemp#3": {
+    "value": "280",
+    "unit": "\u00b0C"
+  },
+  "exhausttemp#4": {
+    "value": "282",
+    "unit": "\u00b0C"
+  },
+  "exhausttemp#5": {
+    "value": "280",
+    "unit": "\u00b0C"
+  },
+  "exhausttemp#6": {
+    "value": "277",
+    "unit": "\u00b0C"
+  },
+  "pumpmark/fuelindex#1": {
+    "value": "72",
+    "unit": null
+  },
+  "pumpmark/fuelindex#2": {
+    "value": "72",
+    "unit": null
+  },
+  "pumpmark/fuelindex#3": {
+    "value": "73",
+    "unit": null
+  },
+  "pumpmark/fuelindex#4": {
+    "value": "73",
+    "unit": null
+  },
+  "pumpmark/fuelindex#5": {
+    "value": "72",
+    "unit": null
+  },
+  "pumpmark/fuelindex#6": {
+    "value": "72",
+    "unit": null
+  },
+  "vitindex#1": {
+    "value": "3.4",
+    "unit": null
+  },
+  "vitindex#2": {
+    "value": "3.6",
+    "unit": null
+  },
+  "vitindex#3": {
+    "value": "3",
+    "unit": null
+  },
+  "vitindex#4": {
+    "value": "2.9",
+    "unit": null
+  },
+  "vitindex#5": {
+    "value": "3.7",
+    "unit": null
+  },
+  "vitindex#6": {
+    "value": "2.7",
+    "unit": null
+  },
+  "jcwtempinlet#1": {
+    "value": "81",
+    "unit": "\u00b0C"
+  },
+  "jcwtempinlet#2": {
+    "value": "81",
+    "unit": "\u00b0C"
+  },
+  "jcwtempinlet#3": {
+    "value": "81",
+    "unit": "\u00b0C"
+  },
+  "jcwtempinlet#4": {
+    "value": "81",
+    "unit": "\u00b0C"
+  },
+  "jcwtempinlet#5": {
+    "value": "81",
+    "unit": "\u00b0C"
+  },
+  "jcwtempinlet#6": {
+    "value": "81",
+    "unit": "\u00b0C"
+  },
+  "jcwtempoutlet#1": {
+    "value": "85",
+    "unit": "\u00b0C"
+  },
+  "jcwtempoutlet#2": {
+    "value": "85",
+    "unit": "\u00b0C"
+  },
+  "jcwtempoutlet#3": {
+    "value": "85",
+    "unit": "\u00b0C"
+  },
+  "jcwtempoutlet#4": {
+    "value": "85",
+    "unit": "\u00b0C"
+  },
+  "jcwtempoutlet#5": {
+    "value": "85",
+    "unit": "\u00b0C"
+  },
+  "jcwtempoutlet#6": {
+    "value": "85",
+    "unit": "\u00b0C"
+  },
+  "pcotempoutlet#1": {
+    "value": "54",
+    "unit": "\u00b0C"
+  },
+  "pcotempoutlet#2": {
+    "value": "54",
+    "unit": "\u00b0C"
+  },
+  "pcotempoutlet#3": {
+    "value": "54",
+    "unit": "\u00b0C"
+  },
+  "pcotempoutlet#4": {
+    "value": "54",
+    "unit": "\u00b0C"
+  },
+  "pcotempoutlet#5": {
+    "value": "54",
+    "unit": "\u00b0C"
+  },
+  "pcotempoutlet#6": {
+    "value": "54",
+    "unit": "\u00b0C"
+  },
+  "rpmpercentage": {
+    "value": "85.87",
+    "unit": "%"
+  },
+  "fotempatflowmeter": {
+    "value": "90",
+    "unit": "\u00b0C"
+  },
+  "totalmassasperbdn/fosulphur%": {
+    "value": "0.49",
+    "unit": "%"
+  },
+  "netenergyasperbdn/folcvselection": {
+    "value": "FO LCV (MJ/Kg)",
+    "unit": null
+  },
+  "netenergyasperbdn/folcv": {
+    "value": "41.64",
+    "unit": "MJ/kg"
+  },
+  "totalmassasperbdn/fosulphurpercentageselection": {
+    "value": "FO Sulphur (%)",
+    "unit": null
+  },
+  "cyllotbn": {
+    "value": "40",
+    "unit": "TBN"
+  },
+  "cyloilfeedratesetting": {
+    "value": "0.9",
+    "unit": "kg/MWh"
+  },
+  "cyllodensity@15c": {
+    "value": "893",
+    "unit": "kg/m\u00b3"
+  },
+  "maxpowerlimitkwaftereplselection": {
+    "value": "Max. power limit (KW)",
+    "unit": null
+  },
+  "maxloadlimitpercentageafereplselection": {
+    "value": "Max load limit (%)after EPL",
+    "unit": null
+  },
+  "foconsumptionmt_hr": {
+    "value": "1.57",
+    "unit": "MT/hr"
+  },
+  "model_dup": {
+    "value": "6S60MC-C 8.1(TIER 2)",
+    "unit": null
+  },
+  "enginemaker_dup": {
+    "value": "STX MAN B&W",
+    "unit": null
+  },
+  "sfoccalculated": {
+    "value": "185.20703078919428",
+    "unit": "g/kWH"
+  },
+  "formname": {
+    "value": "-7",
+    "unit": null
+  },
+  "techno": {
+    "value": "-7",
+    "unit": null
+  },
+  "editionno": {
+    "value": "3",
+    "unit": null
+  },
+  "revno": {
+    "value": "0",
+    "unit": null
+  },
+  "revdate": {
+    "value": "2021-07-10",
+    "unit": null
+  },
+  "noofcyl": {
+    "value": "6",
+    "unit": "cylinders"
+  },
+  "Text7": {
+    "value": "Report Month",
+    "unit": null
+  },
+  "foconsumptionmt_hr_kg_h": {
+    "value": "1570.00",
+    "unit": "kg/h"
+  }
+}

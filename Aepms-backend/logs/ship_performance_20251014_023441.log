@@ -1,0 +1,93 @@
+2025-10-14 02:34:41,565 | __main__             | INFO     | Logging initialized. Log file: logs\ship_performance_20251014_023441.log
+2025-10-14 02:34:41,567 | __main__             | INFO     | Processing Main Engine Excel file: D:\Ozellar Project\Aepms-backend\iso-performance-backend\Engine_Performance_Data.xlsx
+2025-10-14 02:34:41,567 | __main__             | INFO     | Processing Auxiliary Engine Excel file: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\ae_shop_trial.xlsx
+2025-10-14 02:34:41,568 | __main__             | INFO     | Configuration:
+2025-10-14 02:34:41,568 | __main__             | INFO     |   Database: postgresql+psycopg2://aepms_deepa_login:****@20.244.0.96:5432/aepms_db
+2025-10-14 02:34:41,603 | __main__             | INFO     |   Log Level: INFO
+2025-10-14 02:34:41,603 | __main__             | INFO     |   Data Directory: data
+2025-10-14 02:34:41,604 | __main__             | INFO     | Validating Main Engine Excel file...
+2025-10-14 02:34:41,605 | __main__             | ERROR    | Excel file not found: D:\Ozellar Project\Aepms-backend\iso-performance-backend\Engine_Performance_Data.xlsx
+2025-10-14 02:34:41,606 | __main__             | WARNING  | ME file invalid, continuing with AE data only
+2025-10-14 02:34:41,606 | __main__             | INFO     | Validating Auxiliary Engine Excel file...
+2025-10-14 02:34:41,607 | __main__             | INFO     | Excel file validated: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\ae_shop_trial.xlsx (22,978 bytes)
+2025-10-14 02:34:41,607 | __main__             | INFO     | Initializing database connection...
+2025-10-14 02:34:42,078 | app.database         | INFO     | ✅ Database connection successful!
+2025-10-14 02:34:42,079 | app.database         | INFO     | PostgreSQL version: PostgreSQL 16.10 (Ubuntu 16.10-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0, 64-bit
+2025-10-14 02:34:42,080 | app.database         | INFO     | Database: aepms_db
+2025-10-14 02:34:42,080 | app.database         | INFO     | User: aepms_deepa_login
+2025-10-14 02:34:42,533 | app.database         | INFO     | ✅ All tables created successfully!
+2025-10-14 02:34:42,799 | app.database         | INFO     | ✅ Migration applied: widened barometric_pressure_mmh2o to numeric(8,3)
+2025-10-14 02:34:42,872 | app.database         | INFO     | ✅ Migration applied: added fo_consumption_mt_hr to monthly_report_header
+2025-10-14 02:34:42,947 | app.database         | INFO     | ✅ Migration applied: added fuel_injection_pump_index_mm to monthly_report_header
+2025-10-14 02:34:43,020 | app.database         | INFO     | ✅ Migration applied: added exh_temp_cylinder_outlet_ave_c to monthly_report_header
+2025-10-14 02:34:43,090 | app.database         | INFO     | ✅ Migration applied: vessel_info.vessel_id set to NULLABLE
+2025-10-14 02:34:43,159 | app.database         | INFO     | ✅ Migration applied: added permissions column to users
+2025-10-14 02:34:43,231 | app.database         | INFO     | ✅ Migration applied: added password_hash column to users
+2025-10-14 02:34:43,303 | app.database         | INFO     | ✅ Migration applied: added created_by column to users
+2025-10-14 02:34:44,241 | app.database         | INFO     | 📊 Current table row counts:
+2025-10-14 02:34:44,242 | app.database         | INFO     |   vessel_info: 0 rows
+2025-10-14 02:34:44,243 | app.database         | INFO     |   shop_trial_session: 0 rows
+2025-10-14 02:34:44,243 | app.database         | INFO     |   monthly_report_header: 0 rows
+2025-10-14 02:34:44,244 | app.database         | INFO     |   baseline_performance_data: 0 rows
+2025-10-14 02:34:44,244 | app.database         | INFO     |   shop_trial_performance_data: 0 rows
+2025-10-14 02:34:44,245 | app.database         | INFO     |   monthly_report_details_jsonb: 0 rows
+2025-10-14 02:34:44,245 | app.database         | INFO     |   monthly_iso_performance_data: 0 rows
+2025-10-14 02:34:44,246 | app.database         | INFO     |   generator_monthly_report_details_jsonb: 0 rows
+2025-10-14 02:34:44,246 | app.database         | INFO     |   generator_monthly_report_header: 0 rows
+2025-10-14 02:34:44,247 | app.database         | INFO     |   vessel_generator: 0 rows
+2025-10-14 02:34:44,247 | app.database         | INFO     |   generator_performance_graph_data: 0 rows
+2025-10-14 02:34:44,248 | app.database         | INFO     |   role_permissions: 4 rows
+2025-10-14 02:34:44,248 | app.database         | INFO     |   organizations: 2 rows
+2025-10-14 02:34:44,249 | app.database         | INFO     |   users: 1 rows
+2025-10-14 02:34:44,249 | app.database         | INFO     |   generator_baseline_data: 0 rows
+2025-10-14 02:34:44,250 | __main__             | INFO     | Extracting Auxiliary Engine data from Excel file...
+2025-10-14 02:34:47,346 | app.ae_excel_loader  | INFO     | Loaded AE Excel file: D:\Ozellar Project\Aepms-backend\iso-performance-backend\data\ae_shop_trial.xlsx
+2025-10-14 02:34:47,354 | app.ae_excel_loader  | WARNING  | Skipping generator row: missing IMO/engine_no/designation
+2025-10-14 02:34:47,354 | app.ae_excel_loader  | WARNING  | Skipping generator row: missing IMO/engine_no/designation
+2025-10-14 02:34:47,355 | app.ae_excel_loader  | WARNING  | Skipping generator row: missing IMO/engine_no/designation
+2025-10-14 02:34:47,356 | app.ae_excel_loader  | WARNING  | Skipping generator row: missing IMO/engine_no/designation
+2025-10-14 02:34:47,363 | app.ae_excel_loader  | INFO     | AE extraction: 12 generators, 20 baseline records
+2025-10-14 02:34:47,364 | __main__             | INFO     | Auxiliary Engine data extraction summary:
+2025-10-14 02:34:47,364 | __main__             | INFO     |   vessel_generators: 12 records
+2025-10-14 02:34:47,365 | __main__             | INFO     |   generator_baseline_data: 20 records
+2025-10-14 02:34:47,365 | __main__             | INFO     | Loading Auxiliary Engine data into PostgreSQL database...
+2025-10-14 02:34:47,366 | app.ae_data_loader   | INFO     | Starting AE data loading...
+2025-10-14 02:34:47,502 | app.ae_data_loader   | INFO     | Preloaded: 0 vessels, 0 generators, 0 baseline records
+2025-10-14 02:34:47,502 | app.ae_data_loader   | INFO     | Loading 12 generators...
+2025-10-14 02:34:47,503 | app.ae_data_loader   | ERROR    | [generator_loading] Vessel IMO 9481697 not found
+2025-10-14 02:34:47,504 | app.ae_data_loader   | ERROR    | [generator_loading] Vessel IMO 9481697 not found
+2025-10-14 02:34:47,504 | app.ae_data_loader   | ERROR    | [generator_loading] Vessel IMO 9481697 not found
+2025-10-14 02:34:47,505 | app.ae_data_loader   | ERROR    | [generator_loading] Vessel IMO 9832913 not found
+2025-10-14 02:34:47,505 | app.ae_data_loader   | ERROR    | [generator_loading] Vessel IMO 9832913 not found
+2025-10-14 02:34:47,506 | app.ae_data_loader   | ERROR    | [generator_loading] Vessel IMO 9832913 not found
+2025-10-14 02:34:47,507 | app.ae_data_loader   | ERROR    | [generator_loading] Vessel IMO 9481661 not found
+2025-10-14 02:34:47,507 | app.ae_data_loader   | ERROR    | [generator_loading] Vessel IMO 9481661 not found
+2025-10-14 02:34:47,508 | app.ae_data_loader   | ERROR    | [generator_loading] Vessel IMO 9481661 not found
+2025-10-14 02:34:47,509 | app.ae_data_loader   | ERROR    | [generator_loading] Vessel IMO 9481673 not found
+2025-10-14 02:34:47,509 | app.ae_data_loader   | ERROR    | [generator_loading] Vessel IMO 9481673 not found
+2025-10-14 02:34:47,510 | app.ae_data_loader   | ERROR    | [generator_loading] Vessel IMO 9481673 not found
+2025-10-14 02:34:47,533 | app.ae_data_loader   | INFO     | Generators loaded: 0 inserted, 0 updated
+2025-10-14 02:34:47,534 | app.ae_data_loader   | INFO     | Loading 20 baseline records...
+2025-10-14 02:34:47,534 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9481697 not found
+2025-10-14 02:34:47,535 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9481697 not found
+2025-10-14 02:34:47,536 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9481697 not found
+2025-10-14 02:34:47,536 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9481697 not found
+2025-10-14 02:34:47,537 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9481697 not found
+2025-10-14 02:34:47,538 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9832913 not found
+2025-10-14 02:34:47,539 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9832913 not found
+2025-10-14 02:34:47,539 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9832913 not found
+2025-10-14 02:34:47,539 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9832913 not found
+2025-10-14 02:34:47,540 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9832913 not found
+2025-10-14 02:34:47,541 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9481661 not found
+2025-10-14 02:34:47,542 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9481661 not found
+2025-10-14 02:34:47,542 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9481661 not found
+2025-10-14 02:34:47,543 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9481661 not found
+2025-10-14 02:34:47,544 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9481661 not found
+2025-10-14 02:34:47,544 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9481673 not found
+2025-10-14 02:34:47,545 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9481673 not found
+2025-10-14 02:34:47,546 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9481673 not found
+2025-10-14 02:34:47,546 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9481673 not found
+2025-10-14 02:34:47,547 | app.ae_data_loader   | ERROR    | [baseline_loading] Vessel IMO 9481673 not found
+2025-10-14 02:34:47,548 | app.ae_data_loader   | INFO     | Baseline loaded: 0 inserted, 0 updated
+2025-10-14 02:34:47,549 | app.ae_data_loader   | INFO     | AE data loading completed
+2025-10-14 02:34:47,554 | __main__             | ERROR    | No data was successfully loaded
