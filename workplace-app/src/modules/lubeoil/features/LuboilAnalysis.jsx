@@ -2745,7 +2745,7 @@ const LuboilAnalysis = () => {
         try {
           const res = (
             await axiosLub.post(
-              "/upload-luboil-report/",
+              "/api/upload-luboil-report/",
               (() => {
                 const fd = new FormData();
                 fd.append("file", file);

@@ -360,7 +360,7 @@ async def get_luboil_reports(
 
 # In app/api.py
 
-@app.post("/upload-luboil-report/", tags=["Lube Oil"])
+@app.post("/api/upload-luboil-report/", tags=["Lube Oil"])
 async def upload_luboil_report(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
