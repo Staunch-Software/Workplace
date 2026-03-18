@@ -1,5 +1,5 @@
 ﻿# routers/tickets.py
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, not_
 from sqlalchemy.orm import selectinload
