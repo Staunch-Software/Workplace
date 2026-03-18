@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import JiraHeader from '../components/JiraHeader'
 import { MODULES, ENVIRONMENTS, PRIORITY_OPTIONS } from '../constants/index'
@@ -14,13 +14,37 @@ export default function CreateTicket() {
   const [environment, setEnvironment] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [attachments, setAttachments] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef(null)
+
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files)
+    if (!files.length) return
+    e.target.value = ''
+    setUploading(true)
+    try {
+      for (const file of files) {
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await axiosJira.post('/api/attachments/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        setAttachments(prev => [...prev, res.data])
+      }
+    } catch (err) {
+      setError('Failed to upload some files')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      await axiosJira.post('/api/tickets', { summary, description, module, environment, priority })
+      await axiosJira.post('/api/tickets', { summary, description, module, environment, priority, attachments })
       navigate('/jira/vessel/dashboard')
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create ticket')
@@ -98,16 +122,47 @@ export default function CreateTicket() {
                   {MODULES.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
-              <div className="ct-field ct-field--last">
+              <div className="ct-field">
                 <label className="ct-label">Environment <span className="ct-required">*</span></label>
                 <select value={environment} onChange={e => setEnvironment(e.target.value)} required className="ct-select">
                   <option value="">Select environment</option>
                   {ENVIRONMENTS.map(env => <option key={env} value={env}>{env}</option>)}
                 </select>
               </div>
+              <div className="ct-field ct-field--last">
+                <label className="ct-label">Attachments</label>
+                <div
+                  onClick={() => !uploading && fileInputRef.current?.click()}
+                  className={`ct-upload-zone ${uploading ? 'ct-upload-zone--uploading' : ''}`}
+                  onMouseEnter={e => { if (!uploading) e.currentTarget.classList.add('ct-upload-zone--hover') }}
+                  onMouseLeave={e => e.currentTarget.classList.remove('ct-upload-zone--hover')}
+                >
+                  <p className="ct-upload-text">
+                    {uploading ? 'Uploading...' : 'Click to browse or drag and drop files'}
+                  </p>
+                  <input type="file" multiple hidden ref={fileInputRef} onChange={handleFileUpload} />
+                </div>
+                {attachments.length > 0 && (
+                  <div className="ct-attachment-list">
+                    {attachments.map((file, i) => (
+                      <div key={i} className="ct-attachment-item">
+                        <span className="ct-attachment-name">{file.filename}</span>
+                        <button
+                          type="button"
+                          onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))}
+                          className="ct-attachment-remove"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {error && <div className="ct-error">{error}</div>}
               <div className="ct-actions">
-                <button type="submit" disabled={loading} className="ct-submit-btn">
+                <button type="submit" disabled={loading || uploading} className="ct-submit-btn">
                   {loading ? 'Submitting...' : 'Submit'}
                 </button>
                 <button type="button" onClick={() => navigate('/jira/vessel/dashboard')} className="ct-cancel-btn">

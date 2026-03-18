@@ -13,3 +13,4 @@ class TicketCreate(BaseModel):
     module: str
     environment: str
     priority: Literal["Critical", "Major", "Minor"]
+    attachments: Optional[List[dict]] = []  # ← ADD: allows frontend to send Azure attachment metadata

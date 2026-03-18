@@ -5,6 +5,7 @@ from sqlalchemy import select, func, or_, not_
 from sqlalchemy.orm import selectinload
 from db.database import get_db
 from models.schema import Ticket, Comment
+from services.azure_blob import upload_file_to_blob
 from models.ticket import TicketCreate
 from core.deps import get_current_user
 from pydantic import BaseModel
@@ -97,7 +98,12 @@ async def get_tickets(
         if statuses:
             q = q.where(Ticket.jiraStatus.in_(statuses))
     elif status == "open":
-        q = q.where(not_(Ticket.jiraStatus.in_(CLOSED_STATUSES)))
+        q = q.where(
+            or_(
+                Ticket.jiraStatus.is_(None),
+                not_(Ticket.jiraStatus.in_(CLOSED_STATUSES))
+            )
+        )
     elif status == "closed":
         q = q.where(Ticket.jiraStatus.in_(CLOSED_STATUSES))
     elif status and status != "all":
@@ -132,6 +138,14 @@ async def get_tickets(
         "pagination": {"page": page, "limit": limit, "total": total, "totalPages": -(-total // limit)},
     }
 
+@router.post("/upload")
+async def upload_attachment(
+    file: UploadFile = File(...),
+    user=Depends(get_current_user),
+):
+    content = await file.read()
+    result = await upload_file_to_blob(content, file.filename, file.content_type)
+    return result
 
 @router.post("")
 async def create_ticket(
