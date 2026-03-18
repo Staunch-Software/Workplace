@@ -16,7 +16,7 @@ from app.utils.auth_utils import (
 
 router = APIRouter()
 security = HTTPBearer()
-logger = logging.getLogger(__name__) 
+logger = logging.getLogger(__name__)
 
 # ======================= MODELS =======================
 
@@ -30,11 +30,12 @@ class LocalLoginRequest(BaseModel):
 class UserResponse(BaseModel):
     id: str
     email: str
-    name: str
+    full_name: str
+    role: str
+    # ✅ oid and auth_type kept as optional so /me does not break
+    # if frontend still reads them — they just return None/"unknown"
     oid: Optional[str] = None
-    auth_type: str
-    role: Optional[str] = "user"
-    access_type: Optional[str] = "VESSEL"
+    auth_type: Optional[str] = "local"
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -42,6 +43,7 @@ class TokenResponse(BaseModel):
     expires_in: int
     user: UserResponse
 
+# ✅ Kept — was in original, may be used by other routes importing it
 class ProtectedDataResponse(BaseModel):
     message: str
     user_id: str
@@ -50,93 +52,88 @@ class ProtectedDataResponse(BaseModel):
 
 # ======================= DEPENDENCIES =======================
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> dict:
     """Dependency to verify JWT token and extract current user."""
     token = credentials.credentials
     payload = verify_application_jwt(token)
     return payload
 
-# ✅ MOVED HERE: This fixes the Circular Dependency/NameError
 def require_admin(current_user: dict = Depends(get_current_user)):
     """Check if user has admin role."""
-    roles = current_user.get("roles", [])
-    user_role = roles[0] if isinstance(roles, list) and len(roles) > 0 else "user"
-    
-    logger.info(f"🔐 Admin check for {current_user.get('email')} with role: {user_role}")
-    
-    if user_role not in ["admin", "superuser"]:
-        logger.warning(f"❌ Non-admin access attempt by {current_user.get('email')}")
-        raise HTTPException(status_code=403, detail=f"Admin access required. Your role: {user_role}")
-    
+    user_role = str(current_user.get("role") or "VESSEL").upper()
+    if user_role not in ["ADMIN", "SUPERUSER"]:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Admin access required. Your role: {user_role}"
+        )
     return current_user
 
 # ======================= ROUTES =======================
 
 @router.post("/sso/microsoft", response_model=TokenResponse)
-async def microsoft_sso_login(request: MicrosoftSSORequest, db: Session = Depends(get_db)):
+async def microsoft_sso_login(
+    request: MicrosoftSSORequest,
+    db: Session = Depends(get_db)
+):
     try:
         # Validate Microsoft token
         ms_user_info = validate_microsoft_token(request.id_token)
-        
+
         # Check if user exists in database
         user = db.query(User).filter_by(email=ms_user_info["email"]).first()
-        
+
         if not user:
             # NEW USER - Create as INACTIVE
-            email_domain = ms_user_info["email"].split("@")[1]
-            
-            # Find organization by domain
-            org = db.query(Organization).filter_by(domain=email_domain).first()
-            if not org:
-                org = db.query(Organization).filter_by(id=1).first()  # Default to Staunch
-            
+            # ✅ Removed Organization lookup — not in new model
+            # ✅ Added password_hash placeholder — column is NOT NULL
             user = User(
-                name=ms_user_info["name"],
+                full_name=ms_user_info["name"],
                 email=ms_user_info["email"],
-                role="user",
+                password_hash="SSO_USER_NO_PASSWORD",
+                role="VESSEL",          # ✅ default role, admin changes later
                 is_active=False,
-                auth_type="microsoft",
-                organization_id=org.id
             )
-            
+
             db.add(user)
             db.commit()
-            
+
             raise HTTPException(
-                status_code=403, 
+                status_code=403,
                 detail={
                     "type": "pending_approval",
                     "message": "Your access request has been submitted. Please contact your administrator.",
                     "email": ms_user_info["email"]
                 }
             )
-        
+
         if not user.is_active:
             raise HTTPException(
-                status_code=403, 
+                status_code=403,
                 detail={
                     "type": "pending_approval",
                     "message": "Your account is pending approval.",
                     "email": user.email
                 }
             )
-        
+
         user.last_login = datetime.utcnow()
         db.commit()
-        
+
+        logger.info(f"[SSO LOGIN] user: {user.email}, role from DB: '{user.role}'")
+
+        # ✅ Removed auth_type and organization_id — not in new model
         app_token = create_application_jwt({
             "id": str(user.id),
             "email": user.email,
-            "name": user.name,
-            "auth_type": "microsoft",
-            "roles": [user.role],
-            "access_type": user.access_type,
-            "organization_id": user.organization_id,
+            "full_name": user.full_name,
+            "role": user.role,
             "permissions": user.permissions or {}
         })
-        
+
         from app.config import settings
-        
+
         return TokenResponse(
             access_token=app_token,
             token_type="bearer",
@@ -144,77 +141,85 @@ async def microsoft_sso_login(request: MicrosoftSSORequest, db: Session = Depend
             user=UserResponse(
                 id=str(user.id),
                 email=user.email,
-                name=user.name,
-                auth_type="microsoft",
+                full_name=user.full_name,
                 role=user.role,
-                access_type=user.access_type
+                auth_type="microsoft"   # ✅ hardcoded string, not from DB column
             )
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Microsoft SSO error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/local/login", response_model=TokenResponse)
-async def local_login(request: LocalLoginRequest, db: Session = Depends(get_db)):
+async def local_login(
+    request: LocalLoginRequest,
+    db: Session = Depends(get_db)
+):
     """Local authentication endpoint."""
-    
+
     # --- ADMIN BYPASS FOR TESTING ---
     if request.email == "Admin" and request.password == "Admin@123":
         logger.warning("⚠️ ADMIN TESTING CREDENTIALS USED")
         mock_payload = {
-            "id": "999", "email": "Admin", "name": "System Administrator",
-            "auth_type": "local", "roles": ["admin", "superuser"], 
-            "access_type": "SHORE",
-            "organization_id": 1, "permissions": {} 
+            "id": "999",
+            "email": "Admin",
+            "full_name": "System Administrator",
+            "role": "ADMIN",            # ✅ removed auth_type, organization_id
+            "permissions": {}
         }
         app_token = create_application_jwt(mock_payload)
         from app.config import settings
         return TokenResponse(
-            access_token=app_token, expires_in=settings.APP_JWT_EXPIRE_MINUTES * 60,
+            access_token=app_token,
+            expires_in=settings.APP_JWT_EXPIRE_MINUTES * 60,
             user=UserResponse(
-                id="999", 
-                email="Admin", 
-                name="System Admin", 
-                auth_type="local", 
-                role="admin",
-                access_type="SHORE"  # <--- ✅ ADD THIS HERE
+                id="999",
+                email="Admin",
+                full_name="System Administrator",  # ✅ was name= in original — fixed
+                role="ADMIN",
+                auth_type="local"
             )
         )
     # --------------------------------
 
     user = db.query(User).filter_by(email=request.email).first()
-    
+
+    # ✅ Moved null check BEFORE logger to prevent crash on missing user
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    if not user.password_hash:
+
+    logger.info(f"[LOGIN] user found: {user.email}, role from DB: '{user.role}', is_active: {user.is_active}")
+
+    if not user.password_hash or user.password_hash == "SSO_USER_NO_PASSWORD":
         raise HTTPException(status_code=403, detail="Local login disabled. Use SSO.")
-    
-    if not bcrypt.checkpw(request.password.encode('utf-8'), user.password_hash.encode('utf-8')):
+
+    if not bcrypt.checkpw(
+        request.password.encode('utf-8'),
+        user.password_hash.encode('utf-8')
+    ):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    
+
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account not activated")
-    
+
     user.last_login = datetime.utcnow()
     db.commit()
-    
+
+    # ✅ Removed auth_type and organization_id — not in new model
     app_token = create_application_jwt({
         "id": str(user.id),
         "email": user.email,
-        "name": user.name,
-        "auth_type": "local",
-        "roles": [user.role],
-        "access_type": user.access_type,
-        "organization_id": user.organization_id,
+        "full_name": user.full_name,
+        "role": user.role,
         "permissions": user.permissions or {}
     })
-    
+
     from app.config import settings
-    
+
     return TokenResponse(
         access_token=app_token,
         token_type="bearer",
@@ -222,29 +227,35 @@ async def local_login(request: LocalLoginRequest, db: Session = Depends(get_db))
         user=UserResponse(
             id=str(user.id),
             email=user.email,
-            name=user.name,
-            auth_type="local",
+            full_name=user.full_name,
             role=user.role,
-            access_type=user.access_type
+            auth_type="local"           # ✅ hardcoded string, not from DB column
         )
     )
 
+
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+async def get_current_user_info(
+    current_user: dict = Depends(get_current_user)
+):
     return UserResponse(
-        id=current_user["sub"],
+        id=current_user["id"],
         email=current_user["email"],
-        name=current_user["name"],
-        oid=current_user.get("oid"),
-        auth_type=current_user.get("auth_type", "unknown"),
-        role=current_user.get("roles", ["user"])[0],
-         access_type=current_user.get("access_type", "VESSEL")
+        full_name=current_user.get("full_name", ""),
+        role=current_user.get("role", "VESSEL"),
+        oid=current_user.get("oid"),                        # ✅ kept — returns None if not present
+        auth_type=current_user.get("auth_type", "unknown")  # ✅ kept — returns "unknown" if not present
     )
 
+
 @router.get("/check-access")
-async def check_page_access(page: str, current_user: dict = Depends(get_current_user)):
+async def check_page_access(
+    page: str,
+    current_user: dict = Depends(get_current_user)
+):
     # Permissive mode: Always return True
     return {"page": page, "has_access": True, "endpoint": "permissive_mode"}
+
 
 @router.post("/logout")
 async def logout(current_user: dict = Depends(get_current_user)):

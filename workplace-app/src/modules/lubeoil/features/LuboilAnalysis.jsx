@@ -1,3210 +1,3318 @@
 ﻿import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
-    Card,
-    CardHeader,
-    CardTitle,
-    CardContent,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
 } from "../components/ui/Card";
 import Button from "../components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import axiosLub from "../api/axiosLub";
 import OzellarHeader from "./OzellarHeader";
 import {
-    Upload,
-    Bell,
-    AlertTriangle,
-    CheckCircle,
-    AlertCircle,
-    Filter,
-    Droplet,
-    Activity,
-    Clock,
-    AlertOctagon,
-    TrendingUp,
-    Calendar,
-    ChevronUp,
-    ChevronDown,
-    History,
-    MessageSquareText,
-    Download,
-    FileText,
-    Image as ImageIcon,
-    Eye,
-    SendHorizontal,
-    X,
+  Upload,
+  Bell,
+  AlertTriangle,
+  CheckCircle,
+  AlertCircle,
+  Filter,
+  Droplet,
+  Activity,
+  Clock,
+  AlertOctagon,
+  TrendingUp,
+  Calendar,
+  ChevronUp,
+  ChevronDown,
+  History,
+  MessageSquareText,
+  Download,
+  FileText,
+  Image as ImageIcon,
+  Eye,
+  SendHorizontal,
+  X,
 } from "lucide-react";
 import {
-    LineChart,
-    Line,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    Legend,
-    ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
 } from "recharts";
 import "../styles/dashboard.css"; // Reusing dashboard styles
 import "../styles/luboil.css"; // Specific styles for luboil page
 const OverdueVesselRow = ({
-    v,
-    modalType,
-    onViewClick,
-    amIShore,
-    onUpload,
+  v,
+  modalType,
+  onViewClick,
+  amIShore,
+  onUpload,
 }) => {
-    const [isExpanded, setIsExpanded] = React.useState(false);
+  const [isExpanded, setIsExpanded] = React.useState(false);
 
-    // Check if this is the "Configured" modal to determine which layout to show
-    const isConfiguredView = modalType === "Configured";
+  // Check if this is the "Configured" modal to determine which layout to show
+  const isConfiguredView = modalType === "Configured";
 
-    return (
+  return (
+    <div
+      style={{
+        padding: "14px 18px",
+        borderRadius: "12px",
+        border: "1px solid #e2e8f0",
+        backgroundColor: "#fff",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "8px",
+        flexShrink: 0,
+        transition: "all 0.2s ease",
+      }}
+    >
+      {/* Header Area - Clickable to Toggle */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <div
-            style={{
-                padding: "14px 18px",
-                borderRadius: "12px",
-                border: "1px solid #e2e8f0",
-                backgroundColor: "#fff",
-                boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "8px",
-                flexShrink: 0,
-                transition: "all 0.2s ease",
-            }}
+          onClick={() => setIsExpanded(!isExpanded)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            cursor: "pointer",
+            flex: 1,
+          }}
         >
-            {/* Header Area - Clickable to Toggle */}
+          {/* Status Dot - Logic Preserved from Source */}
+          <div
+            style={{
+              width: "10px",
+              height: "10px",
+              borderRadius: "50%",
+              backgroundColor: (() => {
+                if (modalType.includes("60")) return "#ef4444";
+                if (modalType.includes("30")) return "#f59e0b";
+                if (v.overdueItems?.some((i) => i.state === "danger"))
+                  return "#ef4444";
+                if (v.overdueItems?.some((i) => i.state === "warning"))
+                  return "#f59e0b";
+                if (v.overdueItems?.some((i) => i.state === "info"))
+                  return "#3b82f6";
+                return "#22c55e";
+              })(),
+            }}
+          />
+          <div>
             <div
-                style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                }}
+              style={{
+                fontWeight: "700",
+                color: "#1e293b",
+                fontSize: "0.95rem",
+              }}
             >
-                <div
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        cursor: "pointer",
-                        flex: 1,
-                    }}
-                >
-                    {/* Status Dot - Logic Preserved from Source */}
-                    <div
-                        style={{
-                            width: "10px",
-                            height: "10px",
-                            borderRadius: "50%",
-                            backgroundColor: (() => {
-                                if (modalType.includes("60")) return "#ef4444";
-                                if (modalType.includes("30")) return "#f59e0b";
-                                if (v.overdueItems?.some((i) => i.state === "danger"))
-                                    return "#ef4444";
-                                if (v.overdueItems?.some((i) => i.state === "warning"))
-                                    return "#f59e0b";
-                                if (v.overdueItems?.some((i) => i.state === "info"))
-                                    return "#3b82f6";
-                                return "#22c55e";
-                            })(),
-                        }}
-                    />
-                    <div>
-                        <div
-                            style={{
-                                fontWeight: "700",
-                                color: "#1e293b",
-                                fontSize: "0.95rem",
-                            }}
-                        >
-                            {v.name}
-                        </div>
-                        <div
-                            style={{
-                                fontSize: "0.75rem",
-                                color: "#64748b",
-                                fontFamily: "monospace",
-                            }}
-                        >
-                            IMO: {v.imo}
-                        </div>
-                    </div>
-                </div>
-
-                {/* ðŸ”¥ NEW BLOCK: ONLY FOR CONFIGURED MODAL - UPLOAD & VIEW ICONS */}
-                {isConfiguredView && (
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            marginRight: "15px",
-                        }}
-                    >
-                        {/* 1. VIEW FILE ICON (Shows green if URL exists, grey if empty) */}
-                        {/* 1. VIEW FILE ICON (Updated with await) */}
-                        {v.reportUrl ? (
-                            <button
-                                onClick={async (e) => {
-                                    e.stopPropagation();
-                                    // ðŸ”¥ CRITICAL: You must await the promise to get the actual URL string
-                                    const signedUrl = (await axiosLub.get(`/api/blob/freshen-url?blob_url=${encodeURIComponent(v.reportUrl)}`)).data.signed_url;
-
-                                    if (signedUrl) {
-                                        window.open(signedUrl, "_blank");
-                                    } else {
-                                        alert("âŒ Could not generate secure access link.");
-                                    }
-                                }}
-                                style={{
-                                    background: "none",
-                                    border: "none",
-                                    color: "#10b981",
-                                    cursor: "pointer",
-                                    padding: 0,
-                                    display: "flex",
-                                    alignItems: "center",
-                                }}
-                                title="View Vessel Config Report"
-                            >
-                                <FileText size={20} />
-                            </button>
-                        ) : (
-                            <FileText
-                                size={20}
-                                style={{ color: "#e2e8f0" }}
-                                title="No report uploaded"
-                            />
-                        )}
-
-                        {/* 2. UPLOAD ICON (Only visible and usable by Shore users) */}
-                        {amIShore && (
-                            <div style={{ display: "flex", alignItems: "center" }}>
-                                <input
-                                    type="file"
-                                    id={`vessel-manual-up-${v.imo}`}
-                                    style={{ display: "none" }}
-                                    accept=".pdf"
-                                    onChange={(e) => {
-                                        const file = e.target.files[0];
-                                        if (file) onUpload(v.name, v.imo, file);
-                                    }}
-                                />
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        document
-                                            .getElementById(`vessel-manual-up-${v.imo}`)
-                                            .click();
-                                    }}
-                                    style={{
-                                        background: "none",
-                                        border: "none",
-                                        color: "#64748b",
-                                        cursor: "pointer",
-                                        padding: 0,
-                                        display: "flex",
-                                        alignItems: "center",
-                                    }}
-                                    title="Upload Vessel Report"
-                                >
-                                    <Upload size={18} />
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Right Side: Item Count and Chevron - Logic Preserved */}
-                <div
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        color: "#64748b",
-                        cursor: "pointer",
-                    }}
-                >
-                    {v.overdueItems?.length > 0 && (
-                        <span
-                            style={{
-                                fontSize: "0.75rem",
-                                fontWeight: "600",
-                                backgroundColor: "#f1f5f9",
-                                padding: "2px 8px",
-                                borderRadius: "12px",
-                            }}
-                        >
-                            {v.overdueItems.length}{" "}
-                            {v.overdueItems.length === 1 ? "Item" : "Items"}
-                        </span>
-                    )}
-                    {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                </div>
+              {v.name}
             </div>
-
-            {/* Collapsible Content: Overdue Machinery List - Source Preserved */}
-            {isExpanded && v.overdueItems && v.overdueItems.length > 0 && (
-                <div
-                    style={{
-                        marginTop: "4px",
-                        padding: "12px",
-                        backgroundColor: "#f8fafc",
-                        borderRadius: "8px",
-                        border: "1px dashed #cbd5e1",
-                        animation: "fadeIn 0.2s ease-out",
-                    }}
-                >
-                    <p
-                        style={{
-                            margin: "0 0 8px 0",
-                            fontSize: "0.65rem",
-                            fontWeight: "800",
-                            color: "#64748b",
-                            textTransform: "uppercase",
-                        }}
-                    >
-                        Equipment Detail:
-                    </p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                        {v.overdueItems.map((item, i) => (
-                            <div
-                                key={i}
-                                style={{
-                                    fontSize: "0.75rem",
-                                    backgroundColor: "#fff",
-                                    padding: "10px 12px",
-                                    borderRadius: "6px",
-                                    border: "1px solid #e2e8f0",
-                                    color: "#334155",
-                                    fontWeight: "600",
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    gap: "10px",
-                                    alignItems: "center",
-                                }}
-                            >
-                                {/* Text Content Area */}
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: "2px",
-                                    }}
-                                >
-                                    <span style={{ color: "#1e293b", fontWeight: "700" }}>
-                                        {item.fullName} {item.overdueText || ""}
-                                    </span>
-
-                                    {/* ðŸ”¥ ONLY SHOW REPORT DATE LINE IF NOT CONFIGURED MODAL */}
-                                    {!isConfiguredView && (
-                                        <span
-                                            style={{
-                                                fontSize: "0.65rem",
-                                                color: "#64748b",
-                                                fontWeight: "600",
-                                            }}
-                                        >
-                                            Report Date:{" "}
-                                            {item.reportDate
-                                                ? new Date(item.reportDate).toLocaleDateString(
-                                                    "en-GB",
-                                                    { day: "2-digit", month: "short", year: "numeric" },
-                                                )
-                                                : "N/A"}
-                                        </span>
-                                    )}
-                                </div>
-
-                                {/* Right Side Action/Status Area */}
-                                <div
-                                    style={{ display: "flex", alignItems: "center", gap: "12px" }}
-                                >
-                                    {isConfiguredView ? (
-                                        /* ðŸ”¥ REVERTED LOOK FOR CONFIGURED: JUST THE ORIGINAL LABEL */
-                                        <span
-                                            style={{
-                                                backgroundColor: "#eff6ff",
-                                                color: "#1e40af",
-                                                border: "1px solid #dbeafe",
-                                                padding: "2px 8px",
-                                                borderRadius: "4px",
-                                                fontSize: "0.62rem",
-                                                fontWeight: "900",
-                                                textAlign: "center",
-                                                minWidth: "145px",
-                                            }}
-                                        >
-                                            {item.shortCode}
-                                        </span>
-                                    ) : (
-                                        /* ðŸ”¥ NEW LOOK FOR OVERDUE/UNRESOLVED: ICON + VIEW BUTTON */
-                                        <>
-                                            <div
-                                                title={`Status: ${item.status || "N/A"}`}
-                                                style={{ display: "flex", alignItems: "center" }}
-                                            >
-                                                <ShellStatusIcon status={item.status} size={22} />
-                                            </div>
-
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onViewClick(v.name, item);
-                                                }}
-                                                style={{
-                                                    backgroundColor: "#ffffff",
-                                                    color: "#2563eb",
-                                                    border: "1px solid #2563eb",
-                                                    padding: "6px 14px",
-                                                    borderRadius: "6px",
-                                                    fontSize: "0.7rem",
-                                                    fontWeight: "800",
-                                                    cursor: "pointer",
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    gap: "6px",
-                                                    transition: "all 0.2s",
-                                                }}
-                                            >
-                                                <Eye size={14} /> VIEW
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+            <div
+              style={{
+                fontSize: "0.75rem",
+                color: "#64748b",
+                fontFamily: "monospace",
+              }}
+            >
+              IMO: {v.imo}
+            </div>
+          </div>
         </div>
-    );
+
+        {/* ðŸ”¥ NEW BLOCK: ONLY FOR CONFIGURED MODAL - UPLOAD & VIEW ICONS */}
+        {isConfiguredView && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              marginRight: "15px",
+            }}
+          >
+            {/* 1. VIEW FILE ICON (Shows green if URL exists, grey if empty) */}
+            {/* 1. VIEW FILE ICON (Updated with await) */}
+            {v.reportUrl ? (
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  // ðŸ”¥ CRITICAL: You must await the promise to get the actual URL string
+                  const signedUrl = (
+                    await axiosLub.get(
+                      `/api/blob/freshen-url?blob_url=${encodeURIComponent(v.reportUrl)}`,
+                    )
+                  ).data.signed_url;
+
+                  if (signedUrl) {
+                    window.open(signedUrl, "_blank");
+                  } else {
+                    alert("âŒ Could not generate secure access link.");
+                  }
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#10b981",
+                  cursor: "pointer",
+                  padding: 0,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+                title="View Vessel Config Report"
+              >
+                <FileText size={20} />
+              </button>
+            ) : (
+              <FileText
+                size={20}
+                style={{ color: "#e2e8f0" }}
+                title="No report uploaded"
+              />
+            )}
+
+            {/* 2. UPLOAD ICON (Only visible and usable by Shore users) */}
+            {amIShore && (
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <input
+                  type="file"
+                  id={`vessel-manual-up-${v.imo}`}
+                  style={{ display: "none" }}
+                  accept=".pdf"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) onUpload(v.name, v.imo, file);
+                  }}
+                />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    document
+                      .getElementById(`vessel-manual-up-${v.imo}`)
+                      .click();
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#64748b",
+                    cursor: "pointer",
+                    padding: 0,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                  title="Upload Vessel Report"
+                >
+                  <Upload size={18} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Right Side: Item Count and Chevron - Logic Preserved */}
+        <div
+          onClick={() => setIsExpanded(!isExpanded)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            color: "#64748b",
+            cursor: "pointer",
+          }}
+        >
+          {v.overdueItems?.length > 0 && (
+            <span
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: "600",
+                backgroundColor: "#f1f5f9",
+                padding: "2px 8px",
+                borderRadius: "12px",
+              }}
+            >
+              {v.overdueItems.length}{" "}
+              {v.overdueItems.length === 1 ? "Item" : "Items"}
+            </span>
+          )}
+          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </div>
+      </div>
+
+      {/* Collapsible Content: Overdue Machinery List - Source Preserved */}
+      {isExpanded && v.overdueItems && v.overdueItems.length > 0 && (
+        <div
+          style={{
+            marginTop: "4px",
+            padding: "12px",
+            backgroundColor: "#f8fafc",
+            borderRadius: "8px",
+            border: "1px dashed #cbd5e1",
+            animation: "fadeIn 0.2s ease-out",
+          }}
+        >
+          <p
+            style={{
+              margin: "0 0 8px 0",
+              fontSize: "0.65rem",
+              fontWeight: "800",
+              color: "#64748b",
+              textTransform: "uppercase",
+            }}
+          >
+            Equipment Detail:
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {v.overdueItems.map((item, i) => (
+              <div
+                key={i}
+                style={{
+                  fontSize: "0.75rem",
+                  backgroundColor: "#fff",
+                  padding: "10px 12px",
+                  borderRadius: "6px",
+                  border: "1px solid #e2e8f0",
+                  color: "#334155",
+                  fontWeight: "600",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: "10px",
+                  alignItems: "center",
+                }}
+              >
+                {/* Text Content Area */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "2px",
+                  }}
+                >
+                  <span style={{ color: "#1e293b", fontWeight: "700" }}>
+                    {item.fullName} {item.overdueText || ""}
+                  </span>
+
+                  {/* ðŸ”¥ ONLY SHOW REPORT DATE LINE IF NOT CONFIGURED MODAL */}
+                  {!isConfiguredView && (
+                    <span
+                      style={{
+                        fontSize: "0.65rem",
+                        color: "#64748b",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Report Date:{" "}
+                      {item.reportDate
+                        ? new Date(item.reportDate).toLocaleDateString(
+                            "en-GB",
+                            { day: "2-digit", month: "short", year: "numeric" },
+                          )
+                        : "N/A"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Right Side Action/Status Area */}
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "12px" }}
+                >
+                  {isConfiguredView ? (
+                    /* ðŸ”¥ REVERTED LOOK FOR CONFIGURED: JUST THE ORIGINAL LABEL */
+                    <span
+                      style={{
+                        backgroundColor: "#eff6ff",
+                        color: "#1e40af",
+                        border: "1px solid #dbeafe",
+                        padding: "2px 8px",
+                        borderRadius: "4px",
+                        fontSize: "0.62rem",
+                        fontWeight: "900",
+                        textAlign: "center",
+                        minWidth: "145px",
+                      }}
+                    >
+                      {item.shortCode}
+                    </span>
+                  ) : (
+                    /* ðŸ”¥ NEW LOOK FOR OVERDUE/UNRESOLVED: ICON + VIEW BUTTON */
+                    <>
+                      <div
+                        title={`Status: ${item.status || "N/A"}`}
+                        style={{ display: "flex", alignItems: "center" }}
+                      >
+                        <ShellStatusIcon status={item.status} size={22} />
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewClick(v.name, item);
+                        }}
+                        style={{
+                          backgroundColor: "#ffffff",
+                          color: "#2563eb",
+                          border: "1px solid #2563eb",
+                          padding: "6px 14px",
+                          borderRadius: "6px",
+                          fontSize: "0.7rem",
+                          fontWeight: "800",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          transition: "all 0.2s",
+                        }}
+                      >
+                        <Eye size={14} /> VIEW
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 const ShellStatusIcon = ({ status, size = 20 }) => {
-    const s = status?.toLowerCase() || "";
+  const s = status?.toLowerCase() || "";
 
-    // Color Logic: Preserving all original colors and synonyms.
-    let color = "#cbd5e1";
-    if (s === "normal") color = "#22c55e"; // Green
-    if (s === "warning" || s === "attention") color = "#f59e0b"; // Orange
-    if (s === "critical" || s === "action") color = "#ef4444"; // Red
+  // Color Logic: Preserving all original colors and synonyms.
+  let color = "#cbd5e1";
+  if (s === "normal") color = "#22c55e"; // Green
+  if (s === "warning" || s === "attention") color = "#f59e0b"; // Orange
+  if (s === "critical" || s === "action") color = "#ef4444"; // Red
 
-    // Check if we are in a "Missing State"
-    const isPlaceholder = s === "" || s === "none";
+  // Check if we are in a "Missing State"
+  const isPlaceholder = s === "" || s === "none";
 
-    return (
-        <svg
-            width={size}
-            height={size}
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            style={{ display: "block", flexShrink: 0 }}
-        >
-            {/* 
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ display: "block", flexShrink: 0 }}
+    >
+      {/* 
          BASE CIRCLE: 
          - If Placeholder: Reduced radius (r=6) and no border (strokeWidth=0) to make it a small dot.
          - If Icon: Full radius (r=10) and thick border (strokeWidth=2.5).
       */}
-            <circle
-                cx="12"
-                cy="12"
-                r={isPlaceholder ? "6" : "10"}
-                fill={isPlaceholder ? color : "white"}
-                stroke={color}
-                strokeWidth={isPlaceholder ? "0" : "2.5"}
-            />
+      <circle
+        cx="12"
+        cy="12"
+        r={isPlaceholder ? "6" : "10"}
+        fill={isPlaceholder ? color : "white"}
+        stroke={color}
+        strokeWidth={isPlaceholder ? "0" : "2.5"}
+      />
 
-            {/* SYMBOLS: Only rendered if status is a valid alert type */}
+      {/* SYMBOLS: Only rendered if status is a valid alert type */}
 
-            {/* Normal Symbol (Checkmark) */}
-            {s === "normal" && (
-                <path
-                    d="M8 12L11 15L16 9"
-                    stroke={color}
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                />
-            )}
+      {/* Normal Symbol (Checkmark) */}
+      {s === "normal" && (
+        <path
+          d="M8 12L11 15L16 9"
+          stroke={color}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
 
-            {/* Warning/Attention Symbol (Exclamation) */}
-            {(s === "warning" || s === "attention") && (
-                <>
-                    <rect x="11.2" y="7" width="1.6" height="6.5" rx="0.5" fill={color} />
-                    <circle cx="12" cy="16.5" r="1.2" fill={color} />
-                </>
-            )}
+      {/* Warning/Attention Symbol (Exclamation) */}
+      {(s === "warning" || s === "attention") && (
+        <>
+          <rect x="11.2" y="7" width="1.6" height="6.5" rx="0.5" fill={color} />
+          <circle cx="12" cy="16.5" r="1.2" fill={color} />
+        </>
+      )}
 
-            {/* Critical/Action Symbol (X-Mark) */}
-            {(s === "critical" || s === "action") && (
-                <path
-                    d="M8.5 8.5L15.5 15.5M15.5 8.5L8.5 15.5"
-                    stroke={color}
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                />
-            )}
-        </svg>
-    );
+      {/* Critical/Action Symbol (X-Mark) */}
+      {(s === "critical" || s === "action") && (
+        <path
+          d="M8.5 8.5L15.5 15.5M15.5 8.5L8.5 15.5"
+          stroke={color}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+      )}
+    </svg>
+  );
 };
 const LuboilAnalysis = () => {
-    const { user } = useAuth();
-    console.log("DEBUG USER OBJECT:", user);
-    const userData = user?.user || user;
-    const userAccess = (
-        userData?.access_type ||
-        userData?.accessType ||
-        ""
-    ).toUpperCase();
-    const userRole = (userData?.role || "").toUpperCase();
+  const { user } = useAuth();
+  console.log("DEBUG USER OBJECT:", user);
+  const userData = user?.user || user;
+  const userAccess = (
+    userData?.access_type ||
+    userData?.accessType ||
+    ""
+  ).toUpperCase();
+  const userRole = (userData?.role || "").toUpperCase();
 
-    const amIShore =
-        userAccess === "SHORE" ||
-        userRole === "ADMIN" ||
-        userRole === "SUPERUSER" ||
-        userRole === "SHORE";
-    const [matrixData, setMatrixData] = useState(null);
-    const [normalizedTable, setNormalizedTable] = useState({
-        headers: [],
-        rows: {},
-    }); // <--- ADD THIS
-    const hasInitiallySelected = useRef(false);
-    const [loading, setLoading] = useState(true);
-    const [freshGalleryUrls, setFreshGalleryUrls] = useState({});
-    const [uploading, setUploading] = useState(false);
-    const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
-    const [chatMode, setChatMode] = useState("external"); // 'external' or 'internal'
-    const [internalDraft, setInternalDraft] = useState("");
-    const [mentionList, setMentionList] = useState([]);
-    const [showMentionDropdown, setShowMentionDropdown] = useState(false);
-    const [isClosed, setIsClosed] = useState(false);
-    const [mentionFilter, setMentionFilter] = useState("");
-    const [machineryStats, setMachineryStats] = useState({
-        normal: 0,
-        warning: 0,
-        critical: 0,
-    });
-    const [overdueStats, setOverdueStats] = useState({
-        configured: 0,
-        overdue30: 0,
-        overdue60: 0,
-    });
-    const [trendModal, setTrendModal] = useState({
-        isOpen: false,
-        data: [],
-        title: "",
-    });
-    // const [hiddenNotifIds, setHiddenNotifIds] = useState(() => {
-    //   const saved = localStorage.getItem("hidden_notifications");
-    //   return saved ? JSON.parse(saved) : [];
-    // });
-    const [loadingTrend, setLoadingTrend] = useState(false);
-    const [isDiagCollapsed, setIsDiagCollapsed] = useState(false);
-    const [activeVesselInModal, setActiveVesselInModal] = useState(null);
-    const [isReportCollapsed, setIsReportCollapsed] = useState(false);
-    const [isCommCollapsed, setIsCommCollapsed] = useState(false);
-    const [tableColumns, setTableColumns] = useState([]);
-    const [feedReadFilter, setFeedReadFilter] = useState("ALL"); // ALL, READ, UNREAD
-    const [feedVesselFilter, setFeedVesselFilter] = useState("ALL");
-    const [feedFromDate, setFeedFromDate] = useState("");
-    const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
-    const [closeRemarksText, setCloseRemarksText] = useState("");
-    const [selectedCloseFile, setSelectedCloseFile] = useState(null);
-    const [isSubmittingClose, setIsSubmittingClose] = useState(false);
-    const [feedToDate, setFeedToDate] = useState("");
-    // const [hiddenNotifIds, setHiddenNotifIds] = useState([]);
-    const [columnLabels, setColumnLabels] = useState({});
-    const [activeTab, setActiveTab] = useState('dashboard'); // or 'feed'
-    const [isMachineryStatsOpen, setIsMachineryStatsOpen] = useState(false);
-    const [isTableOpen, setIsTableOpen] = useState(true);
-    const [selectedCell, setSelectedCell] = useState(null); // Tracks { vessel, machinery, data }
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isDiagExpanded, setIsDiagExpanded] = useState(false);
-    const [selectedGalleryItems, setSelectedGalleryItems] = useState([]);
-    const [isDownloading, setIsDownloading] = useState(false);
-    const [previewImage, setPreviewImage] = useState(null);
-    const [showNotifDropdown, setShowNotifDropdown] = useState(false);
-    const [viewMode, setViewMode] = useState("matrix"); // 'matrix' or 'liveFeed'
-    const [feedMode, setFeedMode] = useState("FLEET");
-    const [feedData, setFeedData] = useState([]);
-    const [feedLoading, setFeedLoading] = useState(false);
-    const [footerReportVessel, setFooterReportVessel] = useState(null);
-    const [selectedFooterReports, setSelectedFooterReports] = useState([]);
-    const [footerReports, setFooterReports] = useState([]);
-    const [isFooterLoading, setIsFooterLoading] = useState(false);
-    const [isFooterDownloading, setIsFooterDownloading] = useState(false);
-    const footerRef = useRef(null);
-    const chatInputRef = useRef(null);
-    const [feedSearch, setFeedSearch] = useState("");
-    const [feedFilter, setFeedFilter] = useState("ALL");
-    const [isResamplingActive, setIsResamplingActive] = useState(false);
-    const [compareIds, setCompareIds] = useState([]); // Will store exactly 2 IDs
-    const [selectedLubReports, setSelectedLubReports] = useState([]);
-    const authToken =
-        localStorage.getItem("token") || localStorage.getItem("access_token");
-    const [remarksData, setRemarksData] = useState({
-        officer: "",
-        office: "",
-        status: "",
-    });
-    const [existingRemarks, setExistingRemarks] = useState({
-        officer: "",
-        office: "",
-        internal: "",
-    });
-    const getImageUrl = (message) => {
-        if (!message) return null;
-        // This regex finds the URL starting with http/https after the ATTACHED_IMAGE tag
-        const match = message.match(/ATTACHED_IMAGE:\s*(https?:\/\/[^\s]+)/);
-        return match ? match[1] : null;
-    };
-    const [showHistory, setShowHistory] = useState(false);
-    const chatEndRef = useRef(null);
-    const [selectedVesselName, setSelectedVesselName] = useState(null);
-    const [vesselReports, setVesselReports] = useState([]);
-    const [loadingReports, setLoadingReports] = useState(false);
-    const reportsSectionRef = useRef(null);
-    const [rightPanelMode, setRightPanelMode] = useState("report");
-    const [isLinkGenerated, setIsLinkGenerated] = useState(false);
-    const [isActionsCollapsed, setIsActionsCollapsed] = useState(false);
-    const [listModal, setListModal] = useState({
-        isOpen: false,
-        type: "",
-        vessels: [],
-    });
-    const [selectedVesselsFilter, setSelectedVesselsFilter] = useState([]);
-    const [isVesselDropdownOpen, setIsVesselDropdownOpen] = useState(false);
-    const vesselDropdownRef = useRef(null);
-    const fetchFeed = async () => {
-        setFeedLoading(true);
-        try {
-            // You MUST pass feedMode here so the backend knows which filter to apply
-            const data = (await axiosLub.get(`/api/luboil/live-feed?feed_mode=${feedMode}`)).data;
-            setFeedData(data || []);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setFeedLoading(false);
-        }
-    };
-    useEffect(() => {
-        const handleClickOutsideFooter = (event) => {
-            // If the popover is open AND the click is NOT inside the footerRef container
-            if (
-                footerReportVessel &&
-                footerRef.current &&
-                !footerRef.current.contains(event.target)
-            ) {
-                setFooterReportVessel(null);
-                setSelectedFooterReports([]); // Clear selection when closing
-            }
-        };
-
-        // Only add the listener if a popover is actually open
-        if (footerReportVessel) {
-            document.addEventListener("mousedown", handleClickOutsideFooter);
-        }
-
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutsideFooter);
-        };
-    }, [footerReportVessel]);
-
-    useEffect(() => {
-        if (viewMode === "liveFeed") {
-            fetchFeed();
-        }
-    }, [feedMode, viewMode]);
-
-    const handleMarkAllRead = async () => {
-        try {
-            await axiosLub.post('/api/luboil/live-feed/read-all');
-            fetchFeed();
-        } catch (err) {
-            console.error(err);
-        }
-    };
-    const getPriorityColor = (priority) => {
-        switch (priority?.toUpperCase()) {
-            case "CRITICAL":
-                return "#ef4444";
-            case "WARNING":
-                return "#f59e0b";
-            case "SUCCESS":
-                return "#22c55e";
-            default:
-                return "#3b82f6";
-        }
-    };
-    const handleVesselManualReportUpload = async (vesselName, imo, file) => {
-        if (!file) return;
-        setUploading(true);
-        try {
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("imo", imo);
-
-            // Calls the FastAPI endpoint created in Step 1
-            (await axiosLub.post('/api/luboil/vessel/manual-upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } })).data;
-
-            alert(`âœ… Successfully uploaded config report for ${vesselName}`);
-            loadData(); // Reload matrix to update the modal icons
-        } catch (err) {
-            alert("Upload failed: " + err.message);
-        } finally {
-            setUploading(false);
-        }
+  const amIShore =
+    userAccess === "SHORE" ||
+    userRole === "ADMIN" ||
+    userRole === "SUPERUSER" ||
+    userRole === "SHORE";
+  const [matrixData, setMatrixData] = useState(null);
+  const [normalizedTable, setNormalizedTable] = useState({
+    headers: [],
+    rows: {},
+  }); // <--- ADD THIS
+  const hasInitiallySelected = useRef(false);
+  const [loading, setLoading] = useState(true);
+  const [freshGalleryUrls, setFreshGalleryUrls] = useState({});
+  const [uploading, setUploading] = useState(false);
+  const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
+  const [chatMode, setChatMode] = useState("external"); // 'external' or 'internal'
+  const [internalDraft, setInternalDraft] = useState("");
+  const [mentionList, setMentionList] = useState([]);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [isClosed, setIsClosed] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState("");
+  const [machineryStats, setMachineryStats] = useState({
+    normal: 0,
+    warning: 0,
+    critical: 0,
+  });
+  const [overdueStats, setOverdueStats] = useState({
+    configured: 0,
+    overdue30: 0,
+    overdue60: 0,
+  });
+  const [trendModal, setTrendModal] = useState({
+    isOpen: false,
+    data: [],
+    title: "",
+  });
+  // const [hiddenNotifIds, setHiddenNotifIds] = useState(() => {
+  //   const saved = localStorage.getItem("hidden_notifications");
+  //   return saved ? JSON.parse(saved) : [];
+  // });
+  const [loadingTrend, setLoadingTrend] = useState(false);
+  const [isDiagCollapsed, setIsDiagCollapsed] = useState(false);
+  const [activeVesselInModal, setActiveVesselInModal] = useState(null);
+  const [isReportCollapsed, setIsReportCollapsed] = useState(false);
+  const [isCommCollapsed, setIsCommCollapsed] = useState(false);
+  const [tableColumns, setTableColumns] = useState([]);
+  const [feedReadFilter, setFeedReadFilter] = useState("ALL"); // ALL, READ, UNREAD
+  const [feedVesselFilter, setFeedVesselFilter] = useState("ALL");
+  const [feedFromDate, setFeedFromDate] = useState("");
+  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+  const [closeRemarksText, setCloseRemarksText] = useState("");
+  const [selectedCloseFile, setSelectedCloseFile] = useState(null);
+  const [isSubmittingClose, setIsSubmittingClose] = useState(false);
+  const [feedToDate, setFeedToDate] = useState("");
+  // const [hiddenNotifIds, setHiddenNotifIds] = useState([]);
+  const [columnLabels, setColumnLabels] = useState({});
+  const [activeTab, setActiveTab] = useState("dashboard"); // or 'feed'
+  const [isMachineryStatsOpen, setIsMachineryStatsOpen] = useState(false);
+  const [isTableOpen, setIsTableOpen] = useState(true);
+  const [selectedCell, setSelectedCell] = useState(null); // Tracks { vessel, machinery, data }
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDiagExpanded, setIsDiagExpanded] = useState(false);
+  const [selectedGalleryItems, setSelectedGalleryItems] = useState([]);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [viewMode, setViewMode] = useState("matrix"); // 'matrix' or 'liveFeed'
+  const [feedMode, setFeedMode] = useState("FLEET");
+  const [feedData, setFeedData] = useState([]);
+  const [feedLoading, setFeedLoading] = useState(false);
+  const [footerReportVessel, setFooterReportVessel] = useState(null);
+  const [selectedFooterReports, setSelectedFooterReports] = useState([]);
+  const [footerReports, setFooterReports] = useState([]);
+  const [isFooterLoading, setIsFooterLoading] = useState(false);
+  const [isFooterDownloading, setIsFooterDownloading] = useState(false);
+  const footerRef = useRef(null);
+  const chatInputRef = useRef(null);
+  const [feedSearch, setFeedSearch] = useState("");
+  const [feedFilter, setFeedFilter] = useState("ALL");
+  const [isResamplingActive, setIsResamplingActive] = useState(false);
+  const [compareIds, setCompareIds] = useState([]); // Will store exactly 2 IDs
+  const [selectedLubReports, setSelectedLubReports] = useState([]);
+  const authToken =
+    localStorage.getItem("token") || localStorage.getItem("access_token");
+  const [remarksData, setRemarksData] = useState({
+    officer: "",
+    office: "",
+    status: "",
+  });
+  const [existingRemarks, setExistingRemarks] = useState({
+    officer: "",
+    office: "",
+    internal: "",
+  });
+  const getImageUrl = (message) => {
+    if (!message) return null;
+    // This regex finds the URL starting with http/https after the ATTACHED_IMAGE tag
+    const match = message.match(/ATTACHED_IMAGE:\s*(https?:\/\/[^\s]+)/);
+    return match ? match[1] : null;
+  };
+  const [showHistory, setShowHistory] = useState(false);
+  const chatEndRef = useRef(null);
+  const [selectedVesselName, setSelectedVesselName] = useState(null);
+  const [vesselReports, setVesselReports] = useState([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const reportsSectionRef = useRef(null);
+  const [rightPanelMode, setRightPanelMode] = useState("report");
+  const [isLinkGenerated, setIsLinkGenerated] = useState(false);
+  const [isActionsCollapsed, setIsActionsCollapsed] = useState(false);
+  const [listModal, setListModal] = useState({
+    isOpen: false,
+    type: "",
+    vessels: [],
+  });
+  const [selectedVesselsFilter, setSelectedVesselsFilter] = useState([]);
+  const [isVesselDropdownOpen, setIsVesselDropdownOpen] = useState(false);
+  const vesselDropdownRef = useRef(null);
+  const fetchFeed = async () => {
+    setFeedLoading(true);
+    try {
+      // You MUST pass feedMode here so the backend knows which filter to apply
+      const data = (
+        await axiosLub.get(`/api/luboil/live-feed?feed_mode=${feedMode}`)
+      ).data;
+      setFeedData(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setFeedLoading(false);
+    }
+  };
+  useEffect(() => {
+    const handleClickOutsideFooter = (event) => {
+      // If the popover is open AND the click is NOT inside the footerRef container
+      if (
+        footerReportVessel &&
+        footerRef.current &&
+        !footerRef.current.contains(event.target)
+      ) {
+        setFooterReportVessel(null);
+        setSelectedFooterReports([]); // Clear selection when closing
+      }
     };
 
-    const handleReopenIssue = async () => {
-        if (
-            !window.confirm(
-                "Are you sure you want to REOPEN this issue? This will be logged in the Live Feed.",
-            )
+    // Only add the listener if a popover is actually open
+    if (footerReportVessel) {
+      document.addEventListener("mousedown", handleClickOutsideFooter);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideFooter);
+    };
+  }, [footerReportVessel]);
+
+  useEffect(() => {
+    if (viewMode === "liveFeed") {
+      fetchFeed();
+    }
+  }, [feedMode, viewMode]);
+
+  const handleMarkAllRead = async () => {
+    try {
+      await axiosLub.post("/api/luboil/live-feed/read-all");
+      fetchFeed();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  const getPriorityColor = (priority) => {
+    switch (priority?.toUpperCase()) {
+      case "CRITICAL":
+        return "#ef4444";
+      case "WARNING":
+        return "#f59e0b";
+      case "SUCCESS":
+        return "#22c55e";
+      default:
+        return "#3b82f6";
+    }
+  };
+  const handleVesselManualReportUpload = async (vesselName, imo, file) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("imo", imo);
+
+      // Calls the FastAPI endpoint created in Step 1
+      (
+        await axiosLub.post("/api/luboil/vessel/manual-upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        })
+      ).data;
+
+      alert(`âœ… Successfully uploaded config report for ${vesselName}`);
+      loadData(); // Reload matrix to update the modal icons
+    } catch (err) {
+      alert("Upload failed: " + err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleReopenIssue = async () => {
+    if (
+      !window.confirm(
+        "Are you sure you want to REOPEN this issue? This will be logged in the Live Feed.",
+      )
+    )
+      return;
+
+    setIsSubmittingClose(true);
+    try {
+      const payload = {
+        sample_id: selectedCell.data.sample_id,
+        vessel_name: selectedCell.vessel,
+        machinery_name: selectedCell.data.code || selectedCell.machinery,
+        sample_date: selectedCell.data.last_sample,
+        is_resolved: false, // Tells backend to unset resolved status
+      };
+
+      const response = (
+        await axiosLub.post("/api/luboil/remarks/update", payload)
+      ).data;
+
+      // Update Modal UI state immediately to "Unlocked"
+      setSelectedCell((prev) => ({
+        ...prev,
+        data: {
+          ...prev.data,
+          is_resolved: false,
+          is_approval_pending: false,
+          conversation: response.updated_conversation,
+        },
+      }));
+
+      // Update tracking state for current session
+      setExistingRemarks((prev) => ({
+        ...prev,
+        office: response.updated_conversation, // Syncing to latest history
+      }));
+
+      // Refresh matrix and counters
+      await loadData();
+      alert("Issue has been reopened.");
+    } catch (err) {
+      alert("Failed to reopen: " + err.message);
+    } finally {
+      setIsSubmittingClose(false);
+    }
+  };
+  const handleFooterBatchDownload = async (vesselName) => {
+    if (selectedFooterReports.length === 0) return;
+    setIsFooterDownloading(true);
+    try {
+      // Reusing your existing batch download service
+      const blob = (
+        await axiosLub.post(
+          "/api/performance/batch-download-zip",
+          {
+            report_ids: selectedFooterReports,
+            engine_type: "lubeOil",
+          },
+          { responseType: "blob" },
         )
-            return;
+      ).data;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `${vesselName}_Selected_Reports.zip`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error("Batch download failed:", error);
+      alert("Failed to generate ZIP file.");
+    } finally {
+      setIsFooterDownloading(false);
+    }
+  };
+  const handleFooterReportClick = async (vesselName, imo) => {
+    if (footerReportVessel === vesselName) {
+      setFooterReportVessel(null);
+      return;
+    }
+    setFooterReportVessel(vesselName);
+    setIsFooterLoading(true);
+    try {
+      const res = (await axiosLub.get(`/api/luboil/reports/${imo}`)).data;
+      setFooterReports(res || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsFooterLoading(false);
+    }
+  };
 
-        setIsSubmittingClose(true);
-        try {
-            const payload = {
-                sample_id: selectedCell.data.sample_id,
-                vessel_name: selectedCell.vessel,
-                machinery_name: selectedCell.data.code || selectedCell.machinery,
-                sample_date: selectedCell.data.last_sample,
-                is_resolved: false, // Tells backend to unset resolved status
-            };
+  const downloadSingleReport = (report) => {
+    if (!report.report_url) {
+      alert("No report URL available.");
+      return;
+    }
+    window.open(report.report_url, "_blank");
+  };
+  const availableVessels = useMemo(() => {
+    if (!normalizedTable.rows) return [];
+    return Object.keys(normalizedTable.rows)
+      .filter((name) => {
+        // Only return vessels where at least one machinery has an actual report
+        const machineries = normalizedTable.rows[name];
+        return Object.values(machineries).some((m) => m.has_report === true);
+      })
+      .map((name) => ({
+        vessel_name: name,
+        imo: matrixData?.data?.[name]?.imo,
+      }))
+      .sort((a, b) => a.vessel_name.localeCompare(b.vessel_name));
+  }, [normalizedTable.rows, matrixData]);
 
-            const response = (await axiosLub.post('/api/luboil/remarks/update', payload)).data;
+  // PLACE THIS NEW ONE HERE:
+  useEffect(() => {
+    // Only auto-select if we haven't done it yet and we have vessels
+    if (availableVessels.length > 0 && !hasInitiallySelected.current) {
+      const myAssignedShips = availableVessels.map((v) => v.vessel_name);
+      setSelectedVesselsFilter(myAssignedShips);
+      setIsTableOpen(true);
 
-            // Update Modal UI state immediately to "Unlocked"
-            setSelectedCell((prev) => ({
-                ...prev,
-                data: {
-                    ...prev.data,
-                    is_resolved: false,
-                    is_approval_pending: false,
-                    conversation: response.updated_conversation,
-                },
-            }));
+      // ðŸ”¥ Mark as done so the user can manually change things later
+      hasInitiallySelected.current = true;
+    }
+  }, [availableVessels]); // Remove selectedVesselsFilter.length from here!
+  // Add this to LuboilAnalysis.js to auto-refresh the modal content when matrix data changes
+  useEffect(() => {
+    if (
+      listModal.isOpen &&
+      listModal.type === "Configured" &&
+      matrixData?.data
+    ) {
+      const updatedVessels = listModal.vessels.map((v) => {
+        const liveData = matrixData.data[v.name];
+        return {
+          ...v,
+          reportUrl: liveData?.vessel_report_url, // Sync the new URL into the open modal
+        };
+      });
 
-            // Update tracking state for current session
-            setExistingRemarks((prev) => ({
-                ...prev,
-                office: response.updated_conversation, // Syncing to latest history
-            }));
+      // Only update if something actually changed to prevent infinite loops
+      if (
+        JSON.stringify(updatedVessels) !== JSON.stringify(listModal.vessels)
+      ) {
+        setListModal((prev) => ({ ...prev, vessels: updatedVessels }));
+      }
+    }
+  }, [matrixData, listModal.isOpen]);
+  const uniqueFeedVessels = useMemo(() => {
+    // We pull names from availableVessels (which contains every ship in your system)
+    // instead of only ships currently appearing in the feed.
+    const allNames = availableVessels.map((v) => v.vessel_name);
 
-            // Refresh matrix and counters
-            await loadData();
-            alert("âœ… Issue has been reopened.");
-        } catch (err) {
-            alert("âŒ Failed to reopen: " + err.message);
-        } finally {
-            setIsSubmittingClose(false);
-        }
-    };
-    const handleFooterBatchDownload = async (vesselName) => {
-        if (selectedFooterReports.length === 0) return;
-        setIsFooterDownloading(true);
-        try {
-            // Reusing your existing batch download service
-            const blob = (await axiosLub.post('/api/performance/batch-download-zip', {
-                report_ids:
-                    selectedFooterReports, engine_type: "lubeOil",
-            }, { responseType: 'blob' })).data;
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.setAttribute("download", `${vesselName}_Selected_Reports.zip`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        } catch (error) {
-            console.error("Batch download failed:", error);
-            alert("Failed to generate ZIP file.");
-        } finally {
-            setIsFooterDownloading(false);
-        }
-    };
-    const handleFooterReportClick = async (vesselName, imo) => {
-        if (footerReportVessel === vesselName) {
-            setFooterReportVessel(null);
-            return;
-        }
-        setFooterReportVessel(vesselName);
-        setIsFooterLoading(true);
-        try {
-            const res = (await axiosLub.get(`/api/luboil/reports/${imo}`)).data;
-            setFooterReports(res || []);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setIsFooterLoading(false);
-        }
-    };
+    // Prepend "ALL" for the default filter option.
+    // No need to sort or use 'Set' here because availableVessels is already unique and sorted.
+    return ["ALL", ...allNames];
+  }, [availableVessels]);
 
-    const downloadSingleReport = (report) => {
-        if (!report.report_url) {
-            alert("No report URL available.");
-            return;
-        }
-        window.open(report.report_url, "_blank");
-    };
-    const availableVessels = useMemo(() => {
-        if (!normalizedTable.rows) return [];
-        return Object.keys(normalizedTable.rows)
-            .filter((name) => {
-                // Only return vessels where at least one machinery has an actual report
-                const machineries = normalizedTable.rows[name];
-                return Object.values(machineries).some((m) => m.has_report === true);
-            })
-            .map((name) => ({
-                vessel_name: name,
-                imo: matrixData?.data?.[name]?.imo,
-            }))
-            .sort((a, b) => a.vessel_name.localeCompare(b.vessel_name));
-    }, [normalizedTable.rows, matrixData]);
+  const handleShoreApproval = async (action) => {
+    // action will be 'ACCEPT' or 'DECLINE'
+    setIsSubmittingClose(true);
 
-    // PLACE THIS NEW ONE HERE:
-    useEffect(() => {
-        // Only auto-select if we haven't done it yet and we have vessels
-        if (availableVessels.length > 0 && !hasInitiallySelected.current) {
-            const myAssignedShips = availableVessels.map((v) => v.vessel_name);
-            setSelectedVesselsFilter(myAssignedShips);
-            setIsTableOpen(true);
+    try {
+      const now = new Date();
+      const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
 
-            // ðŸ”¥ Mark as done so the user can manually change things later
-            hasInitiallySelected.current = true;
-        }
-    }, [availableVessels]); // Remove selectedVesselsFilter.length from here!
-    // Add this to LuboilAnalysis.js to auto-refresh the modal content when matrix data changes
-    useEffect(() => {
-        if (
-            listModal.isOpen &&
-            listModal.type === "Configured" &&
-            matrixData?.data
-        ) {
-            const updatedVessels = listModal.vessels.map((v) => {
-                const liveData = matrixData.data[v.name];
-                return {
-                    ...v,
-                    reportUrl: liveData?.vessel_report_url, // Sync the new URL into the open modal
-                };
-            });
+      /**
+       * ðŸ”¥ WORKFLOW LOGIC:
+       * We only construct the final 'Closed' chat card if Shore clicks ACCEPT.
+       * We pull the text from 'resolution_remarks' which the vessel submitted.
+       */
+      const vesselRemarks =
+        selectedCell.data.resolution_remarks || "Resolution details provided.";
+      const resolutionMsg = `[${timestamp}]  RESOLUTION ACCEPTED & CLOSED BY ${user.full_name}: ${vesselRemarks}`;
 
-            // Only update if something actually changed to prevent infinite loops
-            if (
-                JSON.stringify(updatedVessels) !== JSON.stringify(listModal.vessels)
-            ) {
-                setListModal((prev) => ({ ...prev, vessels: updatedVessels }));
-            }
-        }
-    }, [matrixData, listModal.isOpen]);
-    const uniqueFeedVessels = useMemo(() => {
-        // We pull names from availableVessels (which contains every ship in your system)
-        // instead of only ships currently appearing in the feed.
-        const allNames = availableVessels.map((v) => v.vessel_name);
+      const payload = {
+        sample_id: selectedCell.data.sample_id,
+        vessel_name: selectedCell.vessel,
+        machinery_name: selectedCell.data.code || selectedCell.machinery,
+        sample_date: selectedCell.data.last_sample,
+        approval_action: action, // This tells the backend what to do
 
-        // Prepend "ALL" for the default filter option.
-        // No need to sort or use 'Set' here because availableVessels is already unique and sorted.
-        return ["ALL", ...allNames];
-    }, [availableVessels]);
+        // If accepting, we officially append the resolution card to the chat history
+        office_remarks:
+          action === "ACCEPT"
+            ? existingRemarks.office
+              ? existingRemarks.office + "\n" + resolutionMsg
+              : resolutionMsg
+            : existingRemarks.office,
+        officer_remarks: existingRemarks.officer,
+      };
 
-    const handleShoreApproval = async (action) => {
-        // action will be 'ACCEPT' or 'DECLINE'
-        setIsSubmittingClose(true);
+      const response = (
+        await axiosLub.post("/api/luboil/remarks/update", payload)
+      ).data;
 
-        try {
-            const now = new Date();
-            const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+      // Update Local UI state immediately
+      setSelectedCell((prev) => ({
+        ...prev,
+        data: {
+          ...prev.data,
+          is_resolved: action === "ACCEPT",
+          is_approval_pending: false,
+          // Update the actual remarks strings so state remains consistent
+          office_remarks: payload.office_remarks,
+          conversation: response.updated_conversation,
+        },
+      }));
 
-            /**
-             * ðŸ”¥ WORKFLOW LOGIC:
-             * We only construct the final 'Closed' chat card if Shore clicks ACCEPT.
-             * We pull the text from 'resolution_remarks' which the vessel submitted.
-             */
-            const vesselRemarks =
-                selectedCell.data.resolution_remarks || "Resolution details provided.";
-            const resolutionMsg = `[${timestamp}]  RESOLUTION ACCEPTED & CLOSED BY ${user.full_name}: ${vesselRemarks}`;
+      // Update tracking state for any subsequent messages in the same session
+      setExistingRemarks((prev) => ({
+        ...prev,
+        office: payload.office_remarks,
+      }));
 
-            const payload = {
-                sample_id: selectedCell.data.sample_id,
-                vessel_name: selectedCell.vessel,
-                machinery_name: selectedCell.data.code || selectedCell.machinery,
-                sample_date: selectedCell.data.last_sample,
-                approval_action: action, // This tells the backend what to do
+      loadData(); // Refresh matrix to update ticks
 
-                // If accepting, we officially append the resolution card to the chat history
-                office_remarks:
-                    action === "ACCEPT"
-                        ? existingRemarks.office
-                            ? existingRemarks.office + "\n" + resolutionMsg
-                            : resolutionMsg
-                        : existingRemarks.office,
-                officer_remarks: existingRemarks.officer,
-            };
+      const successMsg =
+        action === "ACCEPT"
+          ? "Resolution Accepted. Issue is now CLOSED."
+          : "Resolution Declined. Issue remains OPEN for vessel action.";
+      alert(successMsg);
+    } catch (err) {
+      alert("Action failed: " + err.message);
+    } finally {
+      setIsSubmittingClose(false);
+    }
+  };
 
-            const response = (await axiosLub.post('/api/luboil/remarks/update', payload)).data;
+  // Filtering logic for the feed
+  const groupedFeed = useMemo(() => {
+    // 1. Apply your existing filters + Updated Tab Filtering
+    const filtered = feedData.filter((item) => {
+      // --- NEW: TAB MODE FILTERING (RECIPIENT_ID BASED) ---
+      // MY_FEED: Show items where recipient_id is NOT null (these are mentions/private)
+      // FLEET: Show items where recipient_id IS null (these are general fleet actions)
+      const matchesTab =
+        feedMode === "MY_FEED"
+          ? item.recipient_id !== null
+          : item.recipient_id === null;
 
-            // Update Local UI state immediately
-            setSelectedCell((prev) => ({
-                ...prev,
-                data: {
-                    ...prev.data,
-                    is_resolved: action === "ACCEPT",
-                    is_approval_pending: false,
-                    // Update the actual remarks strings so state remains consistent
-                    office_remarks: payload.office_remarks,
-                    conversation: response.updated_conversation,
-                },
-            }));
+      if (!matchesTab) return false;
 
-            // Update tracking state for any subsequent messages in the same session
-            setExistingRemarks((prev) => ({
-                ...prev,
-                office: payload.office_remarks,
-            }));
+      // --- EXISTING: KEYWORD SEARCH ---
+      const matchesSearch =
+        item.message.toLowerCase().includes(feedSearch.toLowerCase()) ||
+        item.vessel_name.toLowerCase().includes(feedSearch.toLowerCase()) ||
+        (item.machinery_name &&
+          item.machinery_name
+            .toLowerCase()
+            .includes(feedSearch.toLowerCase())) ||
+        (item.equipment_code &&
+          item.equipment_code.toLowerCase().includes(feedSearch.toLowerCase()));
 
-            loadData(); // Refresh matrix to update ticks
+      // --- UPDATED: EVENT TYPE FILTER ---
+      // In MY_FEED mode, everything is a personal alert/mention, so we skip the 'All Actions' dropdown.
+      const matchesType =
+        feedMode === "MY_FEED"
+          ? true
+          : feedFilter === "ALL" || item.event_type === feedFilter;
 
-            const successMsg =
-                action === "ACCEPT"
-                    ? "âœ… Resolution Accepted. Issue is now CLOSED."
-                    : "âŒ Resolution Declined. Issue remains OPEN for vessel action.";
-            alert(successMsg);
-        } catch (err) {
-            alert("âŒ Action failed: " + err.message);
-        } finally {
-            setIsSubmittingClose(false);
-        }
-    };
+      // --- EXISTING: READ/UNREAD STATUS ---
+      const matchesReadStatus =
+        feedReadFilter === "ALL" ||
+        (feedReadFilter === "READ" && item.is_read === true) ||
+        (feedReadFilter === "UNREAD" && item.is_read === false);
 
-    // Filtering logic for the feed
-    const groupedFeed = useMemo(() => {
-        // 1. Apply your existing filters + Updated Tab Filtering
-        const filtered = feedData.filter((item) => {
-            // --- NEW: TAB MODE FILTERING (RECIPIENT_ID BASED) ---
-            // MY_FEED: Show items where recipient_id is NOT null (these are mentions/private)
-            // FLEET: Show items where recipient_id IS null (these are general fleet actions)
-            const matchesTab =
-                feedMode === "MY_FEED"
-                    ? item.recipient_id !== null
-                    : item.recipient_id === null;
+      // --- EXISTING: VESSEL FILTER ---
+      const matchesVessel =
+        feedVesselFilter === "ALL" || item.vessel_name === feedVesselFilter;
 
-            if (!matchesTab) return false;
+      // --- EXISTING: DATE RANGE ---
+      // Normalizing to midnight for accurate day comparison
+      const itemDate = new Date(item.created_at).setHours(0, 0, 0, 0);
+      const from = feedFromDate
+        ? new Date(feedFromDate).setHours(0, 0, 0, 0)
+        : null;
+      const to = feedToDate ? new Date(feedToDate).setHours(0, 0, 0, 0) : null;
 
-            // --- EXISTING: KEYWORD SEARCH ---
-            const matchesSearch =
-                item.message.toLowerCase().includes(feedSearch.toLowerCase()) ||
-                item.vessel_name.toLowerCase().includes(feedSearch.toLowerCase()) ||
-                (item.machinery_name &&
-                    item.machinery_name
-                        .toLowerCase()
-                        .includes(feedSearch.toLowerCase())) ||
-                (item.equipment_code &&
-                    item.equipment_code.toLowerCase().includes(feedSearch.toLowerCase()));
+      let matchesDateRange = true;
+      if (from && itemDate < from) matchesDateRange = false;
+      if (to && itemDate > to) matchesDateRange = false;
 
-            // --- UPDATED: EVENT TYPE FILTER ---
-            // In MY_FEED mode, everything is a personal alert/mention, so we skip the 'All Actions' dropdown.
-            const matchesType =
-                feedMode === "MY_FEED"
-                    ? true
-                    : feedFilter === "ALL" || item.event_type === feedFilter;
+      return (
+        matchesSearch &&
+        matchesType &&
+        matchesReadStatus &&
+        matchesVessel &&
+        matchesDateRange
+      );
+    });
 
-            // --- EXISTING: READ/UNREAD STATUS ---
-            const matchesReadStatus =
-                feedReadFilter === "ALL" ||
-                (feedReadFilter === "READ" && item.is_read === true) ||
-                (feedReadFilter === "UNREAD" && item.is_read === false);
+    // 2. Group by Today, Earlier, and Read
+    const todayStart = new Date().setHours(0, 0, 0, 0);
+    const groups = { today: [], earlier: [], read: [] };
 
-            // --- EXISTING: VESSEL FILTER ---
-            const matchesVessel =
-                feedVesselFilter === "ALL" || item.vessel_name === feedVesselFilter;
+    filtered.forEach((item) => {
+      // We use UTC conversion 'Z' to match the backend ISO format if necessary
+      const itemDateOnly = new Date(item.created_at).setHours(0, 0, 0, 0);
 
-            // --- EXISTING: DATE RANGE ---
-            // Normalizing to midnight for accurate day comparison
-            const itemDate = new Date(item.created_at).setHours(0, 0, 0, 0);
-            const from = feedFromDate
-                ? new Date(feedFromDate).setHours(0, 0, 0, 0)
-                : null;
-            const to = feedToDate ? new Date(feedToDate).setHours(0, 0, 0, 0) : null;
+      if (item.is_read) {
+        groups.read.push(item);
+      } else if (itemDateOnly === todayStart) {
+        groups.today.push(item);
+      } else {
+        groups.earlier.push(item);
+      }
+    });
 
-            let matchesDateRange = true;
-            if (from && itemDate < from) matchesDateRange = false;
-            if (to && itemDate > to) matchesDateRange = false;
+    // 3. Sort all groups newest first (Chronological)
+    const sortByTime = (a, b) =>
+      new Date(b.created_at) - new Date(a.created_at);
+    groups.today.sort(sortByTime);
+    groups.earlier.sort(sortByTime);
+    groups.read.sort(sortByTime);
 
-            return (
-                matchesSearch &&
-                matchesType &&
-                matchesReadStatus &&
-                matchesVessel &&
-                matchesDateRange
-            );
-        });
+    return groups;
+  }, [
+    feedData,
+    feedSearch,
+    feedFilter,
+    feedReadFilter,
+    feedVesselFilter,
+    feedFromDate,
+    feedToDate,
+    feedMode,
+  ]);
+  const handleResolutionSubmit = async () => {
+    // 1. Basic Validation
+    if (closeRemarksText.length < 50) {
+      alert("Please enter at least 50 characters for the resolution remarks.");
+      return;
+    }
 
-        // 2. Group by Today, Earlier, and Read
-        const todayStart = new Date().setHours(0, 0, 0, 0);
-        const groups = { today: [], earlier: [], read: [] };
+    // Prevent double submissions while processing
+    setIsSubmittingClose(true);
 
-        filtered.forEach((item) => {
-            // We use UTC conversion 'Z' to match the backend ISO format if necessary
-            const itemDateOnly = new Date(item.created_at).setHours(0, 0, 0, 0);
+    try {
+      const now = new Date();
+      const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
 
-            if (item.is_read) {
-                groups.read.push(item);
-            } else if (itemDateOnly === todayStart) {
-                groups.today.push(item);
-            } else {
-                groups.earlier.push(item);
-            }
-        });
+      // This is the formatted string for the Chat History
+      const resolutionMsg = `[${timestamp}]  ISSUE CLOSED BY ${user.full_name}: ${closeRemarksText}`;
 
-        // 3. Sort all groups newest first (Chronological)
-        const sortByTime = (a, b) =>
-            new Date(b.created_at) - new Date(a.created_at);
-        groups.today.sort(sortByTime);
-        groups.earlier.sort(sortByTime);
-        groups.read.sort(sortByTime);
+      // 2. Upload file if one was selected
+      if (selectedCloseFile) {
+        const formData = new FormData();
+        formData.append("file", selectedCloseFile);
+        formData.append("imo", selectedCell.data.imo);
+        formData.append("equipment_code", selectedCell.data.code);
+        formData.append("sample_date", selectedCell.data.last_sample);
+        formData.append("sample_id", selectedCell.data.sample_id);
+        (
+          await axiosLub.post("/api/luboil/upload-attachment", formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          })
+        ).data;
+      }
 
-        return groups;
-    }, [
-        feedData,
-        feedSearch,
-        feedFilter,
-        feedReadFilter,
-        feedVesselFilter,
-        feedFromDate,
-        feedToDate,
-        feedMode,
-    ]);
-    const handleResolutionSubmit = async () => {
-        // 1. Basic Validation
-        if (closeRemarksText.length < 50) {
-            alert("Please enter at least 50 characters for the resolution remarks.");
-            return;
-        }
-
-        // Prevent double submissions while processing
-        setIsSubmittingClose(true);
-
-        try {
-            const now = new Date();
-            const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
-
-            // This is the formatted string for the Chat History
-            const resolutionMsg = `[${timestamp}]  ISSUE CLOSED BY ${user.full_name}: ${closeRemarksText}`;
-
-            // 2. Upload file if one was selected
-            if (selectedCloseFile) {
-                const formData = new FormData();
-                formData.append("file", selectedCloseFile);
-                formData.append("imo", selectedCell.data.imo);
-                formData.append("equipment_code", selectedCell.data.code);
-                formData.append("sample_date", selectedCell.data.last_sample);
-                formData.append("sample_id", selectedCell.data.sample_id);
-                (await axiosLub.post('/api/luboil/upload-attachment', formData, { headers: { 'Content-Type': 'multipart/form-data' } })).data;
-            }
-
-            // 3. Prepare Payload
-            const payload = {
-                sample_id: selectedCell.data.sample_id,
-                vessel_name: selectedCell.vessel,
-                machinery_name: selectedCell.data.code || selectedCell.machinery,
-                sample_date: selectedCell.data.last_sample,
-                is_resolved: true,
-                resolution_remarks: closeRemarksText,
-
-                /**
-                 * ðŸ”¥ WORKFLOW LOGIC:
-                 * If Shore submits: Append the 'Closed' message to chat history immediately.
-                 * If Vessel submits: Do NOT append to chat history yet.
-                 * The text stays in 'resolution_remarks' for Shore to see in the amber card.
-                 */
-                office_remarks: amIShore
-                    ? existingRemarks.office
-                        ? existingRemarks.office + "\n" + resolutionMsg
-                        : resolutionMsg
-                    : existingRemarks.office,
-                officer_remarks: existingRemarks.officer, // Vessel remarks are not added to chat history until ACCEPTED
-            };
-
-            const response = (await axiosLub.post('/api/luboil/remarks/update', payload)).data;
-
-            // 4. Update Local UI State immediately
-            setSelectedCell((prev) => ({
-                ...prev,
-                data: {
-                    ...prev.data,
-                    // If user is Shore, it's CLOSED. If user is Vessel, it's PENDING APPROVAL.
-                    is_resolved: amIShore ? true : false,
-                    is_approval_pending: !amIShore ? true : false,
-
-                    resolution_remarks: closeRemarksText,
-                    conversation: response.updated_conversation,
-                },
-            }));
-
-            // 5. UI Cleanup
-            setIsCloseModalOpen(false);
-            setCloseRemarksText("");
-            setSelectedCloseFile(null);
-
-            // Refresh the main list to show 'Resolved' status across the app
-            await loadData();
-
-            // Personalized alert based on role
-            const successMsg = amIShore
-                ? "âœ… Issue closed and verified successfully."
-                : "âœ… Resolution submitted. Awaiting Shore approval.";
-            alert(successMsg);
-        } catch (err) {
-            console.error("Resolution Submit Error:", err);
-            alert("âŒ Failed to submit resolution: " + err.message);
-        } finally {
-            setIsSubmittingClose(false);
-        }
-    };
-
-    const handleMarkSingleRead = async (eventId) => {
-        try {
-            await axiosLub.patch(`/api/luboil/live-feed/${eventId}/read`);
-            fetchFeed(); // Refresh the list to show it as read
-        } catch (err) {
-            console.error("Failed to mark as read", err);
-        }
-    };
-    // const [hiddenNotifIds, setHiddenNotifIds] = useState([]);
-
-    const handleHideNotification = async (id) => {
-        // 1. OPTIMISTIC UPDATE: Hide it from the UI list immediately
-        setNotifications((prev) => prev.filter((n) => n.id !== id));
-
-        // 2. OPTIMISTIC UPDATE: Reduce the badge count immediately
-        setUnreadCount((prev) => Math.max(0, prev - 1));
-
-        try {
-            // 3. Tell the backend to hide it permanently
-            await axiosLub.patch(`/api/notifications/${id}/hide`);
-
-            // 4. Background sync (just to be 100% sure)
-            fetchNotifs();
-        } catch (err) {
-            console.error("Failed to hide notification", err);
-            // If it fails, refresh to bring it back so the user isn't confused
-            fetchNotifs();
-        }
-    };
-    // --- NEW: Handle Shore Requesting Resample ---
-    const handleRequestResamplingAction = async () => {
-        const isShore =
-            userAccess === "SHORE" ||
-            userRole === "ADMIN" ||
-            userRole === "SUPERUSER" ||
-            userRole === "SHORE";
-        if (!isShore) return;
-
-        const isCurrentlyRequired = selectedCell.data.is_resampling_required;
-        const targetState = !isCurrentlyRequired;
-
-        const now = new Date();
-        const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
-
-        // This message triggers the Live Feed
-        const systemMsg = targetState
-            ? `[${timestamp}]  <b>${user.full_name}</b> Requested a MANDATORY RESAMPLE for this equipment.`
-            : `[${timestamp}]  <b>${user.full_name}</b> Cancelled the mandatory resampling request.`;
-
-        try {
-            const payload = {
-                vessel_name: selectedCell.vessel,
-                sample_id: selectedCell.data.sample_id,
-                machinery_name: selectedCell.machinery,
-                sample_date: selectedCell.data.last_sample,
-                status_change_msg: systemMsg,
-                is_resampling_required: targetState,
-            };
-
-            const response = (await axiosLub.post('/api/luboil/remarks/update', payload)).data;
-
-            // Update Modal UI state
-            setSelectedCell((prev) => ({
-                ...prev,
-                data: {
-                    ...prev.data,
-                    is_resampling_required: targetState,
-                    conversation: response.updated_conversation || prev.data.conversation,
-                },
-            }));
-
-            // Surgical update to background Matrix
-            setNormalizedTable((prev) => {
-                const updatedRows = { ...prev.rows };
-                const vName = selectedCell.vessel;
-                const mCode = selectedCell.data.code;
-                if (updatedRows[vName]?.[mCode]) {
-                    updatedRows[vName][mCode] = {
-                        ...updatedRows[vName][mCode],
-                        is_resampling_required: targetState,
-                        conversation:
-                            response.updated_conversation ||
-                            updatedRows[vName][mCode].conversation,
-                    };
-                }
-                return { ...prev, rows: updatedRows };
-            });
-
-            setRightPanelMode("history");
-            setShowHistory(true);
-            loadData();
-        } catch (err) {
-            alert("Failed to update resampling requirement.");
-        }
-    };
-    // Deep navigation handler
-    const handleFeedItemClick = async (event) => {
-        // 1. Mark as read
-        // await axiosLub.patch(`/api/luboil/live-feed/event.id/read`);
-
-        // 2. Find matching cell in matrix
-        const vesselName = Object.keys(normalizedTable.rows).find(
-            (name) =>
-                String(normalizedTable.rows[name][event.equipment_code]?.imo) === String(event.imo),
-        );
-
-        if (vesselName) {
-            const cell = normalizedTable.rows[vesselName][event.equipment_code];
-            // 3. Find specific sample within that cell's history
-            const specificSample =
-                cell.history.find((h) => h.sample_id === event.sample_id) ||
-                cell.history[0];
-
-            // 4. Trigger modal logic
-            handleSelectSample(vesselName, cell, specificSample);
-            if (
-                event.event_type === "MENTION" ||
-                event.event_type === "COMMUNICATION"
-            ) {
-                setRightPanelMode("history");
-                setShowHistory(true);
-            }
-
-            // 5. Navigate back to matrix view to show the modal
-            // setViewMode('matrix');
-        }
-    };
-    const handleSelectSample = (vesselName, cellData, specificSample) => {
-        // 1. Reset Chat Modes & Drafts (Preserving your existing logic)
-        setChatMode("external");
-        setInternalDraft("");
-        setIsDiagCollapsed(false);
-        setIsReportCollapsed(false);
-        setIsCommCollapsed(false);
-        setIsActionsCollapsed(false);
+      // 3. Prepare Payload
+      const payload = {
+        sample_id: selectedCell.data.sample_id,
+        vessel_name: selectedCell.vessel,
+        machinery_name: selectedCell.data.code || selectedCell.machinery,
+        sample_date: selectedCell.data.last_sample,
+        is_resolved: true,
+        resolution_remarks: closeRemarksText,
 
         /**
-         * ðŸ”¥ SYNC INPUT BOXES
-         * This is the fix for the "Empty Box" issue. We must update the "memory"
-         * of the remarks state to match the specific strings found in this dot's row.
+         * ðŸ”¥ WORKFLOW LOGIC:
+         * If Shore submits: Append the 'Closed' message to chat history immediately.
+         * If Vessel submits: Do NOT append to chat history yet.
+         * The text stays in 'resolution_remarks' for Shore to see in the amber card.
          */
-        setExistingRemarks({
-            officer: specificSample.officer_remarks || "",
-            office: specificSample.office_remarks || "",
-            internal: specificSample.internal_remarks || "",
+        office_remarks: amIShore
+          ? existingRemarks.office
+            ? existingRemarks.office + "\n" + resolutionMsg
+            : resolutionMsg
+          : existingRemarks.office,
+        officer_remarks: existingRemarks.officer, // Vessel remarks are not added to chat history until ACCEPTED
+      };
+
+      const response = (
+        await axiosLub.post("/api/luboil/remarks/update", payload)
+      ).data;
+
+      // 4. Update Local UI State immediately
+      setSelectedCell((prev) => ({
+        ...prev,
+        data: {
+          ...prev.data,
+          // If user is Shore, it's CLOSED. If user is Vessel, it's PENDING APPROVAL.
+          is_resolved: amIShore ? true : false,
+          is_approval_pending: !amIShore ? true : false,
+
+          resolution_remarks: closeRemarksText,
+          conversation: response.updated_conversation,
+        },
+      }));
+
+      // 5. UI Cleanup
+      setIsCloseModalOpen(false);
+      setCloseRemarksText("");
+      setSelectedCloseFile(null);
+
+      // Refresh the main list to show 'Resolved' status across the app
+      await loadData();
+
+      // Personalized alert based on role
+      const successMsg = amIShore
+        ? "Issue closed and verified successfully. "
+        : "Resolution submitted. Awaiting Shore approval.";
+      alert(successMsg);
+    } catch (err) {
+      console.error("Resolution Submit Error:", err);
+      alert("Failed to submit resolution: " + err.message);
+    } finally {
+      setIsSubmittingClose(false);
+    }
+  };
+
+  const handleMarkSingleRead = async (eventId) => {
+    try {
+      await axiosLub.patch(`/api/luboil/live-feed/${eventId}/read`);
+      fetchFeed(); // Refresh the list to show it as read
+    } catch (err) {
+      console.error("Failed to mark as read", err);
+    }
+  };
+  // const [hiddenNotifIds, setHiddenNotifIds] = useState([]);
+
+  const handleHideNotification = async (id) => {
+    // 1. OPTIMISTIC UPDATE: Hide it from the UI list immediately
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+
+    // 2. OPTIMISTIC UPDATE: Reduce the badge count immediately
+    setUnreadCount((prev) => Math.max(0, prev - 1));
+
+    try {
+      // 3. Tell the backend to hide it permanently
+      await axiosLub.patch(`/api/notifications/${id}/hide`);
+
+      // 4. Background sync (just to be 100% sure)
+      fetchNotifs();
+    } catch (err) {
+      console.error("Failed to hide notification", err);
+      // If it fails, refresh to bring it back so the user isn't confused
+      fetchNotifs();
+    }
+  };
+  // --- NEW: Handle Shore Requesting Resample ---
+  const handleRequestResamplingAction = async () => {
+    const isShore =
+      userAccess === "SHORE" ||
+      userRole === "ADMIN" ||
+      userRole === "SUPERUSER" ||
+      userRole === "SHORE";
+    if (!isShore) return;
+
+    const isCurrentlyRequired = selectedCell.data.is_resampling_required;
+    const targetState = !isCurrentlyRequired;
+
+    const now = new Date();
+    const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+
+    // This message triggers the Live Feed
+    const systemMsg = targetState
+      ? `[${timestamp}]  <b>${user.full_name}</b> Requested a MANDATORY RESAMPLE for this equipment.`
+      : `[${timestamp}]  <b>${user.full_name}</b> Cancelled the mandatory resampling request.`;
+
+    try {
+      const payload = {
+        vessel_name: selectedCell.vessel,
+        sample_id: selectedCell.data.sample_id,
+        machinery_name: selectedCell.machinery,
+        sample_date: selectedCell.data.last_sample,
+        status_change_msg: systemMsg,
+        is_resampling_required: targetState,
+      };
+
+      const response = (
+        await axiosLub.post("/api/luboil/remarks/update", payload)
+      ).data;
+
+      // Update Modal UI state
+      setSelectedCell((prev) => ({
+        ...prev,
+        data: {
+          ...prev.data,
+          is_resampling_required: targetState,
+          conversation: response.updated_conversation || prev.data.conversation,
+        },
+      }));
+
+      // Surgical update to background Matrix
+      setNormalizedTable((prev) => {
+        const updatedRows = { ...prev.rows };
+        const vName = selectedCell.vessel;
+        const mCode = selectedCell.data.code;
+        if (updatedRows[vName]?.[mCode]) {
+          updatedRows[vName][mCode] = {
+            ...updatedRows[vName][mCode],
+            is_resampling_required: targetState,
+            conversation:
+              response.updated_conversation ||
+              updatedRows[vName][mCode].conversation,
+          };
+        }
+        return { ...prev, rows: updatedRows };
+      });
+
+      setRightPanelMode("history");
+      setShowHistory(true);
+      loadData();
+    } catch (err) {
+      alert("Failed to update resampling requirement.");
+    }
+  };
+  // Deep navigation handler
+  const handleFeedItemClick = async (event) => {
+    // 1. Mark as read
+    // await axiosLub.patch(`/api/luboil/live-feed/event.id/read`);
+
+    // 2. Find matching cell in matrix
+    const vesselName = Object.keys(normalizedTable.rows).find(
+      (name) =>
+        String(normalizedTable.rows[name][event.equipment_code]?.imo) ===
+        String(event.imo),
+    );
+
+    if (vesselName) {
+      const cell = normalizedTable.rows[vesselName][event.equipment_code];
+      // 3. Find specific sample within that cell's history
+      const specificSample =
+        cell.history.find((h) => h.sample_id === event.sample_id) ||
+        cell.history[0];
+
+      // 4. Trigger modal logic
+      handleSelectSample(vesselName, cell, specificSample);
+      if (
+        event.event_type === "MENTION" ||
+        event.event_type === "COMMUNICATION"
+      ) {
+        setRightPanelMode("history");
+        setShowHistory(true);
+      }
+
+      // 5. Navigate back to matrix view to show the modal
+      // setViewMode('matrix');
+    }
+  };
+  const handleSelectSample = (vesselName, cellData, specificSample) => {
+    // 1. Reset Chat Modes & Drafts (Preserving your existing logic)
+    setChatMode("external");
+    setInternalDraft("");
+    setIsDiagCollapsed(false);
+    setIsReportCollapsed(false);
+    setIsCommCollapsed(false);
+    setIsActionsCollapsed(false);
+
+    /**
+     * ðŸ”¥ SYNC INPUT BOXES
+     * This is the fix for the "Empty Box" issue. We must update the "memory"
+     * of the remarks state to match the specific strings found in this dot's row.
+     */
+    setExistingRemarks({
+      officer: specificSample.officer_remarks || "",
+      office: specificSample.office_remarks || "",
+      internal: specificSample.internal_remarks || "",
+    });
+
+    /**
+     * ðŸ”¥ UNIQUE CONVERSATION BUILDER
+     * This logic ignores the shared "cellData.conversation" and instead
+     * builds a list specifically from the remarks found in this dot's row.
+     */
+    const buildSampleSpecificConversation = (s) => {
+      const list = [];
+      const uniqueTracker = new Set(); // Prevents duplicate messages from appearing
+
+      // ðŸ”¥ HELPER: Standardizes DD/MM/YYYY to YYYY-MM-DD for perfect sorting
+      const getSortableDate = (dateStr) => {
+        if (!dateStr || dateStr === "Unknown") return "0000-00-00";
+        const match = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})(.*)/);
+        if (match) {
+          return `${match[3]}-${match[2]}-${match[1]}${match[4]}`;
+        }
+        return dateStr;
+      };
+
+      const extractMessages = (rawText, role, isInternal = false) => {
+        if (!rawText) return;
+        rawText.split("\n").forEach((line) => {
+          const clean = line.trim();
+          if (!clean) return;
+
+          let msgText = clean;
+          let msgDate = s.date || s.sample_date || "Unknown";
+
+          // Regex to extract [DD/MM/YYYY HH:MM] from the start of the line
+          const match = clean.match(/^\[(.*?)\]\s*(.*)/);
+          if (match) {
+            msgDate = match[1];
+            msgText = match[2];
+          }
+
+          // Create a unique key to prevent duplicate entries
+          const key = `${msgDate}|${role}|${msgText}|${isInternal}`;
+          if (!uniqueTracker.has(key)) {
+            uniqueTracker.add(key);
+            list.push({
+              date: msgDate,
+              sortDate: getSortableDate(msgDate), // Used only for the .sort() below
+              role: role,
+              message: msgText,
+              is_internal: isInternal,
+            });
+          }
         });
+      };
 
-        /**
-         * ðŸ”¥ UNIQUE CONVERSATION BUILDER
-         * This logic ignores the shared "cellData.conversation" and instead
-         * builds a list specifically from the remarks found in this dot's row.
-         */
-        const buildSampleSpecificConversation = (s) => {
-            const list = [];
-            const uniqueTracker = new Set(); // Prevents duplicate messages from appearing
+      // 1. Extracting specifically from THIS dot's data fields
+      extractMessages(s.officer_remarks, "Vessel");
+      extractMessages(s.office_remarks, "Office");
+      extractMessages(s.internal_remarks, "Office", true);
+      extractMessages(s.status_change_log, "System");
 
-            // ðŸ”¥ HELPER: Standardizes DD/MM/YYYY to YYYY-MM-DD for perfect sorting
-            const getSortableDate = (dateStr) => {
-                if (!dateStr || dateStr === "Unknown") return "0000-00-00";
-                const match = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})(.*)/);
-                if (match) {
-                    return `${match[3]}-${match[2]}-${match[1]}${match[4]}`;
-                }
-                return dateStr;
-            };
+      // 2. ðŸ”¥ ISOLATE ATTACHMENTS (Images/PDFs) specifically for this dot
+      if (s.attachment_url) {
+        const files = s.attachment_url.split("|");
+        files.forEach((fileUrl) => {
+          if (!fileUrl) return;
 
-            const extractMessages = (rawText, role, isInternal = false) => {
-                if (!rawText) return;
-                rawText.split("\n").forEach((line) => {
-                    const clean = line.trim();
-                    if (!clean) return;
+          // Clean URL check for file type (ignores SAS tokens)
+          const isPdf = fileUrl.toLowerCase().split("?")[0].endsWith(".pdf");
+          const prefix = isPdf ? "ATTACHED_PDF" : "ATTACHED_IMAGE";
 
-                    let msgText = clean;
-                    let msgDate = s.date || s.sample_date || "Unknown";
+          // Identify the uploader from status log (Bold name logic)
+          const uploaderMatch = s.status_change_log?.match(
+            /\] (?:<b>)?(.*?)(?:<\/b>)?\s+has successfully uploaded/,
+          );
+          const uploaderName = uploaderMatch ? uploaderMatch[1] : "System";
+          const uploadTime = s.date || s.sample_date || "Unknown";
 
-                    // Regex to extract [DD/MM/YYYY HH:MM] from the start of the line
-                    const match = clean.match(/^\[(.*?)\]\s*(.*)/);
-                    if (match) {
-                        msgDate = match[1];
-                        msgText = match[2];
-                    }
+          // Construct message so UI Regex match(/\] (.*?):/) picks it up
+          const formattedMessage = `[${uploadTime}] ${uploaderName}: ${prefix}: ${fileUrl}`;
 
-                    // Create a unique key to prevent duplicate entries
-                    const key = `${msgDate}|${role}|${msgText}|${isInternal}`;
-                    if (!uniqueTracker.has(key)) {
-                        uniqueTracker.add(key);
-                        list.push({
-                            date: msgDate,
-                            sortDate: getSortableDate(msgDate), // Used only for the .sort() below
-                            role: role,
-                            message: msgText,
-                            is_internal: isInternal,
-                        });
-                    }
-                });
-            };
-
-            // 1. Extracting specifically from THIS dot's data fields
-            extractMessages(s.officer_remarks, "Vessel");
-            extractMessages(s.office_remarks, "Office");
-            extractMessages(s.internal_remarks, "Office", true);
-            extractMessages(s.status_change_log, "System");
-
-            // 2. ðŸ”¥ ISOLATE ATTACHMENTS (Images/PDFs) specifically for this dot
-            if (s.attachment_url) {
-                const files = s.attachment_url.split("|");
-                files.forEach((fileUrl) => {
-                    if (!fileUrl) return;
-
-                    // Clean URL check for file type (ignores SAS tokens)
-                    const isPdf = fileUrl.toLowerCase().split("?")[0].endsWith(".pdf");
-                    const prefix = isPdf ? "ATTACHED_PDF" : "ATTACHED_IMAGE";
-
-                    // Identify the uploader from status log (Bold name logic)
-                    const uploaderMatch = s.status_change_log?.match(
-                        /\] (?:<b>)?(.*?)(?:<\/b>)?\s+has successfully uploaded/,
-                    );
-                    const uploaderName = uploaderMatch ? uploaderMatch[1] : "System";
-                    const uploadTime = s.date || s.sample_date || "Unknown";
-
-                    // Construct message so UI Regex match(/\] (.*?):/) picks it up
-                    const formattedMessage = `[${uploadTime}] ${uploaderName}: ${prefix}: ${fileUrl}`;
-
-                    const key = `file|${fileUrl}`;
-                    if (!uniqueTracker.has(key)) {
-                        uniqueTracker.add(key);
-                        list.push({
-                            date: uploadTime,
-                            sortDate: getSortableDate(uploadTime),
-                            role: "System",
-                            message: formattedMessage,
-                            is_internal: false,
-                        });
-                    }
-                });
-            }
-
-            // 3. Sort messages chronologically using the sortDate helper
-            return list.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
-        };
-
-        // 2. Generate the unique targeted conversation for this dot
-        const specificConversation =
-            buildSampleSpecificConversation(specificSample);
-
-        // 3. UI Navigation Logic
-        const hasPriorComm = specificConversation.length > 0;
-
-        if (hasPriorComm) {
-            setRightPanelMode("report"); // Default to Lab Diagnosis
-            setShowHistory(true); // Open chat panel
-        } else {
-            setRightPanelMode("report");
-            setShowHistory(false); // Close chat panel if dot is new
-        }
-
-        // 4. Update the Selected Cell with specific TECHNICAL and CHAT data
-        setSelectedCell({
-            vessel: vesselName,
-            machinery: cellData.raw_machinery_name,
-            data: {
-                ...cellData, // Keep IMO, Vessel Name, etc.
-                ...specificSample,
-                diagnosis: specificSample.diagnosis || null,
-                summary_error: specificSample.summary_error || null,
-                pdf_page_index: specificSample.pdf_page_index,
-                report_url: specificSample.report_url || cellData.report_url,
-                is_image_required: specificSample.is_image_required || false,
-                is_resolved: specificSample.is_resolved || false,
-                attachment_url: specificSample.attachment_url || "", // Tech results (Iron, Water, Status, Diagnosis)
-                conversation: specificConversation, // ðŸ”¥ The separate chat history for this dot
-                // Store siblings for the Switcher logic
-                allSamplesAtDate: cellData.history.filter(
-                    (h) => h.date === (specificSample.date || specificSample.sample_date),
-                ),
-            },
+          const key = `file|${fileUrl}`;
+          if (!uniqueTracker.has(key)) {
+            uniqueTracker.add(key);
+            list.push({
+              date: uploadTime,
+              sortDate: getSortableDate(uploadTime),
+              role: "System",
+              message: formattedMessage,
+              is_internal: false,
+            });
+          }
         });
+      }
 
-        // 5. Open Modal
-        setIsModalOpen(true);
-    };
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            // If the dropdown is open and we click outside the container, close it
-            if (
-                showNotifDropdown &&
-                notifRef.current &&
-                !notifRef.current.contains(event.target)
-            ) {
-                setShowNotifDropdown(false);
-            }
-        };
-
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [showNotifDropdown]); // Re-run when dropdown state changes
-    // 1. Close dropdown when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (
-                vesselDropdownRef.current &&
-                !vesselDropdownRef.current.contains(event.target)
-            ) {
-                setIsVesselDropdownOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-    const handleOpenTrend = async (vesselName, imo, code, description) => {
-        setLoadingTrend(true);
-        setTrendModal({
-            isOpen: true,
-            data: [],
-            title: `${vesselName} - ${description}`,
-        });
-        try {
-            const data = (await axiosLub.get(`/api/v1/luboil/trend/${imo}/${code}`)).data;
-            setTrendModal((prev) => ({ ...prev, data }));
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoadingTrend(false);
-        }
-    };
-    const handleTextareaChange = async (val) => {
-        // Determine which buffer to update
-        if (chatMode === "internal") {
-            setInternalDraft(val);
-        } else {
-            const isShore = user?.role === "SHORE" || user?.role === "ADMIN";
-            setRemarksData((prev) => ({
-                ...prev,
-                [isShore ? "office" : "officer"]: val,
-            }));
-        }
-
-        // Mention Logic
-        const lastChar = val.slice(-1);
-        const words = val.split(/\s/);
-        const lastWord = words[words.length - 1];
-
-        if (lastWord.startsWith("@")) {
-            const query = lastWord.slice(1);
-            setMentionFilter(query);
-
-            // Fetch if not already fetched or if list is empty
-            try {
-                const users = (await axiosLub.get(`/api/luboil/mentions/${selectedCell.data.imo}?chat_mode=${chatMode}`)).data;
-                setMentionList(users);
-                setShowMentionDropdown(true);
-            } catch (err) {
-                console.error("Mention fetch failed", err);
-            }
-        } else {
-            setShowMentionDropdown(false);
-        }
-    };
-    const [notifications, setNotifications] = useState([]);
-    const [unreadCount, setUnreadCount] = useState(0);
-    const notifRef = useRef(null);
-    //   useEffect(() => {
-    //   localStorage.setItem("hidden_notifications", JSON.stringify(hiddenNotifIds));
-    // }, [hiddenNotifIds]);
-
-    // 1. Fetch from Backend
-    const fetchNotifs = async () => {
-        try {
-            const data = (await axiosLub.get('/api/notifications')).data;
-            setNotifications(data.notifications || []);
-            setUnreadCount(data.unread_count || 0);
-        } catch (err) {
-            console.error("Notif fetch failed", err);
-        }
+      // 3. Sort messages chronologically using the sortDate helper
+      return list.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
     };
 
-    // 2. Set up Polling (Live updates)
-    useEffect(() => {
-        fetchNotifs();
-        const interval = setInterval(fetchNotifs, 45000); // 45 seconds
-        return () => clearInterval(interval);
-    }, []);
+    // 2. Generate the unique targeted conversation for this dot
+    const specificConversation =
+      buildSampleSpecificConversation(specificSample);
 
-    // 3. Handle Notification Click (Redirection + Auto-Open Modal)
-    // 3. Handle Notification Click (Redirection + Auto-Open Modal)
-    const handleNotifClick = async (n) => {
-        if (!n || !normalizedTable?.rows) return; // Safety check: exit if data isn't ready
+    // 3. UI Navigation Logic
+    const hasPriorComm = specificConversation.length > 0;
 
-        await axiosLub.patch(`/api/notifications/${n.id}/read`);
+    if (hasPriorComm) {
+      setRightPanelMode("report"); // Default to Lab Diagnosis
+      setShowHistory(true); // Open chat panel
+    } else {
+      setRightPanelMode("report");
+      setShowHistory(false); // Close chat panel if dot is new
+    }
+
+    // 4. Update the Selected Cell with specific TECHNICAL and CHAT data
+    setSelectedCell({
+      vessel: vesselName,
+      machinery: cellData.raw_machinery_name,
+      data: {
+        ...cellData, // Keep IMO, Vessel Name, etc.
+        ...specificSample,
+        diagnosis: specificSample.diagnosis || null,
+        summary_error: specificSample.summary_error || null,
+        pdf_page_index: specificSample.pdf_page_index,
+        report_url: specificSample.report_url || cellData.report_url,
+        is_image_required: specificSample.is_image_required || false,
+        is_resolved: specificSample.is_resolved || false,
+        attachment_url: specificSample.attachment_url || "", // Tech results (Iron, Water, Status, Diagnosis)
+        conversation: specificConversation, // ðŸ”¥ The separate chat history for this dot
+        // Store siblings for the Switcher logic
+        allSamplesAtDate: cellData.history.filter(
+          (h) => h.date === (specificSample.date || specificSample.sample_date),
+        ),
+      },
+    });
+
+    // 5. Open Modal
+    setIsModalOpen(true);
+  };
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // If the dropdown is open and we click outside the container, close it
+      if (
+        showNotifDropdown &&
+        notifRef.current &&
+        !notifRef.current.contains(event.target)
+      ) {
         setShowNotifDropdown(false);
-        fetchNotifs();
-
-        // Logic to find the vessel/machinery in your current table
-        // Added extra safety checks [name] and [n.equipment_code]
-        const vesselName = Object.keys(normalizedTable.rows).find((name) => {
-            const vesselRow = normalizedTable.rows[name];
-            // Ensure the vessel exists and has this specific machinery before checking IMO
-            return vesselRow && String(vesselRow[n.equipment_code]?.imo) === String(n.imo);
-        });
-
-        if (vesselName && normalizedTable.rows[vesselName][n.equipment_code]) {
-            const cell = normalizedTable.rows[vesselName][n.equipment_code];
-
-            // Find the specific sample if available, else default to latest
-            const specificSample =
-                cell.history?.find((h) => h.sample_id === n.sample_id) ||
-                cell.history?.[0] ||
-                cell;
-
-            // Use your existing select sample logic to trigger the modal correctly
-            handleSelectSample(vesselName, cell, specificSample);
-
-            setRightPanelMode("history"); // Take them straight to the chat
-            setShowHistory(true);
-            setIsModalOpen(true);
-        } else {
-            console.warn(
-                "Could not find matching vessel/machinery in the current matrix for this notification.",
-            );
-        }
-    };
-    const selectUser = (userName) => {
-        const currentDraft =
-            chatMode === "internal"
-                ? internalDraft
-                : amIShore
-                    ? remarksData.office
-                    : remarksData.officer;
-        const words = currentDraft.split(/\s/);
-        words[words.length - 1] = `@${userName} `; // Replace @query with @FullName
-        const newText = words.join(" ");
-
-        if (chatMode === "internal") {
-            setInternalDraft(newText);
-        } else {
-            setRemarksData((prev) => ({
-                ...prev,
-                [amIShore ? "office" : "officer"]: newText,
-            }));
-        }
-        setShowMentionDropdown(false);
-    };
-    const formatDiagnosisAsList = (text) => {
-        if (!text) return null;
-
-        // This Regex looks for markers like (a), (b), (c) or a), b), c)
-        // It splits the text but keeps the markers
-        const parts = text.split(/(?=\([a-z]\))/g);
-
-        return (
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {parts.map((part, index) => {
-                    const trimmedPart = part.trim();
-                    if (!trimmedPart) return null;
-
-                    // If it starts with a marker like (a), render as a list item
-                    if (/^\([a-z]\)/.test(trimmedPart)) {
-                        return (
-                            <div
-                                key={index}
-                                style={{ display: "flex", gap: "12px", paddingLeft: "10px" }}
-                            >
-                                <span
-                                    style={{
-                                        color: "#2563eb",
-                                        fontWeight: "bold",
-                                        minWidth: "20px",
-                                    }}
-                                >
-                                </span>
-                                <span style={{ color: "#475569", lineHeight: "1.6" }}>
-                                    {trimmedPart}
-                                </span>
-                            </div>
-                        );
-                    }
-
-                    // Otherwise render as a normal introductory paragraph
-                    return (
-                        <p
-                            key={index}
-                            style={{
-                                margin: 0,
-                                fontWeight: "500",
-                                color: "#1e293b",
-                                marginBottom: "8px",
-                            }}
-                        >
-                            {trimmedPart}
-                        </p>
-                    );
-                })}
-            </div>
-        );
-    };
-    const handleBulkDelete = async () => {
-        if (selectedGalleryItems.length === 0) return;
-
-        if (
-            !window.confirm(
-                `Are you sure you want to delete ${selectedGalleryItems.length} item(s)?`,
-            )
-        )
-            return;
-
-        const now = new Date();
-        const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
-
-        // ðŸ”¥ CRITICAL: Backend uses this message to trigger the Live Feed "Evidence Deleted" event
-        const deleteSysMsg = `[${timestamp}] <b>${user.full_name}</b> has deleted ${selectedGalleryItems.length} piece(s) of evidence.`;
-
-        // 1. Get current raw paths from the database
-        let currentAttachments = selectedCell.data.attachment_url || "";
-        let attachmentArray = currentAttachments
-            .split("|")
-            .filter((url) => url !== "");
-
-        // 2. Identify the raw paths to delete by stripping the SAS tokens
-        const rawPathsToDelete = selectedGalleryItems.map((item) => {
-            return item.url.split("?")[0];
-        });
-
-        // 3. Filter: Keep only the files NOT in our delete list
-        const updatedArray = attachmentArray.filter((dbPath) => {
-            return !rawPathsToDelete.some((toDelete) => toDelete.includes(dbPath));
-        });
-
-        const finalAttachmentString = updatedArray.join("|");
-
-        try {
-            const response = (await axiosLub.post('/api/luboil/remarks/update', {
-                sample_id: selectedCell.data.sample_id, // ðŸ”¥ Targeted ID prevents "Meshing" error
-                vessel_name: selectedCell.vessel,
-                machinery_name: selectedCell.data.code || selectedCell.machinery,
-                sample_date: selectedCell.data.last_sample,
-                attachment_url: finalAttachmentString,
-                status_change_msg: deleteSysMsg,
-            })).data;
-
-            // 4. Update the Active Modal View (Communication Window)
-            setSelectedCell((prev) => ({
-                ...prev,
-                data: {
-                    ...prev.data,
-                    attachment_url: finalAttachmentString,
-                    conversation: response.updated_conversation,
-                },
-            }));
-
-            // 5. ðŸ”¥ SURGICAL FIX: Update the Background Matrix (normalizedTable)
-            // This ensures that if you click another dot and return, the deleted evidence stays gone.
-            setNormalizedTable((prev) => {
-                const updatedRows = { ...prev.rows };
-                const vessel = selectedCell.vessel;
-                const machineryCode = selectedCell.data.code;
-
-                if (updatedRows[vessel] && updatedRows[vessel][machineryCode]) {
-                    const targetCell = updatedRows[vessel][machineryCode];
-
-                    // Update the specific sample inside the history array for this equipment
-                    if (targetCell.history) {
-                        targetCell.history = targetCell.history.map((h) => {
-                            if (h.sample_id === selectedCell.data.sample_id) {
-                                return {
-                                    ...h,
-                                    attachment_url: finalAttachmentString,
-                                };
-                            }
-                            return h;
-                        });
-                    }
-
-                    // If the dot we are editing is currently the "Latest" one displayed on the matrix
-                    if (targetCell.sample_id === selectedCell.data.sample_id) {
-                        targetCell.attachment_url = finalAttachmentString;
-                        targetCell.conversation = response.updated_conversation;
-                    }
-                }
-                return { ...prev, rows: updatedRows };
-            });
-
-            // 6. UI Cleanup
-            setPreviewImage(null);
-            setSelectedGalleryItems([]);
-
-            // Optional: Full refresh to sync all counters (like Machinery Stats)
-            loadData();
-
-            alert("âœ… Evidence deleted successfully.");
-        } catch (err) {
-            console.error("Delete failed", err);
-            alert("Failed to delete items.");
-        }
+      }
     };
 
-    const handleLubBatchDownload = async () => {
-        if (selectedLubReports.length === 0) return;
-        setIsDownloading(true);
-        try {
-            // Calling the API service (make sure 'lubeOil' case is added to your backend api.py)
-            const blob = (await axiosLub.post('/api/performance/batch-download-zip', {
-                report_ids:
-                    selectedLubReports, engine_type: "lubeOil",
-            }, { responseType: 'blob' })).data;
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.setAttribute(
-                "download",
-                `${selectedVesselName}_Lube_Reports_${new Date().getTime()}.zip`,
-            );
-            document.body.appendChild(link);
-            link.click();
-            link.parentNode.removeChild(link);
-        } catch (error) {
-            console.error("Batch download failed:", error);
-            alert("Failed to generate ZIP file.");
-        } finally {
-            setIsDownloading(false);
-        }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showNotifDropdown]); // Re-run when dropdown state changes
+  // 1. Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        vesselDropdownRef.current &&
+        !vesselDropdownRef.current.contains(event.target)
+      ) {
+        setIsVesselDropdownOpen(false);
+      }
     };
-    // 1. Shore Requesting Image
-    const handleRequestImageAction = async () => {
-        const isShore =
-            user?.role === "SHORE" ||
-            user?.role === "ADMIN" ||
-            user?.role === "SUPERUSER";
-        if (!isShore) return;
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+  const handleOpenTrend = async (vesselName, imo, code, description) => {
+    setLoadingTrend(true);
+    setTrendModal({
+      isOpen: true,
+      data: [],
+      title: `${vesselName} - ${description}`,
+    });
+    try {
+      const response = await axiosLub.get(
+        `/api/v1/luboil/trend/${imo}/${code}`,
+      );
+      const rawData = response.data || [];
 
-        // 1. Determine current state and target state (Undo/Toggle logic)
-        const isCurrentlyRequired = selectedCell.data.is_image_required;
-        const targetState = !isCurrentlyRequired;
-
-        const now = new Date();
-        const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
-
-        // 2. Dynamic message based on whether we are enabling or disabling
-        const systemMsg = targetState
-            ? `[${timestamp}]  <b>${user.full_name}</b> Made the image/file mandatory.`
-            : `[${timestamp}]  <b>${user.full_name}</b> Made the image/file optional(no need)`;
-
-        try {
-            const payload = {
-                vessel_name: selectedCell.vessel,
-                sample_id: selectedCell.data.sample_id,
-                machinery_name: selectedCell.machinery,
-                sample_date: selectedCell.data.last_sample,
-                sample_number: selectedCell.data.sample_number,
-                status_change_msg: systemMsg,
-                is_image_required: targetState, // Changed from hardcoded 'true' to targetState
-            };
-
-            // Send to Backend
-            const response = (await axiosLub.post('/api/luboil/remarks/update', payload)).data;
-
-            // 2. UPDATE MODAL STATE (Immediate visual change)
-            setSelectedCell((prev) => ({
-                ...prev,
-                data: {
-                    ...prev.data,
-                    is_image_required: targetState,
-                    conversation: response.updated_conversation || prev.data.conversation,
-                },
-            }));
-
-            // 3. ðŸ”¥ CRITICAL FIX PRESERVED: UPDATE THE BACKGROUND MATRIX STATE
-            setNormalizedTable((prev) => {
-                const updatedRows = { ...prev.rows };
-                const vesselName = selectedCell.vessel;
-                const machineryCode = selectedCell.data.code;
-
-                if (updatedRows[vesselName] && updatedRows[vesselName][machineryCode]) {
-                    updatedRows[vesselName][machineryCode] = {
-                        ...updatedRows[vesselName][machineryCode],
-                        is_image_required: targetState,
-                        // Sync the conversation history to the background table too
-                        conversation:
-                            response.updated_conversation ||
-                            updatedRows[vesselName][machineryCode].conversation,
-                    };
-                }
-                return { ...prev, rows: updatedRows };
-            });
-
-            // 4. UI Navigation
-            setRightPanelMode("history");
-            setShowHistory(true);
-
-            // 5. Final sync with server
-            loadData();
-        } catch (err) {
-            console.error("Request failed:", err);
-            alert("Failed to update requirement.");
-        }
-    };
-
-    const handleSidebarUpload = async (file) => {
-        if (!file) return;
-
-        if (file.size > 1024 * 1024) {
-            alert("âŒ File too large. Maximum allowed size is 1MB.");
-            return;
-        }
-
-        try {
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("imo", selectedCell.data.imo);
-            formData.append("equipment_code", selectedCell.data.code);
-            formData.append("sample_date", selectedCell.data.last_sample);
-            formData.append("sample_id", selectedCell.data.sample_id);
-
-            // 1. Upload the physical file to storage
-            // This backend call stores the URL in the 'attachment_url' column automatically
-            (await axiosLub.post('/api/luboil/upload-attachment', formData, { headers: { 'Content-Type': 'multipart/form-data' } })).data;
-
-            const now = new Date();
-            const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
-
-            // This remains to show in the system log WHO uploaded the image
-            const systemUploadMsg = `[${timestamp}] <b>${user.full_name}</b> has successfully uploaded the Image/File.`;
-
-            // 2. Update the Database record
-            const response = (await axiosLub.post('/api/luboil/remarks/update', {
-                vessel_name: selectedCell.vessel,
-                machinery_name: selectedCell.machinery,
-                sample_date: selectedCell.data.last_sample,
-                sample_id: selectedCell.data.sample_id,
-                sample_number: selectedCell.data.sample_number,
-                status_change_msg: systemUploadMsg,
-                // is_image_required: false,
-
-                // âœ… UPDATED: We no longer append the 'ATTACHED_IMAGE' string here.
-                // We simply pass the existing remarks history so they remain unchanged.
-                office_remarks: existingRemarks.office,
-                officer_remarks: existingRemarks.officer,
-                internal_remarks: existingRemarks.internal,
-            })).data;
-
-            // 3. UPDATE MODAL STATE IMMEDIATELY
-            setSelectedCell((prev) => ({
-                ...prev,
-                data: {
-                    ...prev.data,
-                    conversation: response.updated_conversation || prev.data.conversation,
-                    // is_image_required: false
-                },
-            }));
-
-            // 4. ðŸ”¥ SURGICAL FIX: Update the background table state immediately
-            setNormalizedTable((prev) => {
-                const updatedRows = { ...prev.rows };
-                const vName = selectedCell.vessel;
-                const mCode = selectedCell.data.code;
-
-                if (updatedRows[vName] && updatedRows[vName][mCode]) {
-                    updatedRows[vName][mCode] = {
-                        ...updatedRows[vName][mCode],
-                        // is_image_required: false,
-                        conversation:
-                            response.updated_conversation ||
-                            updatedRows[vName][mCode].conversation,
-                    };
-                }
-                return { ...prev, rows: updatedRows };
-            });
-
-            // 5. Sync with server for total accuracy
-            loadData();
-            alert("âœ… Evidence uploaded successfully.");
-        } catch (err) {
-            console.error("Upload failed", err);
-            alert("Upload failed.");
-        }
-    };
-
-    const handleSendMessage = async () => {
-        // 1. Robust User Identification (The "Seenu" Fix preserved)
-        const userData = user?.user || user;
-        const userAccess = (userData?.role || "").toUpperCase();
-        const userRole = (userData?.role || "").toUpperCase();
-        const currentUserName = userData?.full_name || "User";
-
-        // Identify if the sender is Shore staff
-        const isShore =
-            userAccess === "SHORE" ||
-            userRole === "ADMIN" ||
-            userRole === "SUPERUSER" ||
-            userRole === "SHORE" ||
-            userRole === "SUPERINTENDENT";
-
-        // 2. Select the correct input buffer based on mode and identified role
-        let currentInput = "";
-        if (chatMode === "internal") {
-            currentInput = internalDraft;
-        } else {
-            currentInput = isShore ? remarksData.office : remarksData.officer;
-        }
-
-        // Validation: Don't send empty messages
-        if (!currentInput || !currentInput.trim()) return;
-
-        try {
-            // 3. Generate standard timestamp [DD/MM/YYYY HH:MM]
-            const now = new Date();
-            const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
-
-            // 4. Prepare updated remark strings
-            // Using existingRemarks ensures we append to the history of the SPECIFIC dot selected
-            let updatedOfficerRemarks = existingRemarks.officer || "";
-            let updatedOfficeRemarks = existingRemarks.office || "";
-            let updatedInternalRemarks = existingRemarks.internal || "";
-
-            const messageLine = `[${timestamp}] ${currentUserName}: ${currentInput}`;
-
-            if (chatMode === "internal") {
-                updatedInternalRemarks +=
-                    (updatedInternalRemarks ? "\n" : "") + messageLine;
-            } else if (isShore) {
-                updatedOfficeRemarks +=
-                    (updatedOfficeRemarks ? "\n" : "") + messageLine;
-            } else {
-                updatedOfficerRemarks +=
-                    (updatedOfficerRemarks ? "\n" : "") + messageLine;
-            }
-
-            // 5. Construct Payload for the Backend
-            const payload = {
-                vessel_name: selectedCell.vessel,
-                machinery_name: selectedCell.machinery,
-                sample_date: selectedCell.data.last_sample,
-                sample_number: selectedCell.data.sample_number,
-                sample_id: selectedCell.data.sample_id, // This is crucial for your isolated backend logic
-                officer_remarks: updatedOfficerRemarks,
-                office_remarks: updatedOfficeRemarks,
-                internal_remarks: updatedInternalRemarks,
-                status: remarksData.status,
-                user_name: currentUserName,
-            };
-
-            // 6. Call API
-            const response = (await axiosLub.post('/api/luboil/remarks/update', payload)).data;
-
-            // 7. SYNC ALL STATES IMMEDIATELY (Fixes the "Meshing" and "Not Showing" bugs)
-            if (response.updated_conversation) {
-                // A. Update the Modal Window (Immediate Visual Feedback)
-                setSelectedCell((prev) => ({
-                    ...prev,
-                    data: {
-                        ...prev.data,
-                        conversation: response.updated_conversation,
-                        officer_remarks: updatedOfficerRemarks,
-                        office_remarks: updatedOfficeRemarks,
-                        internal_remarks: updatedInternalRemarks,
-                    },
-                }));
-
-                // B. SURGICAL FIX: Update the background table (normalizedTable)
-                // This prevents Dot 1 from seeing Dot 2's data when clicking between them
-                setNormalizedTable((prev) => {
-                    const newRows = { ...prev.rows };
-                    const vessel = selectedCell.vessel;
-                    const machinery = selectedCell.machinery;
-
-                    if (newRows[vessel] && newRows[vessel][machinery]) {
-                        const targetCell = newRows[vessel][machinery];
-
-                        // Update the remarks in the history array for this specific sample_id
-                        if (targetCell.history) {
-                            targetCell.history = targetCell.history.map((h) => {
-                                if (h.sample_id === selectedCell.data.sample_id) {
-                                    return {
-                                        ...h,
-                                        officer_remarks: updatedOfficerRemarks,
-                                        office_remarks: updatedOfficeRemarks,
-                                        internal_remarks: updatedInternalRemarks,
-                                    };
-                                }
-                                return h;
-                            });
-                        }
-
-                        // If the dot we just updated is the "Latest" one, update the cell-level strings too
-                        if (targetCell.sample_id === selectedCell.data.sample_id) {
-                            targetCell.officer_remarks = updatedOfficerRemarks;
-                            targetCell.office_remarks = updatedOfficeRemarks;
-                            targetCell.internal_remarks = updatedInternalRemarks;
-                            targetCell.conversation = response.updated_conversation;
-                        }
-                    }
-                    return { ...prev, rows: newRows };
-                });
-
-                // C. Update tracking state for next message
-                setExistingRemarks({
-                    officer: updatedOfficerRemarks,
-                    office: updatedOfficeRemarks,
-                    internal: updatedInternalRemarks,
-                });
-            }
-
-            // 8. Clear input buffers
-            if (chatMode === "internal") {
-                setInternalDraft("");
-            } else {
-                setRemarksData((prev) => ({
-                    ...prev,
-                    officer: "",
-                    office: "",
-                }));
-            }
-
-            // 9. Final refresh to sync everything with the backend
-            loadData();
-        } catch (error) {
-            console.error("Luboil Chat Send Error:", error);
-            alert(
-                "âŒ Failed to send: " + (error.response?.data?.detail || error.message),
-            );
-        }
-    };
-    // 2. Logic to extract unique vessels from your data
-
-    const filteredVessels = useMemo(() => {
-        const allNames = availableVessels.map((v) => v.vessel_name);
-        // If no filter selected, show all vessels that have rows in the table
-        return selectedVesselsFilter.length > 0 ? selectedVesselsFilter : allNames;
-    }, [availableVessels, selectedVesselsFilter]);
-
-    // 3. Selection Handlers
-    const handleVesselToggle = (vesselName) => {
-        setSelectedVesselsFilter((prev) => {
-            if (prev.includes(vesselName)) {
-                return prev.filter((v) => v !== vesselName);
-            } else {
-                return [...prev, vesselName];
-            }
-        });
-    };
-
-    const handleSelectAllVessels = () => {
-        // Use .every() to check if everything is already selected
-        const allSelected = availableVessels.every((v) =>
-            selectedVesselsFilter.includes(v.vessel_name),
-        );
-
-        if (allSelected) {
-            // If all are on, turn them all off
-            setSelectedVesselsFilter([]);
-        } else {
-            // If some/none are on, turn them all on
-            setSelectedVesselsFilter(availableVessels.map((v) => v.vessel_name));
-        }
-    };
-    // Add this effect to lock background scroll when any modal is open
-    useEffect(() => {
-        const isAnyModalOpen = isModalOpen || listModal.isOpen || trendModal.isOpen;
-
-        if (isAnyModalOpen) {
-            document.body.style.overflow = "hidden";
-        } else {
-            document.body.style.overflow = "unset";
-        }
-
-        // Cleanup: ensure scroll is restored if the component is unmounted
-        return () => {
-            document.body.style.overflow = "unset";
+      const processedData = rawData.map((item) => {
+        const dateObj = new Date(item.date);
+        return {
+          ...item,
+          // Numeric timestamp for vertical stacking
+          timestamp: dateObj.getTime(),
+          // Readable string for the Tooltip (e.g., "25 Oct 2025")
+          dateLabel: item.date,
+          viscosity_40c: parseFloat(item.viscosity_40c) || 0,
+          iron: parseFloat(item.iron) || 0,
+          water: parseFloat(item.water) || 0,
+          tan: parseFloat(item.tan) || 0,
+          tbn: parseFloat(item.tbn) || 0,
+          copper: parseFloat(item.copper) || 0,
+          aluminium: parseFloat(item.aluminium) || 0,
+          sodium: parseFloat(item.sodium) || 0,
+          silicon: parseFloat(item.silicon) || 0,
+          calcium: parseFloat(item.calcium) || 0,
+          magnesium: parseFloat(item.magnesium) || 0,
+          zinc: parseFloat(item.zinc) || 0,
         };
-    }, [isModalOpen, listModal.isOpen, trendModal.isOpen]);
-    useEffect(() => {
-        if (selectedCell && selectedCell.data) {
-            const data = selectedCell.data;
-
-            // 1. Reset input buffers for the new selection
-            setRemarksData({
-                officer: "",
-                office: "",
-                status: data.status || "Normal",
-            });
-
-            // 2. Extract all three types of remarks
-            // This ensures we have a reference to append new messages to
-            const rawOfficer =
-                data.officer_remarks || (data.remarks && data.remarks.officer) || "";
-            const rawOffice =
-                data.office_remarks || (data.remarks && data.remarks.office) || "";
-
-            // ðŸ”¥ NEW: Handle Internal Remarks
-            const rawInternal =
-                data.internal_remarks || (data.remarks && data.remarks.internal) || "";
-
-            // 3. Update the tracking state
-            setExistingRemarks({
-                officer: rawOfficer,
-                office: rawOffice,
-                internal: rawInternal, // Store the private notes history
-            });
-
-            // 4. Default to External Chat every time a new machinery is clicked
-            // setChatMode("external");
-            // setInternalDraft("");
-            setShowMentionDropdown(false);
-            setMentionFilter("");
-        }
-    }, [selectedCell]);
-    useEffect(() => {
-        if (showHistory && chatEndRef.current) {
-            chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-        }
-    }, [showHistory, selectedCell]);
-    useEffect(() => {
-        if (selectedVesselName && reportsSectionRef.current) {
-            reportsSectionRef.current.scrollIntoView({
-                behavior: "smooth",
-                block: "start",
-            });
-        }
-    }, [selectedVesselName]);
-    useEffect(() => {
-        const fetchAllVesselUsers = async () => {
-            if (selectedCell?.data?.imo) {
-                try {
-                    // ðŸ”¥ CHANGE: Fetch BOTH lists so all names are recognized for highlighting
-                    const [extUsers, intUsers] = await Promise.all([
-                        axiosLub.get(`/api/luboil/mentions/${selectedCell.data.imo}?chat_mode=external`).then(r => r.data),
-                        axiosLub.get(`/api/luboil/mentions/${selectedCell.data.imo}?chat_mode=internal`).then(r => r.data),
-                    ]);
-
-                    // Merge them and remove duplicates
-                    const combined = [...(extUsers || []), ...(intUsers || [])].reduce(
-                        (acc, current) => {
-                            const x = acc.find((item) => item.name === current.name);
-                            if (!x) return acc.concat([current]);
-                            else return acc;
-                        },
-                        [],
-                    );
-
-                    setMentionList(combined);
-                } catch (err) {
-                    console.error("Highlighting list fetch failed", err);
-                }
-            }
-        };
-        fetchAllVesselUsers();
-    }, [selectedCell]);
-
-    const calculateMachineryStats = (data) => {
-        if (!data || !data.data) return;
-
-        const today = new Date();
-        let vNormal = 0,
-            vWarning = 0,
-            vCritical = 0;
-        let mNormal = 0,
-            mWarning = 0,
-            mCritical = 0;
-
-        // --- COUNTERS ---
-        let totalConfigured = Object.keys(data.data).length;
-        let ov30Count = 0;
-        let ov60Count = 0;
-        let pendingUnresolvedCount = 0; // Tracks vessels needing attention (Action/Approval/Resample)
-
-        Object.values(data.data).forEach((vessel) => {
-            let vesselHasReport = false;
-            let vesselWorstStatus = "Normal";
-            let vesselIsOverdue30 = false;
-            let vesselIsOverdue60 = false;
-            let vesselHasActiveIssue = false; // Flag to see if vessel has pending actions
-
-            Object.values(vessel.machineries).forEach((m) => {
-                if (!m.is_configured) return;
-
-                // --- UPDATED ACTION-BASED LOGIC ---
-                // If it's resolved, it's NO LONGER an active issue.
-                if (m.has_report && !m.is_resolved) {
-                    const isPendingApproval = m.is_approval_pending === true;
-                    const isResamplingRequired = m.is_resampling_required === true;
-                    const isBadStatus =
-                        m.status &&
-                        m.status.toLowerCase() !== "normal" &&
-                        m.status.toLowerCase() !== "none";
-
-                    // UPDATE: Vessel is flagged ONLY if the status is Warning or Critical (isBadStatus).
-                    // This ensures that "Normal" status items do not trigger the "Active Issue" counter
-                    // even if they are pending approval or resampling.
-                    if (isBadStatus) {
-                        vesselHasActiveIssue = true;
-                    }
-                }
-
-                // --- EXISTING HEALTH & OVERDUE LOGIC (Time Based - PRESERVED) ---
-                if (!m.has_report || !m.last_sample) return;
-                vesselHasReport = true;
-
-                const intervalMonths =
-                    typeof m.interval === "number" && m.interval > 0 ? m.interval : 3;
-                const limitDays = intervalMonths * 30;
-                const warningStart = limitDays - 30;
-                const sampleDate = new Date(m.last_sample);
-                const daysElapsed = Math.ceil(
-                    (today - sampleDate) / (1000 * 60 * 60 * 24),
-                );
-
-                // Health Logic
-                if (daysElapsed > limitDays) {
-                    mCritical++;
-                    vesselWorstStatus = "Critical";
-                } else if (daysElapsed >= warningStart) {
-                    mWarning++;
-                    if (vesselWorstStatus !== "Critical") vesselWorstStatus = "Warning";
-                } else {
-                    mNormal++;
-                }
-
-                // Overdue Logic
-                if (daysElapsed > limitDays + 60) vesselIsOverdue60 = true;
-                else if (daysElapsed > limitDays + 30) vesselIsOverdue30 = true;
-            });
-
-            // Vessel Level Health Updates (Preserved)
-            if (vesselHasReport) {
-                if (vesselWorstStatus === "Critical") vCritical++;
-                else if (vesselWorstStatus === "Warning") vWarning++;
-                else vNormal++;
-            }
-
-            // Vessel Level Overdue Updates (Preserved)
-            if (vesselIsOverdue60) ov60Count++;
-            else if (vesselIsOverdue30) ov30Count++;
-
-            // Vessel Level Pending/Unresolved Updates (Action Card)
-            if (vesselHasActiveIssue) {
-                pendingUnresolvedCount++;
-            }
-        });
-
-        // Update all states
-        setStats({ normal: vNormal, warning: vWarning, critical: vCritical });
-        setMachineryStats({
-            normal: mNormal,
-            warning: mWarning,
-            critical: mCritical,
-        });
-        setOverdueStats({
-            configured: totalConfigured,
-            pendingUnresolved: pendingUnresolvedCount, // Updated for new UI card
-            overdue30: ov30Count,
-            overdue60: ov60Count,
-        });
-    };
-
-    // ... existing imports
-
-    const GridStatusIcon = ({ color, bgColor = "transparent", size = 16 }) => (
-        <svg
-            width={size}
-            height={size}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke={color} // The lines represent the CURRENT status (e.g., Normal/Green)
-            strokeWidth="2" // Made slightly thicker for better visibility against colored bg
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{
-                backgroundColor: bgColor, // The background represents the PREVIOUS status (e.g., Critical/Red)
-                borderRadius: "50%",
-                padding: "2px", // Add padding so the grid doesn't touch the edges of the background
-            }}
-        >
-            {/* Outer Circle */}
-            <circle cx="12" cy="12" r="10" />
-
-            {/* Vertical Grid Lines */}
-            <path d="M12 2v20" />
-            <path d="M7 3.5v17" />
-            <path d="M17 3.5v17" />
-
-            {/* Horizontal Grid Lines */}
-            <path d="M2 12h20" />
-            <path d="M3.5 7h17" />
-            <path d="M3.5 17h17" />
-        </svg>
-    );
-    const getShortName = (name) => {
-        if (!name) return "";
-        const n = name.toUpperCase();
-
-        if (n.includes("AUX") && n.includes("NO.1")) return "AE #1";
-        if (n.includes("AUX") && n.includes("NO.2")) return "AE #2";
-        if (n.includes("AUX") && n.includes("NO.3")) return "AE #3";
-        if (n.includes("AUX") && n.includes("ENGINE")) return "AE"; // Fallback for generic AE
-        if (n.includes("MAIN") && n.includes("SYSTEM")) return "ME Sys";
-        if (n.includes("MAIN") && n.includes("NO.1")) return "ME #1";
-        if (n.includes("MAIN") && n.includes("NO.2")) return "ME #2";
-        if (n.includes("HATCH")) return "Hatch";
-        if (n.includes("STEERING")) return "Steering";
-        if (n.includes("STERN") && n.includes("AFT")) return "Stern Aft";
-        if (n.includes("STERN") && n.includes("FWD")) return "Stern Fwd";
-        if (n.includes("STERN")) return "Stern Tube";
-        if (n.includes("WINDLASS") && n.includes("FWD")) return "Winch Fwd";
-        if (n.includes("WINDLASS") && n.includes("AFT")) return "Winch Aft";
-        if (n.includes("REMOTE")) return "RC Valve";
-        if (n.includes("STEERING")) return "Str. Gear";
-        if (n.includes("DECK") && n.includes("CRANE")) return "D.Crane";
-        if (n.includes("PROVISION") && n.includes("CRANE")) return "Prov.Crane";
-        if (n.includes("CARGO") && n.includes("PUMP")) return "COP";
-        if (n.includes("HOSE") && n.includes("CRANE")) return "Hose Crane";
-        if (n.includes("WINDLASS") || n.includes("WINCH")) {
-            if (n.includes("FWD")) return "Winch FWD";
-            if (n.includes("AFT")) return "Winch AFT";
-            return "Winch";
-        }
-
-
-        // If no match, just take the first 3 letters of the first 2 words
-        return name
-            .split(" ")
-            .slice(0, 2)
-            .map((w) => w.substring(0, 4))
-            .join(" ");
-    };
-
-    const processTableData = (data) => {
-        if (!data || !data.data) return;
-        const headers = new Set();
-        const rows = {};
-
-        Object.entries(data.data).forEach(([vessel, vData]) => {
-            rows[vessel] = {};
-            if (vData.machineries) {
-                Object.entries(vData.machineries).forEach(([rawName, mData]) => {
-                    const cleanName = rawName.replace(/\s-\s\d+.*$/, "");
-                    headers.add(cleanName);
-
-                    // 1. Prepare History
-                    const currentHistoryItem = {
-                        date: mData.last_sample,
-                        status: mData.status,
-                    };
-                    const inboundHistory =
-                        Array.isArray(mData.history) && mData.history.length > 0
-                            ? mData.history
-                            : [currentHistoryItem];
-
-                    // 2. Prepare Conversation Logic
-                    // ðŸ”¥ FIX: Trust the backend conversation first (it contains the evidence/images)
-                    // Only run manual extraction if the backend conversation is empty
-                    let conversationList = mData.conversation || [];
-
-                    if (conversationList.length === 0) {
-                        const uniqueTracker = new Set();
-                        const extract_messages = (raw_text, role, default_date) => {
-                            if (!raw_text) return;
-                            const lines = raw_text.split("\n");
-                            for (const line of lines) {
-                                const clean = line.trim();
-                                if (!clean) continue;
-
-                                let msg_date_str = default_date || "1970-01-01 00:00";
-                                let msg_text = clean;
-                                const match = clean.match(/^\[(.*?)\]\s*(.*)/);
-
-                                if (match) {
-                                    const [_, datePart, textPart] = match;
-                                    msg_text = textPart;
-                                    try {
-                                        const [dPart, tPart] = datePart.split(" ");
-                                        const [day, month, year] = dPart.split("/");
-                                        msg_date_str = `${year}-${month}-${day} ${tPart || "00:00"}`;
-                                    } catch (e) {
-                                        msg_date_str = datePart;
-                                    }
-                                }
-
-                                const uniqueKey = `${msg_date_str}|${role}|${msg_text}`;
-                                if (!uniqueTracker.has(uniqueKey)) {
-                                    uniqueTracker.add(uniqueKey);
-                                    conversationList.push({
-                                        date: msg_date_str,
-                                        role: role,
-                                        message: msg_text,
-                                    });
-                                }
-                            }
-                        };
-
-                        const officerText =
-                            mData.officer_remarks || (mData.remarks && mData.remarks.officer);
-                        const officeText =
-                            mData.office_remarks || (mData.remarks && mData.remarks.office);
-                        extract_messages(officerText, "Vessel", mData.last_sample);
-                        extract_messages(officeText, "Office", mData.last_sample);
-                        extract_messages(
-                            mData.status_change_log,
-                            "System",
-                            mData.last_sample,
-                        );
-                        conversationList.sort((a, b) => a.date.localeCompare(b.date));
-                    }
-
-                    // 3. Extract Previous Status from Change Log (Keep existing logic)
-                    let previousStatus = null;
-                    if (mData.status_change_log) {
-                        const matches = [
-                            ...mData.status_change_log.matchAll(
-                                /from\s+(\w+)\s+to\s+(\w+)/gi,
-                            ),
-                        ];
-                        if (matches.length > 0) {
-                            const lastMatch = matches[matches.length - 1];
-                            const oldVal = lastMatch[1];
-                            const newVal = lastMatch[2];
-                            if (
-                                oldVal &&
-                                newVal &&
-                                oldVal.toLowerCase() !== newVal.toLowerCase()
-                            ) {
-                                previousStatus = oldVal;
-                            }
-                        }
-                    }
-
-                    // 4. Merge/Create Entry
-                    const entryData = {
-                        ...mData,
-                        raw_machinery_name: rawName,
-                        conversation: conversationList,
-                        report_url: mData.report_url,
-                        previous_status: previousStatus,
-                        diagnosis: mData.diagnosis || mData.lab_diagnosis,
-                        imo: String(vData.imo ?? ""),
-                    };
-
-                    if (rows[vessel][cleanName]) {
-                        const existingEntry = rows[vessel][cleanName];
-                        const mergedHistory = [
-                            ...(existingEntry.history || []),
-                            ...inboundHistory,
-                        ];
-
-                        // Merge existing conversation with new data, maintaining uniqueness
-                        const mergedConversation = [
-                            ...(existingEntry.conversation || []),
-                            ...conversationList,
-                        ]
-                            .filter(
-                                (v, i, a) =>
-                                    a.findIndex(
-                                        (t) => t.date === v.date && t.message === v.message,
-                                    ) === i,
-                            )
-                            .sort((a, b) => a.date.localeCompare(b.date));
-
-                        const existingDate = new Date(
-                            existingEntry.last_sample?.replace(/-/g, "/"),
-                        );
-                        const newDate = new Date(mData.last_sample?.replace(/-/g, "/"));
-
-                        if (newDate >= existingDate) {
-                            rows[vessel][cleanName] = {
-                                ...entryData,
-                                history: mergedHistory,
-                                conversation: mergedConversation,
-                            };
-                        } else {
-                            rows[vessel][cleanName].history = mergedHistory;
-                            rows[vessel][cleanName].conversation = mergedConversation;
-                        }
-                    } else {
-                        rows[vessel][cleanName] = {
-                            ...entryData,
-                            history: inboundHistory,
-                            conversation: conversationList, // Ensure initial entry has the evidence
-                        };
-                    }
-                });
-            }
-        });
-
-        setNormalizedTable({ headers: Array.from(headers).sort(), rows: rows });
-    };
-    const handleCardClick = (statusType) => {
-        if (!matrixData || !matrixData.data) return;
-
-        const today = new Date();
-        const matchingVessels = [];
-
-        Object.entries(matrixData.data).forEach(([vesselName, vesselData]) => {
-            // --- CASE 1: Configured Vessels ---
-            if (statusType === "Configured") {
-                matchingVessels.push({
-                    name: vesselName,
-                    imo: vesselData.imo || "N/A",
-                    reportUrl: vesselData.vessel_report_url,
-                    overdueItems: Object.values(vesselData.machineries)
-                        .filter((m) => m.is_configured)
-                        .map((m) => ({
-                            fullName: m.description || m.code,
-                            shortCode: m.analyst_code || m.code,
-                        })),
-                });
-                return;
-            }
-
-            // --- CASE 2: Pending / Unresolved ---
-            if (statusType === "PendingUnresolved") {
-                const items = Object.values(vesselData.machineries)
-                    .filter((m) => {
-                        const hasReport = m.has_report === true;
-                        const isNotResolved = !m.is_resolved;
-                        const isBadStatus =
-                            m.status?.toLowerCase() !== "normal" &&
-                            m.status?.toLowerCase() !== "none";
-
-                        // UPDATE: isBadStatus is now mandatory (using && instead of || for that group)
-                        // This ensures Normal items are excluded even if they are pending approval.
-                        return hasReport && isNotResolved && isBadStatus;
-                    })
-                    .map((m) => {
-                        // Logic for dot priority (We keep this so you don't lose the color coding)
-                        let state = "danger";
-                        if (m.is_approval_pending) state = "warning";
-                        else if (m.is_resampling_required) state = "info";
-
-                        return {
-                            fullName: m.description || m.code,
-                            code: m.code,
-                            reportDate: m.report_date,
-                            status: m.status,
-                            rawData: m,
-                            state: state,
-                        };
-                    });
-
-                if (items.length > 0) {
-                    matchingVessels.push({
-                        name: vesselName,
-                        imo: vesselData.imo || "N/A",
-                        overdueItems: items,
-                    });
-                }
-                return;
-            }
-
-            // --- CASE 3: Overdue and Health Status Cards ---
-            let vesselWorstHealthStatus = "Normal";
-            let vesselMatchedOverdueItems = [];
-            let hasReport = false;
-            let vesselIsOverdue60 = false;
-            let vesselIsOverdue30 = false;
-
-            Object.values(vesselData.machineries).forEach((m) => {
-                if (!m.is_configured || !m.has_report || !m.last_sample) return;
-                hasReport = true;
-
-                const interval =
-                    typeof m.interval === "number" && m.interval > 0 ? m.interval : 3;
-                const limitDays = interval * 30;
-                const warningStart = limitDays - 30;
-                const sampleDate = new Date(m.last_sample);
-                const daysElapsed = Math.ceil(
-                    (today - sampleDate) / (1000 * 60 * 60 * 24),
-                );
-                const excessDays = daysElapsed - limitDays;
-
-                // 1. Health Status Logic (Top Row Cards)
-                if (daysElapsed > limitDays) {
-                    vesselWorstHealthStatus = "Critical";
-                } else if (
-                    daysElapsed >= warningStart &&
-                    vesselWorstHealthStatus !== "Critical"
-                ) {
-                    vesselWorstHealthStatus = "Warning";
-                }
-
-                // 2. Overdue Logic (Critical60 / Warning30)
-                const itemData = {
-                    fullName: m.description || m.code,
-                    code: m.code,
-                    status: m.status,
-                    reportDate: m.report_date, // Using Report Date
-                    rawData: m,
-                    overdueText: `(Overdue by ${excessDays} days)`,
-                    state: daysElapsed > limitDays + 60 ? "danger" : "warning",
-                };
-
-                if (daysElapsed > limitDays + 60) {
-                    vesselIsOverdue60 = true;
-                    if (statusType === "Critical60" || statusType === "Warning30") {
-                        vesselMatchedOverdueItems.push(itemData);
-                    }
-                } else if (daysElapsed > limitDays + 30) {
-                    vesselIsOverdue30 = true;
-                    if (statusType === "Warning30") {
-                        vesselMatchedOverdueItems.push(itemData);
-                    }
-                }
-            });
-
-            // Matching Logic for Overdue/Health Status
-            if (hasReport) {
-                if (statusType === "Critical60" && vesselIsOverdue60) {
-                    matchingVessels.push({
-                        name: vesselName,
-                        imo: vesselData.imo || "N/A",
-                        overdueItems: vesselMatchedOverdueItems,
-                    });
-                } else if (
-                    statusType === "Warning30" &&
-                    vesselIsOverdue30 &&
-                    !vesselIsOverdue60
-                ) {
-                    matchingVessels.push({
-                        name: vesselName,
-                        imo: vesselData.imo || "N/A",
-                        overdueItems: vesselMatchedOverdueItems,
-                    });
-                } else if (
-                    vesselWorstHealthStatus === statusType &&
-                    !["Warning30", "Critical60"].includes(statusType)
-                ) {
-                    matchingVessels.push({
-                        name: vesselName,
-                        imo: vesselData.imo || "N/A",
-                        overdueItems: [],
-                    });
-                }
-            }
-        });
-
-        // Alphabetical sort preserved
-        matchingVessels.sort((a, b) => a.name.localeCompare(b.name));
-
-        let modalTitle = statusType;
-        if (statusType === "Warning30") modalTitle = "Overdue > 30 Days";
-        if (statusType === "Critical60") modalTitle = "Overdue > 60 Days";
-        if (statusType === "PendingUnresolved")
-            modalTitle = "Pending Unresolved Cases";
-
-        setListModal({
-            isOpen: true,
-            type: modalTitle,
-            vessels: matchingVessels,
-        });
-    };
-    const loadData = async () => {
-        setLoading(true);
-        try {
-            const res = (await axiosLub.get('/api/v1/fleet/luboil-overview')).data;
-
-            // 1. Store the Matrix Data directly
-            setMatrixData(res);
-
-            // 2. Store the Master Column List from Backend
-            setTableColumns(res.columns || []);
-            setColumnLabels(res.column_labels || {});
-            processTableData(res);
-            // 3. Calculate Stats (using the new logic below)
-            calculateMachineryStats(res);
-        } catch (err) {
-            console.error("Failed to load luboil data", err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const handleFileUpload = async (e) => {
-        // 1. Convert FileList to an Array
-        const files = Array.from(e.target.files);
-        if (files.length === 0) return;
-
-        setUploading(true);
-
-        // 2. Initialize tracking for the summary report
-        let successCount = 0;
-        let duplicateCount = 0;
-        let errorCount = 0;
-        let detailedSummary = [];
-
-        try {
-            // 3. Process files sequentially using for...of
-            // This ensures we don't overwhelm the parser and processed data is saved correctly
-            for (const file of files) {
-                try {
-                    const res = (await axiosLub.post('/upload-luboil-report/', (() => { const fd = new FormData(); fd.append('file', file); return fd; })(), { headers: { 'Content-Type': 'multipart/form-data' } })).data;
-
-                    if (res.is_duplicate) {
-                        duplicateCount++;
-                    } else {
-                        successCount++;
-                    }
-
-                    // 4. Preserve all original data points for the summary
-                    detailedSummary.push(
-                        `${res.is_duplicate ? "âš ï¸ [DUP]" : "âœ… [NEW]"} ${file.name}\n` +
-                        `   Vessel: ${res.vessel} | Date: ${res.report_date}\n` +
-                        `   Summary: ${res.alert_summary} | Machineries: ${res.sample_count}`,
-                    );
-                } catch (fileError) {
-                    errorCount++;
-                    detailedSummary.push(
-                        `âŒ ${file.name}: Upload Failed - ${fileError.message}`,
-                    );
-                }
-            }
-
-            // 5. Construct the final Alert Message (Aggregated from your original template)
-            const finalReport =
-                `BULK UPLOAD COMPLETE\n` +
-                `----------------------------------\n` +
-                `Total Files: ${files.length}\n` +
-                `Successfully Processed: ${successCount}\n` +
-                `Duplicates (Updated): ${duplicateCount}\n` +
-                `Errors: ${errorCount}\n\n` +
-                `DETAILED BREAKDOWN:\n` +
-                detailedSummary.join("\n\n");
-
-            alert(finalReport);
-
-            // 6. Refresh the Matrix
-            loadData();
-        } catch (globalError) {
-            console.error("Bulk Upload Error:", globalError);
-            alert("âŒ A critical error occurred during bulk processing.");
-        } finally {
-            setUploading(false);
-            // 7. Reset the input so the user can upload the same files again if needed
-            e.target.value = null;
-        }
-    };
-
-    // Helper for Status Icons/Colors
-    const getStatusBadge = (status) => {
-        const s = status.toLowerCase();
-        if (s === "normal")
-            return (
-                <span className="status-badge status-success">
-                    <CheckCircle size={14} /> Normal
-                </span>
-            );
-        if (s === "warning" || s === "attention")
-            return (
-                <span className="status-badge status-warning">
-                    <AlertTriangle size={14} /> Warning
-                </span>
-            );
-        if (s === "critical" || s === "action")
-            return (
-                <span className="status-badge status-error">
-                    <AlertCircle size={14} /> Critical
-                </span>
-            );
-        return <span className="status-badge status-default">{status}</span>;
-    };
-    // 1. Add this state for counters
-    const [stats, setStats] = useState({ normal: 0, warning: 0, critical: 0 });
-
-    // 2. Add this calculation function
-    const calculateFleetStats = (data) => {
-        if (!data || !data.data) return;
-        let normal = 0,
-            warning = 0,
-            critical = 0;
-        const today = new Date();
-
-        Object.values(data.data).forEach((vessel) => {
-            const dates = Object.values(vessel.machineries)
-                .map((m) => m.last_sample)
-                .filter((d) => d && d !== "-" && d !== "N/A")
-                .map((d) => new Date(d.replace(/-/g, "/")));
-
-            if (dates.length > 0) {
-                const latestDate = new Date(Math.max(...dates));
-                const diffTime = Math.abs(today - latestDate);
-                const daysElapsed = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-                if (daysElapsed <= 60) normal++;
-                else if (daysElapsed > 60 && daysElapsed <= 90) warning++;
-                else critical++;
-            } else {
-                critical++;
-            }
-        });
-        setStats({ normal, warning, critical });
-    };
-
-    const [isStatsOpen, setIsStatsOpen] = useState(false);
-    const totalEquipment =
-        machineryStats.normal + machineryStats.warning + machineryStats.critical;
-    const getPercentage = (value) => {
-        return totalEquipment > 0 ? (value / totalEquipment) * 100 : 0;
-    };
-    // Helper to get color code based on status string
-    const getStatusColor = (status) => {
-        const s = status ? status.toLowerCase() : "";
-        if (s === "normal") return "#22c55e"; // Green
-        if (s === "warning" || s === "attention") return "#eab308"; // Yellow
-        if (s === "critical" || s === "action") return "#ef4444"; // Red
-        return "#cbd5e1"; // Grey (No Data)
-    };
-    const filterDistinctReports = (history) => {
-        if (!history || !Array.isArray(history)) return [];
-
-        // Sort Descending (Newest -> Oldest)
-        // We simply sort and return all history items without filtering by day interval
-        const sorted = [...history].sort((a, b) => {
-            // Handle both date formats if necessary
-            const dateA = new Date(a.date || a.sample_date);
-            const dateB = new Date(b.date || b.sample_date);
-            return dateB - dateA;
-        });
-
-        return sorted;
-    };
-    const getStatusLightColor = (status) => {
-        const s = status ? status.toLowerCase() : "";
-        if (s === "critical" || s === "action") return "#ef4444"; // Light Red
-        if (s === "warning" || s === "attention") return "#eab308"; // Light Yellow
-        if (s === "normal") return "#dcfce7"; // Light Green
-        return "transparent";
-    };
-    // --- REPLACE YOUR EXISTING StatusDots WITH THIS ---
-    // Add Machinery info and onChartClick callback to props
-    const StatusDots = ({
-        history,
-        hasLatestRemarks,
-        previousStatus,
-        onChartClick,
-        onSampleClick,
-        hasReport,
-        dueText,
-    }) => {
-        // --- STATE FOR DROPDOWN ---
-        const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
-        const dropdownRef = useRef(null);
-
-        // Close dropdown when clicking outside
-        useEffect(() => {
-            const handleClickOutside = (event) => {
-                if (
-                    dropdownRef.current &&
-                    !dropdownRef.current.contains(event.target)
-                ) {
-                    setShowHistoryDropdown(false);
-                }
-            };
-            if (showHistoryDropdown) {
-                document.addEventListener("mousedown", handleClickOutside);
-            }
-            return () =>
-                document.removeEventListener("mousedown", handleClickOutside);
-        }, [showHistoryDropdown]);
-
-        const safeHistory = history && Array.isArray(history) ? history : [];
-
-        // 1. Sort history: Newest -> Oldest
-        const sortedHistory = [...safeHistory].sort((a, b) => {
-            const dateA = new Date(a.date || a.sample_date);
-            const dateB = new Date(b.date || b.sample_date);
-            return dateB - dateA;
-        });
-
-        // 2. logic change: Identify ONLY the latest unique report date
-        const latestDate =
-            sortedHistory.length > 0
-                ? sortedHistory[0].date || sortedHistory[0].sample_date
-                : null;
-
-        return (
-            <div
-                style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: "6px", // Space between the top row and the due badge
-                    position: "relative",
-                }}
-            >
-                {/* --- LINE 1: STATUS ICONS + ACTION BUTTONS (SINGLE LINE) --- */}
-                <div
-                    style={{
-                        display: "flex",
-                        gap: "6px", // Space between status dots and the action group
-                        justifyContent: "center",
-                        alignItems: "center",
-                        flexWrap: "nowrap",
-                    }}
-                >
-                    {/* Status Dots Section */}
-                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                        {latestDate ? (
-                            sortedHistory
-                                .filter((h) => (h.date || h.sample_date) === latestDate)
-                                .map((sample, sampleIdx) => {
-                                    const hasNotes =
-                                        sample.officer_remarks?.trim() ||
-                                        sample.office_remarks?.trim() ||
-                                        sample.internal_remarks?.trim();
-                                    const hasEvidence =
-                                        sample.attachment_url &&
-                                        sample.attachment_url.trim() !== "";
-                                    const isMandatory = sample.is_image_required === true;
-                                    const statusChangeDetected =
-                                        sample.previous_status ||
-                                        (sampleIdx === 0 && previousStatus);
-
-                                    let dotTooltip = `Date: ${sample.date || sample.sample_date}`;
-                                    if (sample.sample_number)
-                                        dotTooltip =
-                                            `Sample: ${sample.sample_number}\n` + dotTooltip;
-
-                                    if (
-                                        hasNotes ||
-                                        hasEvidence ||
-                                        isMandatory ||
-                                        statusChangeDetected
-                                    ) {
-                                        dotTooltip += `\n Contains Activity:`;
-                                        if (hasNotes) dotTooltip += `\n - Communication Notes`;
-                                        if (hasEvidence) dotTooltip += `\n - Attached Evidence`;
-                                        if (isMandatory) dotTooltip += `\n - Image Upload Required`;
-                                        if (statusChangeDetected)
-                                            dotTooltip += `\n - Status changed from: ${sample.previous_status || previousStatus}`;
-                                    }
-
-                                    return (
-                                        <div
-                                            key={`${sample.sample_id || latestDate}-${sampleIdx}`}
-                                            title={dotTooltip}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (onSampleClick) onSampleClick(sample);
-                                            }}
-                                            style={{
-                                                cursor: "pointer",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                transition: "transform 0.1s",
-                                            }}
-                                            onMouseEnter={(e) =>
-                                                (e.currentTarget.style.transform = "scale(1.15)")
-                                            }
-                                            onMouseLeave={(e) =>
-                                                (e.currentTarget.style.transform = "scale(1)")
-                                            }
-                                        >
-                                            {/* ðŸ”¥ INCREASED SIZE TO 24 */}
-                                            <ShellStatusIcon status={sample?.status} size={22} />
-                                        </div>
-                                    );
-                                })
-                        ) : (
-                            <ShellStatusIcon status="none" size={22} />
-                        )}
-                    </div>
-
-                    {/* Action Buttons Section (MOVED TO LINE 1) */}
-                    {hasReport && (
-                        <div
-                            style={{
-                                display: "flex",
-                                gap: "4px",
-                                alignItems: "center",
-                                borderLeft: "1px solid #e2e8f0", // Subtle divider
-                                paddingLeft: "8px",
-                            }}
-                        >
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (onChartClick) onChartClick();
-                                }}
-                                style={{
-                                    background: "#f8fafc",
-                                    border: "1px solid #cbd5e1",
-                                    borderRadius: "4px",
-                                    padding: "3px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    cursor: "pointer",
-                                    color: "#64748b",
-                                    transition: "all 0.2s",
-                                }}
-                                title="View Trend Graph"
-                            >
-                                <TrendingUp size={14} />
-                            </button>
-
-                            <div ref={dropdownRef} style={{ position: "relative" }}>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setShowHistoryDropdown(!showHistoryDropdown);
-                                    }}
-                                    style={{
-                                        background: showHistoryDropdown ? "#eff6ff" : "#f8fafc",
-                                        border: showHistoryDropdown
-                                            ? "1px solid #2563eb"
-                                            : "1px solid #cbd5e1",
-                                        borderRadius: "4px",
-                                        padding: "3px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        cursor: "pointer",
-                                        color: showHistoryDropdown ? "#2563eb" : "#64748b",
-                                        transition: "all 0.2s",
-                                    }}
-                                    title="View Historical Report List"
-                                >
-                                    <FileText size={14} />
-                                </button>
-
-                                {showHistoryDropdown && (
-                                    <div
-                                        style={{
-                                            position: "absolute",
-                                            top: "100%",
-                                            width: "180px",
-                                            backgroundColor: "white",
-                                            border: "1px solid #e2e8f0",
-                                            borderRadius: "8px",
-                                            boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
-                                            zIndex: 10,
-                                            marginTop: "6px",
-                                            maxHeight: "240px",
-                                            overflowY: "auto",
-                                        }}
-                                    >
-                                        <div
-                                            style={{
-                                                padding: "8px 12px",
-                                                fontSize: "0.65rem",
-                                                fontWeight: "800",
-                                                color: "#94a3b8",
-                                                borderBottom: "1px solid #f1f5f9",
-                                                backgroundColor: "#f8fafc",
-                                                textAlign: "left",
-                                            }}
-                                        >
-                                            AVAILABLE REPORTS
-                                        </div>
-                                        {sortedHistory
-                                            .filter((h) => (h.date || h.sample_date) !== latestDate)
-                                            .map((h, i) => (
-                                                <div
-                                                    key={h.sample_id || i}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setShowHistoryDropdown(false);
-                                                        onSampleClick(h);
-                                                    }}
-                                                    style={{
-                                                        padding: "10px 12px",
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        gap: "10px",
-                                                        cursor: "pointer",
-                                                        borderBottom: "1px solid #f8fafc",
-                                                    }}
-                                                    onMouseEnter={(e) =>
-                                                        (e.currentTarget.style.backgroundColor = "#f1f5f9")
-                                                    }
-                                                    onMouseLeave={(e) =>
-                                                        (e.currentTarget.style.backgroundColor = "white")
-                                                    }
-                                                >
-                                                    <ShellStatusIcon status={h.status} size={16} />
-                                                    <span
-                                                        style={{
-                                                            fontSize: "0.75rem",
-                                                            fontWeight: "700",
-                                                            color: "#1e293b",
-                                                        }}
-                                                    >
-                                                        {new Date(
-                                                            h.date || h.sample_date,
-                                                        ).toLocaleDateString("en-GB", {
-                                                            day: "2-digit",
-                                                            month: "short",
-                                                            year: "numeric",
-                                                        })}
-                                                    </span>
-                                                </div>
-                                            ))}
-
-                                        {sortedHistory.filter(
-                                            (h) => (h.date || h.sample_date) !== latestDate,
-                                        ).length === 0 && (
-                                                <div
-                                                    style={{
-                                                        padding: "15px",
-                                                        textAlign: "center",
-                                                        color: "#94a3b8",
-                                                        fontSize: "0.7rem",
-                                                    }}
-                                                >
-                                                    No previous reports found
-                                                </div>
-                                            )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* --- LINE 2: DUE DATE BADGE (ISOLATED BOTTOM) --- */}
-                <span
-                    style={{
-                        backgroundColor: "#ffffff",
-                        color: "#334155",
-                        fontSize: "0.65rem",
-                        padding: "2px 10px",
-                        borderRadius: "4px",
-                        fontWeight: "700",
-                        whiteSpace: "nowrap",
-                        border: "1px solid #cbd5e1",
-                    }}
-                >
-                    Due: {dueText}
-                </span>
-            </div>
-        );
-    };
-    const handleVesselClick = async (vesselName, imoNumber) => {
-        if (!imoNumber) return alert("IMO Number not found.");
-
-        // Close if clicking the same vessel again
-        if (selectedVesselName === vesselName) {
-            setSelectedVesselName(null);
-            setVesselReports([]);
-            return;
-        }
-
-        setSelectedVesselName(vesselName);
-        setLoadingReports(true);
-        setVesselReports([]); // Reset previous data
-
-        try {
-            // Calls the new backend endpoint: /api/luboil/reports/{imo}
-            const res = (await axiosLub.get(`/api/luboil/reports/${imo}`)).data;
-            setVesselReports(res || []);
-        } catch (error) {
-            console.error("Failed to fetch reports:", error);
-        } finally {
-            setLoadingReports(false);
-        }
-    };
-    // --- LOGIC FOR RESOLUTION GATING ---
-    const isVesselUser = !amIShore;
-    const currentSampleDate = new Date(
-        selectedCell?.data?.date || selectedCell?.data?.sample_date,
-    );
-
-    // BUG FIX: Check if image exists in gallery (attachment_url) OR newly selected in modal
-    const evidenceExistsInGallery =
-        selectedCell?.data?.attachment_url &&
-        selectedCell.data.attachment_url.trim().length > 0;
-    const imageRequirementMet =
-        !selectedCell?.data?.is_image_required ||
-        evidenceExistsInGallery ||
-        selectedCloseFile;
-
-    // RESAMPLING CHECK: Scans equipment history for a report date newer than the current one
-    const hasNewerReport = selectedCell?.data?.history?.some(
-        (h) => new Date(h.date) > currentSampleDate,
-    );
-    const resamplingRequirementMet =
-        !selectedCell?.data?.is_resampling_required || hasNewerReport;
-
-    // Final State
-    const canVesselSubmit = imageRequirementMet && resamplingRequirementMet;
-    const isCloseSubmitDisabled =
-        isSubmittingClose ||
-        (closeRemarksText?.length || 0) < 50 ||
-        (isVesselUser && !canVesselSubmit);
+      });
+
+      processedData.sort((a, b) => a.timestamp - b.timestamp);
+      setTrendModal((prev) => ({ ...prev, data: processedData }));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingTrend(false);
+    }
+  };
+  const handleTextareaChange = async (val) => {
+    // Determine which buffer to update
+    if (chatMode === "internal") {
+      setInternalDraft(val);
+    } else {
+      const isShore = user?.role === "SHORE" || user?.role === "ADMIN";
+      setRemarksData((prev) => ({
+        ...prev,
+        [isShore ? "office" : "officer"]: val,
+      }));
+    }
+
+    // Mention Logic
+    const lastChar = val.slice(-1);
+    const words = val.split(/\s/);
+    const lastWord = words[words.length - 1];
+
+    if (lastWord.startsWith("@")) {
+      const query = lastWord.slice(1);
+      setMentionFilter(query);
+
+      // Fetch if not already fetched or if list is empty
+      try {
+        const users = (
+          await axiosLub.get(
+            `/api/luboil/mentions/${selectedCell.data.imo}?chat_mode=${chatMode}`,
+          )
+        ).data;
+        setMentionList(users);
+        setShowMentionDropdown(true);
+      } catch (err) {
+        console.error("Mention fetch failed", err);
+      }
+    } else {
+      setShowMentionDropdown(false);
+    }
+  };
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const notifRef = useRef(null);
+  //   useEffect(() => {
+  //   localStorage.setItem("hidden_notifications", JSON.stringify(hiddenNotifIds));
+  // }, [hiddenNotifIds]);
+
+  // 1. Fetch from Backend
+  const fetchNotifs = async () => {
+    try {
+      const data = (await axiosLub.get("/api/notifications")).data;
+      setNotifications(data.notifications || []);
+      setUnreadCount(data.unread_count || 0);
+    } catch (err) {
+      console.error("Notif fetch failed", err);
+    }
+  };
+
+  // 2. Set up Polling (Live updates)
+  useEffect(() => {
+    fetchNotifs();
+    const interval = setInterval(fetchNotifs, 45000); // 45 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  // 3. Handle Notification Click (Redirection + Auto-Open Modal)
+  // 3. Handle Notification Click (Redirection + Auto-Open Modal)
+  const handleNotifClick = async (n) => {
+    if (!n || !normalizedTable?.rows) return; // Safety check: exit if data isn't ready
+
+    await axiosLub.patch(`/api/notifications/${n.id}/read`);
+    setShowNotifDropdown(false);
+    fetchNotifs();
+
+    // Logic to find the vessel/machinery in your current table
+    // Added extra safety checks [name] and [n.equipment_code]
+    const vesselName = Object.keys(normalizedTable.rows).find((name) => {
+      const vesselRow = normalizedTable.rows[name];
+      // Ensure the vessel exists and has this specific machinery before checking IMO
+      return (
+        vesselRow && String(vesselRow[n.equipment_code]?.imo) === String(n.imo)
+      );
+    });
+
+    if (vesselName && normalizedTable.rows[vesselName][n.equipment_code]) {
+      const cell = normalizedTable.rows[vesselName][n.equipment_code];
+
+      // Find the specific sample if available, else default to latest
+      const specificSample =
+        cell.history?.find((h) => h.sample_id === n.sample_id) ||
+        cell.history?.[0] ||
+        cell;
+
+      // Use your existing select sample logic to trigger the modal correctly
+      handleSelectSample(vesselName, cell, specificSample);
+
+      setRightPanelMode("history"); // Take them straight to the chat
+      setShowHistory(true);
+      setIsModalOpen(true);
+    } else {
+      console.warn(
+        "Could not find matching vessel/machinery in the current matrix for this notification.",
+      );
+    }
+  };
+  const selectUser = (userName) => {
+    const currentDraft =
+      chatMode === "internal"
+        ? internalDraft
+        : amIShore
+          ? remarksData.office
+          : remarksData.officer;
+    const words = currentDraft.split(/\s/);
+    words[words.length - 1] = `@${userName} `; // Replace @query with @FullName
+    const newText = words.join(" ");
+
+    if (chatMode === "internal") {
+      setInternalDraft(newText);
+    } else {
+      setRemarksData((prev) => ({
+        ...prev,
+        [amIShore ? "office" : "officer"]: newText,
+      }));
+    }
+    setShowMentionDropdown(false);
+  };
+  const formatDiagnosisAsList = (text) => {
+    if (!text) return null;
+
+    // This Regex looks for markers like (a), (b), (c) or a), b), c)
+    // It splits the text but keeps the markers
+    const parts = text.split(/(?=\([a-z]\))/g);
 
     return (
-        <div className="dashboard-container-enhanced" style={{ paddingTop: "72px" }}>
-            {/* <PerformanceNav /> */}
-            <OzellarHeader
-                unreadCount={unreadCount}
-                notifications={notifications}
-                showNotifDropdown={showNotifDropdown}
-                notifRef={notifRef}
-                onBellClick={() => setShowNotifDropdown(!showNotifDropdown)}
-                onNotifClick={handleNotifClick}
-                onHideNotification={handleHideNotification}
-                viewMode={viewMode}
-                onFeedClick={() => {
-                    if (viewMode === "matrix") { fetchFeed(); setViewMode("liveFeed"); }
-                    else { setViewMode("matrix"); }
-                }}
-                user={user}
-                onRegisterVessel={() => alert("Register Vessel coming soon")}
-            />
-            {viewMode === "matrix" && (
-                <div
-                    className="section-header-enhanced"
-                    style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: "12px", // Added slight margin for better layout
-                        flexShrink: 0,
-                    }}
-                >
-                    {/* LEFT SIDE: Title and Subtitle */}
-                    <div>
-                        <h1
-                            className="section-title-main"
-                            style={{ fontSize: "1.25rem", margin: 0, lineHeight: "1.2" }}
-                        >
-                            Lube Oil Analysis Overview
-                        </h1>
-                        <p
-                            className="section-subtitle"
-                            style={{
-                                margin: "2px 0 0 0",
-                                fontSize: "0.75rem",
-                                color: "#64748b",
-                            }}
-                        >
-                            Fleet-wide lubrication health & sampling schedule
-                        </p>
-                    </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        {parts.map((part, index) => {
+          const trimmedPart = part.trim();
+          if (!trimmedPart) return null;
 
-                    {/* RIGHT SIDE: Grouped Actions (Bell, Feed, Upload) */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        {/* 1. NOTIFICATION BELL */}
-                        {/* <div style={{ position: "relative" }} ref={notifRef}>
+          // If it starts with a marker like (a), render as a list item
+          if (/^\([a-z]\)/.test(trimmedPart)) {
+            return (
+              <div
+                key={index}
+                style={{ display: "flex", gap: "12px", paddingLeft: "10px" }}
+              >
+                <span
+                  style={{
+                    color: "#2563eb",
+                    fontWeight: "bold",
+                    minWidth: "20px",
+                  }}
+                ></span>
+                <span style={{ color: "#475569", lineHeight: "1.6" }}>
+                  {trimmedPart}
+                </span>
+              </div>
+            );
+          }
+
+          // Otherwise render as a normal introductory paragraph
+          return (
+            <p
+              key={index}
+              style={{
+                margin: 0,
+                fontWeight: "500",
+                color: "#1e293b",
+                marginBottom: "8px",
+              }}
+            >
+              {trimmedPart}
+            </p>
+          );
+        })}
+      </div>
+    );
+  };
+  const handleBulkDelete = async () => {
+    if (selectedGalleryItems.length === 0) return;
+
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${selectedGalleryItems.length} item(s)?`,
+      )
+    )
+      return;
+
+    const now = new Date();
+    const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+
+    // ðŸ”¥ CRITICAL: Backend uses this message to trigger the Live Feed "Evidence Deleted" event
+    const deleteSysMsg = `[${timestamp}] <b>${user.full_name}</b> has deleted ${selectedGalleryItems.length} piece(s) of evidence.`;
+
+    // 1. Get current raw paths from the database
+    let currentAttachments = selectedCell.data.attachment_url || "";
+    let attachmentArray = currentAttachments
+      .split("|")
+      .filter((url) => url !== "");
+
+    // 2. Identify the raw paths to delete by stripping the SAS tokens
+    const rawPathsToDelete = selectedGalleryItems.map((item) => {
+      return item.url.split("?")[0];
+    });
+
+    // 3. Filter: Keep only the files NOT in our delete list
+    const updatedArray = attachmentArray.filter((dbPath) => {
+      return !rawPathsToDelete.some((toDelete) => toDelete.includes(dbPath));
+    });
+
+    const finalAttachmentString = updatedArray.join("|");
+
+    try {
+      const response = (
+        await axiosLub.post("/api/luboil/remarks/update", {
+          sample_id: selectedCell.data.sample_id, // ðŸ”¥ Targeted ID prevents "Meshing" error
+          vessel_name: selectedCell.vessel,
+          machinery_name: selectedCell.data.code || selectedCell.machinery,
+          sample_date: selectedCell.data.last_sample,
+          attachment_url: finalAttachmentString,
+          status_change_msg: deleteSysMsg,
+        })
+      ).data;
+
+      // 4. Update the Active Modal View (Communication Window)
+      setSelectedCell((prev) => ({
+        ...prev,
+        data: {
+          ...prev.data,
+          attachment_url: finalAttachmentString,
+          conversation: response.updated_conversation,
+        },
+      }));
+
+      // 5. ðŸ”¥ SURGICAL FIX: Update the Background Matrix (normalizedTable)
+      // This ensures that if you click another dot and return, the deleted evidence stays gone.
+      setNormalizedTable((prev) => {
+        const updatedRows = { ...prev.rows };
+        const vessel = selectedCell.vessel;
+        const machineryCode = selectedCell.data.code;
+
+        if (updatedRows[vessel] && updatedRows[vessel][machineryCode]) {
+          const targetCell = updatedRows[vessel][machineryCode];
+
+          // Update the specific sample inside the history array for this equipment
+          if (targetCell.history) {
+            targetCell.history = targetCell.history.map((h) => {
+              if (h.sample_id === selectedCell.data.sample_id) {
+                return {
+                  ...h,
+                  attachment_url: finalAttachmentString,
+                };
+              }
+              return h;
+            });
+          }
+
+          // If the dot we are editing is currently the "Latest" one displayed on the matrix
+          if (targetCell.sample_id === selectedCell.data.sample_id) {
+            targetCell.attachment_url = finalAttachmentString;
+            targetCell.conversation = response.updated_conversation;
+          }
+        }
+        return { ...prev, rows: updatedRows };
+      });
+
+      // 6. UI Cleanup
+      setPreviewImage(null);
+      setSelectedGalleryItems([]);
+
+      // Optional: Full refresh to sync all counters (like Machinery Stats)
+      loadData();
+
+      alert("âœ… Evidence deleted successfully.");
+    } catch (err) {
+      console.error("Delete failed", err);
+      alert("Failed to delete items.");
+    }
+  };
+
+  const handleLubBatchDownload = async () => {
+    if (selectedLubReports.length === 0) return;
+    setIsDownloading(true);
+    try {
+      // Calling the API service (make sure 'lubeOil' case is added to your backend api.py)
+      const blob = (
+        await axiosLub.post(
+          "/api/performance/batch-download-zip",
+          {
+            report_ids: selectedLubReports,
+            engine_type: "lubeOil",
+          },
+          { responseType: "blob" },
+        )
+      ).data;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute(
+        "download",
+        `${selectedVesselName}_Lube_Reports_${new Date().getTime()}.zip`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+    } catch (error) {
+      console.error("Batch download failed:", error);
+      alert("Failed to generate ZIP file.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+  // 1. Shore Requesting Image
+  const handleRequestImageAction = async () => {
+    const isShore =
+      user?.role === "SHORE" ||
+      user?.role === "ADMIN" ||
+      user?.role === "SUPERUSER";
+    if (!isShore) return;
+
+    // 1. Determine current state and target state (Undo/Toggle logic)
+    const isCurrentlyRequired = selectedCell.data.is_image_required;
+    const targetState = !isCurrentlyRequired;
+
+    const now = new Date();
+    const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+
+    // 2. Dynamic message based on whether we are enabling or disabling
+    const systemMsg = targetState
+      ? `[${timestamp}]  <b>${user.full_name}</b> Made the image/file mandatory.`
+      : `[${timestamp}]  <b>${user.full_name}</b> Made the image/file optional(no need)`;
+
+    try {
+      const payload = {
+        vessel_name: selectedCell.vessel,
+        sample_id: selectedCell.data.sample_id,
+        machinery_name: selectedCell.machinery,
+        sample_date: selectedCell.data.last_sample,
+        sample_number: selectedCell.data.sample_number,
+        status_change_msg: systemMsg,
+        is_image_required: targetState, // Changed from hardcoded 'true' to targetState
+      };
+
+      // Send to Backend
+      const response = (
+        await axiosLub.post("/api/luboil/remarks/update", payload)
+      ).data;
+
+      // 2. UPDATE MODAL STATE (Immediate visual change)
+      setSelectedCell((prev) => ({
+        ...prev,
+        data: {
+          ...prev.data,
+          is_image_required: targetState,
+          conversation: response.updated_conversation || prev.data.conversation,
+        },
+      }));
+
+      // 3. ðŸ”¥ CRITICAL FIX PRESERVED: UPDATE THE BACKGROUND MATRIX STATE
+      setNormalizedTable((prev) => {
+        const updatedRows = { ...prev.rows };
+        const vesselName = selectedCell.vessel;
+        const machineryCode = selectedCell.data.code;
+
+        if (updatedRows[vesselName] && updatedRows[vesselName][machineryCode]) {
+          updatedRows[vesselName][machineryCode] = {
+            ...updatedRows[vesselName][machineryCode],
+            is_image_required: targetState,
+            // Sync the conversation history to the background table too
+            conversation:
+              response.updated_conversation ||
+              updatedRows[vesselName][machineryCode].conversation,
+          };
+        }
+        return { ...prev, rows: updatedRows };
+      });
+
+      // 4. UI Navigation
+      setRightPanelMode("history");
+      setShowHistory(true);
+
+      // 5. Final sync with server
+      loadData();
+    } catch (err) {
+      console.error("Request failed:", err);
+      alert("Failed to update requirement.");
+    }
+  };
+
+  const handleSidebarUpload = async (file) => {
+    if (!file) return;
+
+    if (file.size > 1024 * 1024) {
+      alert("âŒ File too large. Maximum allowed size is 1MB.");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("imo", selectedCell.data.imo);
+      formData.append("equipment_code", selectedCell.data.code);
+      formData.append("sample_date", selectedCell.data.last_sample);
+      formData.append("sample_id", selectedCell.data.sample_id);
+
+      // 1. Upload the physical file to storage
+      // This backend call stores the URL in the 'attachment_url' column automatically
+      (
+        await axiosLub.post("/api/luboil/upload-attachment", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        })
+      ).data;
+
+      const now = new Date();
+      const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+
+      // This remains to show in the system log WHO uploaded the image
+      const systemUploadMsg = `[${timestamp}] <b>${user.full_name}</b> has successfully uploaded the Image/File.`;
+
+      // 2. Update the Database record
+      const response = (
+        await axiosLub.post("/api/luboil/remarks/update", {
+          vessel_name: selectedCell.vessel,
+          machinery_name: selectedCell.machinery,
+          sample_date: selectedCell.data.last_sample,
+          sample_id: selectedCell.data.sample_id,
+          sample_number: selectedCell.data.sample_number,
+          status_change_msg: systemUploadMsg,
+          // is_image_required: false,
+
+          // âœ… UPDATED: We no longer append the 'ATTACHED_IMAGE' string here.
+          // We simply pass the existing remarks history so they remain unchanged.
+          office_remarks: existingRemarks.office,
+          officer_remarks: existingRemarks.officer,
+          internal_remarks: existingRemarks.internal,
+        })
+      ).data;
+
+      // 3. UPDATE MODAL STATE IMMEDIATELY
+      setSelectedCell((prev) => ({
+        ...prev,
+        data: {
+          ...prev.data,
+          conversation: response.updated_conversation || prev.data.conversation,
+          // is_image_required: false
+        },
+      }));
+
+      // 4. ðŸ”¥ SURGICAL FIX: Update the background table state immediately
+      setNormalizedTable((prev) => {
+        const updatedRows = { ...prev.rows };
+        const vName = selectedCell.vessel;
+        const mCode = selectedCell.data.code;
+
+        if (updatedRows[vName] && updatedRows[vName][mCode]) {
+          updatedRows[vName][mCode] = {
+            ...updatedRows[vName][mCode],
+            // is_image_required: false,
+            conversation:
+              response.updated_conversation ||
+              updatedRows[vName][mCode].conversation,
+          };
+        }
+        return { ...prev, rows: updatedRows };
+      });
+
+      // 5. Sync with server for total accuracy
+      loadData();
+      alert("âœ… Evidence uploaded successfully.");
+    } catch (err) {
+      console.error("Upload failed", err);
+      alert("Upload failed.");
+    }
+  };
+
+  const handleSendMessage = async () => {
+    // 1. Robust User Identification (The "Seenu" Fix preserved)
+    const userData = user?.user || user;
+    const userAccess = (userData?.role || "").toUpperCase();
+    const userRole = (userData?.role || "").toUpperCase();
+    const currentUserName = userData?.full_name || "User";
+
+    // Identify if the sender is Shore staff
+    const isShore =
+      userAccess === "SHORE" ||
+      userRole === "ADMIN" ||
+      userRole === "SUPERUSER" ||
+      userRole === "SHORE" ||
+      userRole === "SUPERINTENDENT";
+
+    // 2. Select the correct input buffer based on mode and identified role
+    let currentInput = "";
+    if (chatMode === "internal") {
+      currentInput = internalDraft;
+    } else {
+      currentInput = isShore ? remarksData.office : remarksData.officer;
+    }
+
+    // Validation: Don't send empty messages
+    if (!currentInput || !currentInput.trim()) return;
+
+    try {
+      // 3. Generate standard timestamp [DD/MM/YYYY HH:MM]
+      const now = new Date();
+      const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+
+      // 4. Prepare updated remark strings
+      // Using existingRemarks ensures we append to the history of the SPECIFIC dot selected
+      let updatedOfficerRemarks = existingRemarks.officer || "";
+      let updatedOfficeRemarks = existingRemarks.office || "";
+      let updatedInternalRemarks = existingRemarks.internal || "";
+
+      const messageLine = `[${timestamp}] ${currentUserName}: ${currentInput}`;
+
+      if (chatMode === "internal") {
+        updatedInternalRemarks +=
+          (updatedInternalRemarks ? "\n" : "") + messageLine;
+      } else if (isShore) {
+        updatedOfficeRemarks +=
+          (updatedOfficeRemarks ? "\n" : "") + messageLine;
+      } else {
+        updatedOfficerRemarks +=
+          (updatedOfficerRemarks ? "\n" : "") + messageLine;
+      }
+
+      // 5. Construct Payload for the Backend
+      const payload = {
+        vessel_name: selectedCell.vessel,
+        machinery_name: selectedCell.machinery,
+        sample_date: selectedCell.data.last_sample,
+        sample_number: selectedCell.data.sample_number,
+        sample_id: selectedCell.data.sample_id, // This is crucial for your isolated backend logic
+        officer_remarks: updatedOfficerRemarks,
+        office_remarks: updatedOfficeRemarks,
+        internal_remarks: updatedInternalRemarks,
+        status: remarksData.status,
+        user_name: currentUserName,
+      };
+
+      // 6. Call API
+      const response = (
+        await axiosLub.post("/api/luboil/remarks/update", payload)
+      ).data;
+
+      // 7. SYNC ALL STATES IMMEDIATELY (Fixes the "Meshing" and "Not Showing" bugs)
+      if (response.updated_conversation) {
+        // A. Update the Modal Window (Immediate Visual Feedback)
+        setSelectedCell((prev) => ({
+          ...prev,
+          data: {
+            ...prev.data,
+            conversation: response.updated_conversation,
+            officer_remarks: updatedOfficerRemarks,
+            office_remarks: updatedOfficeRemarks,
+            internal_remarks: updatedInternalRemarks,
+          },
+        }));
+
+        // B. SURGICAL FIX: Update the background table (normalizedTable)
+        // This prevents Dot 1 from seeing Dot 2's data when clicking between them
+        setNormalizedTable((prev) => {
+          const newRows = { ...prev.rows };
+          const vessel = selectedCell.vessel;
+          const machinery = selectedCell.machinery;
+
+          if (newRows[vessel] && newRows[vessel][machinery]) {
+            const targetCell = newRows[vessel][machinery];
+
+            // Update the remarks in the history array for this specific sample_id
+            if (targetCell.history) {
+              targetCell.history = targetCell.history.map((h) => {
+                if (h.sample_id === selectedCell.data.sample_id) {
+                  return {
+                    ...h,
+                    officer_remarks: updatedOfficerRemarks,
+                    office_remarks: updatedOfficeRemarks,
+                    internal_remarks: updatedInternalRemarks,
+                  };
+                }
+                return h;
+              });
+            }
+
+            // If the dot we just updated is the "Latest" one, update the cell-level strings too
+            if (targetCell.sample_id === selectedCell.data.sample_id) {
+              targetCell.officer_remarks = updatedOfficerRemarks;
+              targetCell.office_remarks = updatedOfficeRemarks;
+              targetCell.internal_remarks = updatedInternalRemarks;
+              targetCell.conversation = response.updated_conversation;
+            }
+          }
+          return { ...prev, rows: newRows };
+        });
+
+        // C. Update tracking state for next message
+        setExistingRemarks({
+          officer: updatedOfficerRemarks,
+          office: updatedOfficeRemarks,
+          internal: updatedInternalRemarks,
+        });
+      }
+
+      // 8. Clear input buffers
+      if (chatMode === "internal") {
+        setInternalDraft("");
+      } else {
+        setRemarksData((prev) => ({
+          ...prev,
+          officer: "",
+          office: "",
+        }));
+      }
+
+      // 9. Final refresh to sync everything with the backend
+      loadData();
+    } catch (error) {
+      console.error("Luboil Chat Send Error:", error);
+      alert(
+        "âŒ Failed to send: " + (error.response?.data?.detail || error.message),
+      );
+    }
+  };
+  // 2. Logic to extract unique vessels from your data
+
+  const filteredVessels = useMemo(() => {
+    const allNames = availableVessels.map((v) => v.vessel_name);
+    // If no filter selected, show all vessels that have rows in the table
+    return selectedVesselsFilter.length > 0 ? selectedVesselsFilter : allNames;
+  }, [availableVessels, selectedVesselsFilter]);
+
+  // 3. Selection Handlers
+  const handleVesselToggle = (vesselName) => {
+    setSelectedVesselsFilter((prev) => {
+      if (prev.includes(vesselName)) {
+        return prev.filter((v) => v !== vesselName);
+      } else {
+        return [...prev, vesselName];
+      }
+    });
+  };
+
+  const handleSelectAllVessels = () => {
+    // Use .every() to check if everything is already selected
+    const allSelected = availableVessels.every((v) =>
+      selectedVesselsFilter.includes(v.vessel_name),
+    );
+
+    if (allSelected) {
+      // If all are on, turn them all off
+      setSelectedVesselsFilter([]);
+    } else {
+      // If some/none are on, turn them all on
+      setSelectedVesselsFilter(availableVessels.map((v) => v.vessel_name));
+    }
+  };
+  // Add this effect to lock background scroll when any modal is open
+  useEffect(() => {
+    const isAnyModalOpen = isModalOpen || listModal.isOpen || trendModal.isOpen;
+
+    if (isAnyModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+
+    // Cleanup: ensure scroll is restored if the component is unmounted
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isModalOpen, listModal.isOpen, trendModal.isOpen]);
+  useEffect(() => {
+    if (selectedCell && selectedCell.data) {
+      const data = selectedCell.data;
+
+      // 1. Reset input buffers for the new selection
+      setRemarksData({
+        officer: "",
+        office: "",
+        status: data.status || "Normal",
+      });
+
+      // 2. Extract all three types of remarks
+      // This ensures we have a reference to append new messages to
+      const rawOfficer =
+        data.officer_remarks || (data.remarks && data.remarks.officer) || "";
+      const rawOffice =
+        data.office_remarks || (data.remarks && data.remarks.office) || "";
+
+      // ðŸ”¥ NEW: Handle Internal Remarks
+      const rawInternal =
+        data.internal_remarks || (data.remarks && data.remarks.internal) || "";
+
+      // 3. Update the tracking state
+      setExistingRemarks({
+        officer: rawOfficer,
+        office: rawOffice,
+        internal: rawInternal, // Store the private notes history
+      });
+
+      // 4. Default to External Chat every time a new machinery is clicked
+      // setChatMode("external");
+      // setInternalDraft("");
+      setShowMentionDropdown(false);
+      setMentionFilter("");
+    }
+  }, [selectedCell]);
+  useEffect(() => {
+    if (showHistory && chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [showHistory, selectedCell]);
+  useEffect(() => {
+    if (selectedVesselName && reportsSectionRef.current) {
+      reportsSectionRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  }, [selectedVesselName]);
+  useEffect(() => {
+    const fetchAllVesselUsers = async () => {
+      if (selectedCell?.data?.imo) {
+        try {
+          // ðŸ”¥ CHANGE: Fetch BOTH lists so all names are recognized for highlighting
+          const [extUsers, intUsers] = await Promise.all([
+            axiosLub
+              .get(
+                `/api/luboil/mentions/${selectedCell.data.imo}?chat_mode=external`,
+              )
+              .then((r) => r.data),
+            axiosLub
+              .get(
+                `/api/luboil/mentions/${selectedCell.data.imo}?chat_mode=internal`,
+              )
+              .then((r) => r.data),
+          ]);
+
+          // Merge them and remove duplicates
+          const combined = [...(extUsers || []), ...(intUsers || [])].reduce(
+            (acc, current) => {
+              const x = acc.find((item) => item.name === current.name);
+              if (!x) return acc.concat([current]);
+              else return acc;
+            },
+            [],
+          );
+
+          setMentionList(combined);
+        } catch (err) {
+          console.error("Highlighting list fetch failed", err);
+        }
+      }
+    };
+    fetchAllVesselUsers();
+  }, [selectedCell]);
+
+  const calculateMachineryStats = (data) => {
+    if (!data || !data.data) return;
+
+    const today = new Date();
+    let vNormal = 0,
+      vWarning = 0,
+      vCritical = 0;
+    let mNormal = 0,
+      mWarning = 0,
+      mCritical = 0;
+
+    // --- COUNTERS ---
+    let totalConfigured = Object.keys(data.data).length;
+    let ov30Count = 0;
+    let ov60Count = 0;
+    let pendingUnresolvedCount = 0; // Tracks vessels needing attention (Action/Approval/Resample)
+
+    Object.values(data.data).forEach((vessel) => {
+      let vesselHasReport = false;
+      let vesselWorstStatus = "Normal";
+      let vesselIsOverdue30 = false;
+      let vesselIsOverdue60 = false;
+      let vesselHasActiveIssue = false; // Flag to see if vessel has pending actions
+
+      Object.values(vessel.machineries).forEach((m) => {
+        if (!m.is_configured) return;
+
+        // --- UPDATED ACTION-BASED LOGIC ---
+        // If it's resolved, it's NO LONGER an active issue.
+        if (m.has_report && !m.is_resolved) {
+          const isPendingApproval = m.is_approval_pending === true;
+          const isResamplingRequired = m.is_resampling_required === true;
+          const isBadStatus =
+            m.status &&
+            m.status.toLowerCase() !== "normal" &&
+            m.status.toLowerCase() !== "none";
+
+          // UPDATE: Vessel is flagged ONLY if the status is Warning or Critical (isBadStatus).
+          // This ensures that "Normal" status items do not trigger the "Active Issue" counter
+          // even if they are pending approval or resampling.
+          if (isBadStatus) {
+            vesselHasActiveIssue = true;
+          }
+        }
+
+        // --- EXISTING HEALTH & OVERDUE LOGIC (Time Based - PRESERVED) ---
+        if (!m.has_report || !m.last_sample) return;
+        vesselHasReport = true;
+
+        const intervalMonths =
+          typeof m.interval === "number" && m.interval > 0 ? m.interval : 3;
+        const limitDays = intervalMonths * 30;
+        const warningStart = limitDays - 30;
+        const sampleDate = new Date(m.last_sample);
+        const daysElapsed = Math.ceil(
+          (today - sampleDate) / (1000 * 60 * 60 * 24),
+        );
+
+        // Health Logic
+        if (daysElapsed > limitDays) {
+          mCritical++;
+          vesselWorstStatus = "Critical";
+        } else if (daysElapsed >= warningStart) {
+          mWarning++;
+          if (vesselWorstStatus !== "Critical") vesselWorstStatus = "Warning";
+        } else {
+          mNormal++;
+        }
+
+        // Overdue Logic
+        if (daysElapsed > limitDays + 60) vesselIsOverdue60 = true;
+        else if (daysElapsed > limitDays + 30) vesselIsOverdue30 = true;
+      });
+
+      // Vessel Level Health Updates (Preserved)
+      if (vesselHasReport) {
+        if (vesselWorstStatus === "Critical") vCritical++;
+        else if (vesselWorstStatus === "Warning") vWarning++;
+        else vNormal++;
+      }
+
+      // Vessel Level Overdue Updates (Preserved)
+      if (vesselIsOverdue60) ov60Count++;
+      else if (vesselIsOverdue30) ov30Count++;
+
+      // Vessel Level Pending/Unresolved Updates (Action Card)
+      if (vesselHasActiveIssue) {
+        pendingUnresolvedCount++;
+      }
+    });
+
+    // Update all states
+    setStats({ normal: vNormal, warning: vWarning, critical: vCritical });
+    setMachineryStats({
+      normal: mNormal,
+      warning: mWarning,
+      critical: mCritical,
+    });
+    setOverdueStats({
+      configured: totalConfigured,
+      pendingUnresolved: pendingUnresolvedCount, // Updated for new UI card
+      overdue30: ov30Count,
+      overdue60: ov60Count,
+    });
+  };
+
+  // ... existing imports
+
+  const GridStatusIcon = ({ color, bgColor = "transparent", size = 16 }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color} // The lines represent the CURRENT status (e.g., Normal/Green)
+      strokeWidth="2" // Made slightly thicker for better visibility against colored bg
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{
+        backgroundColor: bgColor, // The background represents the PREVIOUS status (e.g., Critical/Red)
+        borderRadius: "50%",
+        padding: "2px", // Add padding so the grid doesn't touch the edges of the background
+      }}
+    >
+      {/* Outer Circle */}
+      <circle cx="12" cy="12" r="10" />
+
+      {/* Vertical Grid Lines */}
+      <path d="M12 2v20" />
+      <path d="M7 3.5v17" />
+      <path d="M17 3.5v17" />
+
+      {/* Horizontal Grid Lines */}
+      <path d="M2 12h20" />
+      <path d="M3.5 7h17" />
+      <path d="M3.5 17h17" />
+    </svg>
+  );
+  const getShortName = (name) => {
+    if (!name) return "";
+    const n = name.toUpperCase();
+
+    if (n.includes("AUX") && n.includes("NO.1")) return "AE #1";
+    if (n.includes("AUX") && n.includes("NO.2")) return "AE #2";
+    if (n.includes("AUX") && n.includes("NO.3")) return "AE #3";
+    if (n.includes("AUX") && n.includes("ENGINE")) return "AE"; // Fallback for generic AE
+    if (n.includes("MAIN") && n.includes("SYSTEM")) return "ME Sys";
+    if (n.includes("MAIN") && n.includes("NO.1")) return "ME #1";
+    if (n.includes("MAIN") && n.includes("NO.2")) return "ME #2";
+    if (n.includes("HATCH")) return "Hatch";
+    if (n.includes("STEERING")) return "Steering";
+    if (n.includes("STERN") && n.includes("AFT")) return "Stern Aft";
+    if (n.includes("STERN") && n.includes("FWD")) return "Stern Fwd";
+    if (n.includes("STERN")) return "Stern Tube";
+    if (n.includes("WINDLASS") && n.includes("FWD")) return "Winch Fwd";
+    if (n.includes("WINDLASS") && n.includes("AFT")) return "Winch Aft";
+    if (n.includes("REMOTE")) return "RC Valve";
+    if (n.includes("STEERING")) return "Str. Gear";
+    if (n.includes("DECK") && n.includes("CRANE")) return "D.Crane";
+    if (n.includes("PROVISION") && n.includes("CRANE")) return "Prov.Crane";
+    if (n.includes("CARGO") && n.includes("PUMP")) return "COP";
+    if (n.includes("HOSE") && n.includes("CRANE")) return "Hose Crane";
+    if (n.includes("WINDLASS") || n.includes("WINCH")) {
+      if (n.includes("FWD")) return "Winch FWD";
+      if (n.includes("AFT")) return "Winch AFT";
+      return "Winch";
+    }
+
+    // If no match, just take the first 3 letters of the first 2 words
+    return name
+      .split(" ")
+      .slice(0, 2)
+      .map((w) => w.substring(0, 4))
+      .join(" ");
+  };
+
+  const processTableData = (data) => {
+    if (!data || !data.data) return;
+    const headers = new Set();
+    const rows = {};
+
+    Object.entries(data.data).forEach(([vessel, vData]) => {
+      rows[vessel] = {};
+      if (vData.machineries) {
+        Object.entries(vData.machineries).forEach(([rawName, mData]) => {
+          const cleanName = rawName.replace(/\s-\s\d+.*$/, "");
+          headers.add(cleanName);
+
+          // 1. Prepare History
+          const currentHistoryItem = {
+            date: mData.last_sample,
+            status: mData.status,
+          };
+          const inboundHistory =
+            Array.isArray(mData.history) && mData.history.length > 0
+              ? mData.history
+              : [currentHistoryItem];
+
+          // 2. Prepare Conversation Logic
+          // ðŸ”¥ FIX: Trust the backend conversation first (it contains the evidence/images)
+          // Only run manual extraction if the backend conversation is empty
+          let conversationList = mData.conversation || [];
+
+          if (conversationList.length === 0) {
+            const uniqueTracker = new Set();
+            const extract_messages = (raw_text, role, default_date) => {
+              if (!raw_text) return;
+              const lines = raw_text.split("\n");
+              for (const line of lines) {
+                const clean = line.trim();
+                if (!clean) continue;
+
+                let msg_date_str = default_date || "1970-01-01 00:00";
+                let msg_text = clean;
+                const match = clean.match(/^\[(.*?)\]\s*(.*)/);
+
+                if (match) {
+                  const [_, datePart, textPart] = match;
+                  msg_text = textPart;
+                  try {
+                    const [dPart, tPart] = datePart.split(" ");
+                    const [day, month, year] = dPart.split("/");
+                    msg_date_str = `${year}-${month}-${day} ${tPart || "00:00"}`;
+                  } catch (e) {
+                    msg_date_str = datePart;
+                  }
+                }
+
+                const uniqueKey = `${msg_date_str}|${role}|${msg_text}`;
+                if (!uniqueTracker.has(uniqueKey)) {
+                  uniqueTracker.add(uniqueKey);
+                  conversationList.push({
+                    date: msg_date_str,
+                    role: role,
+                    message: msg_text,
+                  });
+                }
+              }
+            };
+
+            const officerText =
+              mData.officer_remarks || (mData.remarks && mData.remarks.officer);
+            const officeText =
+              mData.office_remarks || (mData.remarks && mData.remarks.office);
+            extract_messages(officerText, "Vessel", mData.last_sample);
+            extract_messages(officeText, "Office", mData.last_sample);
+            extract_messages(
+              mData.status_change_log,
+              "System",
+              mData.last_sample,
+            );
+            conversationList.sort((a, b) => a.date.localeCompare(b.date));
+          }
+
+          // 3. Extract Previous Status from Change Log (Keep existing logic)
+          let previousStatus = null;
+          if (mData.status_change_log) {
+            const matches = [
+              ...mData.status_change_log.matchAll(
+                /from\s+(\w+)\s+to\s+(\w+)/gi,
+              ),
+            ];
+            if (matches.length > 0) {
+              const lastMatch = matches[matches.length - 1];
+              const oldVal = lastMatch[1];
+              const newVal = lastMatch[2];
+              if (
+                oldVal &&
+                newVal &&
+                oldVal.toLowerCase() !== newVal.toLowerCase()
+              ) {
+                previousStatus = oldVal;
+              }
+            }
+          }
+
+          // 4. Merge/Create Entry
+          const entryData = {
+            ...mData,
+            raw_machinery_name: rawName,
+            conversation: conversationList,
+            report_url: mData.report_url,
+            previous_status: previousStatus,
+            diagnosis: mData.diagnosis || mData.lab_diagnosis,
+            imo: String(vData.imo ?? ""),
+          };
+
+          if (rows[vessel][cleanName]) {
+            const existingEntry = rows[vessel][cleanName];
+            const mergedHistory = [
+              ...(existingEntry.history || []),
+              ...inboundHistory,
+            ];
+
+            // Merge existing conversation with new data, maintaining uniqueness
+            const mergedConversation = [
+              ...(existingEntry.conversation || []),
+              ...conversationList,
+            ]
+              .filter(
+                (v, i, a) =>
+                  a.findIndex(
+                    (t) => t.date === v.date && t.message === v.message,
+                  ) === i,
+              )
+              .sort((a, b) => a.date.localeCompare(b.date));
+
+            const existingDate = new Date(
+              existingEntry.last_sample?.replace(/-/g, "/"),
+            );
+            const newDate = new Date(mData.last_sample?.replace(/-/g, "/"));
+
+            if (newDate >= existingDate) {
+              rows[vessel][cleanName] = {
+                ...entryData,
+                history: mergedHistory,
+                conversation: mergedConversation,
+              };
+            } else {
+              rows[vessel][cleanName].history = mergedHistory;
+              rows[vessel][cleanName].conversation = mergedConversation;
+            }
+          } else {
+            rows[vessel][cleanName] = {
+              ...entryData,
+              history: inboundHistory,
+              conversation: conversationList, // Ensure initial entry has the evidence
+            };
+          }
+        });
+      }
+    });
+
+    setNormalizedTable({ headers: Array.from(headers).sort(), rows: rows });
+  };
+  const handleCardClick = (statusType) => {
+    if (!matrixData || !matrixData.data) return;
+
+    const today = new Date();
+    const matchingVessels = [];
+
+    Object.entries(matrixData.data).forEach(([vesselName, vesselData]) => {
+      // --- CASE 1: Configured Vessels ---
+      if (statusType === "Configured") {
+        matchingVessels.push({
+          name: vesselName,
+          imo: vesselData.imo || "N/A",
+          reportUrl: vesselData.vessel_report_url,
+          overdueItems: Object.values(vesselData.machineries)
+            .filter((m) => m.is_configured)
+            .map((m) => ({
+              fullName: m.description || m.code,
+              shortCode: m.analyst_code || m.code,
+            })),
+        });
+        return;
+      }
+
+      // --- CASE 2: Pending / Unresolved ---
+      if (statusType === "PendingUnresolved") {
+        const items = Object.values(vesselData.machineries)
+          .filter((m) => {
+            const hasReport = m.has_report === true;
+            const isNotResolved = !m.is_resolved;
+            const isBadStatus =
+              m.status?.toLowerCase() !== "normal" &&
+              m.status?.toLowerCase() !== "none";
+
+            // UPDATE: isBadStatus is now mandatory (using && instead of || for that group)
+            // This ensures Normal items are excluded even if they are pending approval.
+            return hasReport && isNotResolved && isBadStatus;
+          })
+          .map((m) => {
+            // Logic for dot priority (We keep this so you don't lose the color coding)
+            let state = "danger";
+            if (m.is_approval_pending) state = "warning";
+            else if (m.is_resampling_required) state = "info";
+
+            return {
+              fullName: m.description || m.code,
+              code: m.code,
+              reportDate: m.report_date,
+              status: m.status,
+              rawData: m,
+              state: state,
+            };
+          });
+
+        if (items.length > 0) {
+          matchingVessels.push({
+            name: vesselName,
+            imo: vesselData.imo || "N/A",
+            overdueItems: items,
+          });
+        }
+        return;
+      }
+
+      // --- CASE 3: Overdue and Health Status Cards ---
+      let vesselWorstHealthStatus = "Normal";
+      let vesselMatchedOverdueItems = [];
+      let hasReport = false;
+      let vesselIsOverdue60 = false;
+      let vesselIsOverdue30 = false;
+
+      Object.values(vesselData.machineries).forEach((m) => {
+        if (!m.is_configured || !m.has_report || !m.last_sample) return;
+        hasReport = true;
+
+        const interval =
+          typeof m.interval === "number" && m.interval > 0 ? m.interval : 3;
+        const limitDays = interval * 30;
+        const warningStart = limitDays - 30;
+        const sampleDate = new Date(m.last_sample);
+        const daysElapsed = Math.ceil(
+          (today - sampleDate) / (1000 * 60 * 60 * 24),
+        );
+        const excessDays = daysElapsed - limitDays;
+
+        // 1. Health Status Logic (Top Row Cards)
+        if (daysElapsed > limitDays) {
+          vesselWorstHealthStatus = "Critical";
+        } else if (
+          daysElapsed >= warningStart &&
+          vesselWorstHealthStatus !== "Critical"
+        ) {
+          vesselWorstHealthStatus = "Warning";
+        }
+
+        // 2. Overdue Logic (Critical60 / Warning30)
+        const itemData = {
+          fullName: m.description || m.code,
+          code: m.code,
+          status: m.status,
+          reportDate: m.report_date, // Using Report Date
+          rawData: m,
+          overdueText: `(Overdue by ${excessDays} days)`,
+          state: daysElapsed > limitDays + 60 ? "danger" : "warning",
+        };
+
+        if (daysElapsed > limitDays + 60) {
+          vesselIsOverdue60 = true;
+          if (statusType === "Critical60" || statusType === "Warning30") {
+            vesselMatchedOverdueItems.push(itemData);
+          }
+        } else if (daysElapsed > limitDays + 30) {
+          vesselIsOverdue30 = true;
+          if (statusType === "Warning30") {
+            vesselMatchedOverdueItems.push(itemData);
+          }
+        }
+      });
+
+      // Matching Logic for Overdue/Health Status
+      if (hasReport) {
+        if (statusType === "Critical60" && vesselIsOverdue60) {
+          matchingVessels.push({
+            name: vesselName,
+            imo: vesselData.imo || "N/A",
+            overdueItems: vesselMatchedOverdueItems,
+          });
+        } else if (
+          statusType === "Warning30" &&
+          vesselIsOverdue30 &&
+          !vesselIsOverdue60
+        ) {
+          matchingVessels.push({
+            name: vesselName,
+            imo: vesselData.imo || "N/A",
+            overdueItems: vesselMatchedOverdueItems,
+          });
+        } else if (
+          vesselWorstHealthStatus === statusType &&
+          !["Warning30", "Critical60"].includes(statusType)
+        ) {
+          matchingVessels.push({
+            name: vesselName,
+            imo: vesselData.imo || "N/A",
+            overdueItems: [],
+          });
+        }
+      }
+    });
+
+    // Alphabetical sort preserved
+    matchingVessels.sort((a, b) => a.name.localeCompare(b.name));
+
+    let modalTitle = statusType;
+    if (statusType === "Warning30") modalTitle = "Overdue > 30 Days";
+    if (statusType === "Critical60") modalTitle = "Overdue > 60 Days";
+    if (statusType === "PendingUnresolved")
+      modalTitle = "Pending Unresolved Cases";
+
+    setListModal({
+      isOpen: true,
+      type: modalTitle,
+      vessels: matchingVessels,
+    });
+  };
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const res = (await axiosLub.get("/api/v1/fleet/luboil-overview")).data;
+
+      // 1. Store the Matrix Data directly
+      setMatrixData(res);
+
+      // 2. Store the Master Column List from Backend
+      setTableColumns(res.columns || []);
+      setColumnLabels(res.column_labels || {});
+      processTableData(res);
+      // 3. Calculate Stats (using the new logic below)
+      calculateMachineryStats(res);
+    } catch (err) {
+      console.error("Failed to load luboil data", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleFileUpload = async (e) => {
+    // 1. Convert FileList to an Array
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    setUploading(true);
+
+    // 2. Initialize tracking for the summary report
+    let successCount = 0;
+    let duplicateCount = 0;
+    let errorCount = 0;
+    let detailedSummary = [];
+
+    try {
+      // 3. Process files sequentially using for...of
+      // This ensures we don't overwhelm the parser and processed data is saved correctly
+      for (const file of files) {
+        try {
+          const res = (
+            await axiosLub.post(
+              "/upload-luboil-report/",
+              (() => {
+                const fd = new FormData();
+                fd.append("file", file);
+                return fd;
+              })(),
+              { headers: { "Content-Type": "multipart/form-data" } },
+            )
+          ).data;
+
+          if (res.is_duplicate) {
+            duplicateCount++;
+          } else {
+            successCount++;
+          }
+
+          // 4. Preserve all original data points for the summary
+          detailedSummary.push(
+            `${res.is_duplicate ? "âš ï¸ [DUP]" : "âœ… [NEW]"} ${file.name}\n` +
+              `   Vessel: ${res.vessel} | Date: ${res.report_date}\n` +
+              `   Summary: ${res.alert_summary} | Machineries: ${res.sample_count}`,
+          );
+        } catch (fileError) {
+          errorCount++;
+          detailedSummary.push(
+            `âŒ ${file.name}: Upload Failed - ${fileError.message}`,
+          );
+        }
+      }
+
+      // 5. Construct the final Alert Message (Aggregated from your original template)
+      const finalReport =
+        `BULK UPLOAD COMPLETE\n` +
+        `----------------------------------\n` +
+        `Total Files: ${files.length}\n` +
+        `Successfully Processed: ${successCount}\n` +
+        `Duplicates (Updated): ${duplicateCount}\n` +
+        `Errors: ${errorCount}\n\n` +
+        `DETAILED BREAKDOWN:\n` +
+        detailedSummary.join("\n\n");
+
+      alert(finalReport);
+
+      // 6. Refresh the Matrix
+      loadData();
+    } catch (globalError) {
+      console.error("Bulk Upload Error:", globalError);
+      alert("âŒ A critical error occurred during bulk processing.");
+    } finally {
+      setUploading(false);
+      // 7. Reset the input so the user can upload the same files again if needed
+      e.target.value = null;
+    }
+  };
+
+  // Helper for Status Icons/Colors
+  const getStatusBadge = (status) => {
+    const s = status.toLowerCase();
+    if (s === "normal")
+      return (
+        <span className="status-badge status-success">
+          <CheckCircle size={14} /> Normal
+        </span>
+      );
+    if (s === "warning" || s === "attention")
+      return (
+        <span className="status-badge status-warning">
+          <AlertTriangle size={14} /> Warning
+        </span>
+      );
+    if (s === "critical" || s === "action")
+      return (
+        <span className="status-badge status-error">
+          <AlertCircle size={14} /> Critical
+        </span>
+      );
+    return <span className="status-badge status-default">{status}</span>;
+  };
+  // 1. Add this state for counters
+  const [stats, setStats] = useState({ normal: 0, warning: 0, critical: 0 });
+
+  // 2. Add this calculation function
+  const calculateFleetStats = (data) => {
+    if (!data || !data.data) return;
+    let normal = 0,
+      warning = 0,
+      critical = 0;
+    const today = new Date();
+
+    Object.values(data.data).forEach((vessel) => {
+      const dates = Object.values(vessel.machineries)
+        .map((m) => m.last_sample)
+        .filter((d) => d && d !== "-" && d !== "N/A")
+        .map((d) => new Date(d.replace(/-/g, "/")));
+
+      if (dates.length > 0) {
+        const latestDate = new Date(Math.max(...dates));
+        const diffTime = Math.abs(today - latestDate);
+        const daysElapsed = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (daysElapsed <= 60) normal++;
+        else if (daysElapsed > 60 && daysElapsed <= 90) warning++;
+        else critical++;
+      } else {
+        critical++;
+      }
+    });
+    setStats({ normal, warning, critical });
+  };
+
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const totalEquipment =
+    machineryStats.normal + machineryStats.warning + machineryStats.critical;
+  const getPercentage = (value) => {
+    return totalEquipment > 0 ? (value / totalEquipment) * 100 : 0;
+  };
+  // Helper to get color code based on status string
+  const getStatusColor = (status) => {
+    const s = status ? status.toLowerCase() : "";
+    if (s === "normal") return "#22c55e"; // Green
+    if (s === "warning" || s === "attention") return "#eab308"; // Yellow
+    if (s === "critical" || s === "action") return "#ef4444"; // Red
+    return "#cbd5e1"; // Grey (No Data)
+  };
+  const filterDistinctReports = (history) => {
+    if (!history || !Array.isArray(history)) return [];
+
+    // Sort Descending (Newest -> Oldest)
+    // We simply sort and return all history items without filtering by day interval
+    const sorted = [...history].sort((a, b) => {
+      // Handle both date formats if necessary
+      const dateA = new Date(a.date || a.sample_date);
+      const dateB = new Date(b.date || b.sample_date);
+      return dateB - dateA;
+    });
+
+    return sorted;
+  };
+  const getStatusLightColor = (status) => {
+    const s = status ? status.toLowerCase() : "";
+    if (s === "critical" || s === "action") return "#ef4444"; // Light Red
+    if (s === "warning" || s === "attention") return "#eab308"; // Light Yellow
+    if (s === "normal") return "#dcfce7"; // Light Green
+    return "transparent";
+  };
+  // --- REPLACE YOUR EXISTING StatusDots WITH THIS ---
+  // Add Machinery info and onChartClick callback to props
+  const StatusDots = ({
+    history,
+    hasLatestRemarks,
+    previousStatus,
+    onChartClick,
+    onSampleClick,
+    hasReport,
+    dueText,
+    openUpward,
+  }) => {
+    // --- STATE FOR DROPDOWN ---
+    const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
+    const dropdownRef = useRef(null);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+      const handleClickOutside = (event) => {
+        if (
+          dropdownRef.current &&
+          !dropdownRef.current.contains(event.target)
+        ) {
+          setShowHistoryDropdown(false);
+        }
+      };
+      if (showHistoryDropdown) {
+        document.addEventListener("mousedown", handleClickOutside);
+      }
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }, [showHistoryDropdown]);
+
+    const safeHistory = history && Array.isArray(history) ? history : [];
+
+    // 1. Sort history: Newest -> Oldest
+    const sortedHistory = [...safeHistory].sort((a, b) => {
+      const dateA = new Date(a.date || a.sample_date);
+      const dateB = new Date(b.date || b.sample_date);
+      return dateB - dateA;
+    });
+
+    // 2. logic change: Identify ONLY the latest unique report date
+    const latestDate =
+      sortedHistory.length > 0
+        ? sortedHistory[0].date || sortedHistory[0].sample_date
+        : null;
+
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "6px", // Space between the top row and the due badge
+          position: "relative",
+        }}
+      >
+        {/* --- LINE 1: STATUS ICONS + ACTION BUTTONS (SINGLE LINE) --- */}
+        <div
+          style={{
+            display: "flex",
+            gap: "6px", // Space between status dots and the action group
+            justifyContent: "center",
+            alignItems: "center",
+            flexWrap: "nowrap",
+          }}
+        >
+          {/* Status Dots Section */}
+          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+            {latestDate ? (
+              sortedHistory
+                .filter((h) => (h.date || h.sample_date) === latestDate)
+                .map((sample, sampleIdx) => {
+                  const hasNotes =
+                    sample.officer_remarks?.trim() ||
+                    sample.office_remarks?.trim() ||
+                    sample.internal_remarks?.trim();
+                  const hasEvidence =
+                    sample.attachment_url &&
+                    sample.attachment_url.trim() !== "";
+                  const isMandatory = sample.is_image_required === true;
+                  const statusChangeDetected =
+                    sample.previous_status ||
+                    (sampleIdx === 0 && previousStatus);
+
+                  let dotTooltip = `Date: ${sample.date || sample.sample_date}`;
+                  if (sample.sample_number)
+                    dotTooltip =
+                      `Sample: ${sample.sample_number}\n` + dotTooltip;
+
+                  if (
+                    hasNotes ||
+                    hasEvidence ||
+                    isMandatory ||
+                    statusChangeDetected
+                  ) {
+                    dotTooltip += `\n Contains Activity:`;
+                    if (hasNotes) dotTooltip += `\n - Communication Notes`;
+                    if (hasEvidence) dotTooltip += `\n - Attached Evidence`;
+                    if (isMandatory) dotTooltip += `\n - Image Upload Required`;
+                    if (statusChangeDetected)
+                      dotTooltip += `\n - Status changed from: ${sample.previous_status || previousStatus}`;
+                  }
+
+                  return (
+                    <div
+                      key={`${sample.sample_id || latestDate}-${sampleIdx}`}
+                      title={dotTooltip}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onSampleClick) onSampleClick(sample);
+                      }}
+                      style={{
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        transition: "transform 0.1s",
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.transform = "scale(1.15)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.transform = "scale(1)")
+                      }
+                    >
+                      {/* ðŸ”¥ INCREASED SIZE TO 24 */}
+                      <ShellStatusIcon status={sample?.status} size={22} />
+                    </div>
+                  );
+                })
+            ) : (
+              <ShellStatusIcon status="none" size={22} />
+            )}
+          </div>
+
+          {/* Action Buttons Section (MOVED TO LINE 1) */}
+          {hasReport && (
+            <div
+              style={{
+                display: "flex",
+                gap: "4px",
+                alignItems: "center",
+                borderLeft: "1px solid #e2e8f0", // Subtle divider
+                paddingLeft: "8px",
+              }}
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onChartClick) onChartClick();
+                }}
+                style={{
+                  background: "#f8fafc",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "4px",
+                  padding: "3px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  color: "#64748b",
+                  transition: "all 0.2s",
+                }}
+                title="View Trend Graph"
+              >
+                <TrendingUp size={14} />
+              </button>
+
+              <div ref={dropdownRef} style={{ position: "relative" }}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowHistoryDropdown(!showHistoryDropdown);
+                  }}
+                  style={{
+                    background: showHistoryDropdown ? "#eff6ff" : "#f8fafc",
+                    border: showHistoryDropdown
+                      ? "1px solid #2563eb"
+                      : "1px solid #cbd5e1",
+                    borderRadius: "4px",
+                    padding: "3px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    color: showHistoryDropdown ? "#2563eb" : "#64748b",
+                    transition: "all 0.2s",
+                  }}
+                  title="View Historical Report List"
+                >
+                  <FileText size={14} />
+                </button>
+
+                {showHistoryDropdown && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      [openUpward ? "bottom" : "top"]: "100%",
+                      width: "180px",
+                      backgroundColor: "white",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "8px",
+                      boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+                      zIndex: 5,
+                      marginTop: openUpward ? "0" : "6px",
+                      marginBottom: openUpward ? "6px" : "0",
+                      maxHeight: "240px",
+                      overflowY: "auto",
+                      right: "70%",
+                      transform: "translateX(40%)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: "8px 12px",
+                        fontSize: "0.65rem",
+                        fontWeight: "800",
+                        color: "#94a3b8",
+                        borderBottom: "1px solid #f1f5f9",
+                        backgroundColor: "#f8fafc",
+                        textAlign: "left",
+                      }}
+                    >
+                      AVAILABLE REPORTS
+                    </div>
+                    {sortedHistory
+                      .filter((h) => (h.date || h.sample_date) !== latestDate)
+                      .map((h, i) => (
+                        <div
+                          key={h.sample_id || i}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowHistoryDropdown(false);
+                            onSampleClick(h);
+                          }}
+                          style={{
+                            padding: "10px 12px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "10px",
+                            cursor: "pointer",
+                            borderBottom: "1px solid #f8fafc",
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.backgroundColor = "#f1f5f9")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.backgroundColor = "white")
+                          }
+                        >
+                          <ShellStatusIcon status={h.status} size={16} />
+                          <span
+                            style={{
+                              fontSize: "0.75rem",
+                              fontWeight: "700",
+                              color: "#1e293b",
+                            }}
+                          >
+                            {new Date(
+                              h.date || h.sample_date,
+                            ).toLocaleDateString("en-GB", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </div>
+                      ))}
+
+                    {sortedHistory.filter(
+                      (h) => (h.date || h.sample_date) !== latestDate,
+                    ).length === 0 && (
+                      <div
+                        style={{
+                          padding: "15px",
+                          textAlign: "center",
+                          color: "#94a3b8",
+                          fontSize: "0.7rem",
+                        }}
+                      >
+                        No previous reports found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* --- LINE 2: DUE DATE BADGE (ISOLATED BOTTOM) --- */}
+        <span
+          style={{
+            backgroundColor: "#ffffff",
+            color: "#334155",
+            fontSize: "0.65rem",
+            padding: "2px 10px",
+            borderRadius: "4px",
+            fontWeight: "700",
+            whiteSpace: "nowrap",
+            border: "1px solid #cbd5e1",
+          }}
+        >
+          Due: {dueText}
+        </span>
+      </div>
+    );
+  };
+  const handleVesselClick = async (vesselName, imoNumber) => {
+    if (!imoNumber) return alert("IMO Number not found.");
+
+    // Close if clicking the same vessel again
+    if (selectedVesselName === vesselName) {
+      setSelectedVesselName(null);
+      setVesselReports([]);
+      return;
+    }
+
+    setSelectedVesselName(vesselName);
+    setLoadingReports(true);
+    setVesselReports([]); // Reset previous data
+
+    try {
+      // Calls the new backend endpoint: /api/luboil/reports/{imo}
+      const res = (await axiosLub.get(`/api/luboil/reports/${imo}`)).data;
+      setVesselReports(res || []);
+    } catch (error) {
+      console.error("Failed to fetch reports:", error);
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+  // --- LOGIC FOR RESOLUTION GATING ---
+  const isVesselUser = !amIShore;
+  const currentSampleDate = new Date(
+    selectedCell?.data?.date || selectedCell?.data?.sample_date,
+  );
+
+  // BUG FIX: Check if image exists in gallery (attachment_url) OR newly selected in modal
+  const evidenceExistsInGallery =
+    selectedCell?.data?.attachment_url &&
+    selectedCell.data.attachment_url.trim().length > 0;
+  const imageRequirementMet =
+    !selectedCell?.data?.is_image_required ||
+    evidenceExistsInGallery ||
+    selectedCloseFile;
+
+  // RESAMPLING CHECK: Scans equipment history for a report date newer than the current one
+  const hasNewerReport = selectedCell?.data?.history?.some(
+    (h) => new Date(h.date) > currentSampleDate,
+  );
+  const resamplingRequirementMet =
+    !selectedCell?.data?.is_resampling_required || hasNewerReport;
+
+  // Final State
+  const canVesselSubmit = imageRequirementMet && resamplingRequirementMet;
+  const isCloseSubmitDisabled =
+    isSubmittingClose ||
+    (closeRemarksText?.length || 0) < 50 ||
+    (isVesselUser && !canVesselSubmit);
+
+  return (
+    <div
+      className="dashboard-container-enhanced"
+      style={{ paddingTop: "72px" }}
+    >
+      {/* <PerformanceNav /> */}
+      <OzellarHeader
+        unreadCount={unreadCount}
+        notifications={notifications}
+        showNotifDropdown={showNotifDropdown}
+        notifRef={notifRef}
+        onBellClick={() => setShowNotifDropdown(!showNotifDropdown)}
+        onNotifClick={handleNotifClick}
+        onHideNotification={handleHideNotification}
+        viewMode={viewMode}
+        onFeedClick={() => {
+          if (viewMode === "matrix") {
+            fetchFeed();
+            setViewMode("liveFeed");
+          } else {
+            setViewMode("matrix");
+          }
+        }}
+        user={user}
+        onRegisterVessel={() => alert("Register Vessel coming soon")}
+      />
+      {viewMode === "matrix" && (
+        <div
+          className="section-header-enhanced"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "12px", // Added slight margin for better layout
+            flexShrink: 0,
+          }}
+        >
+          {/* LEFT SIDE: Title and Subtitle */}
+          <div>
+            <h1
+              className="section-title-main"
+              style={{ fontSize: "1.25rem", margin: 0, lineHeight: "1.2" }}
+            >
+              Lube Oil Analysis Overview
+            </h1>
+            <p
+              className="section-subtitle"
+              style={{
+                margin: "2px 0 0 0",
+                fontSize: "0.75rem",
+                color: "#64748b",
+              }}
+            >
+              Fleet-wide lubrication health & sampling schedule
+            </p>
+          </div>
+
+          {/* RIGHT SIDE: Grouped Actions (Bell, Feed, Upload) */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {/* 1. NOTIFICATION BELL */}
+            {/* <div style={{ position: "relative" }} ref={notifRef}>
             <button
               onClick={() => setShowNotifDropdown(!showNotifDropdown)}
               style={{
@@ -3395,8 +3503,8 @@ const LuboilAnalysis = () => {
             )}
           </div> */}
 
-                        {/* 2. LIVE FEED BUTTON */}
-                        {/* <Button
+            {/* 2. LIVE FEED BUTTON */}
+            {/* <Button
             className="nav-pill-btn"
             style={{
               backgroundColor: viewMode === "liveFeed" ? "#0f172a" : "#fff",
@@ -3432,40 +3540,40 @@ const LuboilAnalysis = () => {
             )}
           </Button> */}
 
-                        {/* 3. UPLOAD BUTTON AREA */}
-                        <div style={{ position: "relative" }}>
-                            <input
-                                type="file"
-                                accept=".pdf"
-                                id="luboil-upload"
-                                multiple
-                                style={{ display: "none" }}
-                                onChange={handleFileUpload}
-                            />
-                            <Button
-                                className="nav-pill-btn active-nav-btn"
-                                style={{
-                                    backgroundColor: "#2563eb",
-                                    color: "white",
-                                    height: "36px",
-                                    padding: "0 14px",
-                                    borderRadius: "10px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    fontSize: "0.8rem",
-                                }}
-                                onClick={() => document.getElementById("luboil-upload").click()}
-                                disabled={uploading}
-                            >
-                                <Upload size={18} style={{ marginRight: "8px" }} />
-                                {uploading ? "Processing..." : "Upload Report (PDF)"}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* Stats Grid with Collapsible Header */}
-            {/* <Card
+            {/* 3. UPLOAD BUTTON AREA */}
+            <div style={{ position: "relative" }}>
+              <input
+                type="file"
+                accept=".pdf"
+                id="luboil-upload"
+                multiple
+                style={{ display: "none" }}
+                onChange={handleFileUpload}
+              />
+              <Button
+                className="nav-pill-btn active-nav-btn"
+                style={{
+                  backgroundColor: "#2563eb",
+                  color: "white",
+                  height: "36px",
+                  padding: "0 14px",
+                  borderRadius: "10px",
+                  display: "flex",
+                  alignItems: "center",
+                  fontSize: "0.8rem",
+                }}
+                onClick={() => document.getElementById("luboil-upload").click()}
+                disabled={uploading}
+              >
+                <Upload size={18} style={{ marginRight: "8px" }} />
+                {uploading ? "Processing..." : "Upload Report (PDF)"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Stats Grid with Collapsible Header */}
+      {/* <Card
         className="enhanced-card"
         style={{
           marginBottom: "24px",
@@ -3693,864 +3801,874 @@ const LuboilAnalysis = () => {
           </CardContent>
         )}
       </Card> */}
-            {/* ----------------- NEW OVERDUE STATS ROW ----------------- */}
-            {viewMode === "matrix" ? (
-                <>
+      {/* ----------------- NEW OVERDUE STATS ROW ----------------- */}
+      {viewMode === "matrix" ? (
+        <>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: "12px",
+              marginBottom: "8px",
+              flexShrink: 0,
+            }}
+          >
+            {/* Card 1: Configured Vessels */}
+            <div
+              className="stat-card"
+              onClick={() => handleCardClick("Configured")}
+              style={{
+                backgroundColor: "white",
+                padding: "12px 16px", // Compressed from 20px
+                borderRadius: "8px",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                display: "flex",
+                alignItems: "center",
+                gap: "12px", // Reduced from 16px
+                cursor: "pointer",
+                borderLeft: "5px solid #64748b",
+                transition: "all 0.2s", // Changed from transform to all
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.transform = "translateY(-2px)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.transform = "translateY(0)")
+              }
+            >
+              <div
+                style={{
+                  backgroundColor: "#f1f5f9",
+                  padding: "8px", // Reduced from 10px
+                  borderRadius: "6px",
+                  color: "#64748b",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Activity size={20} /> {/* Reduced from 24 */}
+              </div>
+              <div>
+                <div
+                  style={{
+                    fontSize: "1.2rem", // Reduced from 1.5rem
+                    fontWeight: "bold",
+                    color: "#0f172a",
+                    lineHeight: "1.1",
+                  }}
+                >
+                  {overdueStats.configured}
+                </div>
+                <div
+                  style={{
+                    fontSize: "0.85rem",
+                    fontWeight: "600",
+                    color: "#334155",
+                  }}
+                >
+                  Configured Vessels
+                </div>
+              </div>
+            </div>
+
+            {/* NEW Card 2: Pending / Unresolved Cases */}
+            <div
+              className="stat-card"
+              onClick={() => handleCardClick("PendingUnresolved")}
+              style={{
+                backgroundColor: "white",
+                padding: "12px 16px",
+                borderRadius: "8px",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                cursor: "pointer",
+                borderLeft: "5px solid #ef4444",
+                transition: "all 0.2s",
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: "#fee2e2",
+                  padding: "8px",
+                  borderRadius: "6px",
+                  color: "#ef4444",
+                }}
+              >
+                <AlertCircle size={20} />
+              </div>
+              <div>
+                <div
+                  style={{
+                    fontSize: "1.2rem",
+                    fontWeight: "bold",
+                    color: "#0f172a",
+                    lineHeight: "1.1",
+                  }}
+                >
+                  {overdueStats.pendingUnresolved || 0}
+                </div>
+                <div
+                  style={{
+                    fontSize: "0.85rem",
+                    fontWeight: "600",
+                    color: "#334155",
+                  }}
+                >
+                  Pending / Unresolved
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: Warning Overdue > 30 Days */}
+            <div
+              className="stat-card"
+              onClick={() => handleCardClick("Warning30")}
+              style={{
+                backgroundColor: "white",
+                padding: "12px 16px", // Compressed from 20px
+                borderRadius: "8px",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                cursor: "pointer",
+                borderLeft: "5px solid #f59e0b",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.transform = "translateY(-2px)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.transform = "translateY(0)")
+              }
+            >
+              <div
+                style={{
+                  backgroundColor: "#fff7ed",
+                  padding: "8px",
+                  borderRadius: "6px",
+                  color: "#f59e0b",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Clock size={20} />
+              </div>
+              <div>
+                <div
+                  style={{
+                    fontSize: "1.2rem",
+                    fontWeight: "bold",
+                    color: "#0f172a",
+                    lineHeight: "1.1",
+                  }}
+                >
+                  {overdueStats.overdue30}
+                </div>
+                <div
+                  style={{
+                    fontSize: "0.85rem",
+                    fontWeight: "600",
+                    color: "#334155",
+                  }}
+                >
+                  Overdue &gt; 30 Days
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Critical Overdue > 60 Days */}
+            <div
+              className="stat-card"
+              onClick={() => handleCardClick("Critical60")}
+              style={{
+                backgroundColor: "white",
+                padding: "12px 16px", // Compressed from 20px
+                borderRadius: "8px",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                cursor: "pointer",
+                borderLeft: "5px solid #ef4444",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.transform = "translateY(-2px)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.transform = "translateY(0)")
+              }
+            >
+              <div
+                style={{
+                  backgroundColor: "#fee2e2",
+                  padding: "8px",
+                  borderRadius: "6px",
+                  color: "#ef4444",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <AlertOctagon size={20} />
+              </div>
+              <div>
+                <div
+                  style={{
+                    fontSize: "1.2rem",
+                    fontWeight: "bold",
+                    color: "#0f172a",
+                    lineHeight: "1.1",
+                  }}
+                >
+                  {overdueStats.overdue60}
+                </div>
+                <div
+                  style={{
+                    fontSize: "0.85rem",
+                    fontWeight: "600",
+                    color: "#334155",
+                  }}
+                >
+                  Overdue &gt; 60 Days
+                </div>
+              </div>
+            </div>
+          </div>
+          <Card
+            className="enhanced-card"
+            style={{
+              border: "1px solid #e2e8f0",
+              boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+              marginBottom: "0px",
+            }}
+          >
+            {/* NEW HEADER FOR TABLE */}
+            <CardHeader
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                // width: "100%",
+                padding: "8px 20px",
+                backgroundColor: "white",
+              }}
+            >
+              {/* LEFT GROUP: Icon + Title + Filter (Now grouped together) */}
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "16px" }}
+              >
+                {/* Title & Icon Section */}
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                >
+                  <div
+                    style={{
+                      backgroundColor: "#64748b",
+                      borderRadius: "8px",
+                      width: "32px",
+                      height: "32px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Droplet size={18} color="white" />
+                  </div>
+                  <div style={{ textAlign: "left" }}>
+                    <CardTitle
+                      style={{
+                        fontSize: "0.95rem",
+                        color: "#0f172a",
+                        marginBottom: "0px",
+                        lineHeight: "1.2",
+                      }}
+                    >
+                      Latest Report Matrix
+                    </CardTitle>
+                    {/* <p style={{ margin: 0, fontSize: "0.9rem", color: "#64748b" }}>
+                  Breakdown by Vessel & Machinery
+                </p> */}
+                  </div>
+                </div>
+
+                {/* --- VESSEL DROPDOWN (Positioned on the Left) --- */}
+                <div ref={vesselDropdownRef} style={{ position: "relative" }}>
+                  <button
+                    className={`vessel-dropdown-btn ${isVesselDropdownOpen ? "active" : ""}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsTableOpen(true);
+                      setIsVesselDropdownOpen(!isVesselDropdownOpen);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "4px 12px",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "8px",
+                      backgroundColor: "white",
+                      cursor: "pointer",
+                      fontSize: "0.75rem",
+                      color: "#64748b",
+                      minWidth: "250px",
+                    }}
+                  >
+                    <span style={{ flex: 1, textAlign: "left" }}>
+                      {selectedVesselsFilter.length === 0
+                        ? "Select the vessel"
+                        : selectedVesselsFilter.length ===
+                            availableVessels.length
+                          ? " All Vessels"
+                          : ` ${selectedVesselsFilter.length} Selected`}
+                    </span>
+                    <ChevronDown size={14} />
+                  </button>
+
+                  {isVesselDropdownOpen && (
                     <div
-                        style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(4, 1fr)",
-                            gap: "12px",
-                            marginBottom: "8px",
-                            flexShrink: 0,
-                        }}
+                      className="vessel-dropdown-menu"
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        top: "110%",
+                        zIndex: 1000,
+                        width: "250px",
+                        background: "white",
+                        maxHeight: "200px",
+                        boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
+                        borderRadius: "8px",
+                        border: "1px solid #e2e8f0",
+                        /* FIX 1: Prevent double scrollbar by making wrapper non-scrollable and Flex */
+                        overflow: "hidden",
+                        display: "flex",
+                        flexDirection: "column",
+                      }}
                     >
-                        {/* Card 1: Configured Vessels */}
-                        <div
-                            className="stat-card"
-                            onClick={() => handleCardClick("Configured")}
-                            style={{
-                                backgroundColor: "white",
-                                padding: "12px 16px", // Compressed from 20px
-                                borderRadius: "8px",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px", // Reduced from 16px
-                                cursor: "pointer",
-                                borderLeft: "5px solid #64748b",
-                                transition: "all 0.2s", // Changed from transform to all
-                            }}
-                            onMouseEnter={(e) =>
-                                (e.currentTarget.style.transform = "translateY(-2px)")
-                            }
-                            onMouseLeave={(e) =>
-                                (e.currentTarget.style.transform = "translateY(0)")
-                            }
+                      {/* Sticky Select All at top */}
+                      <div
+                        style={{
+                          padding: "10px",
+                          borderBottom: "1px solid #f1f5f9",
+                          backgroundColor: "#f8fafc",
+                          /* FIX 2: Ensure header stays at the top and doesn't shrink */
+                          flexShrink: 0,
+                        }}
+                      >
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "10px",
+                            cursor: "pointer",
+                            fontWeight: "600",
+                            fontSize: "0.85rem",
+                          }}
                         >
-                            <div
-                                style={{
-                                    backgroundColor: "#f1f5f9",
-                                    padding: "8px", // Reduced from 10px
-                                    borderRadius: "6px",
-                                    color: "#64748b",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                }}
-                            >
-                                <Activity size={20} /> {/* Reduced from 24 */}
-                            </div>
-                            <div>
-                                <div
-                                    style={{
-                                        fontSize: "1.2rem", // Reduced from 1.5rem
-                                        fontWeight: "bold",
-                                        color: "#0f172a",
-                                        lineHeight: "1.1",
-                                    }}
-                                >
-                                    {overdueStats.configured}
-                                </div>
-                                <div
-                                    style={{
-                                        fontSize: "0.85rem",
-                                        fontWeight: "600",
-                                        color: "#334155",
-                                    }}
-                                >
-                                    Configured Vessels
-                                </div>
-                            </div>
-                        </div>
+                          <input
+                            type="checkbox"
+                            checked={
+                              availableVessels.length > 0 &&
+                              availableVessels.every((v) =>
+                                selectedVesselsFilter.includes(v.vessel_name),
+                              )
+                            }
+                            onChange={handleSelectAllVessels}
+                          />
+                          SELECT ALL
+                        </label>
+                      </div>
 
-                        {/* NEW Card 2: Pending / Unresolved Cases */}
-                        <div
-                            className="stat-card"
-                            onClick={() => handleCardClick("PendingUnresolved")}
-                            style={{
-                                backgroundColor: "white",
-                                padding: "12px 16px",
-                                borderRadius: "8px",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                      {/* SCROLLABLE LIST AREA */}
+                      <div
+                        className="vessel-dropdown-scroll"
+                        style={{
+                          maxHeight: "300px",
+                          /* FIX 3: ONLY this specific container will have the scrollbar */
+                          overflowY: "auto",
+                          padding: "5px",
+                          scrollbarWidth: "thin",
+                        }}
+                      >
+                        {availableVessels.map((v) => (
+                          <div
+                            key={v.vessel_name}
+                            style={{ padding: "8px 10px" }}
+                          >
+                            <label
+                              style={{
                                 display: "flex",
                                 alignItems: "center",
-                                gap: "12px",
+                                gap: "10px",
                                 cursor: "pointer",
-                                borderLeft: "5px solid #ef4444",
-                                transition: "all 0.2s",
-                            }}
-                        >
-                            <div
-                                style={{
-                                    backgroundColor: "#fee2e2",
-                                    padding: "8px",
-                                    borderRadius: "6px",
-                                    color: "#ef4444",
-                                }}
+                                fontSize: "0.85rem",
+                              }}
                             >
-                                <AlertCircle size={20} />
-                            </div>
-                            <div>
-                                <div
-                                    style={{
-                                        fontSize: "1.2rem",
-                                        fontWeight: "bold",
-                                        color: "#0f172a",
-                                        lineHeight: "1.1",
-                                    }}
-                                >
-                                    {overdueStats.pendingUnresolved || 0}
-                                </div>
-                                <div
-                                    style={{
-                                        fontSize: "0.85rem",
-                                        fontWeight: "600",
-                                        color: "#334155",
-                                    }}
-                                >
-                                    Pending / Unresolved
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Card 2: Warning Overdue > 30 Days */}
-                        <div
-                            className="stat-card"
-                            onClick={() => handleCardClick("Warning30")}
-                            style={{
-                                backgroundColor: "white",
-                                padding: "12px 16px", // Compressed from 20px
-                                borderRadius: "8px",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
-                                cursor: "pointer",
-                                borderLeft: "5px solid #f59e0b",
-                                transition: "all 0.2s",
-                            }}
-                            onMouseEnter={(e) =>
-                                (e.currentTarget.style.transform = "translateY(-2px)")
-                            }
-                            onMouseLeave={(e) =>
-                                (e.currentTarget.style.transform = "translateY(0)")
-                            }
-                        >
-                            <div
-                                style={{
-                                    backgroundColor: "#fff7ed",
-                                    padding: "8px",
-                                    borderRadius: "6px",
-                                    color: "#f59e0b",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                }}
-                            >
-                                <Clock size={20} />
-                            </div>
-                            <div>
-                                <div
-                                    style={{
-                                        fontSize: "1.2rem",
-                                        fontWeight: "bold",
-                                        color: "#0f172a",
-                                        lineHeight: "1.1",
-                                    }}
-                                >
-                                    {overdueStats.overdue30}
-                                </div>
-                                <div
-                                    style={{
-                                        fontSize: "0.85rem",
-                                        fontWeight: "600",
-                                        color: "#334155",
-                                    }}
-                                >
-                                    Overdue &gt; 30 Days
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Card 3: Critical Overdue > 60 Days */}
-                        <div
-                            className="stat-card"
-                            onClick={() => handleCardClick("Critical60")}
-                            style={{
-                                backgroundColor: "white",
-                                padding: "12px 16px", // Compressed from 20px
-                                borderRadius: "8px",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
-                                cursor: "pointer",
-                                borderLeft: "5px solid #ef4444",
-                                transition: "all 0.2s",
-                            }}
-                            onMouseEnter={(e) =>
-                                (e.currentTarget.style.transform = "translateY(-2px)")
-                            }
-                            onMouseLeave={(e) =>
-                                (e.currentTarget.style.transform = "translateY(0)")
-                            }
-                        >
-                            <div
-                                style={{
-                                    backgroundColor: "#fee2e2",
-                                    padding: "8px",
-                                    borderRadius: "6px",
-                                    color: "#ef4444",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                }}
-                            >
-                                <AlertOctagon size={20} />
-                            </div>
-                            <div>
-                                <div
-                                    style={{
-                                        fontSize: "1.2rem",
-                                        fontWeight: "bold",
-                                        color: "#0f172a",
-                                        lineHeight: "1.1",
-                                    }}
-                                >
-                                    {overdueStats.overdue60}
-                                </div>
-                                <div
-                                    style={{
-                                        fontSize: "0.85rem",
-                                        fontWeight: "600",
-                                        color: "#334155",
-                                    }}
-                                >
-                                    Overdue &gt; 60 Days
-                                </div>
-                            </div>
-                        </div>
+                              <input
+                                type="checkbox"
+                                checked={selectedVesselsFilter.includes(
+                                  v.vessel_name,
+                                )}
+                                onChange={() =>
+                                  handleVesselToggle(v.vessel_name)
+                                }
+                              />
+                              {/* FIX 4: Convert Vessel Name to all capital letters */}
+                              {v.vessel_name.toUpperCase()}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <Card
-                        className="enhanced-card"
-                        style={{
-                            border: "1px solid #e2e8f0",
-                            boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                            marginBottom: "0px",
-                        }}
+                  )}
+                </div>
+              </div>
+
+              {/* RIGHT SIDE: COLLAPSE BUTTON */}
+              <div
+                style={{ color: "#64748b", cursor: "pointer", padding: "8px" }}
+                onClick={() => setIsTableOpen(!isTableOpen)}
+              >
+                {isTableOpen ? (
+                  <ChevronUp size={20} />
+                ) : (
+                  <ChevronDown size={20} />
+                )}
+              </div>
+            </CardHeader>
+
+            {/* CONDITIONALLY RENDER CONTENT */}
+            {isTableOpen && (
+              <CardContent style={{ padding: "0" }}>
+                {loading ? (
+                  <div className="loading-state-enhanced">
+                    <div className="loading-spinner"></div>
+                  </div>
+                ) : selectedVesselsFilter.length > 0 ? (
+                  /* 1. SCROLLABLE WRAPPER: Set to 500px height */
+                  <div
+                    className="matrix-scroll-container"
+                    style={{
+                      maxHeight: "505px",
+                      width: "100%",
+                      overflow: "auto",
+                      position: "relative",
+                      borderBottomRightRadius: "8px",
+                      borderBottomLeftRadius: "8px",
+                      scrollbarWidth: "thin",
+                      scrollbarColor: "#cbd5e1 transparent",
+                    }}
+                  >
+                    <table
+                      className="vessel-table-enhanced"
+                      style={{
+                        width:
+                          selectedVesselsFilter.length > 4
+                            ? `calc(220px + (${selectedVesselsFilter.length} * ((100% - 220px) / 4)))`
+                            : "100%",
+                        borderCollapse: "separate", // Necessary for sticky headers to not flicker
+                        borderSpacing: 0,
+                        tableLayout: "fixed", // ðŸ”¥ Ensures all columns respect the defined width
+                      }}
                     >
-                        {/* NEW HEADER FOR TABLE */}
-                        <CardHeader
+                      <thead>
+                        <tr>
+                          {/* TOP-LEFT STICKY HEADER (Highest Z-Index) */}
+                          <th
+                            className="sticky-col"
                             style={{
-                                display: "flex",
-                                flexDirection: "row",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                // width: "100%",
-                                padding: "8px 20px",
-                                backgroundColor: "white",
+                              position: "sticky",
+                              left: 0,
+                              top: 0,
+                              zIndex: 1000,
+                              backgroundColor: "#f1f5f9",
+                              borderRight: "1px solid #e2e8f0",
+                              borderBottom: "2px solid #cbd5e1",
+                              textAlign: "left",
+                              padding: "12px",
+                              width: "220px",
+                              minWidth: "220px",
+                              fontSize: "0.75rem",
+                              fontWeight: "800",
+                              color: "#475569",
                             }}
-                        >
-                            {/* LEFT GROUP: Icon + Title + Filter (Now grouped together) */}
-                            <div
-                                style={{ display: "flex", alignItems: "center", gap: "16px" }}
-                            >
-                                {/* Title & Icon Section */}
+                          >
+                            MACHINERY / EQUIPMENT
+                          </th>
+
+                          {/* TOP STICKY VESSEL HEADERS (Restored Click Logic) */}
+                          {selectedVesselsFilter.map((vesselName) => {
+                            const vesselImo =
+                              matrixData?.data?.[vesselName]?.imo;
+
+                            // 1. Logic to find the Lab Name from the machinery data
+                            // Searches all machineries for this vessel and picks the first 'lab_name' found.
+                            const vesselData = matrixData?.data?.[vesselName];
+                            const foundLab = Object.values(
+                              vesselData?.machineries || {},
+                            ).find(
+                              (m) => m.lab_name && m.lab_name.trim() !== "",
+                            )?.lab_name;
+
+                            // 2. Safety Fallback: If no lab_name is found in any machinery, default to "SHELL"
+                            const labNameDisplay = foundLab || "SHELL";
+
+                            return (
+                              <th
+                                key={vesselName}
+                                // onClick={() => handleVesselClick(vesselName, vesselImo)}
+                                style={{
+                                  position: "sticky",
+                                  top: 0,
+                                  zIndex: 50,
+                                  width: "calc((100% - 220px) / 4)",
+                                  minWidth: "calc((100% - 220px) / 4)",
+                                  fontSize: "0.8rem",
+                                  textAlign: "center",
+                                  padding: "10px 4px", // Adjusted padding for better vertical fit
+                                  backgroundColor: "#f8fafc",
+                                  borderBottom: "2px solid #cbd5e1",
+                                  borderRight: "1px solid #e2e8f0",
+                                  cursor: "pointer",
+                                  color: "#1e293b",
+                                  transition: "background 0.2s",
+                                }}
+                                onMouseEnter={(e) =>
+                                  (e.currentTarget.style.backgroundColor =
+                                    "#eff6ff")
+                                }
+                                onMouseLeave={(e) =>
+                                  (e.currentTarget.style.backgroundColor =
+                                    "#f8fafc")
+                                }
+                              >
                                 <div
-                                    style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                    gap: "2px",
+                                    lineHeight: "1.2",
+                                  }}
                                 >
-                                    <div
+                                  {/* Vessel Name */}
+                                  <span
+                                    style={{
+                                      fontWeight: "800",
+                                      color: "#0f172a",
+                                    }}
+                                  >
+                                    {vesselName}
+                                  </span>
+
+                                  {/* Lab Source Name */}
+                                  <span
+                                    style={{
+                                      fontSize: "0.65rem",
+                                      fontWeight: "600",
+                                      color: "#2563eb", // Blue color to distinguish from the name
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.4px",
+                                      opacity: 0.8,
+                                    }}
+                                  >
+                                    {labNameDisplay}
+                                  </span>
+                                </div>
+                              </th>
+                            );
+                          })}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* ROW ITERATION (Machinery) */}
+                        {(() => {
+                          // 1. DYNAMIC FILTER: Determine which equipment rows actually have data in the current view
+                          const visibleColumns = tableColumns.filter(
+                            (colCode) => {
+                              // Return true if ANY of the selected vessels has a report for this equipment
+                              return selectedVesselsFilter.some(
+                                (vesselName) => {
+                                  const cell =
+                                    normalizedTable.rows[vesselName]?.[colCode];
+                                  return (
+                                    cell &&
+                                    cell.is_configured &&
+                                    cell.has_report === true
+                                  );
+                                },
+                              );
+                            },
+                          );
+
+                          // 2. MAP ONLY THE VISIBLE ROWS (Hiding universal Missing/NA rows)
+                          return visibleColumns.map((colCode, rowIndex) => {
+                            // ðŸ”¥ NEW: Find the full description for this machinery code to show on hover
+                            const vesselWithInfo = selectedVesselsFilter.find(
+                              (vName) =>
+                                normalizedTable.rows[vName]?.[colCode]
+                                  ?.description,
+                            );
+                            const fullName = vesselWithInfo
+                              ? normalizedTable.rows[vesselWithInfo][colCode]
+                                  .description
+                              : columnLabels[colCode] || colCode;
+
+                            return (
+                              <tr key={colCode} style={{ height: "60px" }}>
+                                {/* LEFT STICKY MACHINERY NAME */}
+                                <td
+                                  className="sticky-col"
+                                  title={fullName} // ðŸ”¥ ADDED: Shows full name on hover
+                                  style={{
+                                    position: "sticky",
+                                    left: 0,
+                                    backgroundColor: "#ffffff",
+                                    color: "#0f172a",
+                                    borderRight: "1px solid #e2e8f0",
+                                    borderBottom: "1px solid #e2e8f0",
+                                    fontWeight: "bold",
+                                    padding: "6px 10px",
+                                    fontSize: "0.75rem",
+                                    boxShadow:
+                                      "2px 0 5px -2px rgba(0,0,0,0.05)",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    cursor: "help",
+                                    width: "200px",
+                                    zIndex: 6,
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      lineHeight: "1.2",
+                                    }}
+                                  >
+                                    <span>
+                                      {columnLabels[colCode] || colCode}
+                                    </span>
+                                    <span
+                                      style={{
+                                        fontSize: "0.55rem",
+                                        color: "#64748b",
+                                        fontWeight: "500",
+                                        whiteSpace: "normal", // Allows the long name to wrap if needed
+                                        marginTop: "2px",
+                                      }}
+                                    >
+                                      {fullName}
+                                    </span>
+                                  </div>
+                                </td>
+
+                                {/* DATA CELLS */}
+                                {selectedVesselsFilter.map((vesselName) => {
+                                  const cell =
+                                    normalizedTable.rows[vesselName]?.[colCode];
+                                  const isResolved = cell?.is_resolved === true;
+                                  const isLatestReport =
+                                    cell?.sample_id ===
+                                    cell?.history?.[0]?.sample_id;
+                                  const showVerifiedTick =
+                                    isResolved && isLatestReport;
+                                  const vesselImo =
+                                    matrixData?.data?.[vesselName]?.imo;
+                                  const today = new Date();
+
+                                  const cellBaseStyle = {
+                                    width: "calc((100% - 220px) / 4)",
+                                    minWidth: "calc((100% - 220px) / 4)",
+                                    height: "80px",
+                                    textAlign: "center",
+                                    verticalAlign: "middle",
+                                    padding: "2px",
+                                    borderBottom: "1px solid #f1f5f9",
+                                    borderRight: "1px solid #f1f5f9",
+                                    boxSizing: "border-box",
+                                    position: "relative",
+                                  };
+
+                                  // --- CONDITION 1: N/A ---
+                                  if (!cell || !cell.is_configured) {
+                                    return (
+                                      <td
+                                        key={vesselName}
                                         style={{
-                                            backgroundColor: "#64748b",
-                                            borderRadius: "8px",
-                                            width: "32px",
-                                            height: "32px",
+                                          ...cellBaseStyle,
+                                          backgroundColor: "#f8fafc",
+                                          color: "#cbd5e1",
+                                          backgroundImage:
+                                            "radial-gradient(#e2e8f0 1px, transparent 1px)",
+                                          backgroundSize: "4px 4px",
+                                        }}
+                                      >
+                                        <span
+                                          style={{
+                                            fontSize: "0.65rem",
+                                            fontStyle: "italic",
+                                            opacity: 0.7,
+                                          }}
+                                        >
+                                          N/A
+                                        </span>
+                                      </td>
+                                    );
+                                  }
+
+                                  // --- CONDITION 2: MISSING ---
+                                  if (!cell.has_report) {
+                                    return (
+                                      <td
+                                        key={vesselName}
+                                        style={{
+                                          ...cellBaseStyle,
+                                          backgroundColor: "#fff1f2",
+                                        }}
+                                      >
+                                        <div
+                                          style={{
+                                            color: "#be123c",
+                                            fontSize: "0.7rem",
+                                            fontWeight: "800",
                                             display: "flex",
                                             alignItems: "center",
                                             justifyContent: "center",
-                                        }}
-                                    >
-                                        <Droplet size={18} color="white" />
-                                    </div>
-                                    <div style={{ textAlign: "left" }}>
-                                        <CardTitle
-                                            style={{
-                                                fontSize: "0.95rem",
-                                                color: "#0f172a",
-                                                marginBottom: "0px",
-                                                lineHeight: "1.2",
-                                            }}
-                                        >
-                                            Latest Report Matrix
-                                        </CardTitle>
-                                        {/* <p style={{ margin: 0, fontSize: "0.9rem", color: "#64748b" }}>
-                  Breakdown by Vessel & Machinery
-                </p> */}
-                                    </div>
-                                </div>
-
-                                {/* --- VESSEL DROPDOWN (Positioned on the Left) --- */}
-                                <div ref={vesselDropdownRef} style={{ position: "relative" }}>
-                                    <button
-                                        className={`vessel-dropdown-btn ${isVesselDropdownOpen ? "active" : ""}`}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setIsTableOpen(true);
-                                            setIsVesselDropdownOpen(!isVesselDropdownOpen);
-                                        }}
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                            padding: "4px 12px",
-                                            border: "1px solid #e2e8f0",
-                                            borderRadius: "8px",
-                                            backgroundColor: "white",
-                                            cursor: "pointer",
-                                            fontSize: "0.75rem",
-                                            color: "#64748b",
-                                            minWidth: "180px",
-                                        }}
-                                    >
-                                        <span style={{ flex: 1, textAlign: "left" }}>
-                                            {selectedVesselsFilter.length === 0
-                                                ? "Select the vessel"
-                                                : selectedVesselsFilter.length ===
-                                                    availableVessels.length
-                                                    ? " All Vessels"
-                                                    : ` ${selectedVesselsFilter.length} Selected`}
-                                        </span>
-                                        <ChevronDown size={14} />
-                                    </button>
-
-                                    {isVesselDropdownOpen && (
-                                        <div
-                                            className="vessel-dropdown-menu"
-                                            style={{
-                                                position: "absolute",
-                                                left: 0,
-                                                top: "110%",
-                                                zIndex: 100,
-                                                width: "250px",
-                                                background: "white",
-                                                boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
-                                                borderRadius: "8px",
-                                                border: "1px solid #e2e8f0",
-                                                /* FIX 1: Prevent double scrollbar by making wrapper non-scrollable and Flex */
-                                                overflow: "hidden",
-                                                display: "flex",
-                                                flexDirection: "column",
-                                            }}
-                                        >
-                                            {/* Sticky Select All at top */}
-                                            <div
-                                                style={{
-                                                    padding: "10px",
-                                                    borderBottom: "1px solid #f1f5f9",
-                                                    backgroundColor: "#f8fafc",
-                                                    /* FIX 2: Ensure header stays at the top and doesn't shrink */
-                                                    flexShrink: 0,
-                                                }}
-                                            >
-                                                <label
-                                                    style={{
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        gap: "10px",
-                                                        cursor: "pointer",
-                                                        fontWeight: "600",
-                                                        fontSize: "0.85rem",
-                                                    }}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={
-                                                            availableVessels.length > 0 &&
-                                                            availableVessels.every((v) =>
-                                                                selectedVesselsFilter.includes(v.vessel_name),
-                                                            )
-                                                        }
-                                                        onChange={handleSelectAllVessels}
-                                                    />
-                                                    SELECT ALL
-                                                </label>
-                                            </div>
-
-                                            {/* SCROLLABLE LIST AREA */}
-                                            <div
-                                                className="vessel-dropdown-scroll"
-                                                style={{
-                                                    maxHeight: "300px",
-                                                    /* FIX 3: ONLY this specific container will have the scrollbar */
-                                                    overflowY: "auto",
-                                                    padding: "5px",
-                                                    scrollbarWidth: "thin",
-                                                }}
-                                            >
-                                                {availableVessels.map((v) => (
-                                                    <div
-                                                        key={v.vessel_name}
-                                                        style={{ padding: "8px 10px" }}
-                                                    >
-                                                        <label
-                                                            style={{
-                                                                display: "flex",
-                                                                alignItems: "center",
-                                                                gap: "10px",
-                                                                cursor: "pointer",
-                                                                fontSize: "0.85rem",
-                                                            }}
-                                                        >
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedVesselsFilter.includes(
-                                                                    v.vessel_name,
-                                                                )}
-                                                                onChange={() =>
-                                                                    handleVesselToggle(v.vessel_name)
-                                                                }
-                                                            />
-                                                            {/* FIX 4: Convert Vessel Name to all capital letters */}
-                                                            {v.vessel_name.toUpperCase()}
-                                                        </label>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* RIGHT SIDE: COLLAPSE BUTTON */}
-                            <div
-                                style={{ color: "#64748b", cursor: "pointer", padding: "8px" }}
-                                onClick={() => setIsTableOpen(!isTableOpen)}
-                            >
-                                {isTableOpen ? (
-                                    <ChevronUp size={20} />
-                                ) : (
-                                    <ChevronDown size={20} />
-                                )}
-                            </div>
-                        </CardHeader>
-
-                        {/* CONDITIONALLY RENDER CONTENT */}
-                        {isTableOpen && (
-                            <CardContent style={{ padding: "0" }}>
-                                {loading ? (
-                                    <div className="loading-state-enhanced">
-                                        <div className="loading-spinner"></div>
-                                    </div>
-                                ) : selectedVesselsFilter.length > 0 ? (
-                                    /* 1. SCROLLABLE WRAPPER: Set to 500px height */
-                                    <div
-                                        className="matrix-scroll-container"
-                                        style={{
-                                            maxHeight: "505px",
+                                            height: "100%",
                                             width: "100%",
-                                            overflow: "auto",
-                                            position: "relative",
-                                            borderBottomRightRadius: "8px",
-                                            borderBottomLeftRadius: "8px",
-                                            scrollbarWidth: "thin",
-                                            scrollbarColor: "#cbd5e1 transparent",
-                                        }}
-                                    >
-                                        <table
-                                            className="vessel-table-enhanced"
-                                            style={{
-                                                width:
-                                                    selectedVesselsFilter.length > 4
-                                                        ? `calc(220px + (${selectedVesselsFilter.length} * ((100% - 220px) / 4)))`
-                                                        : "100%",
-                                                borderCollapse: "separate", // Necessary for sticky headers to not flicker
-                                                borderSpacing: 0,
-                                                tableLayout: "fixed", // ðŸ”¥ Ensures all columns respect the defined width
-                                            }}
+                                          }}
                                         >
-                                            <thead>
-                                                <tr>
-                                                    {/* TOP-LEFT STICKY HEADER (Highest Z-Index) */}
-                                                    <th
-                                                        className="sticky-col"
-                                                        style={{
-                                                            position: "sticky",
-                                                            left: 0,
-                                                            top: 0,
-                                                            zIndex: 1000,
-                                                            backgroundColor: "#f1f5f9",
-                                                            borderRight: "1px solid #e2e8f0",
-                                                            borderBottom: "2px solid #cbd5e1",
-                                                            textAlign: "left",
-                                                            padding: "12px",
-                                                            width: "220px",
-                                                            minWidth: "220px",
-                                                            fontSize: "0.75rem",
-                                                            fontWeight: "800",
-                                                            color: "#475569",
-                                                        }}
-                                                    >
-                                                        MACHINERY / EQUIPMENT
-                                                    </th>
+                                          MISSING
+                                        </div>
+                                      </td>
+                                    );
+                                  }
 
-                                                    {/* TOP STICKY VESSEL HEADERS (Restored Click Logic) */}
-                                                    {selectedVesselsFilter.map((vesselName) => {
-                                                        const vesselImo =
-                                                            matrixData?.data?.[vesselName]?.imo;
+                                  // --- CONDITION 3: DATA AVAILABLE ---
+                                  const interval =
+                                    typeof cell.interval === "number" &&
+                                    cell.interval > 0
+                                      ? cell.interval
+                                      : 3;
+                                  const sampleDate = new Date(cell.last_sample);
+                                  const dueDate = new Date(sampleDate);
+                                  dueDate.setMonth(
+                                    dueDate.getMonth() + interval,
+                                  );
+                                  const formattedDue =
+                                    dueDate.toLocaleDateString("en-GB", {
+                                      day: "2-digit",
+                                      month: "short",
+                                      year: "2-digit",
+                                    });
 
-                                                        // 1. Logic to find the Lab Name from the machinery data
-                                                        // Searches all machineries for this vessel and picks the first 'lab_name' found.
-                                                        const vesselData = matrixData?.data?.[vesselName];
-                                                        const foundLab = Object.values(
-                                                            vesselData?.machineries || {},
-                                                        ).find(
-                                                            (m) => m.lab_name && m.lab_name.trim() !== "",
-                                                        )?.lab_name;
+                                  const hasRemarks =
+                                    cell.officer_remarks || cell.office_remarks;
+                                  const isNormal =
+                                    cell.status &&
+                                    cell.status.toLowerCase() === "normal";
 
-                                                        // 2. Safety Fallback: If no lab_name is found in any machinery, default to "SHELL"
-                                                        const labNameDisplay = foundLab || "SHELL";
+                                  let badgeBg = "#4e4f4f";
+                                  let badgeText = "#fcfdfd";
 
-                                                        return (
-                                                            <th
-                                                                key={vesselName}
-                                                                // onClick={() => handleVesselClick(vesselName, vesselImo)}
-                                                                style={{
-                                                                    position: "sticky",
-                                                                    top: 0,
-                                                                    zIndex: 50,
-                                                                    width: "calc((100% - 220px) / 4)",
-                                                                    minWidth: "calc((100% - 220px) / 4)",
-                                                                    fontSize: "0.8rem",
-                                                                    textAlign: "center",
-                                                                    padding: "10px 4px", // Adjusted padding for better vertical fit
-                                                                    backgroundColor: "#f8fafc",
-                                                                    borderBottom: "2px solid #cbd5e1",
-                                                                    borderRight: "1px solid #e2e8f0",
-                                                                    cursor: "pointer",
-                                                                    color: "#1e293b",
-                                                                    transition: "background 0.2s",
-                                                                }}
-                                                                onMouseEnter={(e) =>
-                                                                (e.currentTarget.style.backgroundColor =
-                                                                    "#eff6ff")
-                                                                }
-                                                                onMouseLeave={(e) =>
-                                                                (e.currentTarget.style.backgroundColor =
-                                                                    "#f8fafc")
-                                                                }
-                                                            >
-                                                                <div
-                                                                    style={{
-                                                                        display: "flex",
-                                                                        flexDirection: "column",
-                                                                        alignItems: "center",
-                                                                        gap: "2px",
-                                                                        lineHeight: "1.2",
-                                                                    }}
-                                                                >
-                                                                    {/* Vessel Name */}
-                                                                    <span
-                                                                        style={{
-                                                                            fontWeight: "800",
-                                                                            color: "#0f172a",
-                                                                        }}
-                                                                    >
-                                                                        {vesselName}
-                                                                    </span>
-
-                                                                    {/* Lab Source Name */}
-                                                                    <span
-                                                                        style={{
-                                                                            fontSize: "0.65rem",
-                                                                            fontWeight: "600",
-                                                                            color: "#2563eb", // Blue color to distinguish from the name
-                                                                            textTransform: "uppercase",
-                                                                            letterSpacing: "0.4px",
-                                                                            opacity: 0.8,
-                                                                        }}
-                                                                    >
-                                                                        {labNameDisplay}
-                                                                    </span>
-                                                                </div>
-                                                            </th>
-                                                        );
-                                                    })}
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {/* ROW ITERATION (Machinery) */}
-                                                {(() => {
-                                                    // 1. DYNAMIC FILTER: Determine which equipment rows actually have data in the current view
-                                                    const visibleColumns = tableColumns.filter(
-                                                        (colCode) => {
-                                                            // Return true if ANY of the selected vessels has a report for this equipment
-                                                            return selectedVesselsFilter.some(
-                                                                (vesselName) => {
-                                                                    const cell =
-                                                                        normalizedTable.rows[vesselName]?.[colCode];
-                                                                    return (
-                                                                        cell &&
-                                                                        cell.is_configured &&
-                                                                        cell.has_report === true
-                                                                    );
-                                                                },
-                                                            );
-                                                        },
-                                                    );
-
-                                                    // 2. MAP ONLY THE VISIBLE ROWS (Hiding universal Missing/NA rows)
-                                                    return visibleColumns.map((colCode) => {
-                                                        // ðŸ”¥ NEW: Find the full description for this machinery code to show on hover
-                                                        const vesselWithInfo = selectedVesselsFilter.find(
-                                                            (vName) =>
-                                                                normalizedTable.rows[vName]?.[colCode]
-                                                                    ?.description,
-                                                        );
-                                                        const fullName = vesselWithInfo
-                                                            ? normalizedTable.rows[vesselWithInfo][colCode]
-                                                                .description
-                                                            : columnLabels[colCode] || colCode;
-
-                                                        return (
-                                                            <tr key={colCode} style={{ height: "60px" }}>
-                                                                {/* LEFT STICKY MACHINERY NAME */}
-                                                                <td
-                                                                    className="sticky-col"
-                                                                    title={fullName} // ðŸ”¥ ADDED: Shows full name on hover
-                                                                    style={{
-                                                                        position: "sticky",
-                                                                        left: 0,
-                                                                        backgroundColor: "#ffffff",
-                                                                        color: "#0f172a",
-                                                                        borderRight: "1px solid #e2e8f0",
-                                                                        borderBottom: "1px solid #e2e8f0",
-                                                                        fontWeight: "bold",
-                                                                        padding: "6px 10px",
-                                                                        fontSize: "0.75rem",
-                                                                        boxShadow:
-                                                                            "2px 0 5px -2px rgba(0,0,0,0.05)",
-                                                                        overflow: "hidden",
-                                                                        textOverflow: "ellipsis",
-                                                                        whiteSpace: "nowrap",
-                                                                        cursor: "help",
-                                                                        width: "200px",
-                                                                        zIndex: 1,
-                                                                    }}
-                                                                >
-                                                                    <div
-                                                                        style={{
-                                                                            display: "flex",
-                                                                            flexDirection: "column",
-                                                                            lineHeight: "1.2",
-                                                                        }}
-                                                                    >
-                                                                        <span>
-                                                                            {columnLabels[colCode] || colCode}
-                                                                        </span>
-                                                                        <span
-                                                                            style={{
-                                                                                fontSize: "0.55rem",
-                                                                                color: "#64748b",
-                                                                                fontWeight: "500",
-                                                                                whiteSpace: "normal", // Allows the long name to wrap if needed
-                                                                                marginTop: "2px",
-                                                                            }}
-                                                                        >
-                                                                            {fullName}
-                                                                        </span>
-                                                                    </div>
-                                                                </td>
-
-                                                                {/* DATA CELLS */}
-                                                                {selectedVesselsFilter.map((vesselName) => {
-                                                                    const cell =
-                                                                        normalizedTable.rows[vesselName]?.[colCode];
-                                                                    const isResolved = cell?.is_resolved === true;
-                                                                    const isLatestReport =
-                                                                        cell?.sample_id ===
-                                                                        cell?.history?.[0]?.sample_id;
-                                                                    const showVerifiedTick =
-                                                                        isResolved && isLatestReport;
-                                                                    const vesselImo =
-                                                                        matrixData?.data?.[vesselName]?.imo;
-                                                                    const today = new Date();
-
-                                                                    const cellBaseStyle = {
-                                                                        width: "calc((100% - 220px) / 4)",
-                                                                        minWidth: "calc((100% - 220px) / 4)",
-                                                                        height: "80px",
-                                                                        textAlign: "center",
-                                                                        verticalAlign: "middle",
-                                                                        padding: "2px",
-                                                                        borderBottom: "1px solid #f1f5f9",
-                                                                        borderRight: "1px solid #f1f5f9",
-                                                                        boxSizing: "border-box",
-                                                                        position: "relative",
-                                                                    };
-
-                                                                    // --- CONDITION 1: N/A ---
-                                                                    if (!cell || !cell.is_configured) {
-                                                                        return (
-                                                                            <td
-                                                                                key={vesselName}
-                                                                                style={{
-                                                                                    ...cellBaseStyle,
-                                                                                    backgroundColor: "#f8fafc",
-                                                                                    color: "#cbd5e1",
-                                                                                    backgroundImage:
-                                                                                        "radial-gradient(#e2e8f0 1px, transparent 1px)",
-                                                                                    backgroundSize: "4px 4px",
-                                                                                }}
-                                                                            >
-                                                                                <span
-                                                                                    style={{
-                                                                                        fontSize: "0.65rem",
-                                                                                        fontStyle: "italic",
-                                                                                        opacity: 0.7,
-                                                                                    }}
-                                                                                >
-                                                                                    N/A
-                                                                                </span>
-                                                                            </td>
-                                                                        );
-                                                                    }
-
-                                                                    // --- CONDITION 2: MISSING ---
-                                                                    if (!cell.has_report) {
-                                                                        return (
-                                                                            <td
-                                                                                key={vesselName}
-                                                                                style={{
-                                                                                    ...cellBaseStyle,
-                                                                                    backgroundColor: "#fff1f2",
-                                                                                }}
-                                                                            >
-                                                                                <div
-                                                                                    style={{
-                                                                                        color: "#be123c",
-                                                                                        fontSize: "0.7rem",
-                                                                                        fontWeight: "800",
-                                                                                        display: "flex",
-                                                                                        alignItems: "center",
-                                                                                        justifyContent: "center",
-                                                                                        height: "100%",
-                                                                                        width: "100%",
-                                                                                    }}
-                                                                                >
-                                                                                    MISSING
-                                                                                </div>
-                                                                            </td>
-                                                                        );
-                                                                    }
-
-                                                                    // --- CONDITION 3: DATA AVAILABLE ---
-                                                                    const interval =
-                                                                        typeof cell.interval === "number" &&
-                                                                            cell.interval > 0
-                                                                            ? cell.interval
-                                                                            : 3;
-                                                                    const sampleDate = new Date(cell.last_sample);
-                                                                    const dueDate = new Date(sampleDate);
-                                                                    dueDate.setMonth(
-                                                                        dueDate.getMonth() + interval,
-                                                                    );
-                                                                    const formattedDue =
-                                                                        dueDate.toLocaleDateString("en-GB", {
-                                                                            day: "2-digit",
-                                                                            month: "short",
-                                                                            year: "2-digit",
-                                                                        });
-
-                                                                    const hasRemarks =
-                                                                        cell.officer_remarks || cell.office_remarks;
-                                                                    const isNormal =
-                                                                        cell.status &&
-                                                                        cell.status.toLowerCase() === "normal";
-
-                                                                    let badgeBg = "#4e4f4f";
-                                                                    let badgeText = "#fcfdfd";
-
-                                                                    return (
-                                                                        <td
-                                                                            key={vesselName}
-                                                                            // onClick={() => {
-                                                                            //   const latestSample = cell.history && cell.history.length > 0 ? cell.history[0] : null;
-                                                                            //   handleSelectSample(vesselName, cell, latestSample);
-                                                                            // }}
-                                                                            style={{
-                                                                                ...cellBaseStyle,
-                                                                                cursor: isNormal
-                                                                                    ? "default"
-                                                                                    : "pointer",
-                                                                                transition: "background 0.2s",
-                                                                            }}
-                                                                            className={
-                                                                                isNormal ? "" : "hover:bg-slate-50"
-                                                                            }
-                                                                        >
-                                                                            {showVerifiedTick && (
-                                                                                <div
-                                                                                    title="Resolution Documented & Verified"
-                                                                                    style={{
-                                                                                        position: "absolute",
-                                                                                        top: 0,
-                                                                                        right: 0,
-                                                                                        width: "28px",
-                                                                                        height: "28px",
-                                                                                        backgroundColor: "#10b981", // Green Success Color
-                                                                                        // This creates the "1/4 circle" / dog-ear effect in the top right corner
-                                                                                        borderBottomLeftRadius: "100%",
-                                                                                        display: "flex",
-                                                                                        alignItems: "flex-start",
-                                                                                        justifyContent: "flex-end",
-                                                                                        padding: "4px 4px 0 0",
-                                                                                        zIndex: 5,
-                                                                                        boxShadow:
-                                                                                            "-1px 1px 3px rgba(0,0,0,0.1)",
-                                                                                    }}
-                                                                                >
-                                                                                    <CheckCircle
-                                                                                        size={12}
-                                                                                        color="white"
-                                                                                    />
-                                                                                </div>
-                                                                            )}
-                                                                            <div
-                                                                                style={{
-                                                                                    display: "flex",
-                                                                                    flexDirection: "column",
-                                                                                    alignItems: "center",
-                                                                                    gap: "6px",
-                                                                                    justifyContent: "center",
-                                                                                    height: "100%",
-                                                                                }}
-                                                                            >
-                                                                                <StatusDots
-                                                                                    history={cell.history}
-                                                                                    vesselName={vesselName} // Pass vessel
-                                                                                    cellData={cell}
-                                                                                    hasLatestRemarks={hasRemarks}
-                                                                                    previousStatus={cell.previous_status}
-                                                                                    hasReport={cell.has_report}
-                                                                                    dueText={formattedDue}
-                                                                                    onChartClick={() => {
-                                                                                        handleOpenTrend(
-                                                                                            vesselName,
-                                                                                            vesselImo,
-                                                                                            cell.code,
-                                                                                            cell.description,
-                                                                                        );
-                                                                                    }}
-                                                                                    onSampleClick={(sample) =>
-                                                                                        handleSelectSample(
-                                                                                            vesselName,
-                                                                                            cell,
-                                                                                            sample,
-                                                                                        )
-                                                                                    }
-                                                                                />
-                                                                                {/* <span
+                                  return (
+                                    <td
+                                      key={vesselName}
+                                      // onClick={() => {
+                                      //   const latestSample = cell.history && cell.history.length > 0 ? cell.history[0] : null;
+                                      //   handleSelectSample(vesselName, cell, latestSample);
+                                      // }}
+                                    //   style={{
+                                    //     ...cellBaseStyle,
+                                    //     cursor: isNormal
+                                    //       ? "default"
+                                    //       : "pointer",
+                                    //     transition: "background 0.2s",
+                                    //   }}
+                                      style={{
+                                        ...cellBaseStyle,
+                                        cursor: "pointer", // Always show pointer
+                                        transition: "background 0.2s",
+                                      }}
+                                      className={
+                                        isNormal ? "" : "hover:bg-slate-50"
+                                      }
+                                    >
+                                      {showVerifiedTick && (
+                                        <div
+                                          title="Resolution Documented & Verified"
+                                          style={{
+                                            position: "absolute",
+                                            top: 0,
+                                            right: 0,
+                                            width: "28px",
+                                            height: "28px",
+                                            backgroundColor: "#10b981", // Green Success Color
+                                            // This creates the "1/4 circle" / dog-ear effect in the top right corner
+                                            borderBottomLeftRadius: "100%",
+                                            display: "flex",
+                                            alignItems: "flex-start",
+                                            justifyContent: "flex-end",
+                                            padding: "4px 4px 0 0",
+                                            zIndex: 5,
+                                            boxShadow:
+                                              "-1px 1px 3px rgba(0,0,0,0.1)",
+                                          }}
+                                        >
+                                          <CheckCircle
+                                            size={12}
+                                            color="white"
+                                          />
+                                        </div>
+                                      )}
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          alignItems: "center",
+                                          gap: "6px",
+                                          justifyContent: "center",
+                                          height: "100%",
+                                        }}
+                                      >
+                                        <StatusDots
+                                          history={cell.history}
+                                          vesselName={vesselName} // Pass vessel
+                                          cellData={cell}
+                                          hasLatestRemarks={hasRemarks}
+                                          previousStatus={cell.previous_status}
+                                          hasReport={cell.has_report}
+                                          dueText={formattedDue}
+                                          openUpward={
+                                            rowIndex >=
+                                            visibleColumns.length - 2
+                                          }
+                                          onChartClick={() => {
+                                            handleOpenTrend(
+                                              vesselName,
+                                              vesselImo,
+                                              cell.code,
+                                              cell.description,
+                                            );
+                                          }}
+                                          onSampleClick={(sample) =>
+                                            handleSelectSample(
+                                              vesselName,
+                                              cell,
+                                              sample,
+                                            )
+                                          }
+                                        />
+                                        {/* <span
                     style={{
                       backgroundColor: badgeBg,
                       color: badgeText,
@@ -4563,1021 +4681,1027 @@ const LuboilAnalysis = () => {
                   >
                     Due: {formattedDue}
                   </span> */}
-                                                                            </div>
-                                                                        </td>
-                                                                    );
-                                                                })}
-                                                            </tr>
-                                                        );
-                                                    });
-                                                })()}
-                                            </tbody>
-                                            {/* ðŸ”¥ FULLY UPDATED STICKY FOOTER WITH CHECKLIST POPOVER */}
-                                            <tfoot
-                                                style={{
-                                                    position: "sticky",
-                                                    bottom: 0,
-                                                    zIndex: 100,
-                                                    paddingTop: "2px",
-                                                }}
-                                            >
-                                                <tr>
-                                                    <td
-                                                        className="sticky-col"
-                                                        style={{
-                                                            position: "sticky",
-                                                            left: 0,
-                                                            bottom: 0,
-                                                            backgroundColor: "#f1f5f9",
-                                                            borderRight: "1px solid #e2e8f0",
-                                                            borderTop: "2px solid #cbd5e1",
-                                                            padding: "8px",
-                                                            zIndex: 10,
-                                                            fontSize: "0.7rem",
-                                                            fontWeight: "800",
-                                                            color: "#475569",
-                                                            textTransform: "uppercase",
-                                                        }}
-                                                    >
-                                                        PDF Reports
-                                                    </td>
-
-                                                    {selectedVesselsFilter.map((vesselName) => {
-                                                        const vesselImo =
-                                                            matrixData?.data?.[vesselName]?.imo;
-                                                        const isOpen = footerReportVessel === vesselName;
-
-                                                        return (
-                                                            <td
-                                                                key={`foot-${vesselName}`}
-                                                                style={{
-                                                                    position: "sticky",
-                                                                    bottom: 0,
-                                                                    backgroundColor: "#fff",
-                                                                    borderTop: "2px solid #cbd5e1",
-                                                                    borderRight: "1px solid #f1f5f9",
-                                                                    textAlign: "center",
-                                                                    padding: "8px",
-                                                                    zIndex: 5,
-                                                                }}
-                                                            >
-                                                                <div
-                                                                    ref={
-                                                                        footerReportVessel === vesselName
-                                                                            ? footerRef
-                                                                            : null
-                                                                    }
-                                                                    style={{
-                                                                        position: "relative",
-                                                                        display: "inline-block",
-                                                                    }}
-                                                                >
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            if (isOpen) {
-                                                                                setFooterReportVessel(null);
-                                                                                setSelectedFooterReports([]);
-                                                                            } else {
-                                                                                handleFooterReportClick(
-                                                                                    vesselName,
-                                                                                    vesselImo,
-                                                                                );
-                                                                            }
-                                                                        }}
-                                                                        style={{
-                                                                            backgroundColor: isOpen
-                                                                                ? "#0f172a"
-                                                                                : "#f8fafc",
-                                                                            color: isOpen ? "white" : "#2563eb",
-                                                                            border: `1px solid ${isOpen ? "#0f172a" : "#bfdbfe"}`,
-                                                                            borderRadius: "6px",
-                                                                            padding: "5px 12px",
-                                                                            cursor: "pointer",
-                                                                            display: "flex",
-                                                                            alignItems: "center",
-                                                                            gap: "6px",
-                                                                            fontSize: "0.65rem",
-                                                                            fontWeight: "800",
-                                                                        }}
-                                                                    >
-                                                                        <FileText size={14} />
-                                                                        {isOpen ? "CLOSE" : "SELECT"}
-                                                                    </button>
-
-                                                                    {/* ðŸ”¥ CHECKLIST POPOVER CONTAINER */}
-                                                                    {isOpen && (
-                                                                        <div
-                                                                            style={{
-                                                                                position: "absolute",
-                                                                                bottom: "120%",
-                                                                                left: "50%",
-                                                                                transform: "translateX(-50%)",
-                                                                                width: "280px",
-                                                                                backgroundColor: "white",
-                                                                                borderRadius: "12px",
-                                                                                boxShadow:
-                                                                                    "0 20px 25px -5px rgba(0,0,0,0.2), 0 10px 10px -5px rgba(0,0,0,0.1)",
-                                                                                border: "1px solid #e2e8f0",
-                                                                                zIndex: 200,
-                                                                                overflow: "hidden",
-                                                                                display: "flex",
-                                                                                flexDirection: "column",
-                                                                            }}
-                                                                        >
-                                                                            {/* Popover Header */}
-                                                                            <div
-                                                                                style={{
-                                                                                    padding: "10px 12px",
-                                                                                    backgroundColor: "#f8fafc",
-                                                                                    borderBottom: "1px solid #f1f5f9",
-                                                                                    display: "flex",
-                                                                                    justifyContent: "space-between",
-                                                                                    alignItems: "center",
-                                                                                }}
-                                                                            >
-                                                                                <span
-                                                                                    style={{
-                                                                                        fontSize: "0.7rem",
-                                                                                        fontWeight: "800",
-                                                                                        color: "#64748b",
-                                                                                    }}
-                                                                                >
-                                                                                    SELECT REPORTS
-                                                                                </span>
-                                                                                {selectedFooterReports.length > 0 && (
-                                                                                    <span
-                                                                                        style={{
-                                                                                            fontSize: "0.65rem",
-                                                                                            color: "#2563eb",
-                                                                                            fontWeight: "700",
-                                                                                        }}
-                                                                                    >
-                                                                                        {selectedFooterReports.length}{" "}
-                                                                                        Selected
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-
-                                                                            {/* Popover List Body */}
-                                                                            <div
-                                                                                style={{
-                                                                                    maxHeight: "200px",
-                                                                                    overflowY: "auto",
-                                                                                    padding: "6px",
-                                                                                }}
-                                                                            >
-                                                                                {isFooterLoading ? (
-                                                                                    <div
-                                                                                        style={{
-                                                                                            padding: "20px",
-                                                                                            textAlign: "center",
-                                                                                        }}
-                                                                                    >
-                                                                                        <div className="loading-spinner-small"></div>
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    footerReports.map((report, idx) => (
-                                                                                        <label
-                                                                                            key={idx}
-                                                                                            style={{
-                                                                                                display: "flex",
-                                                                                                alignItems: "center",
-                                                                                                gap: "10px",
-                                                                                                padding: "8px 10px",
-                                                                                                borderRadius: "8px",
-                                                                                                cursor: "pointer",
-                                                                                                transition: "background 0.2s",
-                                                                                            }}
-                                                                                            className="hover:bg-slate-50"
-                                                                                        >
-                                                                                            <input
-                                                                                                type="checkbox"
-                                                                                                checked={selectedFooterReports.includes(
-                                                                                                    report.report_id,
-                                                                                                )}
-                                                                                                onChange={() => {
-                                                                                                    setSelectedFooterReports(
-                                                                                                        (prev) =>
-                                                                                                            prev.includes(
-                                                                                                                report.report_id,
-                                                                                                            )
-                                                                                                                ? prev.filter(
-                                                                                                                    (id) =>
-                                                                                                                        id !==
-                                                                                                                        report.report_id,
-                                                                                                                )
-                                                                                                                : [
-                                                                                                                    ...prev,
-                                                                                                                    report.report_id,
-                                                                                                                ],
-                                                                                                    );
-                                                                                                }}
-                                                                                                style={{
-                                                                                                    width: "15px",
-                                                                                                    height: "15px",
-                                                                                                    cursor: "pointer",
-                                                                                                }}
-                                                                                            />
-                                                                                            <span
-                                                                                                style={{
-                                                                                                    fontSize: "0.8rem",
-                                                                                                    fontWeight: "600",
-                                                                                                    color: "#334155",
-                                                                                                }}
-                                                                                            >
-                                                                                                {report.report_date
-                                                                                                    ? new Date(report.report_date).toLocaleDateString("en-GB", {
-                                                                                                        day: "2-digit",
-                                                                                                        month: "short",
-                                                                                                        year: "numeric",
-                                                                                                    })
-                                                                                                    : "Unknown Date"}
-                                                                                            </span>
-                                                                                        </label>
-                                                                                    ))
-                                                                                )}
-                                                                            </div>
-
-                                                                            {/* Popover Footer (Common Download Button) */}
-                                                                            <div
-                                                                                style={{
-                                                                                    padding: "10px",
-                                                                                    borderTop: "1px solid #f1f5f9",
-                                                                                    backgroundColor: "#f8fafc",
-                                                                                }}
-                                                                            >
-                                                                                <button
-                                                                                    disabled={
-                                                                                        selectedFooterReports.length ===
-                                                                                        0 || isFooterDownloading
-                                                                                    }
-                                                                                    onClick={() =>
-                                                                                        handleFooterBatchDownload(
-                                                                                            vesselName,
-                                                                                        )
-                                                                                    }
-                                                                                    style={{
-                                                                                        width: "100%",
-                                                                                        backgroundColor:
-                                                                                            selectedFooterReports.length > 0
-                                                                                                ? "#10b981"
-                                                                                                : "#cbd5e1",
-                                                                                        color: "white",
-                                                                                        border: "none",
-                                                                                        borderRadius: "6px",
-                                                                                        padding: "8px",
-                                                                                        fontSize: "0.7rem",
-                                                                                        fontWeight: "800",
-                                                                                        cursor:
-                                                                                            selectedFooterReports.length > 0
-                                                                                                ? "pointer"
-                                                                                                : "not-allowed",
-                                                                                        display: "flex",
-                                                                                        alignItems: "center",
-                                                                                        justifyContent: "center",
-                                                                                        gap: "6px",
-                                                                                    }}
-                                                                                >
-                                                                                    {isFooterDownloading ? (
-                                                                                        "PREPARING ZIP..."
-                                                                                    ) : (
-                                                                                        <>
-                                                                                            <Download size={14} />
-                                                                                            DOWNLOAD SELECTED
-                                                                                        </>
-                                                                                    )}
-                                                                                </button>
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                        );
-                                                    })}
-                                                </tr>
-                                            </tfoot>
-                                        </table>
-                                    </div>
-                                ) : (
-                                    <div
-                                        style={{
-                                            padding: "72px 24px",
-                                            textAlign: "center",
-                                            color: "#94a3af",
-                                        }}
-                                    >
-                                        <p style={{ margin: 0, fontSize: "1.1rem" }}>
-                                             Select one or more vessels above to view Fleet Analysis
-                                            Matrix
-                                        </p>
-                                    </div>
-                                )}
-                            </CardContent>
-                        )}
-                    </Card>
-                </>
-            ) : (
-                <div style={{ animation: "fadeIn 0.4s ease-out" }}>
-                    {/* 1. Main Card: Set to Flexbox and Hide global overflow */}
-                    <Card
-                        className="enhanced-card"
+                                      </div>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          });
+                        })()}
+                      </tbody>
+                      {/* ðŸ”¥ FULLY UPDATED STICKY FOOTER WITH CHECKLIST POPOVER */}
+                      <tfoot
                         style={{
-                            padding: "0",
-                            height: "600px", // Adjusted height to accommodate ~5-6 items + header
-                            display: "flex",
-                            flexDirection: "column",
-                            overflow: "hidden",
-                            border: "1px solid #e2e8f0",
-                            scrollbarWidth: "thin",
-                            scrollbarColor: "#cbd5e1 transparent",
+                          position: "sticky",
+                          bottom: 0,
+                          zIndex: 100,
+                          paddingTop: "2px",
                         }}
-                    >
-                        {/* 2. Sticky Header: Positioned at the top with a higher Z-index */}
-                        <CardHeader
+                      >
+                        <tr>
+                          <td
+                            className="sticky-col"
                             style={{
-                                backgroundColor: "#f8fafc",
-                                borderBottom: "1px solid #e2e8f0",
-                                padding: "8px 16px",
-                                flexShrink: 0,
+                              position: "sticky",
+                              left: 0,
+                              bottom: 0,
+                              backgroundColor: "#f1f5f9",
+                              borderRight: "1px solid #e2e8f0",
+                              borderTop: "2px solid #cbd5e1",
+                              padding: "8px",
+                              zIndex: 10,
+                              fontSize: "0.7rem",
+                              fontWeight: "800",
+                              color: "#475569",
+                              textTransform: "uppercase",
                             }}
-                        >
-                            <div
+                          >
+                            PDF Reports
+                          </td>
+
+                          {selectedVesselsFilter.map((vesselName) => {
+                            const vesselImo =
+                              matrixData?.data?.[vesselName]?.imo;
+                            const isOpen = footerReportVessel === vesselName;
+
+                            return (
+                              <td
+                                key={`foot-${vesselName}`}
                                 style={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: "8px",
+                                  position: "sticky",
+                                  bottom: 0,
+                                  backgroundColor: "#fff",
+                                  borderTop: "2px solid #cbd5e1",
+                                  borderRight: "1px solid #f1f5f9",
+                                  textAlign: "center",
+                                  padding: "8px",
+                                  zIndex: 5,
                                 }}
-                            >
-                                {/* TOP ROW: Title and Horizontal Toggles */}
+                              >
                                 <div
-                                    style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                    }}
+                                  ref={
+                                    footerReportVessel === vesselName
+                                      ? footerRef
+                                      : null
+                                  }
+                                  style={{
+                                    position: "relative",
+                                    display: "inline-block",
+                                  }}
                                 >
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "12px",
-                                        }}
-                                    >
-                                        <div
-                                            style={{
-                                                backgroundColor: "#0f172a",
-                                                padding: "6px",
-                                                borderRadius: "6px",
-                                                color: "white",
-                                            }}
-                                        >
-                                            <Activity size={18} />
-                                        </div>
-                                        <CardTitle
-                                            style={{ fontSize: "0.95rem", fontWeight: "700" }}
-                                        >
-                                            LIVE FEED
-                                        </CardTitle>
-                                    </div>
-
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "8px",
-                                        }}
-                                    >
-                                        {/* NEW: FLEET / MY FEED TOGGLE SWITCH */}
-                                        <div
-                                            style={{
-                                                display: "flex",
-                                                background: "#e2e8f0",
-                                                padding: "2px",
-                                                borderRadius: "8px",
-                                                gap: "2px",
-                                            }}
-                                        >
-                                            {["FLEET", "MY FEED"].map((mode) => (
-                                                <button
-                                                    key={mode}
-                                                    onClick={() =>
-                                                        setFeedMode(
-                                                            mode === "MY FEED" ? "MY_FEED" : "FLEET",
-                                                        )
-                                                    }
-                                                    style={{
-                                                        padding: "4px 12px",
-                                                        borderRadius: "6px",
-                                                        border: "none",
-                                                        fontSize: "0.65rem",
-                                                        fontWeight: "800",
-                                                        cursor: "pointer",
-                                                        transition: "all 0.2s",
-                                                        backgroundColor:
-                                                            (feedMode === "MY_FEED" && mode === "MY FEED") ||
-                                                                (feedMode === "FLEET" && mode === "FLEET")
-                                                                ? "white"
-                                                                : "transparent",
-                                                        color:
-                                                            (feedMode === "MY_FEED" && mode === "MY FEED") ||
-                                                                (feedMode === "FLEET" && mode === "FLEET")
-                                                                ? "#2563eb"
-                                                                : "#64748b",
-                                                        boxShadow:
-                                                            (feedMode === "MY_FEED" && mode === "MY FEED") ||
-                                                                (feedMode === "FLEET" && mode === "FLEET")
-                                                                ? "0 2px 4px rgba(0,0,0,0.1)"
-                                                                : "none",
-                                                    }}
-                                                >
-                                                    {mode}
-                                                </button>
-                                            ))}
-                                        </div>
-
-                                        {/* HORIZONTAL TOGGLE SWITCH (READ/UNREAD) */}
-                                        <div
-                                            style={{
-                                                display: "flex",
-                                                background: "#e2e8f0",
-                                                padding: "2px",
-                                                borderRadius: "8px",
-                                                gap: "1px",
-                                            }}
-                                        >
-                                            {["ALL", "UNREAD", "READ"].map((mode) => (
-                                                <button
-                                                    key={mode}
-                                                    onClick={() => setFeedReadFilter(mode)}
-                                                    style={{
-                                                        padding: "4px 12px",
-                                                        borderRadius: "6px",
-                                                        border: "none",
-                                                        fontSize: "0.65rem",
-                                                        fontWeight: "800",
-                                                        cursor: "pointer",
-                                                        transition: "all 0.2s",
-                                                        backgroundColor:
-                                                            feedReadFilter === mode ? "white" : "transparent",
-                                                        color:
-                                                            feedReadFilter === mode ? "#2563eb" : "#64748b",
-                                                        boxShadow:
-                                                            feedReadFilter === mode
-                                                                ? "0 2px 4px rgba(0,0,0,0.1)"
-                                                                : "none",
-                                                    }}
-                                                >
-                                                    {mode}
-                                                </button>
-                                            ))}
-                                        </div>
-
-                                        <Button
-                                            onClick={fetchFeed}
-                                            style={{
-                                                background: "white",
-                                                color: "#0f172a",
-                                                border: "1px solid #cbd5e1",
-                                                fontSize: "0.75rem",
-                                                height: "36px",
-                                                padding: "0px 10px",
-                                            }}
-                                        >
-                                            <Clock size={14} style={{ marginRight: "5px" }} /> Refresh
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {/* BOTTOM ROW: Filters and Search */}
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        gap: "10px",
-                                        alignItems: "center",
-                                        flexWrap: "nowrap",
+                                  <button
+                                    onClick={() => {
+                                      if (isOpen) {
+                                        setFooterReportVessel(null);
+                                        setSelectedFooterReports([]);
+                                      } else {
+                                        handleFooterReportClick(
+                                          vesselName,
+                                          vesselImo,
+                                        );
+                                      }
                                     }}
-                                >
-                                    {/* Keyword Search */}
-                                    <div style={{ position: "relative", flex: "1 1 300px" }}>
-                                        <Filter
-                                            size={16}
-                                            style={{
-                                                position: "absolute",
-                                                left: "10px",
-                                                top: "50%",
-                                                transform: "translateY(-50%)",
-                                                color: "#94a3b8",
-                                            }}
-                                        />
-                                        <input
-                                            type="text"
-                                            placeholder="Search feed..."
-                                            value={feedSearch}
-                                            onChange={(e) => setFeedSearch(e.target.value)}
-                                            style={{
-                                                width: "100%",
-                                                padding: "6px 10px 6px 32px",
-                                                borderRadius: "6px",
-                                                border: "1px solid #e2e8f0",
-                                                fontSize: "0.75rem",
-                                                backgroundColor: "white",
-                                                color: "black",
-                                            }}
-                                        />
-                                    </div>
-
-                                    {/* Vessel Dropdown */}
-                                    <select
-                                        value={feedVesselFilter}
-                                        onChange={(e) => setFeedVesselFilter(e.target.value)}
-                                        style={{
-                                            padding: "6px",
-                                            borderRadius: "6px",
-                                            border: "1px solid #e2e8f0",
-                                            fontSize: "0.85rem",
-                                            backgroundColor: "white",
-                                            color: "black",
-                                            cursor: "pointer",
-                                            minWidth: "140px",
-                                        }}
-                                    >
-                                        {uniqueFeedVessels.map((v) => (
-                                            <option key={v} value={v}>
-                                                {v === "ALL" ? "ALL VESSEL" : v}
-                                            </option>
-                                        ))}
-                                    </select>
-
-                                    {/* Event Type Dropdown - CONDITIONALLY RENDERED */}
-                                    {feedMode === "FLEET" && (
-                                        <select
-                                            value={feedFilter}
-                                            onChange={(e) => setFeedFilter(e.target.value)}
-                                            style={{
-                                                padding: "6px",
-                                                borderRadius: "6px",
-                                                border: "1px solid #e2e8f0",
-                                                fontSize: "0.75rem",
-                                                backgroundColor: "white",
-                                                color: "black",
-                                                cursor: "pointer",
-                                                minWidth: "150px",
-                                            }}
-                                        >
-                                            <option value="ALL">ALL ACTIONS</option>
-                                            <option value="NEW_REPORT">UPLOADED REPORT</option>
-                                            <option value="EVIDENCE_UPLOAD">UPLOADED EVIDENCE</option>
-                                            <option value="RESAMPLE_REMINDER">
-                                                RESAMPLE PENDING
-                                            </option>
-                                            <option value="EVIDENCE_DELETE">DELETED EVIDENCE</option>
-                                            <option value="SCHEDULE_ALERT">OVERDUE</option>
-                                            <option value="MANDATORY">IMAGE MANDATORY</option>
-                                        </select>
-                                    )}
-
-                                    {/* Date Pickers */}
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                            backgroundColor: "white",
-                                            padding: "4px 8px",
-                                            borderRadius: "6px",
-                                            border: "1px solid #e2e8f0",
-                                            height: "32px",
-                                        }}
-                                    >
-                                        <div
-                                            style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: "6px",
-                                            }}
-                                        >
-                                            <span
-                                                style={{
-                                                    fontSize: "0.65rem",
-                                                    color: "#64748b",
-                                                    fontWeight: "800",
-                                                }}
-                                            >
-                                                FROM:
-                                            </span>
-                                            <input
-                                                type="date"
-                                                value={feedFromDate}
-                                                onChange={(e) => setFeedFromDate(e.target.value)}
-                                                style={{
-                                                    border: "none",
-                                                    fontSize: "0.75rem",
-                                                    outline: "none",
-                                                    backgroundColor: "white",
-                                                    color: "black",
-                                                    cursor: "pointer",
-                                                    colorScheme: "light",
-                                                    width: "105px",
-                                                }}
-                                            />
-                                        </div>
-
-                                        <div
-                                            style={{
-                                                width: "1px",
-                                                height: "14px",
-                                                backgroundColor: "#e2e8f0",
-                                            }}
-                                        ></div>
-
-                                        <div
-                                            style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: "6px",
-                                            }}
-                                        >
-                                            <span
-                                                style={{
-                                                    fontSize: "0.65rem",
-                                                    color: "#64748b",
-                                                    fontWeight: "800",
-                                                }}
-                                            >
-                                                TO:
-                                            </span>
-                                            <input
-                                                type="date"
-                                                value={feedToDate}
-                                                onChange={(e) => setFeedToDate(e.target.value)}
-                                                style={{
-                                                    border: "none",
-                                                    fontSize: "0.75rem",
-                                                    outline: "none",
-                                                    backgroundColor: "white",
-                                                    color: "black",
-                                                    cursor: "pointer",
-                                                    colorScheme: "light",
-                                                    width: "105px",
-                                                }}
-                                            />
-                                        </div>
-
-                                        {(feedFromDate || feedToDate) && (
-                                            <X
-                                                size={14}
-                                                onClick={() => {
-                                                    setFeedFromDate("");
-                                                    setFeedToDate("");
-                                                }}
-                                                style={{
-                                                    cursor: "pointer",
-                                                    color: "#ef4444",
-                                                    marginLeft: "4px",
-                                                }}
-                                            />
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </CardHeader>
-
-                        {/* 3. Scrollable Content Area */}
-                        <CardContent
-                            style={{
-                                padding: "10px 16px",
-                                overflowY: "auto",
-                                height: "400px",
-                                flex: 1,
-                                backgroundColor: "#ffffff",
-                                scrollbarWidth: "thin",
-                            }}
-                        >
-                            {feedLoading ? (
-                                <div
                                     style={{
-                                        display: "flex",
-                                        justifyContent: "center",
-                                        padding: "60px",
+                                      backgroundColor: isOpen
+                                        ? "#0f172a"
+                                        : "#f8fafc",
+                                      color: isOpen ? "white" : "#2563eb",
+                                      border: `1px solid ${isOpen ? "#0f172a" : "#bfdbfe"}`,
+                                      borderRadius: "6px",
+                                      padding: "5px 12px",
+                                      cursor: "pointer",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "6px",
+                                      fontSize: "0.65rem",
+                                      fontWeight: "800",
                                     }}
-                                >
-                                    <div className="loading-spinner"></div>
-                                </div>
-                            ) : groupedFeed.today.length > 0 ||
-                                groupedFeed.earlier.length > 0 ||
-                                groupedFeed.read.length > 0 ? (
-                                <div
-                                    style={{
+                                  >
+                                    <FileText size={14} />
+                                    {isOpen ? "CLOSE" : "SELECT"}
+                                  </button>
+
+                                  {/* ðŸ”¥ CHECKLIST POPOVER CONTAINER */}
+                                  {isOpen && (
+                                    <div
+                                      style={{
+                                        position: "absolute",
+                                        bottom: "120%",
+                                        left: "50%",
+                                        transform: "translateX(-50%)",
+                                        width: "280px",
+                                        backgroundColor: "white",
+                                        borderRadius: "12px",
+                                        boxShadow:
+                                          "0 20px 25px -5px rgba(0,0,0,0.2), 0 10px 10px -5px rgba(0,0,0,0.1)",
+                                        border: "1px solid #e2e8f0",
+                                        zIndex: 200,
+                                        overflow: "hidden",
+                                        maxHeight: "250px",
                                         display: "flex",
                                         flexDirection: "column",
-                                        gap: "6px",
-                                    }}
-                                >
-                                    {/* Helper Internal Function to keep existing styling exactly as it was */}
-                                    {(() => {
-                                        const renderFeedItem = (item) => (
-                                            <div
-                                                key={item.id}
-                                                style={{
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    padding: "6px 12px",
-                                                    borderRadius: "8px",
-                                                    border: "1px solid #e2e8f0",
-                                                    cursor: "default",
-                                                    transition: "all 0.2s",
-                                                    backgroundColor: item.is_read ? "#ffffff" : "#f0f9ff",
-                                                    borderLeft: item.is_read
-                                                        ? "6px solid #cbd5e1"
-                                                        : "6px solid #2563eb",
-                                                    position: "relative",
-                                                    marginBottom: "4px",
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.boxShadow =
-                                                        "0 4px 12px rgba(0,0,0,0.05)";
-                                                    e.currentTarget.style.backgroundColor = item.is_read
-                                                        ? "#f8fafc"
-                                                        : "#e0f2fe";
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.boxShadow = "none";
-                                                    e.currentTarget.style.backgroundColor = item.is_read
-                                                        ? "#ffffff"
-                                                        : "#f0f9ff";
-                                                }}
+                                      }}
+                                    >
+                                      {/* Popover Header */}
+                                      <div
+                                        style={{
+                                          padding: "10px 12px",
+                                          backgroundColor: "#f8fafc",
+                                          borderBottom: "1px solid #f1f5f9",
+                                          display: "flex",
+                                          justifyContent: "space-between",
+                                          alignItems: "center",
+                                        }}
+                                      >
+                                        <span
+                                          style={{
+                                            fontSize: "0.7rem",
+                                            fontWeight: "800",
+                                            color: "#64748b",
+                                          }}
+                                        >
+                                          SELECT REPORTS
+                                        </span>
+                                        {selectedFooterReports.length > 0 && (
+                                          <span
+                                            style={{
+                                              fontSize: "0.65rem",
+                                              color: "#2563eb",
+                                              fontWeight: "700",
+                                            }}
+                                          >
+                                            {selectedFooterReports.length}{" "}
+                                            Selected
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {/* Popover List Body */}
+                                      <div
+                                        style={{
+                                          maxHeight: "200px",
+                                          overflowY: "auto",
+                                          padding: "6px",
+                                        }}
+                                      >
+                                        {isFooterLoading ? (
+                                          <div
+                                            style={{
+                                              padding: "20px",
+                                              textAlign: "center",
+                                            }}
+                                          >
+                                            <div className="loading-spinner-small"></div>
+                                          </div>
+                                        ) : (
+                                          footerReports.map((report, idx) => (
+                                            <label
+                                              key={idx}
+                                              style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "10px",
+                                                padding: "8px 10px",
+                                                borderRadius: "8px",
+                                                cursor: "pointer",
+                                                transition: "background 0.2s",
+                                              }}
+                                              className="hover:bg-slate-50"
                                             >
-                                                {/* Event Icon */}
-                                                <div
-                                                    style={{
-                                                        width: "32px",
-                                                        height: "32px",
-                                                        borderRadius: "8px",
-                                                        backgroundColor: item.is_read ? "#f8fafc" : "#fff",
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        justifyContent: "center",
-                                                        marginRight: "12px",
-                                                        color: item.is_read ? "#94a3b8" : "#2563eb",
-                                                        boxShadow: item.is_read
-                                                            ? "none"
-                                                            : "0 2px 4px rgba(0,0,0,0.05)",
-                                                    }}
-                                                >
-                                                    {item.event_type === "MENTION" ? (
-                                                        <MessageSquareText size={16} />
-                                                    ) : item.event_type === "EVIDENCE_UPLOAD" ? (
-                                                        <ImageIcon size={16} />
-                                                    ) : item.event_type === "MANDATORY" ? ( // ðŸ”¥ NEW: Icon for Image/Resample Mandatory toggles
-                                                        <AlertTriangle size={16} />
-                                                    ) : item.event_type === "APPROVAL_REQUEST" ? ( // ðŸ”¥ NEW: Vessel requesting closure
-                                                        <Clock size={16} />
-                                                    ) : item.event_type === "STATUS_CHANGE" ? ( // ðŸ”¥ NEW: Reopening or Status Alerts
-                                                        <Activity size={16} />
-                                                    ) : item.event_type === "APPROVAL_DECLINED" ? ( // ðŸ”¥ NEW: Shore declined closure
-                                                        <X size={16} color="#ef4444" />
-                                                    ) : item.event_type === "RESAMPLE_REMINDER" ? (
-                                                        <History size={16} />
-                                                    ) : item.priority === "CRITICAL" ? (
-                                                        <AlertOctagon size={16} />
-                                                    ) : item.event_type === "SCHEDULE_ALERT" ? (
-                                                        <Clock size={16} />
-                                                    ) : (
-                                                        <FileText size={16} />
-                                                    )}
-                                                </div>
-
-                                                {/* Message Body */}
-                                                <div style={{ flex: 1 }}>
-                                                    {(() => {
-                                                        const msgParts = item.message.split("\n");
-                                                        const headerText = msgParts[0];
-                                                        const bodyContent = msgParts.slice(1).join("\n");
-
-                                                        return (
-                                                            <>
-                                                                <div style={{ marginBottom: "4px" }}>
-                                                                    <span
-                                                                        style={{
-                                                                            fontWeight: "700",
-                                                                            color: item.is_read
-                                                                                ? "#64748b"
-                                                                                : "#0f172a",
-                                                                            fontSize: "0.85rem",
-                                                                        }}
-                                                                    >
-                                                                        {headerText}
-                                                                    </span>
-                                                                </div>
-                                                                <div
-                                                                    style={{
-                                                                        color: item.is_read ? "#94a3b8" : "#334155",
-                                                                        fontWeight: item.is_read ? "400" : "600",
-                                                                        fontSize: "0.78rem",
-                                                                        whiteSpace: "pre-wrap",
-                                                                        lineHeight: "1.4",
-                                                                    }}
-                                                                >
-                                                                    {bodyContent}
-                                                                </div>
-                                                            </>
-                                                        );
-                                                    })()}
-                                                </div>
-
-                                                {/* Action Area: Timestamp + Buttons */}
-                                                <div
-                                                    style={{
-                                                        textAlign: "right",
-                                                        minWidth: "180px",
-                                                        display: "flex",
-                                                        flexDirection: "column",
-                                                        alignItems: "flex-end",
-                                                        gap: "10px",
-                                                    }}
-                                                >
-                                                    <div
-                                                        style={{
-                                                            fontSize: "0.65rem",
-                                                            color: "#94a3b8",
-                                                            fontWeight: "600",
-                                                        }}
-                                                    >
-                                                        {new Date(item.created_at + "Z").toLocaleDateString(
-                                                            "en-GB",
-                                                        )}{" "}
-                                                        {new Date(item.created_at + "Z").toLocaleTimeString(
-                                                            "en-GB",
-                                                            {
-                                                                hour: "2-digit",
-                                                                minute: "2-digit",
-                                                                hour12: true,
-                                                            },
-                                                        )}
-                                                    </div>
-
-                                                    <div
-                                                        style={{
-                                                            display: "flex",
-                                                            alignItems: "center",
-                                                            gap: "8px",
-                                                        }}
-                                                    >
-                                                        {!item.is_read && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleMarkSingleRead(item.id);
-                                                                }}
-                                                                style={{
-                                                                    backgroundColor: "white",
-                                                                    border: "1px solid #2563eb",
-                                                                    color: "#2563eb",
-                                                                    padding: "3px 8px",
-                                                                    borderRadius: "4px",
-                                                                    fontSize: "0.6rem",
-                                                                    fontWeight: "700",
-                                                                    cursor: "pointer",
-                                                                    display: "flex",
-                                                                    alignItems: "center",
-                                                                    gap: "4px",
-                                                                }}
-                                                            >
-                                                                <CheckCircle size={12} /> MARK AS READ
-                                                            </button>
-                                                        )}
-
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleFeedItemClick(item);
-                                                            }}
-                                                            style={{
-                                                                backgroundColor: "white",
-                                                                color: "#2563eb",
-                                                                border: "1px solid #2563eb",
-                                                                padding: "3px 8px",
-                                                                borderRadius: "4px",
-                                                                fontSize: "0.6rem",
-                                                                fontWeight: "700",
-                                                                cursor: "pointer",
-                                                                display: "flex",
-                                                                alignItems: "center",
-                                                                gap: "6px",
-                                                                transition: "all 0.2s",
-                                                            }}
-                                                            onMouseEnter={(e) => {
-                                                                e.currentTarget.style.backgroundColor =
-                                                                    "#2563eb";
-                                                                e.currentTarget.style.color = "white";
-                                                            }}
-                                                            onMouseLeave={(e) => {
-                                                                e.currentTarget.style.backgroundColor = "white";
-                                                                e.currentTarget.style.color = "#2563eb";
-                                                            }}
-                                                        >
-                                                            <Eye size={14} /> VIEW
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-
-                                        const SectionHeader = (text) => (
-                                            <div
-                                                style={{
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    margin: "10px 0 6px 0",
-                                                    justifyContent: "center",
+                                              <input
+                                                type="checkbox"
+                                                checked={selectedFooterReports.includes(
+                                                  report.report_id,
+                                                )}
+                                                onChange={() => {
+                                                  setSelectedFooterReports(
+                                                    (prev) =>
+                                                      prev.includes(
+                                                        report.report_id,
+                                                      )
+                                                        ? prev.filter(
+                                                            (id) =>
+                                                              id !==
+                                                              report.report_id,
+                                                          )
+                                                        : [
+                                                            ...prev,
+                                                            report.report_id,
+                                                          ],
+                                                  );
                                                 }}
-                                            >
-                                                <div
-                                                    style={{
-                                                        flex: 1,
-                                                        height: "1px",
-                                                        backgroundColor: "#f1f5f9",
-                                                    }}
-                                                ></div>
-                                                <span
-                                                    style={{
-                                                        padding: "2px 10px",
-                                                        fontSize: "0.6rem",
-                                                        fontWeight: "800",
-                                                        color: "#f59e0b",
-                                                        border: "1px solid #f59e0b",
-                                                        borderRadius: "6px",
-                                                        backgroundColor: "#fff7ed",
-                                                        paddingTop: "4px",
-                                                        paddingBottom: "4px",
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: "1px",
-                                                    }}
-                                                >
-                                                    {text}
-                                                </span>
-                                                <div
-                                                    style={{
-                                                        flex: 1,
-                                                        height: "1px",
-                                                        backgroundColor: "#f1f5f9",
-                                                    }}
-                                                ></div>
-                                            </div>
-                                        );
+                                                style={{
+                                                  width: "15px",
+                                                  height: "15px",
+                                                  cursor: "pointer",
+                                                }}
+                                              />
+                                              <span
+                                                style={{
+                                                  fontSize: "0.8rem",
+                                                  fontWeight: "600",
+                                                  color: "#334155",
+                                                }}
+                                              >
+                                                {report.report_date
+                                                  ? new Date(
+                                                      report.report_date,
+                                                    ).toLocaleDateString(
+                                                      "en-GB",
+                                                      {
+                                                        day: "2-digit",
+                                                        month: "short",
+                                                        year: "numeric",
+                                                      },
+                                                    )
+                                                  : "Unknown Date"}
+                                              </span>
+                                            </label>
+                                          ))
+                                        )}
+                                      </div>
 
-                                        return (
+                                      {/* Popover Footer (Common Download Button) */}
+                                      <div
+                                        style={{
+                                          padding: "10px",
+                                          borderTop: "1px solid #f1f5f9",
+                                          backgroundColor: "#f8fafc",
+                                        }}
+                                      >
+                                        <button
+                                          disabled={
+                                            selectedFooterReports.length ===
+                                              0 || isFooterDownloading
+                                          }
+                                          onClick={() =>
+                                            handleFooterBatchDownload(
+                                              vesselName,
+                                            )
+                                          }
+                                          style={{
+                                            width: "100%",
+                                            backgroundColor:
+                                              selectedFooterReports.length > 0
+                                                ? "#10b981"
+                                                : "#cbd5e1",
+                                            color: "white",
+                                            border: "none",
+                                            borderRadius: "6px",
+                                            padding: "8px",
+                                            fontSize: "0.7rem",
+                                            fontWeight: "800",
+                                            cursor:
+                                              selectedFooterReports.length > 0
+                                                ? "pointer"
+                                                : "not-allowed",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            gap: "6px",
+                                          }}
+                                        >
+                                          {isFooterDownloading ? (
+                                            "PREPARING ZIP..."
+                                          ) : (
                                             <>
-                                                {groupedFeed.today.length > 0 && (
-                                                    <>
-                                                        {SectionHeader("TODAY")}
-                                                        {groupedFeed.today.map((item) =>
-                                                            renderFeedItem(item),
-                                                        )}
-                                                    </>
-                                                )}
-
-                                                {groupedFeed.earlier.length > 0 && (
-                                                    <>
-                                                        {SectionHeader("EARLIER")}
-                                                        {groupedFeed.earlier.map((item) =>
-                                                            renderFeedItem(item),
-                                                        )}
-                                                    </>
-                                                )}
-
-                                                {groupedFeed.read.length > 0 && (
-                                                    <>
-                                                        {SectionHeader("READ")}
-                                                        {groupedFeed.read.map((item) =>
-                                                            renderFeedItem(item),
-                                                        )}
-                                                    </>
-                                                )}
+                                              <Download size={14} />
+                                              DOWNLOAD SELECTED
                                             </>
-                                        );
-                                    })()}
+                                          )}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
-                            ) : (
-                                <div
-                                    style={{
-                                        textAlign: "center",
-                                        padding: "60px 20px",
-                                        color: "#94a3b8",
-                                    }}
-                                >
-                                    <Activity
-                                        size={48}
-                                        style={{ opacity: 0.2, marginBottom: "12px" }}
-                                    />
-                                    <p>No feed items match your current filters.</p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      padding: "72px 24px",
+                      textAlign: "center",
+                      color: "#94a3af",
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: "1.1rem" }}>
+                      Select one or more vessels above to view Fleet Analysis
+                      Matrix
+                    </p>
+                  </div>
+                )}
+              </CardContent>
             )}
-            {/* <Card
+          </Card>
+        </>
+      ) : (
+        <div style={{ animation: "fadeIn 0.4s ease-out" }}>
+          {/* 1. Main Card: Set to Flexbox and Hide global overflow */}
+          <Card
+            className="enhanced-card"
+            style={{
+              padding: "0",
+              height: "600px", // Adjusted height to accommodate ~5-6 items + header
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              border: "1px solid #e2e8f0",
+              scrollbarWidth: "thin",
+              scrollbarColor: "#cbd5e1 transparent",
+            }}
+          >
+            {/* 2. Sticky Header: Positioned at the top with a higher Z-index */}
+            <CardHeader
+              style={{
+                backgroundColor: "#f8fafc",
+                borderBottom: "1px solid #e2e8f0",
+                padding: "8px 16px",
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                }}
+              >
+                {/* TOP ROW: Title and Horizontal Toggles */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        backgroundColor: "#0f172a",
+                        padding: "6px",
+                        borderRadius: "6px",
+                        color: "white",
+                      }}
+                    >
+                      <Activity size={18} />
+                    </div>
+                    <CardTitle
+                      style={{ fontSize: "0.95rem", fontWeight: "700" }}
+                    >
+                      LIVE FEED
+                    </CardTitle>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    {/* NEW: FLEET / MY FEED TOGGLE SWITCH */}
+                    <div
+                      style={{
+                        display: "flex",
+                        background: "#e2e8f0",
+                        padding: "2px",
+                        borderRadius: "8px",
+                        gap: "2px",
+                      }}
+                    >
+                      {["FLEET", "MY FEED"].map((mode) => (
+                        <button
+                          key={mode}
+                          onClick={() =>
+                            setFeedMode(
+                              mode === "MY FEED" ? "MY_FEED" : "FLEET",
+                            )
+                          }
+                          style={{
+                            padding: "4px 12px",
+                            borderRadius: "6px",
+                            border: "none",
+                            fontSize: "0.65rem",
+                            fontWeight: "800",
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                            backgroundColor:
+                              (feedMode === "MY_FEED" && mode === "MY FEED") ||
+                              (feedMode === "FLEET" && mode === "FLEET")
+                                ? "white"
+                                : "transparent",
+                            color:
+                              (feedMode === "MY_FEED" && mode === "MY FEED") ||
+                              (feedMode === "FLEET" && mode === "FLEET")
+                                ? "#2563eb"
+                                : "#64748b",
+                            boxShadow:
+                              (feedMode === "MY_FEED" && mode === "MY FEED") ||
+                              (feedMode === "FLEET" && mode === "FLEET")
+                                ? "0 2px 4px rgba(0,0,0,0.1)"
+                                : "none",
+                          }}
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* HORIZONTAL TOGGLE SWITCH (READ/UNREAD) */}
+                    <div
+                      style={{
+                        display: "flex",
+                        background: "#e2e8f0",
+                        padding: "2px",
+                        borderRadius: "8px",
+                        gap: "1px",
+                      }}
+                    >
+                      {["ALL", "UNREAD", "READ"].map((mode) => (
+                        <button
+                          key={mode}
+                          onClick={() => setFeedReadFilter(mode)}
+                          style={{
+                            padding: "4px 12px",
+                            borderRadius: "6px",
+                            border: "none",
+                            fontSize: "0.65rem",
+                            fontWeight: "800",
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                            backgroundColor:
+                              feedReadFilter === mode ? "white" : "transparent",
+                            color:
+                              feedReadFilter === mode ? "#2563eb" : "#64748b",
+                            boxShadow:
+                              feedReadFilter === mode
+                                ? "0 2px 4px rgba(0,0,0,0.1)"
+                                : "none",
+                          }}
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
+
+                    <Button
+                      onClick={fetchFeed}
+                      style={{
+                        background: "white",
+                        color: "#0f172a",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "0.75rem",
+                        height: "36px",
+                        padding: "0px 10px",
+                      }}
+                    >
+                      <Clock size={14} style={{ marginRight: "5px" }} /> Refresh
+                    </Button>
+                  </div>
+                </div>
+
+                {/* BOTTOM ROW: Filters and Search */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    alignItems: "center",
+                    flexWrap: "nowrap",
+                  }}
+                >
+                  {/* Keyword Search */}
+                  <div style={{ position: "relative", flex: "1 1 300px" }}>
+                    <Filter
+                      size={16}
+                      style={{
+                        position: "absolute",
+                        left: "10px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        color: "#94a3b8",
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Search feed..."
+                      value={feedSearch}
+                      onChange={(e) => setFeedSearch(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "6px 10px 6px 32px",
+                        borderRadius: "6px",
+                        border: "1px solid #e2e8f0",
+                        fontSize: "0.75rem",
+                        backgroundColor: "white",
+                        color: "black",
+                      }}
+                    />
+                  </div>
+
+                  {/* Vessel Dropdown */}
+                  <select
+                    value={feedVesselFilter}
+                    onChange={(e) => setFeedVesselFilter(e.target.value)}
+                    style={{
+                      padding: "6px",
+                      borderRadius: "6px",
+                      border: "1px solid #e2e8f0",
+                      fontSize: "0.85rem",
+                      backgroundColor: "white",
+                      color: "black",
+                      cursor: "pointer",
+                      minWidth: "140px",
+                    }}
+                  >
+                    {uniqueFeedVessels.map((v) => (
+                      <option key={v} value={v}>
+                        {v === "ALL" ? "ALL VESSEL" : v}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Event Type Dropdown - CONDITIONALLY RENDERED */}
+                  {feedMode === "FLEET" && (
+                    <select
+                      value={feedFilter}
+                      onChange={(e) => setFeedFilter(e.target.value)}
+                      style={{
+                        padding: "6px",
+                        borderRadius: "6px",
+                        border: "1px solid #e2e8f0",
+                        fontSize: "0.75rem",
+                        backgroundColor: "white",
+                        color: "black",
+                        cursor: "pointer",
+                        minWidth: "150px",
+                      }}
+                    >
+                      <option value="ALL">ALL ACTIONS</option>
+                      <option value="NEW_REPORT">UPLOADED REPORT</option>
+                      <option value="EVIDENCE_UPLOAD">UPLOADED EVIDENCE</option>
+                      <option value="RESAMPLE_REMINDER">
+                        RESAMPLE PENDING
+                      </option>
+                      <option value="EVIDENCE_DELETE">DELETED EVIDENCE</option>
+                      <option value="SCHEDULE_ALERT">OVERDUE</option>
+                      <option value="MANDATORY">IMAGE MANDATORY</option>
+                    </select>
+                  )}
+
+                  {/* Date Pickers */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      backgroundColor: "white",
+                      padding: "4px 8px",
+                      borderRadius: "6px",
+                      border: "1px solid #e2e8f0",
+                      height: "32px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "0.65rem",
+                          color: "#64748b",
+                          fontWeight: "800",
+                        }}
+                      >
+                        FROM:
+                      </span>
+                      <input
+                        type="date"
+                        value={feedFromDate}
+                        onChange={(e) => setFeedFromDate(e.target.value)}
+                        style={{
+                          border: "none",
+                          fontSize: "0.75rem",
+                          outline: "none",
+                          backgroundColor: "white",
+                          color: "black",
+                          cursor: "pointer",
+                          colorScheme: "light",
+                          width: "105px",
+                        }}
+                      />
+                    </div>
+
+                    <div
+                      style={{
+                        width: "1px",
+                        height: "14px",
+                        backgroundColor: "#e2e8f0",
+                      }}
+                    ></div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "0.65rem",
+                          color: "#64748b",
+                          fontWeight: "800",
+                        }}
+                      >
+                        TO:
+                      </span>
+                      <input
+                        type="date"
+                        value={feedToDate}
+                        onChange={(e) => setFeedToDate(e.target.value)}
+                        style={{
+                          border: "none",
+                          fontSize: "0.75rem",
+                          outline: "none",
+                          backgroundColor: "white",
+                          color: "black",
+                          cursor: "pointer",
+                          colorScheme: "light",
+                          width: "105px",
+                        }}
+                      />
+                    </div>
+
+                    {(feedFromDate || feedToDate) && (
+                      <X
+                        size={14}
+                        onClick={() => {
+                          setFeedFromDate("");
+                          setFeedToDate("");
+                        }}
+                        style={{
+                          cursor: "pointer",
+                          color: "#ef4444",
+                          marginLeft: "4px",
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+
+            {/* 3. Scrollable Content Area */}
+            <CardContent
+              style={{
+                padding: "10px 16px",
+                overflowY: "auto",
+                height: "400px",
+                flex: 1,
+                backgroundColor: "#ffffff",
+                scrollbarWidth: "thin",
+              }}
+            >
+              {feedLoading ? (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    padding: "60px",
+                  }}
+                >
+                  <div className="loading-spinner"></div>
+                </div>
+              ) : groupedFeed.today.length > 0 ||
+                groupedFeed.earlier.length > 0 ||
+                groupedFeed.read.length > 0 ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "6px",
+                  }}
+                >
+                  {/* Helper Internal Function to keep existing styling exactly as it was */}
+                  {(() => {
+                    const renderFeedItem = (item) => (
+                      <div
+                        key={item.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          padding: "6px 12px",
+                          borderRadius: "8px",
+                          border: "1px solid #e2e8f0",
+                          cursor: "default",
+                          transition: "all 0.2s",
+                          backgroundColor: item.is_read ? "#ffffff" : "#f0f9ff",
+                          borderLeft: item.is_read
+                            ? "6px solid #cbd5e1"
+                            : "6px solid #2563eb",
+                          position: "relative",
+                          marginBottom: "4px",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.boxShadow =
+                            "0 4px 12px rgba(0,0,0,0.05)";
+                          e.currentTarget.style.backgroundColor = item.is_read
+                            ? "#f8fafc"
+                            : "#e0f2fe";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.boxShadow = "none";
+                          e.currentTarget.style.backgroundColor = item.is_read
+                            ? "#ffffff"
+                            : "#f0f9ff";
+                        }}
+                      >
+                        {/* Event Icon */}
+                        <div
+                          style={{
+                            width: "32px",
+                            height: "32px",
+                            borderRadius: "8px",
+                            backgroundColor: item.is_read ? "#f8fafc" : "#fff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            marginRight: "12px",
+                            color: item.is_read ? "#94a3b8" : "#2563eb",
+                            boxShadow: item.is_read
+                              ? "none"
+                              : "0 2px 4px rgba(0,0,0,0.05)",
+                          }}
+                        >
+                          {item.event_type === "MENTION" ? (
+                            <MessageSquareText size={16} />
+                          ) : item.event_type === "EVIDENCE_UPLOAD" ? (
+                            <ImageIcon size={16} />
+                          ) : item.event_type === "MANDATORY" ? ( // ðŸ”¥ NEW: Icon for Image/Resample Mandatory toggles
+                            <AlertTriangle size={16} />
+                          ) : item.event_type === "APPROVAL_REQUEST" ? ( // ðŸ”¥ NEW: Vessel requesting closure
+                            <Clock size={16} />
+                          ) : item.event_type === "STATUS_CHANGE" ? ( // ðŸ”¥ NEW: Reopening or Status Alerts
+                            <Activity size={16} />
+                          ) : item.event_type === "APPROVAL_DECLINED" ? ( // ðŸ”¥ NEW: Shore declined closure
+                            <X size={16} color="#ef4444" />
+                          ) : item.event_type === "RESAMPLE_REMINDER" ? (
+                            <History size={16} />
+                          ) : item.priority === "CRITICAL" ? (
+                            <AlertOctagon size={16} />
+                          ) : item.event_type === "SCHEDULE_ALERT" ? (
+                            <Clock size={16} />
+                          ) : (
+                            <FileText size={16} />
+                          )}
+                        </div>
+
+                        {/* Message Body */}
+                        <div style={{ flex: 1 }}>
+                          {(() => {
+                            const msgParts = item.message.split("\n");
+                            const headerText = msgParts[0];
+                            const bodyContent = msgParts.slice(1).join("\n");
+
+                            return (
+                              <>
+                                <div style={{ marginBottom: "4px" }}>
+                                  <span
+                                    style={{
+                                      fontWeight: "700",
+                                      color: item.is_read
+                                        ? "#64748b"
+                                        : "#0f172a",
+                                      fontSize: "0.85rem",
+                                    }}
+                                  >
+                                    {headerText}
+                                  </span>
+                                </div>
+                                <div
+                                  style={{
+                                    color: item.is_read ? "#94a3b8" : "#334155",
+                                    fontWeight: item.is_read ? "400" : "600",
+                                    fontSize: "0.78rem",
+                                    whiteSpace: "pre-wrap",
+                                    lineHeight: "1.4",
+                                  }}
+                                >
+                                  {bodyContent}
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Action Area: Timestamp + Buttons */}
+                        <div
+                          style={{
+                            textAlign: "right",
+                            minWidth: "180px",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "flex-end",
+                            gap: "10px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: "0.65rem",
+                              color: "#94a3b8",
+                              fontWeight: "600",
+                            }}
+                          >
+                            {new Date(item.created_at + "Z").toLocaleDateString(
+                              "en-GB",
+                            )}{" "}
+                            {new Date(item.created_at + "Z").toLocaleTimeString(
+                              "en-GB",
+                              {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: true,
+                              },
+                            )}
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                            }}
+                          >
+                            {!item.is_read && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMarkSingleRead(item.id);
+                                }}
+                                style={{
+                                  backgroundColor: "white",
+                                  border: "1px solid #2563eb",
+                                  color: "#2563eb",
+                                  padding: "3px 8px",
+                                  borderRadius: "4px",
+                                  fontSize: "0.6rem",
+                                  fontWeight: "700",
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                }}
+                              >
+                                <CheckCircle size={12} /> MARK AS READ
+                              </button>
+                            )}
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleFeedItemClick(item);
+                              }}
+                              style={{
+                                backgroundColor: "white",
+                                color: "#2563eb",
+                                border: "1px solid #2563eb",
+                                padding: "3px 8px",
+                                borderRadius: "4px",
+                                fontSize: "0.6rem",
+                                fontWeight: "700",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                transition: "all 0.2s",
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor =
+                                  "#2563eb";
+                                e.currentTarget.style.color = "white";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = "white";
+                                e.currentTarget.style.color = "#2563eb";
+                              }}
+                            >
+                              <Eye size={14} /> VIEW
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+
+                    const SectionHeader = (text) => (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          margin: "10px 0 6px 0",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <div
+                          style={{
+                            flex: 1,
+                            height: "1px",
+                            backgroundColor: "#f1f5f9",
+                          }}
+                        ></div>
+                        <span
+                          style={{
+                            padding: "2px 10px",
+                            fontSize: "0.6rem",
+                            fontWeight: "800",
+                            color: "#f59e0b",
+                            border: "1px solid #f59e0b",
+                            borderRadius: "6px",
+                            backgroundColor: "#fff7ed",
+                            paddingTop: "4px",
+                            paddingBottom: "4px",
+                            textTransform: "uppercase",
+                            letterSpacing: "1px",
+                          }}
+                        >
+                          {text}
+                        </span>
+                        <div
+                          style={{
+                            flex: 1,
+                            height: "1px",
+                            backgroundColor: "#f1f5f9",
+                          }}
+                        ></div>
+                      </div>
+                    );
+
+                    return (
+                      <>
+                        {groupedFeed.today.length > 0 && (
+                          <>
+                            {SectionHeader("TODAY")}
+                            {groupedFeed.today.map((item) =>
+                              renderFeedItem(item),
+                            )}
+                          </>
+                        )}
+
+                        {groupedFeed.earlier.length > 0 && (
+                          <>
+                            {SectionHeader("EARLIER")}
+                            {groupedFeed.earlier.map((item) =>
+                              renderFeedItem(item),
+                            )}
+                          </>
+                        )}
+
+                        {groupedFeed.read.length > 0 && (
+                          <>
+                            {SectionHeader("READ")}
+                            {groupedFeed.read.map((item) =>
+                              renderFeedItem(item),
+                            )}
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "60px 20px",
+                    color: "#94a3b8",
+                  }}
+                >
+                  <Activity
+                    size={48}
+                    style={{ opacity: 0.2, marginBottom: "12px" }}
+                  />
+                  <p>No feed items match your current filters.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      {/* <Card
         className="enhanced-card"
         style={{
           marginBottom: "24px",
@@ -5930,376 +6054,376 @@ const LuboilAnalysis = () => {
         )}
       </Card> */}
 
-            {/* Main Matrix Table */}
-            {/* Main Matrix Table */}
-            {selectedVesselName && (
-                <Card
-                    ref={reportsSectionRef}
-                    className="enhanced-card"
-                    style={{
-                        marginTop: "24px",
-                        border: "1px solid #e2e8f0",
-                        animation: "fadeIn 0.4s ease-out",
-                    }}
+      {/* Main Matrix Table */}
+      {/* Main Matrix Table */}
+      {selectedVesselName && (
+        <Card
+          ref={reportsSectionRef}
+          className="enhanced-card"
+          style={{
+            marginTop: "24px",
+            border: "1px solid #e2e8f0",
+            animation: "fadeIn 0.4s ease-out",
+          }}
+        >
+          <CardHeader
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              backgroundColor: "#f8fafc",
+              borderBottom: "1px solid #e2e8f0",
+              padding: "20px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "16px",
+                textAlign: "left",
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: "#3b82f6",
+                  borderRadius: "8px",
+                  width: "48px",
+                  height: "48px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <FileText size={24} color="white" />
+              </div>
+              <div>
+                <CardTitle
+                  style={{
+                    fontSize: "1.1rem",
+                    color: "#0f172a",
+                    marginBottom: "4px",
+                    lineHeight: "1.2",
+                  }}
                 >
-                    <CardHeader
+                  {selectedVesselName} - Report History
+                </CardTitle>
+                <p style={{ margin: 0, fontSize: "0.9rem", color: "#64748b" }}>
+                  Raw PDF Reports available for download/preview
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              {selectedLubReports.length > 0 && (
+                <Button
+                  onClick={handleLubBatchDownload}
+                  disabled={isDownloading} // Prevents double-clicking
+                  style={{
+                    backgroundColor: isDownloading ? "#94a3b8" : "#10b981",
+                    color: "white",
+                    padding: "8px 16px",
+                    fontSize: "0.85rem",
+                    borderRadius: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontWeight: "700",
+                    boxShadow: isDownloading
+                      ? "none"
+                      : "0 4px 6px -1px rgba(16, 185, 129, 0.2)",
+                    cursor: isDownloading ? "not-allowed" : "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  {isDownloading ? (
+                    <>
+                      <Activity size={16} className="animate-spin" />
+                      <span>Preparing ZIP...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download size={16} />
+                      <span>Download {selectedLubReports.length} Selected</span>
+                    </>
+                  )}
+                </Button>
+              )}
+
+              <Button
+                onClick={() => {
+                  setSelectedVesselName(null);
+                  setVesselReports([]);
+                  setSelectedLubReports([]);
+                }}
+                style={{
+                  backgroundColor: "transparent",
+                  color: "#64748b",
+                  padding: "8px",
+                  height: "auto",
+                  minWidth: "auto",
+                }}
+              >
+                <X size={20} />
+              </Button>
+            </div>
+          </CardHeader>
+
+          <CardContent
+            style={{ padding: "0", maxHeight: "400px", overflowY: "auto" }}
+          >
+            {loadingReports ? (
+              <div className="loading-state-enhanced">
+                <div className="loading-spinner"></div>
+              </div>
+            ) : vesselReports.length > 0 ? (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead
+                  style={{
+                    position: "sticky",
+                    top: 0,
+                    backgroundColor: "#f1f5f9",
+                    zIndex: 1,
+                  }}
+                >
+                  <tr>
+                    <th
+                      style={{
+                        padding: "12px 24px",
+                        width: "60px",
+                        textAlign: "center",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
                         style={{
-                            display: "flex",
-                            flexDirection: "row",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            backgroundColor: "#f8fafc",
-                            borderBottom: "1px solid #e2e8f0",
-                            padding: "20px",
+                          width: "16px",
+                          height: "16px",
+                          cursor: "pointer",
                         }}
+                        checked={
+                          selectedLubReports.length === vesselReports.length &&
+                          vesselReports.length > 0
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedLubReports(
+                              vesselReports.map((r) => r.report_id),
+                            );
+                          } else {
+                            setSelectedLubReports([]);
+                          }
+                        }}
+                      />
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 24px",
+                        textAlign: "left",
+                        fontSize: "0.8rem",
+                        color: "#64748b",
+                      }}
                     >
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "16px",
-                                textAlign: "left",
-                            }}
-                        >
-                            <div
-                                style={{
-                                    backgroundColor: "#3b82f6",
-                                    borderRadius: "8px",
-                                    width: "48px",
-                                    height: "48px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    flexShrink: 0,
-                                }}
-                            >
-                                <FileText size={24} color="white" />
-                            </div>
-                            <div>
-                                <CardTitle
-                                    style={{
-                                        fontSize: "1.1rem",
-                                        color: "#0f172a",
-                                        marginBottom: "4px",
-                                        lineHeight: "1.2",
-                                    }}
-                                >
-                                    {selectedVesselName} - Report History
-                                </CardTitle>
-                                <p style={{ margin: 0, fontSize: "0.9rem", color: "#64748b" }}>
-                                    Raw PDF Reports available for download/preview
-                                </p>
-                            </div>
-                        </div>
-
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                            {selectedLubReports.length > 0 && (
-                                <Button
-                                    onClick={handleLubBatchDownload}
-                                    disabled={isDownloading} // Prevents double-clicking
-                                    style={{
-                                        backgroundColor: isDownloading ? "#94a3b8" : "#10b981",
-                                        color: "white",
-                                        padding: "8px 16px",
-                                        fontSize: "0.85rem",
-                                        borderRadius: "8px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "8px",
-                                        fontWeight: "700",
-                                        boxShadow: isDownloading
-                                            ? "none"
-                                            : "0 4px 6px -1px rgba(16, 185, 129, 0.2)",
-                                        cursor: isDownloading ? "not-allowed" : "pointer",
-                                        transition: "all 0.2s ease",
-                                    }}
-                                >
-                                    {isDownloading ? (
-                                        <>
-                                            <Activity size={16} className="animate-spin" />
-                                            <span>Preparing ZIP...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Download size={16} />
-                                            <span>Download {selectedLubReports.length} Selected</span>
-                                        </>
-                                    )}
-                                </Button>
-                            )}
-
-                            <Button
-                                onClick={() => {
-                                    setSelectedVesselName(null);
-                                    setVesselReports([]);
-                                    setSelectedLubReports([]);
-                                }}
-                                style={{
-                                    backgroundColor: "transparent",
-                                    color: "#64748b",
-                                    padding: "8px",
-                                    height: "auto",
-                                    minWidth: "auto",
-                                }}
-                            >
-                                <X size={20} />
-                            </Button>
-                        </div>
-                    </CardHeader>
-
-                    <CardContent
-                        style={{ padding: "0", maxHeight: "400px", overflowY: "auto" }}
+                      Report Date
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 24px",
+                        textAlign: "left",
+                        fontSize: "0.8rem",
+                        color: "#64748b",
+                      }}
                     >
-                        {loadingReports ? (
-                            <div className="loading-state-enhanced">
-                                <div className="loading-spinner"></div>
-                            </div>
-                        ) : vesselReports.length > 0 ? (
-                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                                <thead
-                                    style={{
-                                        position: "sticky",
-                                        top: 0,
-                                        backgroundColor: "#f1f5f9",
-                                        zIndex: 1,
-                                    }}
-                                >
-                                    <tr>
-                                        <th
-                                            style={{
-                                                padding: "12px 24px",
-                                                width: "60px",
-                                                textAlign: "center",
-                                            }}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                style={{
-                                                    width: "16px",
-                                                    height: "16px",
-                                                    cursor: "pointer",
-                                                }}
-                                                checked={
-                                                    selectedLubReports.length === vesselReports.length &&
-                                                    vesselReports.length > 0
-                                                }
-                                                onChange={(e) => {
-                                                    if (e.target.checked) {
-                                                        setSelectedLubReports(
-                                                            vesselReports.map((r) => r.report_id),
-                                                        );
-                                                    } else {
-                                                        setSelectedLubReports([]);
-                                                    }
-                                                }}
-                                            />
-                                        </th>
-                                        <th
-                                            style={{
-                                                padding: "12px 24px",
-                                                textAlign: "left",
-                                                fontSize: "0.8rem",
-                                                color: "#64748b",
-                                            }}
-                                        >
-                                            Report Date
-                                        </th>
-                                        <th
-                                            style={{
-                                                padding: "12px 24px",
-                                                textAlign: "left",
-                                                fontSize: "0.8rem",
-                                                color: "#64748b",
-                                            }}
-                                        >
-                                            Lube Oil Report
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {vesselReports.map((report, idx) => (
-                                        <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                                            <td style={{ padding: "12px 24px", textAlign: "center" }}>
-                                                <input
-                                                    type="checkbox"
-                                                    style={{
-                                                        width: "16px",
-                                                        height: "16px",
-                                                        cursor: "pointer",
-                                                    }}
-                                                    checked={selectedLubReports.includes(
-                                                        report.report_id,
-                                                    )}
-                                                    onChange={() => {
-                                                        setSelectedLubReports((prev) =>
-                                                            prev.includes(report.report_id)
-                                                                ? prev.filter((id) => id !== report.report_id)
-                                                                : [...prev, report.report_id],
-                                                        );
-                                                    }}
-                                                />
-                                            </td>
-                                            <td
-                                                style={{
-                                                    padding: "12px 24px",
-                                                    fontSize: "0.9rem",
-                                                    color: "#334155",
-                                                }}
-                                            >
-                                                {report.report_date
-                                                    ? new Date(report.report_date).toLocaleDateString(
-                                                        "en-GB",
-                                                        {
-                                                            day: "2-digit",
-                                                            month: "short",
-                                                            year: "2-digit",
-                                                        },
-                                                    )
-                                                    : "N/A"}
-                                            </td>
-                                            <td style={{ padding: "12px 24px", textAlign: "left" }}>
-                                                <Button
-                                                    onClick={() =>
-                                                        window.open(
-                                                            report.report_url || report.url,
-                                                            "_blank",
-                                                        )
-                                                    }
-                                                    disabled={!report.report_url && !report.url}
-                                                    style={{
-                                                        backgroundColor: "white",
-                                                        border: "1px solid #cbd5e1",
-                                                        color: "#2563eb",
-                                                        padding: "6px 12px",
-                                                        fontSize: "0.8rem",
-                                                        borderRadius: "6px",
-                                                        display: "inline-flex",
-                                                        gap: "6px",
-                                                        alignItems: "center",
-                                                    }}
-                                                >
-                                                    <Eye size={14} /> Preview
-                                                </Button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        ) : (
-                            <div
-                                style={{
-                                    padding: "40px",
-                                    textAlign: "center",
-                                    color: "#94a3b8",
-                                }}
-                            >
-                                No reports found.
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
-            {/* ----------------- MODAL START ----------------- */}
-            {isModalOpen && selectedCell && (
-                <div
-                    style={{
-                        position: "fixed",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: "rgba(15, 23, 42, 0.65)",
-                        backdropFilter: "blur(4px)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        zIndex: 9999,
-                        padding: "20px",
-                    }}
-                >
-                    {/* â”€â”€ OUTER MODAL SHELL â”€â”€ */}
-                    <div
+                      Lube Oil Report
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vesselReports.map((report, idx) => (
+                    <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                      <td style={{ padding: "12px 24px", textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          style={{
+                            width: "16px",
+                            height: "16px",
+                            cursor: "pointer",
+                          }}
+                          checked={selectedLubReports.includes(
+                            report.report_id,
+                          )}
+                          onChange={() => {
+                            setSelectedLubReports((prev) =>
+                              prev.includes(report.report_id)
+                                ? prev.filter((id) => id !== report.report_id)
+                                : [...prev, report.report_id],
+                            );
+                          }}
+                        />
+                      </td>
+                      <td
                         style={{
+                          padding: "12px 24px",
+                          fontSize: "0.9rem",
+                          color: "#334155",
+                        }}
+                      >
+                        {report.report_date
+                          ? new Date(report.report_date).toLocaleDateString(
+                              "en-GB",
+                              {
+                                day: "2-digit",
+                                month: "short",
+                                year: "2-digit",
+                              },
+                            )
+                          : "N/A"}
+                      </td>
+                      <td style={{ padding: "12px 24px", textAlign: "left" }}>
+                        <Button
+                          onClick={() =>
+                            window.open(
+                              report.report_url || report.url,
+                              "_blank",
+                            )
+                          }
+                          disabled={!report.report_url && !report.url}
+                          style={{
                             backgroundColor: "white",
-                            width: "98vw",
-                            maxWidth: "1850px",
-                            height: "87vh",
-                            marginTop: "50px",
-                            display: "flex",
-                            flexDirection: "column",
-                            borderRadius: "12px",
-                            overflow: "hidden",
-                            boxShadow: "0 25px 50px -12px rgba(0,0,0,0.35)",
-                        }}
-                    >
-                        {/* â”€â”€ MODAL TOP BAR (vessel name + close) â”€â”€ */}
-                        <div
-                            style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                padding: "10px 20px",
-                                borderBottom: "1px solid #e2e8f0",
-                                backgroundColor: "#f8fafc",
-                                flexShrink: 0,
-                            }}
+                            border: "1px solid #cbd5e1",
+                            color: "#2563eb",
+                            padding: "6px 12px",
+                            fontSize: "0.8rem",
+                            borderRadius: "6px",
+                            display: "inline-flex",
+                            gap: "6px",
+                            alignItems: "center",
+                          }}
                         >
-                            <div
-                                style={{ display: "flex", alignItems: "center", gap: "12px" }}
-                            >
-                                <h3
-                                    style={{
-                                        margin: 0,
-                                        fontSize: "1.1rem",
-                                        color: "#0f172a",
-                                        fontWeight: "700",
-                                    }}
-                                >
-                                    {selectedCell.vessel}
-                                </h3>
-                                <span
-                                    style={{
-                                        fontSize: "0.8rem",
-                                        color: "#64748b",
-                                        fontWeight: "600",
-                                    }}
-                                >
-                                     {selectedCell.machinery}
-                                </span>
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "6px",
-                                        backgroundColor: "#eff6ff", // Light blue background
-                                        padding: "4px 10px",
-                                        borderRadius: "6px",
-                                        border: "1px solid #bfdbfe",
-                                        color: "black",
-                                        marginLeft: "8px",
-                                    }}
-                                >
-                                    Report Date:
-                                    <span
-                                        style={{
-                                            fontSize: "0.78rem",
-                                            color: "black",
-                                            fontWeight: "800",
-                                        }}
-                                    >
-                                        {new Date(
-                                            selectedCell.data.report_date ||
-                                            selectedCell.data.date ||
-                                            selectedCell.data.sample_date,
-                                        ).toLocaleDateString("en-GB", {
-                                            day: "2-digit",
-                                            month: "short",
-                                            year: "numeric",
-                                        })}
-                                    </span>
-                                </div>
-                                {/* Status pill */}
-                                {/* <span
+                          <Eye size={14} /> Preview
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div
+                style={{
+                  padding: "40px",
+                  textAlign: "center",
+                  color: "#94a3b8",
+                }}
+              >
+                No reports found.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+      {/* ----------------- MODAL START ----------------- */}
+      {isModalOpen && selectedCell && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.65)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "20px",
+          }}
+        >
+          {/* â”€â”€ OUTER MODAL SHELL â”€â”€ */}
+          <div
+            style={{
+              backgroundColor: "white",
+              width: "98vw",
+              maxWidth: "1850px",
+              height: "87vh",
+              marginTop: "50px",
+              display: "flex",
+              flexDirection: "column",
+              borderRadius: "12px",
+              overflow: "hidden",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.35)",
+            }}
+          >
+            {/* â”€â”€ MODAL TOP BAR (vessel name + close) â”€â”€ */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "10px 20px",
+                borderBottom: "1px solid #e2e8f0",
+                backgroundColor: "#f8fafc",
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "12px" }}
+              >
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: "1.1rem",
+                    color: "#0f172a",
+                    fontWeight: "700",
+                  }}
+                >
+                  {selectedCell.vessel}
+                </h3>
+                <span
+                  style={{
+                    fontSize: "0.8rem",
+                    color: "#64748b",
+                    fontWeight: "600",
+                  }}
+                >
+                  {selectedCell.machinery}
+                </span>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    backgroundColor: "#eff6ff", // Light blue background
+                    padding: "4px 10px",
+                    borderRadius: "6px",
+                    border: "1px solid #bfdbfe",
+                    color: "black",
+                    marginLeft: "8px",
+                  }}
+                >
+                  Report Date:
+                  <span
+                    style={{
+                      fontSize: "0.78rem",
+                      color: "black",
+                      fontWeight: "800",
+                    }}
+                  >
+                    {new Date(
+                      selectedCell.data.report_date ||
+                        selectedCell.data.date ||
+                        selectedCell.data.sample_date,
+                    ).toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+                {/* Status pill */}
+                {/* <span
             style={{
               padding: "3px 10px",
               borderRadius: "20px",
@@ -6323,2332 +6447,2354 @@ const LuboilAnalysis = () => {
           >
             {selectedCell.data.status || "N/A"}
           </span> */}
-                            </div>
+              </div>
 
-                            <button
-                                onClick={() => {
-                                    setIsModalOpen(false);
-                                    setRightPanelMode("report");
-                                    setIsResamplingActive(false);
-                                    setCompareIds([]);
-                                    setIsLinkGenerated(false);
-                                    setIsDiagExpanded(false);
-                                }}
-                                style={{
-                                    background: "none",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    color: "#94a3b8",
-                                }}
-                            >
-                                <X size={24} />
-                            </button>
-                        </div>
+              <button
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setRightPanelMode("report");
+                  setIsResamplingActive(false);
+                  setCompareIds([]);
+                  setIsLinkGenerated(false);
+                  setIsDiagExpanded(false);
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#94a3b8",
+                }}
+              >
+                <X size={24} />
+              </button>
+            </div>
 
-                        {/* â”€â”€ THREE-PANEL ROW â”€â”€ */}
-                        <div
-                            style={{
-                                flex: 1,
-                                display: "flex",
-                                flexDirection: "row",
-                                overflow: "hidden",
-                                minHeight: 0,
-                            }}
-                        >
-                            {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            {/* â”€â”€ THREE-PANEL ROW â”€â”€ */}
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "row",
+                overflow: "hidden",
+                minHeight: 0,
+              }}
+            >
+              {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
             PANEL 1 â€” DIAGNOSIS  (flex: 1)
             - Fully scrollable body
             - Reduced font sizes throughout
             - Upload + View Evidence on one row
             - Collapsible ACTIONS section
         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-                            <div
+              <div
+                style={{
+                  flex: isDiagCollapsed ? "0 0 45px" : 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  borderRight: "1px solid #e2e8f0",
+                  backgroundColor: "white",
+                  overflow: "hidden",
+                  transition: "flex 0.3s ease",
+                  minWidth: 0,
+                }}
+              >
+                {/* â”€â”€ Panel Header (sticky, click to collapse whole panel) â”€â”€ */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 12px",
+                    borderBottom: "1px solid #f1f5f9",
+                    backgroundColor: "#f8fafc",
+                    flexShrink: 0,
+                    cursor: "pointer",
+                    userSelect: "none",
+                  }}
+                  onClick={() => setIsDiagCollapsed(!isDiagCollapsed)}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <Activity size={14} color="#2563eb" />
+                    {!isDiagCollapsed && (
+                      <span
+                        style={{
+                          fontSize: "0.78rem",
+                          fontWeight: "700",
+                          color: "#334155",
+                        }}
+                      >
+                        Lab Diagnosis & Evidence
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    {!isDiagCollapsed && (
+                      <ShellStatusIcon
+                        status={selectedCell.data.status}
+                        size={18}
+                      />
+                    )}
+                    {isDiagCollapsed ? (
+                      <ChevronDown size={14} color="#64748b" />
+                    ) : (
+                      <ChevronUp size={14} color="#64748b" />
+                    )}
+                  </div>
+                </div>
+
+                {/* â”€â”€ Panel Body: ONE scrollable area for everything â”€â”€ */}
+                {!isDiagCollapsed && (
+                  <div
+                    style={{
+                      flex: 1,
+                      overflowY: "auto",
+                      padding: "10px 10px 16px 10px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px",
+                      /* custom thin scrollbar */
+                      scrollbarWidth: "thin",
+                      scrollbarColor: "#cbd5e1 transparent",
+                    }}
+                  >
+                    {/* 1 â”€â”€ DETECTED ANOMALIES */}
+                    {selectedCell.data.summary_error && (
+                      <div
+                        style={{
+                          padding: "10px 12px",
+                          backgroundColor: "#fff7ed",
+                          borderLeft: "3px solid #f97316",
+                          borderRadius: "0 8px 8px 0",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            marginBottom: "6px",
+                          }}
+                        >
+                          <AlertTriangle size={13} color="#c2410c" />
+                          <h5
+                            style={{
+                              margin: 0,
+                              color: "#9a3412",
+                              fontSize: "0.65rem",
+                              fontWeight: "800",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.4px",
+                            }}
+                          >
+                            Detected Anomalies
+                          </h5>
+                        </div>
+                        <ul
+                          style={{
+                            margin: 0,
+                            paddingLeft: "1rem",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "4px",
+                          }}
+                        >
+                          {selectedCell.data.summary_error
+                            .split(" & ")
+                            .map((alert, idx) => (
+                              <li
+                                key={idx}
                                 style={{
-                                    flex: isDiagCollapsed ? "0 0 45px" : 1,
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    borderRight: "1px solid #e2e8f0",
-                                    backgroundColor: "white",
-                                    overflow: "hidden",
-                                    transition: "flex 0.3s ease",
-                                    minWidth: 0,
+                                  color: "#7c2d12",
+                                  fontSize: "0.78rem",
+                                  fontWeight: "700",
+                                  lineHeight: "1.4",
                                 }}
+                              >
+                                {alert}
+                              </li>
+                            ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* 2 â”€â”€ TECHNICAL ANALYSIS ACCORDION */}
+                    {selectedCell.data.diagnosis ? (
+                      <div
+                        style={{
+                          border: "1px solid #e2e8f0",
+                          borderRadius: "8px",
+                          overflow: "hidden",
+                          backgroundColor: "white",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <button
+                          onClick={() => setIsDiagExpanded(!isDiagExpanded)}
+                          style={{
+                            width: "100%",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "9px 12px",
+                            backgroundColor: "#f8fafc",
+                            border: "none",
+                            cursor: "pointer",
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.backgroundColor = "#f1f5f9")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.backgroundColor = "#f8fafc")
+                          }
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "7px",
+                            }}
+                          >
+                            <FileText size={13} color="#64748b" />
+                            <span
+                              style={{
+                                fontWeight: "700",
+                                color: "#334155",
+                                fontSize: "0.72rem",
+                              }}
                             >
-                                {/* â”€â”€ Panel Header (sticky, click to collapse whole panel) â”€â”€ */}
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        padding: "8px 12px",
-                                        borderBottom: "1px solid #f1f5f9",
-                                        backgroundColor: "#f8fafc",
-                                        flexShrink: 0,
-                                        cursor: "pointer",
-                                        userSelect: "none",
-                                    }}
-                                    onClick={() => setIsDiagCollapsed(!isDiagCollapsed)}
-                                >
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                        }}
-                                    >
-                                        <Activity size={14} color="#2563eb" />
-                                        {!isDiagCollapsed && (
-                                            <span
-                                                style={{
-                                                    fontSize: "0.78rem",
-                                                    fontWeight: "700",
-                                                    color: "#334155",
-                                                }}
-                                            >
-                                                Lab Diagnosis & Evidence
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                        }}
-                                    >
-                                        {!isDiagCollapsed && (
-                                            <ShellStatusIcon
-                                                status={selectedCell.data.status}
-                                                size={18}
-                                            />
-                                        )}
-                                        {isDiagCollapsed ? (
-                                            <ChevronDown size={14} color="#64748b" />
-                                        ) : (
-                                            <ChevronUp size={14} color="#64748b" />
-                                        )}
-                                    </div>
-                                </div>
+                              Technical Analysis & Recommendations
+                            </span>
+                          </div>
+                          {isDiagExpanded ? (
+                            <ChevronUp size={14} color="#94a3b8" />
+                          ) : (
+                            <ChevronDown size={14} color="#94a3b8" />
+                          )}
+                        </button>
 
-                                {/* â”€â”€ Panel Body: ONE scrollable area for everything â”€â”€ */}
-                                {!isDiagCollapsed && (
-                                    <div
-                                        style={{
-                                            flex: 1,
-                                            overflowY: "auto",
-                                            padding: "10px 10px 16px 10px",
-                                            display: "flex",
-                                            flexDirection: "column",
-                                            gap: "10px",
-                                            /* custom thin scrollbar */
-                                            scrollbarWidth: "thin",
-                                            scrollbarColor: "#cbd5e1 transparent",
-                                        }}
-                                    >
-                                        {/* 1 â”€â”€ DETECTED ANOMALIES */}
-                                        {selectedCell.data.summary_error && (
-                                            <div
-                                                style={{
-                                                    padding: "10px 12px",
-                                                    backgroundColor: "#fff7ed",
-                                                    borderLeft: "3px solid #f97316",
-                                                    borderRadius: "0 8px 8px 0",
-                                                    flexShrink: 0,
-                                                }}
-                                            >
-                                                <div
-                                                    style={{
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        gap: "6px",
-                                                        marginBottom: "6px",
-                                                    }}
-                                                >
-                                                    <AlertTriangle size={13} color="#c2410c" />
-                                                    <h5
-                                                        style={{
-                                                            margin: 0,
-                                                            color: "#9a3412",
-                                                            fontSize: "0.65rem",
-                                                            fontWeight: "800",
-                                                            textTransform: "uppercase",
-                                                            letterSpacing: "0.4px",
-                                                        }}
-                                                    >
-                                                        Detected Anomalies
-                                                    </h5>
-                                                </div>
-                                                <ul
-                                                    style={{
-                                                        margin: 0,
-                                                        paddingLeft: "1rem",
-                                                        display: "flex",
-                                                        flexDirection: "column",
-                                                        gap: "4px",
-                                                    }}
-                                                >
-                                                    {selectedCell.data.summary_error
-                                                        .split(" & ")
-                                                        .map((alert, idx) => (
-                                                            <li
-                                                                key={idx}
-                                                                style={{
-                                                                    color: "#7c2d12",
-                                                                    fontSize: "0.78rem",
-                                                                    fontWeight: "700",
-                                                                    lineHeight: "1.4",
-                                                                }}
-                                                            >
-                                                                {alert}
-                                                            </li>
-                                                        ))}
-                                                </ul>
-                                            </div>
-                                        )}
-
-                                        {/* 2 â”€â”€ TECHNICAL ANALYSIS ACCORDION */}
-                                        {selectedCell.data.diagnosis ? (
-                                            <div
-                                                style={{
-                                                    border: "1px solid #e2e8f0",
-                                                    borderRadius: "8px",
-                                                    overflow: "hidden",
-                                                    backgroundColor: "white",
-                                                    flexShrink: 0,
-                                                }}
-                                            >
-                                                <button
-                                                    onClick={() => setIsDiagExpanded(!isDiagExpanded)}
-                                                    style={{
-                                                        width: "100%",
-                                                        display: "flex",
-                                                        justifyContent: "space-between",
-                                                        alignItems: "center",
-                                                        padding: "9px 12px",
-                                                        backgroundColor: "#f8fafc",
-                                                        border: "none",
-                                                        cursor: "pointer",
-                                                    }}
-                                                    onMouseEnter={(e) =>
-                                                        (e.currentTarget.style.backgroundColor = "#f1f5f9")
-                                                    }
-                                                    onMouseLeave={(e) =>
-                                                        (e.currentTarget.style.backgroundColor = "#f8fafc")
-                                                    }
-                                                >
-                                                    <div
-                                                        style={{
-                                                            display: "flex",
-                                                            alignItems: "center",
-                                                            gap: "7px",
-                                                        }}
-                                                    >
-                                                        <FileText size={13} color="#64748b" />
-                                                        <span
-                                                            style={{
-                                                                fontWeight: "700",
-                                                                color: "#334155",
-                                                                fontSize: "0.72rem",
-                                                            }}
-                                                        >
-                                                            Technical Analysis & Recommendations
-                                                        </span>
-                                                    </div>
-                                                    {isDiagExpanded ? (
-                                                        <ChevronUp size={14} color="#94a3b8" />
-                                                    ) : (
-                                                        <ChevronDown size={14} color="#94a3b8" />
-                                                    )}
-                                                </button>
-
-                                                {isDiagExpanded && (
-                                                    <div
-                                                        style={{
-                                                            padding: "14px",
-                                                            backgroundColor: "#fff",
-                                                            borderTop: "1px solid #f1f5f9",
-                                                            animation: "fadeIn 0.25s ease",
-                                                        }}
-                                                    >
-                                                        <div style={{ position: "relative" }}>
-                                                            <div
-                                                                style={{
-                                                                    position: "absolute",
-                                                                    top: "-12px",
-                                                                    left: "-6px",
-                                                                    color: "#f1f5f9",
-                                                                    fontSize: "2.8rem",
-                                                                    fontWeight: "bold",
-                                                                    zIndex: 0,
-                                                                    userSelect: "none",
-                                                                }}
-                                                            >
-                                                                "
-                                                            </div>
-                                                            <div
-                                                                style={{
-                                                                    margin: 0,
-                                                                    fontSize: "0.75rem",
-                                                                    lineHeight: "1.7",
-                                                                    color: "#475569",
-                                                                    whiteSpace: "pre-wrap",
-                                                                    position: "relative",
-                                                                    zIndex: 1,
-                                                                }}
-                                                            >
-                                                                {formatDiagnosisAsList(
-                                                                    selectedCell.data.diagnosis,
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <div
-                                                            style={{
-                                                                marginTop: "10px",
-                                                                textAlign: "right",
-                                                                borderTop: "1px solid #f8fafc",
-                                                                paddingTop: "8px",
-                                                            }}
-                                                        >
-                                                            <span
-                                                                style={{
-                                                                    fontSize: "0.6rem",
-                                                                    color: "#cbd5e1",
-                                                                    fontWeight: "800",
-                                                                    letterSpacing: "0.8px",
-                                                                }}
-                                                            >
-                                                                SOURCE:{" "}
-                                                                {selectedCell.data.lab_name ||
-                                                                    "SHELL LUBEANALYST"}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <div
-                                                style={{
-                                                    height: "100px",
-                                                    display: "flex",
-                                                    flexDirection: "column",
-                                                    alignItems: "center",
-                                                    justifyContent: "center",
-                                                    color: "#94a3b8",
-                                                    border: "2px dashed #f1f5f9",
-                                                    borderRadius: "8px",
-                                                    flexShrink: 0,
-                                                }}
-                                            >
-                                                <AlertCircle
-                                                    size={22}
-                                                    style={{ marginBottom: "6px", opacity: 0.4 }}
-                                                />
-                                                <p style={{ margin: 0, fontSize: "0.72rem" }}>
-                                                    No lab diagnosis found.
-                                                </p>
-                                            </div>
-                                        )}
-
-                                        {/* 3 â”€â”€ ACTIONS (collapsible section) */}
-                                        <div
-                                            style={{
-                                                border: "1px solid #e2e8f0",
-                                                borderRadius: "8px",
-                                                overflow: "hidden",
-                                                flexShrink: 0,
-                                                backgroundColor: "white",
-                                            }}
-                                        >
-                                            {/* Actions header â€” click to collapse/expand */}
-                                            <div
-                                                onClick={() =>
-                                                    setIsActionsCollapsed(!isActionsCollapsed)
-                                                }
-                                                style={{
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "space-between",
-                                                    padding: "7px 10px",
-                                                    backgroundColor: "#f8fafc",
-                                                    cursor: "pointer",
-                                                    userSelect: "none",
-                                                    borderBottom: isActionsCollapsed
-                                                        ? "none"
-                                                        : "1px solid #f1f5f9",
-                                                }}
-                                            >
-                                                <span
-                                                    style={{
-                                                        fontSize: "0.6rem",
-                                                        fontWeight: "800",
-                                                        color: "#64748b",
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: "0.5px",
-                                                    }}
-                                                >
-                                                    Evidence
-                                                </span>
-                                                {isActionsCollapsed ? (
-                                                    <ChevronDown size={13} color="#94a3b8" />
-                                                ) : (
-                                                    <ChevronUp size={13} color="#94a3b8" />
-                                                )}
-                                            </div>
-
-                                            {/* Actions body */}
-                                            {!isActionsCollapsed && (
-                                                <div
-                                                    style={{
-                                                        padding: "8px",
-                                                        display: "flex",
-                                                        flexDirection: "column",
-                                                        gap: "6px",
-                                                    }}
-                                                >
-                                                    {/* ROLE-BASED IMAGE REQUIREMENT TOGGLE */}
-                                                    {(() => {
-                                                        const _userData = user?.user || user;
-                                                        const _userAccess = (_userData?.access_type || _userData?.accessType || "").toUpperCase();
-                                                        const _userRole = (_userData?.role || "").toUpperCase();
-                                                        const isShore =
-                                                            _userAccess === "SHORE" ||
-                                                            _userRole === "ADMIN" ||
-                                                            _userRole === "SUPERUSER" ||
-                                                            _userRole === "SHORE";
-
-                                                        const isImageRequired =
-                                                            selectedCell.data.is_image_required;
-                                                        const isResamplingRequired =
-                                                            selectedCell.data.is_resampling_required; // New Flag
-                                                        const isLocked = selectedCell.data.is_resolved;
-
-                                                        if (isShore) {
-                                                            return (
-                                                                <div
-                                                                    style={{
-                                                                        display: "flex",
-                                                                        flexDirection: "column",
-                                                                        gap: "6px",
-                                                                    }}
-                                                                >
-                                                                    {/* --- EXISTING IMAGE BUTTON (UNCHANGED) --- */}
-                                                                    <button
-                                                                        onClick={handleRequestImageAction}
-                                                                        disabled={isLocked}
-                                                                        style={{
-                                                                            width: "100%",
-                                                                            display: "flex",
-                                                                            alignItems: "center",
-                                                                            justifyContent: "center",
-                                                                            gap: "6px",
-                                                                            padding: "7px 8px",
-                                                                            borderRadius: "5px",
-                                                                            fontSize: "0.65rem",
-                                                                            fontWeight: "800",
-                                                                            border: isImageRequired
-                                                                                ? "1px solid #ef4444"
-                                                                                : "1px dashed #cbd5e1",
-                                                                            backgroundColor: isImageRequired
-                                                                                ? "#fee2e2"
-                                                                                : "transparent",
-                                                                            color: isImageRequired
-                                                                                ? "#dc2626"
-                                                                                : "#64748b",
-                                                                            transition: "all 0.2s",
-                                                                            opacity: selectedCell.data.is_resolved
-                                                                                ? 0.5
-                                                                                : 1, // Visual feedback
-                                                                            cursor: selectedCell.data.is_resolved
-                                                                                ? "not-allowed"
-                                                                                : "pointer",
-                                                                        }}
-                                                                    >
-                                                                        {isImageRequired ? (
-                                                                            <>
-                                                                                <AlertTriangle
-                                                                                    size={12}
-                                                                                    className="animate-pulse"
-                                                                                />{" "}
-                                                                                IMAGE MANDATORY
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                <ImageIcon size={12} /> IMAGE MANDATORY
-                                                                            </>
-                                                                        )}
-                                                                    </button>
-
-                                                                    {/* --- NEW RESAMPLING BUTTON (MATCHING STYLE) --- */}
-                                                                    <button
-                                                                        onClick={handleRequestResamplingAction}
-                                                                        disabled={isLocked}
-                                                                        style={{
-                                                                            width: "100%",
-                                                                            display: "flex",
-                                                                            alignItems: "center",
-                                                                            justifyContent: "center",
-                                                                            gap: "6px",
-                                                                            padding: "7px 8px",
-                                                                            borderRadius: "5px",
-                                                                            fontSize: "0.65rem",
-                                                                            fontWeight: "800",
-                                                                            border: isResamplingRequired
-                                                                                ? "1px solid #ef4444"
-                                                                                : "1px dashed #cbd5e1",
-                                                                            backgroundColor: isResamplingRequired
-                                                                                ? "#fee2e2"
-                                                                                : "transparent",
-                                                                            color: isResamplingRequired
-                                                                                ? "#dc2626"
-                                                                                : "#64748b",
-                                                                            transition: "all 0.2s",
-                                                                            cursor: isLocked
-                                                                                ? "not-allowed"
-                                                                                : "pointer",
-                                                                            opacity: isLocked ? 0.6 : 1,
-                                                                        }}
-                                                                    >
-                                                                        {isResamplingRequired ? (
-                                                                            <>
-                                                                                <History
-                                                                                    size={12}
-                                                                                    className="animate-pulse"
-                                                                                />{" "}
-                                                                                RESAMPLING MANDATORY
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                <History size={12} /> RESAMPLING
-                                                                                MANDATORY
-                                                                            </>
-                                                                        )}
-                                                                    </button>
-                                                                </div>
-                                                            );
-                                                        }
-
-                                                        if (
-                                                            !isShore &&
-                                                            (isImageRequired || isResamplingRequired)
-                                                        ) {
-                                                            return (
-                                                                <div
-                                                                    style={{
-                                                                        display: "flex",
-                                                                        flexDirection: "column",
-                                                                        gap: "4px",
-                                                                    }}
-                                                                >
-                                                                    {/* --- EXISTING IMAGE BANNER (UNCHANGED) --- */}
-                                                                    {isImageRequired && (
-                                                                        <div
-                                                                            style={{
-                                                                                display: "flex",
-                                                                                alignItems: "center",
-                                                                                justifyContent: "center",
-                                                                                gap: "6px",
-                                                                                padding: "7px 8px",
-                                                                                borderRadius: "5px",
-                                                                                fontSize: "0.65rem",
-                                                                                fontWeight: "800",
-                                                                                border: "1px solid #ef4444",
-                                                                                backgroundColor: "#fee2e2",
-                                                                                color: "#dc2626",
-                                                                                cursor: "default",
-                                                                            }}
-                                                                        >
-                                                                            <AlertTriangle
-                                                                                size={12}
-                                                                                className="animate-pulse"
-                                                                            />{" "}
-                                                                            IMAGE UPLOAD MANDATORY
-                                                                        </div>
-                                                                    )}
-
-                                                                    {/* --- NEW RESAMPLING BANNER (MATCHING STYLE) --- */}
-                                                                    {isResamplingRequired && (
-                                                                        <div
-                                                                            style={{
-                                                                                display: "flex",
-                                                                                alignItems: "center",
-                                                                                justifyContent: "center",
-                                                                                gap: "6px",
-                                                                                padding: "7px 8px",
-                                                                                borderRadius: "5px",
-                                                                                fontSize: "0.65rem",
-                                                                                fontWeight: "800",
-                                                                                border: "1px solid #ef4444",
-                                                                                backgroundColor: "#fee2e2",
-                                                                                color: "#dc2626",
-                                                                                cursor: "default",
-                                                                            }}
-                                                                        >
-                                                                            <History
-                                                                                size={12}
-                                                                                className="animate-pulse"
-                                                                            />{" "}
-                                                                            RESAMPLING REQUIRED
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return null;
-                                                    })()}
-
-                                                    {/* UPLOAD + VIEW EVIDENCE â€” side by side on one row */}
-                                                    <div style={{ display: "flex", gap: "6px" }}>
-                                                        {/* Upload */}
-                                                        <input
-                                                            type="file"
-                                                            id="lub-sidebar-upload"
-                                                            hidden
-                                                            accept="*"
-                                                            onChange={(e) =>
-                                                                handleSidebarUpload(e.target.files[0])
-                                                            }
-                                                        />
-                                                        {!selectedCell.data.is_resolved && (
-                                                            <button
-                                                                onClick={() =>
-                                                                    document
-                                                                        .getElementById("lub-sidebar-upload")
-                                                                        .click()
-                                                                }
-                                                                style={{
-                                                                    flex: 1,
-                                                                    display: "flex",
-                                                                    alignItems: "center",
-                                                                    justifyContent: "center",
-                                                                    gap: "4px",
-                                                                    padding: "7px 4px",
-                                                                    borderRadius: "5px",
-                                                                    cursor: "pointer",
-                                                                    fontSize: "0.62rem",
-                                                                    fontWeight: "700",
-                                                                    backgroundColor: "#2563eb",
-                                                                    color: "white",
-                                                                    border: "none",
-                                                                    whiteSpace: "nowrap",
-                                                                }}
-                                                            >
-                                                                <Upload size={11} /> Upload
-                                                            </button>
-                                                        )}
-
-                                                        {/* View Evidence */}
-                                                        <button
-                                                            onClick={() => setIsEvidenceModalOpen(true)}
-                                                            style={{
-                                                                flex: 1,
-                                                                display: "flex",
-                                                                alignItems: "center",
-                                                                justifyContent: "center",
-                                                                gap: "4px",
-                                                                padding: "7px 4px",
-                                                                borderRadius: "5px",
-                                                                cursor: "pointer",
-                                                                fontSize: "0.62rem",
-                                                                fontWeight: "700",
-                                                                backgroundColor: "#f8fafc",
-                                                                color: "#1e293b",
-                                                                border: "1px solid #e2e8f0",
-                                                                whiteSpace: "nowrap",
-                                                            }}
-                                                        >
-                                                            <Eye size={11} /> View (
-                                                            {selectedCell.data.conversation?.filter(
-                                                                (m) =>
-                                                                    m.message?.includes("ATTACHED_IMAGE:") ||
-                                                                    m.message?.includes("ATTACHED_PDF:"),
-                                                            ).length || 0}
-                                                            )
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* 4 â”€â”€ RESAMPLING WITH LINK (shore-only) */}
-                                        {(user?.access_type === "SHORE" ||
-                                            user?.role === "admin" ||
-                                            user?.role === "superuser" ||
-                                            user?.role === "shore") && (
-                                                <div style={{ flexShrink: 0 }}>
-                                                    <button
-                                                        onClick={() => {
-                                                            if (isResamplingActive) {
-                                                                setRightPanelMode("report");
-                                                                setCompareIds([]);
-                                                                setIsLinkGenerated(false);
-                                                                setIsResamplingActive(false);
-                                                            } else {
-                                                                // Keep current sample ID as the first ID in comparison
-                                                                setCompareIds([selectedCell.data.sample_id]);
-                                                                setIsResamplingActive(true);
-                                                            }
-                                                        }}
-                                                        style={{
-                                                            width: "100%",
-                                                            display: "flex",
-                                                            alignItems: "center",
-                                                            justifyContent: "center",
-                                                            gap: "6px",
-                                                            padding: "8px",
-                                                            borderRadius: "7px",
-                                                            cursor: "pointer",
-                                                            fontSize: "0.65rem",
-                                                            fontWeight: "800",
-                                                            backgroundColor: isResamplingActive
-                                                                ? "#fff1f2"
-                                                                : "#f8fafc",
-                                                            color: isResamplingActive ? "#ef4444" : "#1e293b",
-                                                            border: isResamplingActive
-                                                                ? "1px solid #fecaca"
-                                                                : "1px solid #e2e8f0",
-                                                            transition: "all 0.2s",
-                                                        }}
-                                                    >
-                                                        <History size={13} />
-                                                        {isResamplingActive
-                                                            ? "CANCEL"
-                                                            : "LINK WITH RESAMPLING"}
-                                                    </button>
-
-                                                    {isResamplingActive && (
-                                                        <div
-                                                            style={{
-                                                                marginTop: "8px",
-                                                                padding: "10px",
-                                                                backgroundColor: "white",
-                                                                borderRadius: "8px",
-                                                                border: "1px solid #e2e8f0",
-                                                                animation: "fadeIn 0.2s ease",
-                                                            }}
-                                                        >
-                                                            {!isLinkGenerated ? (
-                                                                <>
-                                                                    <p
-                                                                        style={{
-                                                                            margin: "0 0 6px 0",
-                                                                            fontSize: "0.6rem",
-                                                                            fontWeight: "800",
-                                                                            color: "#64748b",
-                                                                            textTransform: "uppercase",
-                                                                        }}
-                                                                    >
-                                                                        Select Report:
-                                                                    </p>
-                                                                    <div
-                                                                        style={{
-                                                                            display: "flex",
-                                                                            flexDirection: "column",
-                                                                            gap: "5px",
-                                                                        }}
-                                                                    >
-                                                                        {(() => {
-                                                                            // 1. Get the date of the current selected report
-                                                                            const currentReportDate = new Date(
-                                                                                selectedCell.data.date ||
-                                                                                selectedCell.data.last_sample,
-                                                                            );
-
-                                                                            // 2. Filter history for reports that occur AFTER the current one
-                                                                            const futureReports =
-                                                                                selectedCell.data.history?.filter((h) => {
-                                                                                    const hDate = new Date(
-                                                                                        h.date || h.sample_date,
-                                                                                    );
-                                                                                    // Ensure it's in the future and NOT the same sample
-                                                                                    return (
-                                                                                        hDate > currentReportDate &&
-                                                                                        h.sample_id !==
-                                                                                        selectedCell.data.sample_id
-                                                                                    );
-                                                                                });
-
-                                                                            if (
-                                                                                futureReports &&
-                                                                                futureReports.length > 0
-                                                                            ) {
-                                                                                return futureReports.map((item) => (
-                                                                                    <label
-                                                                                        key={item.sample_id}
-                                                                                        style={{
-                                                                                            display: "flex",
-                                                                                            alignItems: "center",
-                                                                                            gap: "8px",
-                                                                                            padding: "6px 8px",
-                                                                                            borderRadius: "5px",
-                                                                                            border: "1px solid #f1f5f9",
-                                                                                            cursor: "pointer",
-                                                                                            fontSize: "0.68rem",
-                                                                                            backgroundColor:
-                                                                                                compareIds.includes(
-                                                                                                    item.sample_id,
-                                                                                                )
-                                                                                                    ? "#eff6ff"
-                                                                                                    : "transparent",
-                                                                                        }}
-                                                                                    >
-                                                                                        <input
-                                                                                            type="checkbox"
-                                                                                            checked={compareIds.includes(
-                                                                                                item.sample_id,
-                                                                                            )}
-                                                                                            onChange={() => {
-                                                                                                if (
-                                                                                                    compareIds.includes(
-                                                                                                        item.sample_id,
-                                                                                                    )
-                                                                                                ) {
-                                                                                                    // Reset back to just the current report if unchecked
-                                                                                                    setCompareIds([
-                                                                                                        selectedCell.data.sample_id,
-                                                                                                    ]);
-                                                                                                } else {
-                                                                                                    // Select this future report as the second comparison point
-                                                                                                    setCompareIds([
-                                                                                                        selectedCell.data.sample_id,
-                                                                                                        item.sample_id,
-                                                                                                    ]);
-                                                                                                }
-                                                                                            }}
-                                                                                            style={{
-                                                                                                width: "13px",
-                                                                                                height: "13px",
-                                                                                            }}
-                                                                                        />
-                                                                                        <div
-                                                                                            style={{
-                                                                                                display: "flex",
-                                                                                                flexDirection: "column",
-                                                                                            }}
-                                                                                        >
-                                                                                            <span
-                                                                                                style={{
-                                                                                                    fontWeight: "700",
-                                                                                                    fontSize: "0.68rem",
-                                                                                                }}
-                                                                                            >
-                                                                                                {item.date}
-                                                                                            </span>
-                                                                                            <span
-                                                                                                style={{
-                                                                                                    fontSize: "0.58rem",
-                                                                                                    color: getStatusColor(
-                                                                                                        item.status,
-                                                                                                    ),
-                                                                                                }}
-                                                                                            >
-                                                                                                {item.status}
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    </label>
-                                                                                ));
-                                                                            } else {
-                                                                                // If no reports are newer than the currently selected one
-                                                                                return (
-                                                                                    <div
-                                                                                        style={{
-                                                                                            padding: "12px",
-                                                                                            textAlign: "center",
-                                                                                            border: "1px dashed #cbd5e1",
-                                                                                            borderRadius: "6px",
-                                                                                            backgroundColor: "#f8fafc",
-                                                                                        }}
-                                                                                    >
-                                                                                        <p
-                                                                                            style={{
-                                                                                                margin: 0,
-                                                                                                fontSize: "0.7rem",
-                                                                                                color: "#94a3b8",
-                                                                                                fontWeight: "600",
-                                                                                            }}
-                                                                                        >
-                                                                                            No Subsequent Reports Available.
-                                                                                        </p>
-                                                                                    </div>
-                                                                                );
-                                                                            }
-                                                                        })()}
-                                                                    </div>
-
-                                                                    <button
-                                                                        disabled={compareIds.length !== 2}
-                                                                        onClick={() => setIsLinkGenerated(true)}
-                                                                        style={{
-                                                                            width: "100%",
-                                                                            marginTop: "8px",
-                                                                            padding: "7px",
-                                                                            borderRadius: "5px",
-                                                                            border: "none",
-                                                                            backgroundColor:
-                                                                                compareIds.length === 2
-                                                                                    ? "#2563eb"
-                                                                                    : "#cbd5e1",
-                                                                            color: "white",
-                                                                            fontSize: "0.65rem",
-                                                                            fontWeight: "800",
-                                                                            cursor:
-                                                                                compareIds.length === 2
-                                                                                    ? "pointer"
-                                                                                    : "not-allowed",
-                                                                        }}
-                                                                    >
-                                                                        GENERATE LINK
-                                                                    </button>
-                                                                </>
-                                                            ) : (
-                                                                <div style={{ textAlign: "left" }}>
-                                                                    <p
-                                                                        style={{
-                                                                            fontSize: "0.58rem",
-                                                                            color: "#64748b",
-                                                                            fontWeight: "800",
-                                                                            marginBottom: "6px",
-                                                                            textTransform: "uppercase",
-                                                                        }}
-                                                                    >
-                                                                        Resampling Comparison:
-                                                                    </p>
-                                                                    <div
-                                                                        style={{
-                                                                            padding: "10px",
-                                                                            backgroundColor: "#f0f9ff",
-                                                                            border: "1px solid #bae6fd",
-                                                                            borderRadius: "8px",
-                                                                            marginBottom: "8px",
-                                                                        }}
-                                                                    >
-                                                                        {(() => {
-                                                                            // 1. Get the date of the primary opened report
-                                                                            const firstDate =
-                                                                                selectedCell.data.date ||
-                                                                                selectedCell.data.sample_date;
-
-                                                                            // 2. Find the date of the second selected report from the history array
-                                                                            const targetId = compareIds.find(
-                                                                                (id) =>
-                                                                                    id !== selectedCell.data.sample_id,
-                                                                            );
-                                                                            const targetSample =
-                                                                                selectedCell.data.history?.find(
-                                                                                    (h) => h.sample_id === targetId,
-                                                                                );
-                                                                            const secondDate =
-                                                                                targetSample?.date || "Subsequent";
-
-                                                                            // 3. Mixed Parameters String: Domain / Vessel / Machinery / Date & Date
-                                                                            const mixedLinkDisplay = `${window.location.origin} / ${selectedCell.vessel} / ${selectedCell.machinery} / ${firstDate} & ${secondDate}`;
-
-                                                                            return (
-                                                                                <a
-                                                                                    href="#"
-                                                                                    onClick={(e) => {
-                                                                                        e.preventDefault();
-                                                                                        setRightPanelMode("resampling_view");
-                                                                                        setIsDiagExpanded(false);
-                                                                                    }}
-                                                                                    style={{
-                                                                                        color: "#0369a1",
-                                                                                        fontSize: "0.7rem",
-                                                                                        textDecoration: "underline",
-                                                                                        fontWeight: "800",
-                                                                                        lineHeight: "1.4",
-                                                                                        display: "block",
-                                                                                        wordBreak: "break-word",
-                                                                                    }}
-                                                                                >
-                                                                                    {mixedLinkDisplay}
-                                                                                </a>
-                                                                            );
-                                                                        })()}
-                                                                    </div>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setIsLinkGenerated(false);
-                                                                            setCompareIds([
-                                                                                selectedCell.data.sample_id,
-                                                                            ]);
-                                                                        }}
-                                                                        style={{
-                                                                            fontSize: "0.58rem",
-                                                                            color: "#ef4444",
-                                                                            background: "none",
-                                                                            border: "none",
-                                                                            cursor: "pointer",
-                                                                            fontWeight: "700",
-                                                                        }}
-                                                                    >
-                                                                        Change Selected Reports
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                    </div>
+                        {isDiagExpanded && (
+                          <div
+                            style={{
+                              padding: "14px",
+                              backgroundColor: "#fff",
+                              borderTop: "1px solid #f1f5f9",
+                              animation: "fadeIn 0.25s ease",
+                            }}
+                          >
+                            <div style={{ position: "relative" }}>
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: "-12px",
+                                  left: "-6px",
+                                  color: "#f1f5f9",
+                                  fontSize: "2.8rem",
+                                  fontWeight: "bold",
+                                  zIndex: 0,
+                                  userSelect: "none",
+                                }}
+                              >
+                                "
+                              </div>
+                              <div
+                                style={{
+                                  margin: 0,
+                                  fontSize: "0.75rem",
+                                  lineHeight: "1.7",
+                                  color: "#475569",
+                                  whiteSpace: "pre-wrap",
+                                  position: "relative",
+                                  zIndex: 1,
+                                }}
+                              >
+                                {formatDiagnosisAsList(
+                                  selectedCell.data.diagnosis,
                                 )}
-                                {selectedCell.data.status?.toLowerCase() !== "normal" && (
-                                    <div
-                                        style={{
-                                            padding: "10px",
-                                            borderTop: "1px solid #e2e8f0",
-                                            backgroundColor: "#fff",
-                                            flexShrink: 0,
-                                            zIndex: 10,
-                                        }}
-                                    >
-                                        <div
-                                            style={{ display: "flex", gap: "10px", width: "100%" }}
-                                        >
-                                            {/* --- BUTTON 1: STATUS BUTTON (CLOSE / PENDING / CLOSED) --- */}
-                                            <button
-                                                // 1. Disable if resolved, awaiting approval, or submitting
-                                                disabled={
-                                                    selectedCell.data.is_resolved ||
-                                                    selectedCell.data.is_approval_pending ||
-                                                    isSubmittingClose
-                                                }
-                                                // 2. Only allow opening the modal if it's not already resolved or pending
-                                                onClick={() => {
-                                                    if (
-                                                        !selectedCell.data.is_resolved &&
-                                                        !selectedCell.data.is_approval_pending
-                                                    ) {
-                                                        setIsCloseModalOpen(true);
-                                                    }
-                                                }}
-                                                style={{
-                                                    // ðŸ”¥ UPDATED: 50% width if Reopen button is present, otherwise 100%
-                                                    flex:
-                                                        selectedCell.data.is_resolved && amIShore ? 1 : 1,
-                                                    width:
-                                                        selectedCell.data.is_resolved && amIShore
-                                                            ? "50%"
-                                                            : "100%",
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "center",
-                                                    gap: "8px",
-                                                    padding: "12px",
-                                                    borderRadius: "8px",
-
-                                                    // 3. Dynamic Background Color (Preserved)
-                                                    backgroundColor: selectedCell.data.is_resolved
-                                                        ? "#94a3b8"
-                                                        : selectedCell.data.is_approval_pending
-                                                            ? "#f59e0b"
-                                                            : "#059669",
-
-                                                    color: "white",
-                                                    fontSize: "0.75rem",
-                                                    fontWeight: "800",
-                                                    border: "none",
-                                                    flexShrink: 0,
-
-                                                    // 4. Dynamic Cursor (Preserved)
-                                                    cursor:
-                                                        selectedCell.data.is_resolved ||
-                                                            selectedCell.data.is_approval_pending
-                                                            ? "not-allowed"
-                                                            : "pointer",
-
-                                                    boxShadow: "0 -2px 10px rgba(0,0,0,0.05)",
-
-                                                    // 5. Visual feedback (Preserved)
-                                                    opacity:
-                                                        selectedCell.data.is_resolved ||
-                                                            selectedCell.data.is_approval_pending
-                                                            ? 0.8
-                                                            : 1,
-                                                    transition: "all 0.3s ease",
-                                                }}
-                                            >
-                                                {/* 6. Dynamic Icon & Text Logic (Preserved) */}
-                                                {selectedCell.data.is_resolved ? (
-                                                    <>
-                                                        <CheckCircle size={16} />
-                                                        CLOSED
-                                                    </>
-                                                ) : selectedCell.data.is_approval_pending ? (
-                                                    <>
-                                                        <Clock size={16} />
-                                                        PENDING APPROVAL
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <CheckCircle size={16} />
-                                                        CLOSE
-                                                    </>
-                                                )}
-                                            </button>
-
-                                            {/* --- BUTTON 2: REOPEN BUTTON (ONLY FOR SHORE WHEN CLOSED) --- */}
-                                            {selectedCell.data.is_resolved && amIShore && (
-                                                <button
-                                                    onClick={handleReopenIssue}
-                                                    disabled={isSubmittingClose}
-                                                    style={{
-                                                        flex: 1,
-                                                        width: "50%",
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        justifyContent: "center",
-                                                        gap: "8px",
-                                                        padding: "12px",
-                                                        borderRadius: "8px",
-                                                        backgroundColor: "#2563eb", // Blue color for Reopen
-                                                        color: "white",
-                                                        fontSize: "0.75rem",
-                                                        fontWeight: "800",
-                                                        border: "none",
-                                                        cursor: isSubmittingClose
-                                                            ? "not-allowed"
-                                                            : "pointer",
-                                                        boxShadow: "0 4px 6px rgba(37, 99, 235, 0.2)",
-                                                        transition: "all 0.3s ease",
-                                                    }}
-                                                >
-                                                    <History size={16} />
-                                                    REOPEN ISSUE
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
+                              </div>
                             </div>
-
-                            {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-            PANEL 2 â€” PDF REPORT  (flex: 1.8)
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
                             <div
+                              style={{
+                                marginTop: "10px",
+                                textAlign: "right",
+                                borderTop: "1px solid #f8fafc",
+                                paddingTop: "8px",
+                              }}
+                            >
+                              <span
                                 style={{
-                                    flex: isReportCollapsed ? "0 0 45px" : 1.8,
+                                  fontSize: "0.6rem",
+                                  color: "#cbd5e1",
+                                  fontWeight: "800",
+                                  letterSpacing: "0.8px",
+                                }}
+                              >
+                                SOURCE:{" "}
+                                {selectedCell.data.lab_name ||
+                                  "SHELL LUBEANALYST"}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          height: "100px",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#94a3b8",
+                          border: "2px dashed #f1f5f9",
+                          borderRadius: "8px",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <AlertCircle
+                          size={22}
+                          style={{ marginBottom: "6px", opacity: 0.4 }}
+                        />
+                        <p style={{ margin: 0, fontSize: "0.72rem" }}>
+                          No lab diagnosis found.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* 3 â”€â”€ ACTIONS (collapsible section) */}
+                    <div
+                      style={{
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "8px",
+                        overflow: "hidden",
+                        flexShrink: 0,
+                        backgroundColor: "white",
+                      }}
+                    >
+                      {/* Actions header â€” click to collapse/expand */}
+                      <div
+                        onClick={() =>
+                          setIsActionsCollapsed(!isActionsCollapsed)
+                        }
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "7px 10px",
+                          backgroundColor: "#f8fafc",
+                          cursor: "pointer",
+                          userSelect: "none",
+                          borderBottom: isActionsCollapsed
+                            ? "none"
+                            : "1px solid #f1f5f9",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "0.6rem",
+                            fontWeight: "800",
+                            color: "#64748b",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.5px",
+                          }}
+                        >
+                          Evidence
+                        </span>
+                        {isActionsCollapsed ? (
+                          <ChevronDown size={13} color="#94a3b8" />
+                        ) : (
+                          <ChevronUp size={13} color="#94a3b8" />
+                        )}
+                      </div>
+
+                      {/* Actions body */}
+                      {!isActionsCollapsed && (
+                        <div
+                          style={{
+                            padding: "8px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "6px",
+                          }}
+                        >
+                          {/* ROLE-BASED IMAGE REQUIREMENT TOGGLE */}
+                          {(() => {
+                            const _userData = user?.user || user;
+                            const _userAccess = (
+                              _userData?.access_type ||
+                              _userData?.accessType ||
+                              ""
+                            ).toUpperCase();
+                            const _userRole = (
+                              _userData?.role || ""
+                            ).toUpperCase();
+                            const isShore =
+                              _userAccess === "SHORE" ||
+                              _userRole === "ADMIN" ||
+                              _userRole === "SUPERUSER" ||
+                              _userRole === "SHORE";
+
+                            const isImageRequired =
+                              selectedCell.data.is_image_required;
+                            const isResamplingRequired =
+                              selectedCell.data.is_resampling_required; // New Flag
+                            const isLocked = selectedCell.data.is_resolved;
+
+                            if (isShore) {
+                              return (
+                                <div
+                                  style={{
                                     display: "flex",
                                     flexDirection: "column",
-                                    borderRight: "1px solid #e2e8f0",
-                                    backgroundColor: "#f1f5f9",
-                                    overflow: "hidden",
-                                    transition: "flex 0.3s ease",
-                                }}
-                            >
-                                {/* Panel Header */}
-                                <div
+                                    gap: "6px",
+                                  }}
+                                >
+                                  {/* --- EXISTING IMAGE BUTTON (UNCHANGED) --- */}
+                                  <button
+                                    onClick={handleRequestImageAction}
+                                    disabled={isLocked}
                                     style={{
+                                      width: "100%",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: "6px",
+                                      padding: "7px 8px",
+                                      borderRadius: "5px",
+                                      fontSize: "0.65rem",
+                                      fontWeight: "800",
+                                      border: isImageRequired
+                                        ? "1px solid #ef4444"
+                                        : "1px dashed #cbd5e1",
+                                      backgroundColor: isImageRequired
+                                        ? "#fee2e2"
+                                        : "transparent",
+                                      color: isImageRequired
+                                        ? "#dc2626"
+                                        : "#64748b",
+                                      transition: "all 0.2s",
+                                      opacity: selectedCell.data.is_resolved
+                                        ? 0.5
+                                        : 1, // Visual feedback
+                                      cursor: selectedCell.data.is_resolved
+                                        ? "not-allowed"
+                                        : "pointer",
+                                    }}
+                                  >
+                                    {isImageRequired ? (
+                                      <>
+                                        <AlertTriangle
+                                          size={12}
+                                          className="animate-pulse"
+                                        />{" "}
+                                        IMAGE MANDATORY
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ImageIcon size={12} /> IMAGE MANDATORY
+                                      </>
+                                    )}
+                                  </button>
+
+                                  {/* --- NEW RESAMPLING BUTTON (MATCHING STYLE) --- */}
+                                  <button
+                                    onClick={handleRequestResamplingAction}
+                                    disabled={isLocked}
+                                    style={{
+                                      width: "100%",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: "6px",
+                                      padding: "7px 8px",
+                                      borderRadius: "5px",
+                                      fontSize: "0.65rem",
+                                      fontWeight: "800",
+                                      border: isResamplingRequired
+                                        ? "1px solid #ef4444"
+                                        : "1px dashed #cbd5e1",
+                                      backgroundColor: isResamplingRequired
+                                        ? "#fee2e2"
+                                        : "transparent",
+                                      color: isResamplingRequired
+                                        ? "#dc2626"
+                                        : "#64748b",
+                                      transition: "all 0.2s",
+                                      cursor: isLocked
+                                        ? "not-allowed"
+                                        : "pointer",
+                                      opacity: isLocked ? 0.6 : 1,
+                                    }}
+                                  >
+                                    {isResamplingRequired ? (
+                                      <>
+                                        <History
+                                          size={12}
+                                          className="animate-pulse"
+                                        />{" "}
+                                        RESAMPLING MANDATORY
+                                      </>
+                                    ) : (
+                                      <>
+                                        <History size={12} /> RESAMPLING
+                                        MANDATORY
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              );
+                            }
+
+                            if (
+                              !isShore &&
+                              (isImageRequired || isResamplingRequired)
+                            ) {
+                              return (
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "4px",
+                                  }}
+                                >
+                                  {/* --- EXISTING IMAGE BANNER (UNCHANGED) --- */}
+                                  {isImageRequired && (
+                                    <div
+                                      style={{
                                         display: "flex",
                                         alignItems: "center",
-                                        justifyContent: "space-between",
-                                        padding: "7px 16px",
-                                        borderBottom: "1px solid #e2e8f0",
-                                        backgroundColor: "#fff",
-                                        flexShrink: 0,
-                                        cursor: "pointer",
-                                    }}
-                                    onClick={() => setIsReportCollapsed(!isReportCollapsed)}
-                                >
+                                        justifyContent: "center",
+                                        gap: "6px",
+                                        padding: "7px 8px",
+                                        borderRadius: "5px",
+                                        fontSize: "0.65rem",
+                                        fontWeight: "800",
+                                        border: "1px solid #ef4444",
+                                        backgroundColor: "#fee2e2",
+                                        color: "#dc2626",
+                                        cursor: "default",
+                                      }}
+                                    >
+                                      <AlertTriangle
+                                        size={12}
+                                        className="animate-pulse"
+                                      />{" "}
+                                      IMAGE UPLOAD MANDATORY
+                                    </div>
+                                  )}
+
+                                  {/* --- NEW RESAMPLING BANNER (MATCHING STYLE) --- */}
+                                  {isResamplingRequired && (
                                     <div
-                                        style={{
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: "6px",
+                                        padding: "7px 8px",
+                                        borderRadius: "5px",
+                                        fontSize: "0.65rem",
+                                        fontWeight: "800",
+                                        border: "1px solid #ef4444",
+                                        backgroundColor: "#fee2e2",
+                                        color: "#dc2626",
+                                        cursor: "default",
+                                      }}
+                                    >
+                                      <History
+                                        size={12}
+                                        className="animate-pulse"
+                                      />{" "}
+                                      RESAMPLING REQUIRED
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+
+                          {/* UPLOAD + VIEW EVIDENCE â€” side by side on one row */}
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            {/* Upload */}
+                            <input
+                              type="file"
+                              id="lub-sidebar-upload"
+                              hidden
+                              accept="*"
+                              onChange={(e) =>
+                                handleSidebarUpload(e.target.files[0])
+                              }
+                            />
+                            {!selectedCell.data.is_resolved && (
+                              <button
+                                onClick={() =>
+                                  document
+                                    .getElementById("lub-sidebar-upload")
+                                    .click()
+                                }
+                                style={{
+                                  flex: 1,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  gap: "4px",
+                                  padding: "7px 4px",
+                                  borderRadius: "5px",
+                                  cursor: "pointer",
+                                  fontSize: "0.62rem",
+                                  fontWeight: "700",
+                                  backgroundColor: "#2563eb",
+                                  color: "white",
+                                  border: "none",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <Upload size={11} /> Upload
+                              </button>
+                            )}
+
+                            {/* View Evidence */}
+                            <button
+                              onClick={() => setIsEvidenceModalOpen(true)}
+                              style={{
+                                flex: 1,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "4px",
+                                padding: "7px 4px",
+                                borderRadius: "5px",
+                                cursor: "pointer",
+                                fontSize: "0.62rem",
+                                fontWeight: "700",
+                                backgroundColor: "#f8fafc",
+                                color: "#1e293b",
+                                border: "1px solid #e2e8f0",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              <Eye size={11} /> View (
+                              {selectedCell.data.conversation?.filter(
+                                (m) =>
+                                  m.message?.includes("ATTACHED_IMAGE:") ||
+                                  m.message?.includes("ATTACHED_PDF:"),
+                              ).length || 0}
+                              )
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 4 â”€â”€ RESAMPLING WITH LINK (shore-only) */}
+                    {(user?.access_type === "SHORE" ||
+                      user?.role === "admin" ||
+                      user?.role === "superuser" ||
+                      user?.role === "shore") && (
+                      <div style={{ flexShrink: 0 }}>
+                        <button
+                          onClick={() => {
+                            if (isResamplingActive) {
+                              setRightPanelMode("report");
+                              setCompareIds([]);
+                              setIsLinkGenerated(false);
+                              setIsResamplingActive(false);
+                            } else {
+                              // Keep current sample ID as the first ID in comparison
+                              setCompareIds([selectedCell.data.sample_id]);
+                              setIsResamplingActive(true);
+                            }
+                          }}
+                          style={{
+                            width: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "6px",
+                            padding: "8px",
+                            borderRadius: "7px",
+                            cursor: "pointer",
+                            fontSize: "0.65rem",
+                            fontWeight: "800",
+                            backgroundColor: isResamplingActive
+                              ? "#fff1f2"
+                              : "#f8fafc",
+                            color: isResamplingActive ? "#ef4444" : "#1e293b",
+                            border: isResamplingActive
+                              ? "1px solid #fecaca"
+                              : "1px solid #e2e8f0",
+                            transition: "all 0.2s",
+                          }}
+                        >
+                          <History size={13} />
+                          {isResamplingActive
+                            ? "CANCEL"
+                            : "LINK WITH RESAMPLING"}
+                        </button>
+
+                        {isResamplingActive && (
+                          <div
+                            style={{
+                              marginTop: "8px",
+                              padding: "10px",
+                              backgroundColor: "white",
+                              borderRadius: "8px",
+                              border: "1px solid #e2e8f0",
+                              animation: "fadeIn 0.2s ease",
+                            }}
+                          >
+                            {!isLinkGenerated ? (
+                              <>
+                                <p
+                                  style={{
+                                    margin: "0 0 6px 0",
+                                    fontSize: "0.6rem",
+                                    fontWeight: "800",
+                                    color: "#64748b",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
+                                  Select Report:
+                                </p>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "5px",
+                                  }}
+                                >
+                                  {(() => {
+                                    // 1. Get the date of the current selected report
+                                    const currentReportDate = new Date(
+                                      selectedCell.data.date ||
+                                        selectedCell.data.last_sample,
+                                    );
+
+                                    // 2. Filter history for reports that occur AFTER the current one
+                                    const futureReports =
+                                      selectedCell.data.history?.filter((h) => {
+                                        const hDate = new Date(
+                                          h.date || h.sample_date,
+                                        );
+                                        // Ensure it's in the future and NOT the same sample
+                                        return (
+                                          hDate > currentReportDate &&
+                                          h.sample_id !==
+                                            selectedCell.data.sample_id
+                                        );
+                                      });
+
+                                    if (
+                                      futureReports &&
+                                      futureReports.length > 0
+                                    ) {
+                                      return futureReports.map((item) => (
+                                        <label
+                                          key={item.sample_id}
+                                          style={{
                                             display: "flex",
                                             alignItems: "center",
                                             gap: "8px",
-                                        }}
-                                    >
-                                        <FileText size={16} color="#2563eb" />
-                                        {!isReportCollapsed && (
-                                            <div
-                                                style={{
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    gap: "8px",
-                                                }}
+                                            padding: "6px 8px",
+                                            borderRadius: "5px",
+                                            border: "1px solid #f1f5f9",
+                                            cursor: "pointer",
+                                            fontSize: "0.68rem",
+                                            backgroundColor:
+                                              compareIds.includes(
+                                                item.sample_id,
+                                              )
+                                                ? "#eff6ff"
+                                                : "transparent",
+                                          }}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={compareIds.includes(
+                                              item.sample_id,
+                                            )}
+                                            onChange={() => {
+                                              if (
+                                                compareIds.includes(
+                                                  item.sample_id,
+                                                )
+                                              ) {
+                                                // Reset back to just the current report if unchecked
+                                                setCompareIds([
+                                                  selectedCell.data.sample_id,
+                                                ]);
+                                              } else {
+                                                // Select this future report as the second comparison point
+                                                setCompareIds([
+                                                  selectedCell.data.sample_id,
+                                                  item.sample_id,
+                                                ]);
+                                              }
+                                            }}
+                                            style={{
+                                              width: "13px",
+                                              height: "13px",
+                                            }}
+                                          />
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              flexDirection: "column",
+                                            }}
+                                          >
+                                            <span
+                                              style={{
+                                                fontWeight: "700",
+                                                fontSize: "0.68rem",
+                                              }}
                                             >
-                                                <span
-                                                    style={{
-                                                        fontSize: "0.85rem",
-                                                        fontWeight: "700",
-                                                        color: "#334155",
-                                                    }}
-                                                >
-                                                    Analysis Report
-                                                </span>
-                                                {/* {selectedCell.data.pdf_page_index !== undefined && (
+                                              {item.date}
+                                            </span>
+                                            <span
+                                              style={{
+                                                fontSize: "0.58rem",
+                                                color: getStatusColor(
+                                                  item.status,
+                                                ),
+                                              }}
+                                            >
+                                              {item.status}
+                                            </span>
+                                          </div>
+                                        </label>
+                                      ));
+                                    } else {
+                                      // If no reports are newer than the currently selected one
+                                      return (
+                                        <div
+                                          style={{
+                                            padding: "12px",
+                                            textAlign: "center",
+                                            border: "1px dashed #cbd5e1",
+                                            borderRadius: "6px",
+                                            backgroundColor: "#f8fafc",
+                                          }}
+                                        >
+                                          <p
+                                            style={{
+                                              margin: 0,
+                                              fontSize: "0.7rem",
+                                              color: "#94a3b8",
+                                              fontWeight: "600",
+                                            }}
+                                          >
+                                            No Subsequent Reports Available.
+                                          </p>
+                                        </div>
+                                      );
+                                    }
+                                  })()}
+                                </div>
+
+                                <button
+                                  disabled={compareIds.length !== 2}
+                                  onClick={() => setIsLinkGenerated(true)}
+                                  style={{
+                                    width: "100%",
+                                    marginTop: "8px",
+                                    padding: "7px",
+                                    borderRadius: "5px",
+                                    border: "none",
+                                    backgroundColor:
+                                      compareIds.length === 2
+                                        ? "#2563eb"
+                                        : "#cbd5e1",
+                                    color: "white",
+                                    fontSize: "0.65rem",
+                                    fontWeight: "800",
+                                    cursor:
+                                      compareIds.length === 2
+                                        ? "pointer"
+                                        : "not-allowed",
+                                  }}
+                                >
+                                  GENERATE LINK
+                                </button>
+                              </>
+                            ) : (
+                              <div style={{ textAlign: "left" }}>
+                                <p
+                                  style={{
+                                    fontSize: "0.58rem",
+                                    color: "#64748b",
+                                    fontWeight: "800",
+                                    marginBottom: "6px",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
+                                  Resampling Comparison:
+                                </p>
+                                <div
+                                  style={{
+                                    padding: "10px",
+                                    backgroundColor: "#f0f9ff",
+                                    border: "1px solid #bae6fd",
+                                    borderRadius: "8px",
+                                    marginBottom: "8px",
+                                  }}
+                                >
+                                  {(() => {
+                                    // 1. Get the date of the primary opened report
+                                    const firstDate =
+                                      selectedCell.data.date ||
+                                      selectedCell.data.sample_date;
+
+                                    // 2. Find the date of the second selected report from the history array
+                                    const targetId = compareIds.find(
+                                      (id) =>
+                                        id !== selectedCell.data.sample_id,
+                                    );
+                                    const targetSample =
+                                      selectedCell.data.history?.find(
+                                        (h) => h.sample_id === targetId,
+                                      );
+                                    const secondDate =
+                                      targetSample?.date || "Subsequent";
+
+                                    // 3. Mixed Parameters String: Domain / Vessel / Machinery / Date & Date
+                                    const mixedLinkDisplay = `${window.location.origin} / ${selectedCell.vessel} / ${selectedCell.machinery} / ${firstDate} & ${secondDate}`;
+
+                                    return (
+                                      <a
+                                        href="#"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          setRightPanelMode("resampling_view");
+                                          setIsDiagExpanded(false);
+                                        }}
+                                        style={{
+                                          color: "#0369a1",
+                                          fontSize: "0.7rem",
+                                          textDecoration: "underline",
+                                          fontWeight: "800",
+                                          lineHeight: "1.4",
+                                          display: "block",
+                                          wordBreak: "break-word",
+                                        }}
+                                      >
+                                        {mixedLinkDisplay}
+                                      </a>
+                                    );
+                                  })()}
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setIsLinkGenerated(false);
+                                    setCompareIds([
+                                      selectedCell.data.sample_id,
+                                    ]);
+                                  }}
+                                  style={{
+                                    fontSize: "0.58rem",
+                                    color: "#ef4444",
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    fontWeight: "700",
+                                  }}
+                                >
+                                  Change Selected Reports
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* {selectedCell.data.status?.toLowerCase() !== "normal" && ( */}
+                  <div
+                    style={{
+                      padding: "10px",
+                      borderTop: "1px solid #e2e8f0",
+                      backgroundColor: "#fff",
+                      flexShrink: 0,
+                      zIndex: 10,
+                    }}
+                  >
+                    <div
+                      style={{ display: "flex", gap: "10px", width: "100%" }}
+                    >
+                      {/* --- BUTTON 1: STATUS BUTTON (CLOSE / PENDING / CLOSED) --- */}
+                      <button
+                        // 1. Disable if resolved, awaiting approval, or submitting
+                        disabled={
+                          selectedCell.data.is_resolved ||
+                          selectedCell.data.is_approval_pending ||
+                          isSubmittingClose
+                        }
+                        // 2. Only allow opening the modal if it's not already resolved or pending
+                        onClick={() => {
+                          if (
+                            !selectedCell.data.is_resolved &&
+                            !selectedCell.data.is_approval_pending
+                          ) {
+                            setIsCloseModalOpen(true);
+                          }
+                        }}
+                        style={{
+                          // ðŸ”¥ UPDATED: 50% width if Reopen button is present, otherwise 100%
+                          flex:
+                            selectedCell.data.is_resolved && amIShore ? 1 : 1,
+                          width:
+                            selectedCell.data.is_resolved && amIShore
+                              ? "50%"
+                              : "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "8px",
+                          padding: "12px",
+                          borderRadius: "8px",
+
+                          // 3. Dynamic Background Color (Preserved)
+                          backgroundColor: selectedCell.data.is_resolved
+                            ? "#94a3b8"
+                            : selectedCell.data.is_approval_pending
+                              ? "#f59e0b"
+                              : "#059669",
+
+                          color: "white",
+                          fontSize: "0.75rem",
+                          fontWeight: "800",
+                          border: "none",
+                          flexShrink: 0,
+
+                          // 4. Dynamic Cursor (Preserved)
+                          cursor:
+                            selectedCell.data.is_resolved ||
+                            selectedCell.data.is_approval_pending
+                              ? "not-allowed"
+                              : "pointer",
+
+                          boxShadow: "0 -2px 10px rgba(0,0,0,0.05)",
+
+                          // 5. Visual feedback (Preserved)
+                          opacity:
+                            selectedCell.data.is_resolved ||
+                            selectedCell.data.is_approval_pending
+                              ? 0.8
+                              : 1,
+                          transition: "all 0.3s ease",
+                        }}
+                      >
+                        {/* 6. Dynamic Icon & Text Logic (Preserved) */}
+                        {selectedCell.data.is_resolved ? (
+                          <>
+                            <CheckCircle size={16} />
+                            CLOSED
+                          </>
+                        ) : selectedCell.data.is_approval_pending ? (
+                          <>
+                            <Clock size={16} />
+                            PENDING APPROVAL
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle size={16} />
+                            CLOSE
+                          </>
+                        )}
+                      </button>
+
+                      {/* --- BUTTON 2: REOPEN BUTTON (ONLY FOR SHORE WHEN CLOSED) --- */}
+                      {selectedCell.data.is_resolved && amIShore && (
+                        <button
+                          onClick={handleReopenIssue}
+                          disabled={isSubmittingClose}
+                          style={{
+                            flex: 1,
+                            width: "50%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "8px",
+                            padding: "12px",
+                            borderRadius: "8px",
+                            backgroundColor: "#2563eb", // Blue color for Reopen
+                            color: "white",
+                            fontSize: "0.75rem",
+                            fontWeight: "800",
+                            border: "none",
+                            cursor: isSubmittingClose
+                              ? "not-allowed"
+                              : "pointer",
+                            boxShadow: "0 4px 6px rgba(37, 99, 235, 0.2)",
+                            transition: "all 0.3s ease",
+                          }}
+                        >
+                          <History size={16} />
+                          REOPEN ISSUE
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                {/* )} */}
+              </div>
+
+              {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            PANEL 2 â€” PDF REPORT  (flex: 1.8)
+        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+              <div
+                style={{
+                  flex: isReportCollapsed ? "0 0 45px" : 1.8,
+                  display: "flex",
+                  flexDirection: "column",
+                  borderRight: "1px solid #e2e8f0",
+                  backgroundColor: "#f1f5f9",
+                  overflow: "hidden",
+                  transition: "flex 0.3s ease",
+                }}
+              >
+                {/* Panel Header */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "7px 16px",
+                    borderBottom: "1px solid #e2e8f0",
+                    backgroundColor: "#fff",
+                    flexShrink: 0,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setIsReportCollapsed(!isReportCollapsed)}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <FileText size={16} color="#2563eb" />
+                    {!isReportCollapsed && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "0.85rem",
+                            fontWeight: "700",
+                            color: "#334155",
+                          }}
+                        >
+                          Analysis Report
+                        </span>
+                        {/* {selectedCell.data.pdf_page_index !== undefined && (
                     <span style={{ padding: "2px 8px", backgroundColor: "#eff6ff", borderRadius: "4px", color: "#2563eb", fontSize: "0.68rem", fontWeight: "800" }}>
                       PAGE {selectedCell.data.pdf_page_index + 1}
                     </span>
                   )} */}
-                                            </div>
-                                        )}
-                                    </div>
-                                    {isReportCollapsed ? (
-                                        <ChevronDown size={16} color="#64748b" />
-                                    ) : (
-                                        <ChevronUp size={16} color="#64748b" />
-                                    )}
-                                </div>
-
-                                {/* Panel Body */}
-                                {!isReportCollapsed && (
-                                    <>
-                                        {/* RESAMPLING VIEW (takes over PDF panel when active) */}
-                                        {rightPanelMode === "resampling_view" ? (
-                                            <div
-                                                style={{
-                                                    flex: 1,
-                                                    display: "flex",
-                                                    flexDirection: "row",
-                                                    backgroundColor: "#e2e8f0",
-                                                    gap: "3px",
-                                                    overflow: "hidden",
-                                                }}
-                                            >
-                                                {/* Left: The report originally opened in the modal (September in your example) */}
-                                                <div
-                                                    style={{
-                                                        flex: 1,
-                                                        display: "flex",
-                                                        flexDirection: "column",
-                                                        backgroundColor: "white",
-                                                    }}
-                                                >
-                                                    <div
-                                                        style={{
-                                                            padding: "7px 14px",
-                                                            backgroundColor: "#f8fafc",
-                                                            borderBottom: "2px solid #2563eb",
-                                                            display: "flex",
-                                                            justifyContent: "space-between",
-                                                            alignItems: "center",
-                                                        }}
-                                                    >
-                                                        <span
-                                                            style={{
-                                                                fontSize: "0.72rem",
-                                                                fontWeight: "800",
-                                                                color: "#2563eb",
-                                                            }}
-                                                        >
-                                                            {/* ðŸ”¥ FIXED: Use .date instead of .last_sample to show the specific dot's date */}
-                                                            OPENED:{" "}
-                                                            {selectedCell.data.date ||
-                                                                selectedCell.data.sample_date}
-                                                        </span>
-                                                        <span
-                                                            style={{
-                                                                fontSize: "0.58rem",
-                                                                color: "#64748b",
-                                                                fontWeight: "600",
-                                                            }}
-                                                        >
-                                                            Extracted Page
-                                                        </span>
-                                                    </div>
-                                                    <iframe
-                                                        src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
-                                                        style={{ width: "100%", flex: 1, border: "none" }}
-                                                        title="Opened View"
-                                                    />
-                                                </div>
-
-                                                {/* Right: The future resampling report selected from the list (November in your example) */}
-                                                {(() => {
-                                                    const targetId = compareIds.find(
-                                                        (id) => id !== selectedCell.data.sample_id,
-                                                    );
-                                                    // Find the specific date for the targetId from the history array
-                                                    const targetSample = selectedCell.data.history?.find(
-                                                        (h) => h.sample_id === targetId,
-                                                    );
-                                                    const targetDate =
-                                                        targetSample?.date || "Newer Report";
-
-                                                    return (
-                                                        <div
-                                                            style={{
-                                                                flex: 1,
-                                                                display: "flex",
-                                                                flexDirection: "column",
-                                                                backgroundColor: "white",
-                                                            }}
-                                                        >
-                                                            <div
-                                                                style={{
-                                                                    padding: "7px 14px",
-                                                                    backgroundColor: "#f8fafc",
-                                                                    borderBottom: "2px solid #64748b",
-                                                                    display: "flex",
-                                                                    justifyContent: "space-between",
-                                                                    alignItems: "center",
-                                                                }}
-                                                            >
-                                                                <span
-                                                                    style={{
-                                                                        fontSize: "0.72rem",
-                                                                        fontWeight: "800",
-                                                                        color: "#1e293b",
-                                                                    }}
-                                                                >
-                                                                    {/* ðŸ”¥ FIXED: Changed label to SUBSEQUENT since it's a future report */}
-                                                                    SUBSEQUENT: {targetDate}
-                                                                </span>
-                                                                <span
-                                                                    style={{
-                                                                        fontSize: "0.58rem",
-                                                                        color: "#64748b",
-                                                                        fontWeight: "600",
-                                                                    }}
-                                                                >
-                                                                    Extracted Page
-                                                                </span>
-                                                            </div>
-                                                            <iframe
-                                                                src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
-                                                                style={{ width: "100%", flex: 1, border: "none" }}
-                                                                title="Future View"
-                                                            />
-                                                        </div>
-                                                    );
-                                                })()}
-                                            </div>
-                                        ) : selectedCell.data.report_url ? (
-                                            <iframe
-                                                src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
-                                                style={{ width: "100%", flex: 1, border: "none" }}
-                                                title="Original Report"
-                                            />
-                                        ) : (
-                                            <div
-                                                style={{
-                                                    flex: 1,
-                                                    display: "flex",
-                                                    flexDirection: "column",
-                                                    alignItems: "center",
-                                                    justifyContent: "center",
-                                                    color: "#94a3b8",
-                                                    gap: "12px",
-                                                }}
-                                            >
-                                                <FileText size={40} style={{ opacity: 0.2 }} />
-                                                <p style={{ margin: 0, fontSize: "0.9rem" }}>
-                                                    No PDF report available for this sample.
-                                                </p>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-
-                            {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-            PANEL 3 â€” COMMUNICATION  (flex: 1.2)
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-                            <div
-                                style={{
-                                    flex: isCommCollapsed ? "0 0 45px" : 1.2,
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    backgroundColor: "white",
-                                    overflow: "hidden",
-                                    transition: "flex 0.3s ease",
-                                }}
-                            >
-                                {/* Panel Header */}
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        padding: "10px 16px",
-                                        borderBottom: "1px solid #f1f5f9",
-                                        backgroundColor: "#f8fafc",
-                                        flexShrink: 0,
-                                        cursor: "pointer",
-                                    }}
-                                    onClick={() => setIsCommCollapsed(!isCommCollapsed)}
-                                >
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "8px",
-                                        }}
-                                    >
-                                        <MessageSquareText size={16} color="#2563eb" />
-                                        {!isCommCollapsed && (
-                                            <span
-                                                style={{
-                                                    fontSize: "0.85rem",
-                                                    fontWeight: "700",
-                                                    color: "#334155",
-                                                }}
-                                            >
-                                                Communication
-                                            </span>
-                                        )}
-                                    </div>
-                                    {isCommCollapsed ? (
-                                        <ChevronDown size={16} color="#64748b" />
-                                    ) : (
-                                        <ChevronUp size={16} color="#64748b" />
-                                    )}
-                                </div>
-
-                                {/* Panel Body â€” the full chat UI */}
-                                {!isCommCollapsed &&
-                                    (() => {
-                                        const userData = user?.user || user;
-                                        const userAccess = (
-                                            userData?.access_type ||
-                                            userData?.accessType ||
-                                            ""
-                                        ).toUpperCase();
-                                        const userRole = (userData?.role || "").toUpperCase();
-
-                                        const amIShore =
-                                            userAccess === "SHORE" ||
-                                            userRole === "ADMIN" ||
-                                            userRole === "SUPERUSER" ||
-                                            userRole === "SHORE" ||
-                                            userRole === "SUPERINTENDENT";
-
-                                        // Input change handler
-                                        const handleInputChange = async (val) => {
-                                            if (chatMode === "internal") {
-                                                setInternalDraft(val);
-                                            } else {
-                                                if (amIShore) {
-                                                    setRemarksData((prev) => ({ ...prev, office: val }));
-                                                } else {
-                                                    setRemarksData((prev) => ({ ...prev, officer: val }));
-                                                }
-                                            }
-                                            const parts = val.split(/[\s\n]/);
-                                            const lastWord = parts[parts.length - 1];
-                                            if (lastWord.startsWith("@")) {
-                                                const query = lastWord.slice(1).toLowerCase();
-                                                setMentionFilter(query);
-                                                try {
-                                                    const users = (await axiosLub.get(`/api/luboil/mentions/${selectedCell.data.imo}?chat_mode=${chatMode}`)).data;
-                                                    setMentionList(users);
-                                                    setShowMentionDropdown(true);
-                                                } catch (err) {
-                                                    console.error("Failed to fetch mentions", err);
-                                                }
-                                            } else {
-                                                setShowMentionDropdown(false);
-                                            }
-                                        };
-
-                                        const applyMention = (targetName) => {
-                                            const currentVal =
-                                                chatMode === "internal"
-                                                    ? internalDraft
-                                                    : amIShore
-                                                        ? remarksData.office
-                                                        : remarksData.officer;
-                                            const parts = currentVal.split(/[\s\n]/);
-                                            parts.pop();
-                                            const newVal = [...parts, `@${targetName} `].join(" ");
-                                            if (chatMode === "internal") {
-                                                setInternalDraft(newVal);
-                                            } else {
-                                                setRemarksData((prev) => ({
-                                                    ...prev,
-                                                    [amIShore ? "office" : "officer"]: newVal,
-                                                }));
-                                            }
-                                            setTimeout(() => chatInputRef.current?.focus(), 0);
-                                            setShowMentionDropdown(false);
-                                        };
-
-                                        return (
-                                            <div
-                                                style={{
-                                                    display: "flex",
-                                                    flexDirection: "column",
-                                                    flex: 1,
-                                                    overflow: "hidden",
-                                                    backgroundColor:
-                                                        chatMode === "internal" ? "#f0f9ff" : "#efeae2",
-                                                    transition: "background-color 0.3s ease",
-                                                    position: "relative",
-                                                }}
-                                            >
-                                                {/* CHAT MODE TOGGLE (shore only) */}
-                                                {amIShore && (
-                                                    <div
-                                                        style={{
-                                                            display: "flex",
-                                                            justifyContent: "center",
-                                                            padding: "8px",
-                                                            background: "rgba(255,255,255,0.5)",
-                                                            borderBottom: "1px solid #cbd5e1",
-                                                            gap: "6px",
-                                                            flexShrink: 0,
-                                                        }}
-                                                    >
-                                                        <button
-                                                            onClick={() => {
-                                                                setChatMode("external");
-                                                                setShowMentionDropdown(false);
-                                                            }}
-                                                            style={{
-                                                                padding: "4px 16px",
-                                                                borderRadius: "20px",
-                                                                border: "none",
-                                                                fontSize: "10px",
-                                                                fontWeight: "800",
-                                                                cursor: "pointer",
-                                                                background:
-                                                                    chatMode === "external" ? "#f97316" : "#fff",
-                                                                color:
-                                                                    chatMode === "external" ? "white" : "#64748b",
-                                                                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                                                                transition: "all 0.2s",
-                                                            }}
-                                                        >
-                                                            EXTERNAL CHAT
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                setChatMode("internal");
-                                                                setShowMentionDropdown(false);
-                                                            }}
-                                                            style={{
-                                                                padding: "4px 16px",
-                                                                borderRadius: "20px",
-                                                                border: "none",
-                                                                fontSize: "10px",
-                                                                fontWeight: "800",
-                                                                cursor: "pointer",
-                                                                background:
-                                                                    chatMode === "internal" ? "#3b82f6" : "#fff",
-                                                                color:
-                                                                    chatMode === "internal" ? "white" : "#64748b",
-                                                                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                                                                transition: "all 0.2s",
-                                                            }}
-                                                        >
-                                                            INTERNAL CHAT
-                                                        </button>
-                                                    </div>
-                                                )}
-
-                                                {/* â”€â”€ MESSAGES AREA (flex: 1, scrollable) â”€â”€ */}
-                                                <div
-                                                    style={{
-                                                        flex: 1,
-                                                        overflowY: "auto",
-                                                        padding: "12px",
-                                                        display: "flex",
-                                                        flexDirection: "column",
-                                                        gap: "6px",
-                                                    }}
-                                                >
-                                                    {selectedCell.data.conversation
-                                                        ?.filter((msg) =>
-                                                            chatMode === "internal"
-                                                                ? msg.is_internal === true
-                                                                : msg.is_internal !== true,
-                                                        )
-                                                        .map((msg, idx) => {
-                                                            const isSystem = msg.role === "System";
-                                                            const isFileAttachment =
-                                                                msg.message.includes("ATTACHED_IMAGE:") ||
-                                                                msg.message.includes("ATTACHED_PDF:");
-                                                            if (isFileAttachment) return null;
-
-                                                            const msgUserData = user?.user || user;
-                                                            const uAccess = (
-                                                                msgUserData?.access_type ||
-                                                                msgUserData?.accessType ||
-                                                                ""
-                                                            ).toUpperCase();
-                                                            const uRole = (
-                                                                msgUserData?.role || ""
-                                                            ).toUpperCase();
-                                                            const amIShoreMsg =
-                                                                uAccess === "SHORE" ||
-                                                                uRole === "ADMIN" ||
-                                                                uRole === "SUPERUSER" ||
-                                                                uRole === "SHORE" ||
-                                                                uRole === "SUPERINTENDENT";
-
-                                                            // Centered System Log
-                                                            if (isSystem)
-                                                                return (
-                                                                    <div
-                                                                        key={idx}
-                                                                        style={{
-                                                                            textAlign: "center",
-                                                                            margin: "10px 0",
-                                                                        }}
-                                                                    >
-                                                                        <span
-                                                                            style={{
-                                                                                backgroundColor: "#f1f5f9",
-                                                                                fontSize: "0.68rem",
-                                                                                padding: "3px 10px",
-                                                                                borderRadius: "10px",
-                                                                                color: "#64748b",
-                                                                                border: "1px solid #e2e8f0",
-                                                                                fontWeight: "400",
-                                                                            }}
-                                                                        >
-                                                                            <span
-                                                                                dangerouslySetInnerHTML={{
-                                                                                    __html: msg.message,
-                                                                                }}
-                                                                            />{" "}
-                                                                            {msg.date}
-                                                                        </span>
-                                                                    </div>
-                                                                );
-
-                                                            // Extract sender name and clean body
-                                                            let senderNameInMsg = msg.role;
-                                                            let cleanBody = msg.message;
-                                                            if (msg.message.includes(": ")) {
-                                                                const splitPoint = msg.message.indexOf(": ");
-                                                                senderNameInMsg = msg.message
-                                                                    .substring(0, splitPoint)
-                                                                    .trim();
-                                                                cleanBody = msg.message.substring(
-                                                                    splitPoint + 2,
-                                                                );
-                                                            }
-
-                                                            const isMe =
-                                                                senderNameInMsg.toLowerCase() ===
-                                                                user?.full_name?.toLowerCase();
-
-                                                            // Full-name mention highlighter
-                                                            const renderVerifiedMessage = (text) => {
-                                                                // 1. Guard clause
-                                                                if (!text)
-                                                                    return (
-                                                                        <span style={{ fontWeight: "400" }}>
-                                                                            {text}
-                                                                        </span>
-                                                                    );
-
-                                                                // THE FIX: Get your own name from the auth state
-                                                                const myName =
-                                                                    user?.full_name || "";
-
-                                                                // Create a combined list: the API mention list + your own name
-                                                                const allNamesToHighlight = [
-                                                                    ...(mentionList || []),
-                                                                ];
-
-                                                                // If your name isn't already in the list, add it so @YourName turns blue too
-                                                                if (
-                                                                    myName &&
-                                                                    !allNamesToHighlight.some(
-                                                                        (u) =>
-                                                                            u.full_name?.toLowerCase() ===
-                                                                            myName.toLowerCase(),
-                                                                    )
-                                                                ) {
-                                                                    allNamesToHighlight.push({ full_name: myName });
-                                                                }
-
-                                                                // If no names are found to highlight, return plain text
-                                                                if (allNamesToHighlight.length === 0) {
-                                                                    return (
-                                                                        <span style={{ fontWeight: "400" }}>
-                                                                            {text}
-                                                                        </span>
-                                                                    );
-                                                                }
-
-                                                                // 2. Sort users by name length to prevent partial matches (e.g., "Gokul D" before "Gokul")
-                                                                const sortedUsers = allNamesToHighlight.sort(
-                                                                    (a, b) => (b.full_name || b.name || "").length - (a.full_name || a.name || "").length,
-                                                                );
-
-                                                                let contentParts = [text];
-
-                                                                sortedUsers.forEach((targetUser) => {
-                                                                    const userName = targetUser.full_name || targetUser.name || "";
-                                                                    // Escapes special characters and ensures boundary checks
-                                                                    const pattern = new RegExp(
-                                                                        `(@${userName.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&")})(?=[\\s\\n.,!?;:]|$)`,
-                                                                        "gi",
-                                                                    );
-
-                                                                    let nextParts = [];
-                                                                    contentParts.forEach((part) => {
-                                                                        if (typeof part !== "string") {
-                                                                            nextParts.push(part);
-                                                                            return;
-                                                                        }
-
-                                                                        const splitArr = part.split(pattern);
-                                                                        splitArr.forEach((sub) => {
-                                                                            // Case-insensitive check to see if the part is the mention
-                                                                            if (
-                                                                                sub.toLowerCase() ===
-                                                                                `@${userName}`.toLowerCase()
-                                                                            ) {
-                                                                                nextParts.push(
-                                                                                    <span
-                                                                                        key={`${userName}-${Math.random()}`}
-                                                                                        style={{
-                                                                                            fontWeight: "600",
-                                                                                            color: "#00a5f4", // âœ¨ EXACT WHATSAPP MENTION BLUE
-                                                                                            display: "inline",
-                                                                                            pointerEvents: "none", // Keeps bubble clickable while maintaining color
-                                                                                        }}
-                                                                                    >
-                                                                                        {sub}
-                                                                                    </span>,
-                                                                                );
-                                                                            } else if (sub !== "") {
-                                                                                nextParts.push(sub);
-                                                                            }
-                                                                        });
-                                                                    });
-                                                                    contentParts = nextParts;
-                                                                });
-
-                                                                return contentParts.map((p, i) =>
-                                                                    typeof p === "string" ? (
-                                                                        <span key={i} style={{ fontWeight: "400" }}>
-                                                                            {p}
-                                                                        </span>
-                                                                    ) : (
-                                                                        p
-                                                                    ),
-                                                                );
-                                                            };
-                                                            return (
-                                                                <div
-                                                                    key={idx}
-                                                                    style={{
-                                                                        display: "flex",
-                                                                        justifyContent: isMe
-                                                                            ? "flex-end"
-                                                                            : "flex-start",
-                                                                        marginBottom: "2px",
-                                                                    }}
-                                                                >
-                                                                    <div
-                                                                        style={{
-                                                                            minWidth: "120px",
-                                                                            maxWidth: "80%",
-                                                                            // WhatsApp Style: Light Green for 'Me', White for others
-                                                                            backgroundColor: isMe
-                                                                                ? "#dcf8c6"
-                                                                                : "#ffffff",
-                                                                            borderRadius: "10px",
-                                                                            padding: "6px 10px",
-                                                                            boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
-                                                                            // Added a subtle border for the green bubble to look professional
-                                                                            border: isMe
-                                                                                ? "1px solid #cde6b9"
-                                                                                : "1px solid #e2e8f0",
-                                                                            display: "flex",
-                                                                            flexDirection: "column",
-                                                                        }}
-                                                                    >
-                                                                        {/* Header: name | role */}
-                                                                        <div
-                                                                            style={{
-                                                                                display: "flex",
-                                                                                justifyContent: "space-between",
-                                                                                alignItems: "center",
-                                                                                marginBottom: "3px",
-                                                                                gap: "10px",
-                                                                            }}
-                                                                        >
-                                                                            <span
-                                                                                style={{
-                                                                                    fontSize: "0.7rem",
-                                                                                    fontWeight: "800",
-                                                                                    // Dark Teal for 'Me' names (WhatsApp style), Dark Gray for others
-                                                                                    color: isMe ? "#080808" : "#1e293b",
-                                                                                }}
-                                                                            >
-                                                                                {senderNameInMsg}
-                                                                            </span>
-                                                                            <span
-                                                                                style={{
-                                                                                    fontSize: "0.58rem",
-                                                                                    fontWeight: "700",
-                                                                                    textTransform: "uppercase",
-                                                                                    // Darker green-gray for 'Me' role, standard colors for others
-                                                                                    color: isMe
-                                                                                        ? "#4c4d4c"
-                                                                                        : msg.role === "Office"
-                                                                                            ? "#4c4d4c"
-                                                                                            : "#d97706",
-                                                                                }}
-                                                                            >
-                                                                                {msg.role === "Office"
-                                                                                    ? "Office"
-                                                                                    : "Vessel"}
-                                                                            </span>
-                                                                        </div>
-
-                                                                        {/* Body */}
-                                                                        <div
-                                                                            style={{
-                                                                                fontSize: "0.82rem",
-                                                                                // Always use dark text for readability on light backgrounds
-                                                                                color: "#111b21",
-                                                                                whiteSpace: "pre-wrap",
-                                                                                lineHeight: "1.35",
-                                                                            }}
-                                                                        >
-                                                                            {renderVerifiedMessage(cleanBody)}
-                                                                        </div>
-
-                                                                        {/* Footer: timestamp */}
-                                                                        <div
-                                                                            style={{
-                                                                                textAlign: "right",
-                                                                                marginTop: "2px",
-                                                                            }}
-                                                                        >
-                                                                            <span
-                                                                                style={{
-                                                                                    fontSize: "0.58rem",
-                                                                                    // WhatsApp-style gray for timestamp
-                                                                                    color: isMe ? "#667781" : "#94a3b8",
-                                                                                    fontWeight: "500",
-                                                                                }}
-                                                                            >
-                                                                                {msg.date}
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    <div ref={chatEndRef} />
-                                                </div>
-
-                                                {/* â”€â”€ QUICK ACTIONS FOOTER (always pinned, never pushed up) â”€â”€ */}
-                                                <div
-                                                    style={{
-                                                        flexShrink: 0,
-                                                        backgroundColor: "#f8fafc",
-                                                        borderTop: "1px solid #e2e8f0",
-                                                        padding: "10px 14px",
-                                                        position: "relative",
-                                                    }}
-                                                >
-                                                    {/* 1. APPROVAL CARD - Original logic preserved exactly */}
-                                                    {selectedCell.data.is_approval_pending &&
-                                                        amIShore &&
-                                                        !selectedCell.data.is_resolved && (
-                                                            <div
-                                                                style={{
-                                                                    backgroundColor: "#fffbeb", // Warning Yellow
-                                                                    border: "1px solid #fde68a",
-                                                                    borderRadius: "10px",
-                                                                    padding: "12px",
-                                                                    marginBottom: "12px",
-                                                                    boxShadow:
-                                                                        "0 4px 6px -1px rgba(0, 0, 0, 0.05)",
-                                                                    animation: "fadeIn 0.3s ease",
-                                                                }}
-                                                            >
-                                                                <div
-                                                                    style={{
-                                                                        display: "flex",
-                                                                        alignItems: "center",
-                                                                        gap: "8px",
-                                                                        marginBottom: "8px",
-                                                                    }}
-                                                                >
-                                                                    <Clock size={16} color="#d97706" />
-                                                                    <span
-                                                                        style={{
-                                                                            fontSize: "0.75rem",
-                                                                            fontWeight: "800",
-                                                                            color: "#92400e",
-                                                                            textTransform: "uppercase",
-                                                                        }}
-                                                                    >
-                                                                        Resolution Awaiting Approval
-                                                                    </span>
-                                                                </div>
-
-                                                                <div
-                                                                    style={{
-                                                                        fontSize: "0.8rem",
-                                                                        color: "#451a03",
-                                                                        backgroundColor: "rgba(255,255,255,0.5)",
-                                                                        padding: "8px",
-                                                                        borderRadius: "6px",
-                                                                        marginBottom: "10px",
-                                                                        borderLeft: "3px solid #f59e0b",
-                                                                        fontStyle: "italic",
-                                                                    }}
-                                                                >
-                                                                    "{selectedCell.data.resolution_remarks}"
-                                                                </div>
-
-                                                                <div style={{ display: "flex", gap: "8px" }}>
-                                                                    <button
-                                                                        onClick={() =>
-                                                                            handleShoreApproval("ACCEPT")
-                                                                        }
-                                                                        disabled={isSubmittingClose}
-                                                                        style={{
-                                                                            flex: 1,
-                                                                            backgroundColor: "#10b981",
-                                                                            color: "white",
-                                                                            border: "none",
-                                                                            borderRadius: "6px",
-                                                                            padding: "8px",
-                                                                            fontSize: "0.7rem",
-                                                                            fontWeight: "700",
-                                                                            cursor: "pointer",
-                                                                            display: "flex",
-                                                                            alignItems: "center",
-                                                                            justifyContent: "center",
-                                                                            gap: "4px",
-                                                                        }}
-                                                                    >
-                                                                        <CheckCircle size={14} /> ACCEPT
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() =>
-                                                                            handleShoreApproval("DECLINE")
-                                                                        }
-                                                                        disabled={isSubmittingClose}
-                                                                        style={{
-                                                                            flex: 1,
-                                                                            backgroundColor: "#ef4444",
-                                                                            color: "white",
-                                                                            border: "none",
-                                                                            borderRadius: "6px",
-                                                                            padding: "8px",
-                                                                            fontSize: "0.7rem",
-                                                                            fontWeight: "700",
-                                                                            cursor: "pointer",
-                                                                            display: "flex",
-                                                                            alignItems: "center",
-                                                                            justifyContent: "center",
-                                                                            gap: "4px",
-                                                                        }}
-                                                                    >
-                                                                        <X size={14} /> DECLINE
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        )}
-
-                                                    {/* ðŸ”¥ GATING LOGIC: If resolved, show Locked UI. If not resolved, show original chat UI */}
-                                                    {selectedCell.data.is_resolved ? (
-                                                        <div
-                                                            style={{
-                                                                textAlign: "center",
-                                                                padding: "12px",
-                                                                backgroundColor: "#f1f5f9",
-                                                                borderRadius: "10px",
-                                                                border: "1px dashed #cbd5e1",
-                                                                color: "#64748b",
-                                                                display: "flex",
-                                                                flexDirection: "column",
-                                                                alignItems: "center",
-                                                                gap: "4px",
-                                                            }}
-                                                        >
-                                                            <X size={18} style={{ opacity: 0.5 }} />
-                                                            <span
-                                                                style={{
-                                                                    fontSize: "0.75rem",
-                                                                    fontWeight: "800",
-                                                                    color: "#475569",
-                                                                }}
-                                                            >
-                                                                COMMUNICATION LOCKED
-                                                            </span>
-                                                            <span style={{ fontSize: "0.65rem" }}>
-                                                                This issue is closed.{" "}
-                                                                {amIShore
-                                                                    ? "Use REOPEN button below to enable chat."
-                                                                    : "Only Shore staff can reopen this issue."}
-                                                            </span>
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            {/* Mention dropdown - Original preserved */}
-                                                            {showMentionDropdown &&
-                                                                mentionList.length > 0 && (
-                                                                    <div
-                                                                        style={{
-                                                                            position: "absolute",
-                                                                            bottom: "100%",
-                                                                            left: "14px",
-                                                                            width: "260px",
-                                                                            maxHeight: "180px",
-                                                                            backgroundColor: "white",
-                                                                            borderRadius: "10px",
-                                                                            boxShadow: "0 -4px 20px rgba(0,0,0,0.15)",
-                                                                            border: "1px solid #e2e8f0",
-                                                                            overflowY: "auto",
-                                                                            zIndex: 1000,
-                                                                            marginBottom: "8px",
-                                                                        }}
-                                                                    >
-                                                                        <div
-                                                                            style={{
-                                                                                padding: "6px 10px",
-                                                                                fontSize: "9px",
-                                                                                fontWeight: "800",
-                                                                                color: "#94a3b8",
-                                                                                borderBottom: "1px solid #f1f5f9",
-                                                                                position: "sticky",
-                                                                                top: 0,
-                                                                                backgroundColor: "white",
-                                                                            }}
-                                                                        >
-                                                                            ASSIGNED TO THIS VESSEL
-                                                                        </div>
-                                                                        {mentionList
-                                                                            .filter((u) =>
-                                                                                u.full_name?.toLowerCase()
-                                                                                    .includes(mentionFilter),
-                                                                            )
-                                                                            .map((u, i) => (
-                                                                                <div
-                                                                                    key={i}
-                                                                                    onClick={() => applyMention(u.full_name)}
-                                                                                    style={{
-                                                                                        padding: "8px 14px",
-                                                                                        cursor: "pointer",
-                                                                                        borderBottom: "1px solid #f8fafc",
-                                                                                        display: "flex",
-                                                                                        flexDirection: "column",
-                                                                                    }}
-                                                                                >
-                                                                                    <span
-                                                                                        style={{
-                                                                                            fontSize: "0.82rem",
-                                                                                            fontWeight: "700",
-                                                                                            color: "#1e293b",
-                                                                                        }}
-                                                                                    >
-                                                                                        {u.full_name}
-                                                                                    </span>
-                                                                                    <span
-                                                                                        style={{
-                                                                                            fontSize: "0.68rem",
-                                                                                            color: "#64748b",
-                                                                                        }}
-                                                                                    >
-                                                                                        {u.job_title || "User"} {" "}
-                                                                                        {u.role}
-                                                                                    </span>
-                                                                                </div>
-                                                                            ))}
-                                                                    </div>
-                                                                )}
-
-                                                            {chatMode === "internal" && (
-                                                                <div
-                                                                    style={{
-                                                                        marginBottom: "6px",
-                                                                        fontSize: "10px",
-                                                                        color: "#3b82f6",
-                                                                        fontWeight: "800",
-                                                                    }}
-                                                                >
-                                                                     INTERNAL NOTE (SHORE ONLY)
-                                                                </div>
-                                                            )}
-
-                                                            {/* Input row - Original preserved */}
-                                                            <div
-                                                                style={{
-                                                                    backgroundColor: "#1e293b",
-                                                                    borderRadius: "10px",
-                                                                    display: "flex",
-                                                                    alignItems: "center",
-                                                                    padding: "5px 12px",
-                                                                    gap: "10px",
-                                                                    border:
-                                                                        chatMode === "internal"
-                                                                            ? "2px solid #3b82f6"
-                                                                            : "none",
-                                                                }}
-                                                            >
-                                                                <textarea
-                                                                    ref={chatInputRef}
-                                                                    value={
-                                                                        chatMode === "internal"
-                                                                            ? internalDraft
-                                                                            : amIShore
-                                                                                ? remarksData.office
-                                                                                : remarksData.officer
-                                                                    }
-                                                                    onChange={(e) =>
-                                                                        handleInputChange(e.target.value)
-                                                                    }
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === "Enter" && !e.shiftKey) {
-                                                                            if (
-                                                                                showMentionDropdown &&
-                                                                                mentionList.length > 0
-                                                                            ) {
-                                                                                const filtered = mentionList.filter(
-                                                                                    (u) =>
-                                                                                        u.full_name
-                                                                                            .toLowerCase()
-                                                                                            .includes(mentionFilter),
-                                                                                );
-                                                                                if (filtered.length > 0) {
-                                                                                    e.preventDefault();
-                                                                                    applyMention(filtered[0].full_name);
-                                                                                }
-                                                                            } else {
-                                                                                e.preventDefault();
-                                                                                handleSendMessage();
-                                                                            }
-                                                                        }
-                                                                        if (e.key === "Escape")
-                                                                            setShowMentionDropdown(false);
-                                                                    }}
-                                                                    placeholder={
-                                                                        chatMode === "internal"
-                                                                            ? "Type an internal note..."
-                                                                            : "Type a message..."
-                                                                    }
-                                                                    style={{
-                                                                        flex: 1,
-                                                                        backgroundColor: "transparent",
-                                                                        border: "none",
-                                                                        color: "white",
-                                                                        outline: "none",
-                                                                        resize: "none",
-                                                                        minHeight: "28px",
-                                                                        maxHeight: "120px",
-                                                                        fontFamily: "inherit",
-                                                                        fontSize: "0.9rem",
-                                                                    }}
-                                                                />
-                                                                <button
-                                                                    onClick={handleSendMessage}
-                                                                    style={{
-                                                                        backgroundColor:
-                                                                            chatMode === "internal"
-                                                                                ? "#3b82f6"
-                                                                                : "#2563eb",
-                                                                        color: "white",
-                                                                        border: "none",
-                                                                        borderRadius: "8px",
-                                                                        padding: "6px",
-                                                                        cursor: "pointer",
-                                                                        display: "flex",
-                                                                        alignItems: "center",
-                                                                        justifyContent: "center",
-                                                                        flexShrink: 0,
-                                                                    }}
-                                                                >
-                                                                    <SendHorizontal
-                                                                        size={18}
-                                                                        color="white"
-                                                                        strokeWidth={2.5}
-                                                                    />
-                                                                </button>
-                                                            </div>
-
-                                                            {/* Footer meta row - Original preserved */}
-                                                            <div
-                                                                style={{
-                                                                    marginTop: "6px",
-                                                                    display: "flex",
-                                                                    justifyContent: "space-between",
-                                                                    color: "#94a3b8",
-                                                                    fontSize: "0.65rem",
-                                                                    fontWeight: "600",
-                                                                }}
-                                                            >
-                                                                <span>
-                                                                    ACCESSIBLE:{" "}
-                                                                    <strong
-                                                                        style={{
-                                                                            color:
-                                                                                chatMode === "internal"
-                                                                                    ? "#3b82f6"
-                                                                                    : "#64748b",
-                                                                        }}
-                                                                    >
-                                                                        {chatMode === "internal"
-                                                                            ? "INTERNAL TEAM"
-                                                                            : amIShore
-                                                                                ? "OFFICE & SHORE"
-                                                                                : "VESSEL"}
-                                                                    </strong>
-                                                                </span>
-                                                                <span>Enter to send</span>
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
-                            </div>
-                        </div>
-                        {/* â”€â”€ END THREE-PANEL ROW â”€â”€ */}
-                    </div>
-                    {/* â”€â”€ END OUTER MODAL SHELL â”€â”€ */}
+                      </div>
+                    )}
+                  </div>
+                  {isReportCollapsed ? (
+                    <ChevronDown size={16} color="#64748b" />
+                  ) : (
+                    <ChevronUp size={16} color="#64748b" />
+                  )}
                 </div>
-            )}
-            {/* ----------------- MODAL END ----------------- */}
-            {/* ----------------- VESSEL LIST MODAL ----------------- */}
-            {/* ----------------- VESSEL LIST MODAL (FULLY UPDATED) ----------------- */}
-            {listModal.isOpen && (
-                <div
-                    style={{
-                        position: "fixed",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: "rgba(15, 23, 42, 0.7)",
-                        backdropFilter: "blur(4px)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        zIndex: 10001,
-                    }}
-                >
-                    <div
+
+                {/* Panel Body */}
+                {!isReportCollapsed && (
+                  <>
+                    {/* RESAMPLING VIEW (takes over PDF panel when active) */}
+                    {rightPanelMode === "resampling_view" ? (
+                      <div
                         style={{
-                            marginTop: "60px", // Push down to avoid Top Nav Header
-                            backgroundColor: "white",
-                            width: "90%",
-                            maxWidth: "500px",
-                            borderRadius: "16px",
-                            padding: "0",
-                            overflow: "hidden",
-                            boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+                          flex: 1,
+                          display: "flex",
+                          flexDirection: "row",
+                          backgroundColor: "#e2e8f0",
+                          gap: "3px",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {/* Left: The report originally opened in the modal (September in your example) */}
+                        <div
+                          style={{
+                            flex: 1,
                             display: "flex",
                             flexDirection: "column",
-                            maxHeight: "80vh",
-                        }}
-                    >
-                        {/* Header */}
-                        <div
-                            style={{
-                                padding: "20px 24px",
-                                background: "#f8fafc",
-                                borderBottom: "1px solid #e2e8f0",
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                            }}
+                            backgroundColor: "white",
+                          }}
                         >
-                            <div>
-                                <h3
-                                    style={{
-                                        margin: 0,
-                                        fontSize: "1.1rem",
-                                        color: "#0f172a",
-                                        fontWeight: "700",
-                                    }}
-                                >
-                                    {listModal.type === "Configured"
-                                        ? "Fleet Configuration"
-                                        : listModal.type === "Warning"
-                                            ? "Action Required"
-                                            : listModal.type}{" "}
-                                    Vessels
-                                </h3>
-                                <p
-                                    style={{
-                                        margin: "2px 0 0 0",
-                                        fontSize: "0.8rem",
-                                        color: "#64748b",
-                                    }}
-                                >
-                                    {listModal.vessels.length}{" "}
-                                    {listModal.vessels.length === 1 ? "vessel" : "vessels"}{" "}
-                                    {/* ðŸ”¥ Logic change for configured label */}
-                                    {listModal.type === "Configured"
-                                        ? "in fleet overview"
-                                        : "requiring attention"}
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => setListModal({ ...listModal, isOpen: false })}
-                                style={{
-                                    border: "none",
-                                    background: "none",
-                                    cursor: "pointer",
-                                    color: "#94a3b8",
-                                    padding: "4px",
-                                }}
+                          <div
+                            style={{
+                              padding: "7px 14px",
+                              backgroundColor: "#f8fafc",
+                              borderBottom: "2px solid #2563eb",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: "0.72rem",
+                                fontWeight: "800",
+                                color: "#2563eb",
+                              }}
                             >
-                                <X size={20} />
-                            </button>
+                              {/* ðŸ”¥ FIXED: Use .date instead of .last_sample to show the specific dot's date */}
+                              OPENED:{" "}
+                              {selectedCell.data.date ||
+                                selectedCell.data.sample_date}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "0.58rem",
+                                color: "#64748b",
+                                fontWeight: "600",
+                              }}
+                            >
+                              Extracted Page
+                            </span>
+                          </div>
+                          <iframe
+                            src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                            style={{ width: "100%", flex: 1, border: "none" }}
+                            title="Opened View"
+                          />
                         </div>
 
-                        {/* List Body Area - Optimized for Scrolling 10+ items */}
-                        <div
-                            className="vessel-modal-scroll-area"
-                            style={{
-                                padding: "16px",
-                                maxHeight: "500px",
-                                overflowY: "auto",
+                        {/* Right: The future resampling report selected from the list (November in your example) */}
+                        {(() => {
+                          const targetId = compareIds.find(
+                            (id) => id !== selectedCell.data.sample_id,
+                          );
+                          // Find the specific date for the targetId from the history array
+                          const targetSample = selectedCell.data.history?.find(
+                            (h) => h.sample_id === targetId,
+                          );
+                          const targetDate =
+                            targetSample?.date || "Newer Report";
+
+                          return (
+                            <div
+                              style={{
+                                flex: 1,
                                 display: "flex",
                                 flexDirection: "column",
-                                gap: "10px",
-                                scrollbarWidth: "thin",
-                                scrollbarColor: "#cbd5e1 transparent",
+                                backgroundColor: "white",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  padding: "7px 14px",
+                                  backgroundColor: "#f8fafc",
+                                  borderBottom: "2px solid #64748b",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: "0.72rem",
+                                    fontWeight: "800",
+                                    color: "#1e293b",
+                                  }}
+                                >
+                                  {/* ðŸ”¥ FIXED: Changed label to SUBSEQUENT since it's a future report */}
+                                  SUBSEQUENT: {targetDate}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: "0.58rem",
+                                    color: "#64748b",
+                                    fontWeight: "600",
+                                  }}
+                                >
+                                  Extracted Page
+                                </span>
+                              </div>
+                              <iframe
+                                src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
+                                style={{
+                                  width: "100%",
+                                  flex: 1,
+                                  border: "none",
+                                }}
+                                title="Future View"
+                              />
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ) : selectedCell.data.report_url ? (
+                      <iframe
+                        src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                        style={{ width: "100%", flex: 1, border: "none" }}
+                        title="Original Report"
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          flex: 1,
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#94a3b8",
+                          gap: "12px",
+                        }}
+                      >
+                        <FileText size={40} style={{ opacity: 0.2 }} />
+                        <p style={{ margin: 0, fontSize: "0.9rem" }}>
+                          No PDF report available for this sample.
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            PANEL 3 â€” COMMUNICATION  (flex: 1.2)
+        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+              <div
+                style={{
+                  flex: isCommCollapsed ? "0 0 45px" : 1.2,
+                  display: "flex",
+                  flexDirection: "column",
+                  backgroundColor: "white",
+                  overflow: "hidden",
+                  transition: "flex 0.3s ease",
+                }}
+              >
+                {/* Panel Header */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 16px",
+                    borderBottom: "1px solid #f1f5f9",
+                    backgroundColor: "#f8fafc",
+                    flexShrink: 0,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setIsCommCollapsed(!isCommCollapsed)}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <MessageSquareText size={16} color="#2563eb" />
+                    {!isCommCollapsed && (
+                      <span
+                        style={{
+                          fontSize: "0.85rem",
+                          fontWeight: "700",
+                          color: "#334155",
+                        }}
+                      >
+                        Communication
+                      </span>
+                    )}
+                  </div>
+                  {isCommCollapsed ? (
+                    <ChevronDown size={16} color="#64748b" />
+                  ) : (
+                    <ChevronUp size={16} color="#64748b" />
+                  )}
+                </div>
+
+                {/* Panel Body â€” the full chat UI */}
+                {!isCommCollapsed &&
+                  (() => {
+                    const userData = user?.user || user;
+                    const userAccess = (
+                      userData?.access_type ||
+                      userData?.accessType ||
+                      ""
+                    ).toUpperCase();
+                    const userRole = (userData?.role || "").toUpperCase();
+
+                    const amIShore =
+                      userAccess === "SHORE" ||
+                      userRole === "ADMIN" ||
+                      userRole === "SUPERUSER" ||
+                      userRole === "SHORE" ||
+                      userRole === "SUPERINTENDENT";
+
+                    // Input change handler
+                    const handleInputChange = async (val) => {
+                      if (chatMode === "internal") {
+                        setInternalDraft(val);
+                      } else {
+                        if (amIShore) {
+                          setRemarksData((prev) => ({ ...prev, office: val }));
+                        } else {
+                          setRemarksData((prev) => ({ ...prev, officer: val }));
+                        }
+                      }
+                      const parts = val.split(/[\s\n]/);
+                      const lastWord = parts[parts.length - 1];
+                      if (lastWord.startsWith("@")) {
+                        const query = lastWord.slice(1).toLowerCase();
+                        setMentionFilter(query);
+                        try {
+                          const users = (
+                            await axiosLub.get(
+                              `/api/luboil/mentions/${selectedCell.data.imo}?chat_mode=${chatMode}`,
+                            )
+                          ).data;
+                          setMentionList(users);
+                          setShowMentionDropdown(true);
+                        } catch (err) {
+                          console.error("Failed to fetch mentions", err);
+                        }
+                      } else {
+                        setShowMentionDropdown(false);
+                      }
+                    };
+
+                    const applyMention = (targetName) => {
+                      const currentVal =
+                        chatMode === "internal"
+                          ? internalDraft
+                          : amIShore
+                            ? remarksData.office
+                            : remarksData.officer;
+                      const parts = currentVal.split(/[\s\n]/);
+                      parts.pop();
+                      const newVal = [...parts, `@${targetName} `].join(" ");
+                      if (chatMode === "internal") {
+                        setInternalDraft(newVal);
+                      } else {
+                        setRemarksData((prev) => ({
+                          ...prev,
+                          [amIShore ? "office" : "officer"]: newVal,
+                        }));
+                      }
+                      setTimeout(() => chatInputRef.current?.focus(), 0);
+                      setShowMentionDropdown(false);
+                    };
+
+                    return (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          flex: 1,
+                          overflow: "hidden",
+                          backgroundColor:
+                            chatMode === "internal" ? "#f0f9ff" : "#efeae2",
+                          transition: "background-color 0.3s ease",
+                          position: "relative",
+                        }}
+                      >
+                        {/* CHAT MODE TOGGLE (shore only) */}
+                        {amIShore && (
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "center",
+                              padding: "8px",
+                              background: "rgba(255,255,255,0.5)",
+                              borderBottom: "1px solid #cbd5e1",
+                              gap: "6px",
+                              flexShrink: 0,
                             }}
+                          >
+                            <button
+                              onClick={() => {
+                                setChatMode("external");
+                                setShowMentionDropdown(false);
+                              }}
+                              style={{
+                                padding: "4px 16px",
+                                borderRadius: "20px",
+                                border: "none",
+                                fontSize: "10px",
+                                fontWeight: "800",
+                                cursor: "pointer",
+                                background:
+                                  chatMode === "external" ? "#f97316" : "#fff",
+                                color:
+                                  chatMode === "external" ? "white" : "#64748b",
+                                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                                transition: "all 0.2s",
+                              }}
+                            >
+                              EXTERNAL CHAT
+                            </button>
+                            <button
+                              onClick={() => {
+                                setChatMode("internal");
+                                setShowMentionDropdown(false);
+                              }}
+                              style={{
+                                padding: "4px 16px",
+                                borderRadius: "20px",
+                                border: "none",
+                                fontSize: "10px",
+                                fontWeight: "800",
+                                cursor: "pointer",
+                                background:
+                                  chatMode === "internal" ? "#3b82f6" : "#fff",
+                                color:
+                                  chatMode === "internal" ? "white" : "#64748b",
+                                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                                transition: "all 0.2s",
+                              }}
+                            >
+                              INTERNAL CHAT
+                            </button>
+                          </div>
+                        )}
+
+                        {/* â”€â”€ MESSAGES AREA (flex: 1, scrollable) â”€â”€ */}
+                        <div
+                          style={{
+                            flex: 1,
+                            overflowY: "auto",
+                            padding: "12px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "6px",
+                          }}
                         >
-                            {listModal.vessels.length > 0 ? (
-                                listModal.vessels.map((v, idx) => (
-                                    <OverdueVesselRow
-                                        key={idx}
-                                        v={v}
-                                        modalType={listModal.type}
-                                        amIShore={amIShore} // Pass the shore check here
-                                        onUpload={handleVesselManualReportUpload}
-                                        /* ðŸ”¥ THIS ADDITION HANDLES THE REDIRECT */
-                                        onViewClick={(vesselName, item) => {
-                                            // 1. Close the current Pending/Overdue list window
-                                            setListModal((prev) => ({ ...prev, isOpen: false }));
+                          {selectedCell.data.conversation
+                            ?.filter((msg) =>
+                              chatMode === "internal"
+                                ? msg.is_internal === true
+                                : msg.is_internal !== true,
+                            )
+                            .map((msg, idx) => {
+                              const isSystem = msg.role === "System";
+                              const isFileAttachment =
+                                msg.message.includes("ATTACHED_IMAGE:") ||
+                                msg.message.includes("ATTACHED_PDF:");
+                              if (isFileAttachment) return null;
 
-                                            // 2. Identify the full machinery cell from the master matrix
-                                            // item.code is the equipment key (e.g., 'ME.SYS')
-                                            const cellData =
-                                                normalizedTable.rows[vesselName][item.code];
+                              const msgUserData = user?.user || user;
+                              const uAccess = (
+                                msgUserData?.access_type ||
+                                msgUserData?.accessType ||
+                                ""
+                              ).toUpperCase();
+                              const uRole = (
+                                msgUserData?.role || ""
+                              ).toUpperCase();
+                              const amIShoreMsg =
+                                uAccess === "SHORE" ||
+                                uRole === "ADMIN" ||
+                                uRole === "SUPERUSER" ||
+                                uRole === "SHORE" ||
+                                uRole === "SUPERINTENDENT";
 
-                                            // 3. specificSample is the rawData we stored in handleCardClick
-                                            const specificSample = item.rawData;
-
-                                            // 4. Trigger the Technical Communication Modal
-                                            // This uses your existing logic to open the 3-panel modal and load the PDF
-                                            handleSelectSample(vesselName, cellData, specificSample);
+                              // Centered System Log
+                              if (isSystem)
+                                return (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      textAlign: "center",
+                                      margin: "10px 0",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        backgroundColor: "#f1f5f9",
+                                        fontSize: "0.68rem",
+                                        padding: "3px 10px",
+                                        borderRadius: "10px",
+                                        color: "#64748b",
+                                        border: "1px solid #e2e8f0",
+                                        fontWeight: "400",
+                                      }}
+                                    >
+                                      <span
+                                        dangerouslySetInnerHTML={{
+                                          __html: msg.message,
                                         }}
-                                    />
-                                ))
-                            ) : (
-                                <div style={{ padding: "60px 20px", textAlign: "center" }}>
-                                    <CheckCircle
-                                        size={40}
-                                        color="#22c55e"
-                                        style={{ opacity: 0.2, marginBottom: "12px" }}
-                                    />
-                                    <p style={{ color: "#94a3b8", margin: 0 }}>
-                                        No vessels in this category.
-                                    </p>
+                                      />{" "}
+                                      {msg.date}
+                                    </span>
+                                  </div>
+                                );
+
+                              // Extract sender name and clean body
+                              let senderNameInMsg = msg.role;
+                              let cleanBody = msg.message;
+                              if (msg.message.includes(": ")) {
+                                const splitPoint = msg.message.indexOf(": ");
+                                senderNameInMsg = msg.message
+                                  .substring(0, splitPoint)
+                                  .trim();
+                                cleanBody = msg.message.substring(
+                                  splitPoint + 2,
+                                );
+                              }
+
+                              const isMe =
+                                senderNameInMsg.toLowerCase() ===
+                                user?.full_name?.toLowerCase();
+
+                              // Full-name mention highlighter
+                              const renderVerifiedMessage = (text) => {
+                                // 1. Guard clause
+                                if (!text)
+                                  return (
+                                    <span style={{ fontWeight: "400" }}>
+                                      {text}
+                                    </span>
+                                  );
+
+                                // THE FIX: Get your own name from the auth state
+                                const myName = user?.full_name || "";
+
+                                // Create a combined list: the API mention list + your own name
+                                const allNamesToHighlight = [
+                                  ...(mentionList || []),
+                                ];
+
+                                // If your name isn't already in the list, add it so @YourName turns blue too
+                                if (
+                                  myName &&
+                                  !allNamesToHighlight.some(
+                                    (u) =>
+                                      u.full_name?.toLowerCase() ===
+                                      myName.toLowerCase(),
+                                  )
+                                ) {
+                                  allNamesToHighlight.push({
+                                    full_name: myName,
+                                  });
+                                }
+
+                                // If no names are found to highlight, return plain text
+                                if (allNamesToHighlight.length === 0) {
+                                  return (
+                                    <span style={{ fontWeight: "400" }}>
+                                      {text}
+                                    </span>
+                                  );
+                                }
+
+                                // 2. Sort users by name length to prevent partial matches (e.g., "Gokul D" before "Gokul")
+                                const sortedUsers = allNamesToHighlight.sort(
+                                  (a, b) =>
+                                    (b.full_name || b.name || "").length -
+                                    (a.full_name || a.name || "").length,
+                                );
+
+                                let contentParts = [text];
+
+                                sortedUsers.forEach((targetUser) => {
+                                  const userName =
+                                    targetUser.full_name ||
+                                    targetUser.name ||
+                                    "";
+                                  // Escapes special characters and ensures boundary checks
+                                  const pattern = new RegExp(
+                                    `(@${userName.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&")})(?=[\\s\\n.,!?;:]|$)`,
+                                    "gi",
+                                  );
+
+                                  let nextParts = [];
+                                  contentParts.forEach((part) => {
+                                    if (typeof part !== "string") {
+                                      nextParts.push(part);
+                                      return;
+                                    }
+
+                                    const splitArr = part.split(pattern);
+                                    splitArr.forEach((sub) => {
+                                      // Case-insensitive check to see if the part is the mention
+                                      if (
+                                        sub.toLowerCase() ===
+                                        `@${userName}`.toLowerCase()
+                                      ) {
+                                        nextParts.push(
+                                          <span
+                                            key={`${userName}-${Math.random()}`}
+                                            style={{
+                                              fontWeight: "600",
+                                              color: "#00a5f4", // âœ¨ EXACT WHATSAPP MENTION BLUE
+                                              display: "inline",
+                                              pointerEvents: "none", // Keeps bubble clickable while maintaining color
+                                            }}
+                                          >
+                                            {sub}
+                                          </span>,
+                                        );
+                                      } else if (sub !== "") {
+                                        nextParts.push(sub);
+                                      }
+                                    });
+                                  });
+                                  contentParts = nextParts;
+                                });
+
+                                return contentParts.map((p, i) =>
+                                  typeof p === "string" ? (
+                                    <span key={i} style={{ fontWeight: "400" }}>
+                                      {p}
+                                    </span>
+                                  ) : (
+                                    p
+                                  ),
+                                );
+                              };
+                              return (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: isMe
+                                      ? "flex-end"
+                                      : "flex-start",
+                                    marginBottom: "2px",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      minWidth: "120px",
+                                      maxWidth: "80%",
+                                      // WhatsApp Style: Light Green for 'Me', White for others
+                                      backgroundColor: isMe
+                                        ? "#dcf8c6"
+                                        : "#ffffff",
+                                      borderRadius: "10px",
+                                      padding: "6px 10px",
+                                      boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
+                                      // Added a subtle border for the green bubble to look professional
+                                      border: isMe
+                                        ? "1px solid #cde6b9"
+                                        : "1px solid #e2e8f0",
+                                      display: "flex",
+                                      flexDirection: "column",
+                                    }}
+                                  >
+                                    {/* Header: name | role */}
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        marginBottom: "3px",
+                                        gap: "10px",
+                                      }}
+                                    >
+                                      <span
+                                        style={{
+                                          fontSize: "0.7rem",
+                                          fontWeight: "800",
+                                          // Dark Teal for 'Me' names (WhatsApp style), Dark Gray for others
+                                          color: isMe ? "#080808" : "#1e293b",
+                                        }}
+                                      >
+                                        {senderNameInMsg}
+                                      </span>
+                                      <span
+                                        style={{
+                                          fontSize: "0.58rem",
+                                          fontWeight: "700",
+                                          textTransform: "uppercase",
+                                          // Darker green-gray for 'Me' role, standard colors for others
+                                          color: isMe
+                                            ? "#4c4d4c"
+                                            : msg.role === "Office"
+                                              ? "#4c4d4c"
+                                              : "#d97706",
+                                        }}
+                                      >
+                                        {msg.role === "Office"
+                                          ? "Office"
+                                          : "Vessel"}
+                                      </span>
+                                    </div>
+
+                                    {/* Body */}
+                                    <div
+                                      style={{
+                                        fontSize: "0.82rem",
+                                        // Always use dark text for readability on light backgrounds
+                                        color: "#111b21",
+                                        whiteSpace: "pre-wrap",
+                                        lineHeight: "1.35",
+                                      }}
+                                    >
+                                      {renderVerifiedMessage(cleanBody)}
+                                    </div>
+
+                                    {/* Footer: timestamp */}
+                                    <div
+                                      style={{
+                                        textAlign: "right",
+                                        marginTop: "2px",
+                                      }}
+                                    >
+                                      <span
+                                        style={{
+                                          fontSize: "0.58rem",
+                                          // WhatsApp-style gray for timestamp
+                                          color: isMe ? "#667781" : "#94a3b8",
+                                          fontWeight: "500",
+                                        }}
+                                      >
+                                        {msg.date}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
-                            )}
+                              );
+                            })}
+                          <div ref={chatEndRef} />
                         </div>
 
-                        {/* Footer */}
-                        {/* <div
+                        {/* â”€â”€ QUICK ACTIONS FOOTER (always pinned, never pushed up) â”€â”€ */}
+                        <div
+                          style={{
+                            flexShrink: 0,
+                            backgroundColor: "#f8fafc",
+                            borderTop: "1px solid #e2e8f0",
+                            padding: "10px 14px",
+                            position: "relative",
+                          }}
+                        >
+                          {/* 1. APPROVAL CARD - Original logic preserved exactly */}
+                          {selectedCell.data.is_approval_pending &&
+                            amIShore &&
+                            !selectedCell.data.is_resolved && (
+                              <div
+                                style={{
+                                  backgroundColor: "#fffbeb", // Warning Yellow
+                                  border: "1px solid #fde68a",
+                                  borderRadius: "10px",
+                                  padding: "12px",
+                                  marginBottom: "12px",
+                                  boxShadow:
+                                    "0 4px 6px -1px rgba(0, 0, 0, 0.05)",
+                                  animation: "fadeIn 0.3s ease",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                    marginBottom: "8px",
+                                  }}
+                                >
+                                  <Clock size={16} color="#d97706" />
+                                  <span
+                                    style={{
+                                      fontSize: "0.75rem",
+                                      fontWeight: "800",
+                                      color: "#92400e",
+                                      textTransform: "uppercase",
+                                    }}
+                                  >
+                                    Resolution Awaiting Approval
+                                  </span>
+                                </div>
+
+                                <div
+                                  style={{
+                                    fontSize: "0.8rem",
+                                    color: "#451a03",
+                                    backgroundColor: "rgba(255,255,255,0.5)",
+                                    padding: "8px",
+                                    borderRadius: "6px",
+                                    marginBottom: "10px",
+                                    borderLeft: "3px solid #f59e0b",
+                                    fontStyle: "italic",
+                                  }}
+                                >
+                                  "{selectedCell.data.resolution_remarks}"
+                                </div>
+
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                  <button
+                                    onClick={() =>
+                                      handleShoreApproval("ACCEPT")
+                                    }
+                                    disabled={isSubmittingClose}
+                                    style={{
+                                      flex: 1,
+                                      backgroundColor: "#10b981",
+                                      color: "white",
+                                      border: "none",
+                                      borderRadius: "6px",
+                                      padding: "8px",
+                                      fontSize: "0.7rem",
+                                      fontWeight: "700",
+                                      cursor: "pointer",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: "4px",
+                                    }}
+                                  >
+                                    <CheckCircle size={14} /> ACCEPT
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      handleShoreApproval("DECLINE")
+                                    }
+                                    disabled={isSubmittingClose}
+                                    style={{
+                                      flex: 1,
+                                      backgroundColor: "#ef4444",
+                                      color: "white",
+                                      border: "none",
+                                      borderRadius: "6px",
+                                      padding: "8px",
+                                      fontSize: "0.7rem",
+                                      fontWeight: "700",
+                                      cursor: "pointer",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: "4px",
+                                    }}
+                                  >
+                                    <X size={14} /> DECLINE
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                          {/* ðŸ”¥ GATING LOGIC: If resolved, show Locked UI. If not resolved, show original chat UI */}
+                          {selectedCell.data.is_resolved ? (
+                            <div
+                              style={{
+                                textAlign: "center",
+                                padding: "12px",
+                                backgroundColor: "#f1f5f9",
+                                borderRadius: "10px",
+                                border: "1px dashed #cbd5e1",
+                                color: "#64748b",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                gap: "4px",
+                              }}
+                            >
+                              <X size={18} style={{ opacity: 0.5 }} />
+                              <span
+                                style={{
+                                  fontSize: "0.75rem",
+                                  fontWeight: "800",
+                                  color: "#475569",
+                                }}
+                              >
+                                COMMUNICATION LOCKED
+                              </span>
+                              <span style={{ fontSize: "0.65rem" }}>
+                                This issue is closed.{" "}
+                                {amIShore
+                                  ? "Use REOPEN button below to enable chat."
+                                  : "Only Shore staff can reopen this issue."}
+                              </span>
+                            </div>
+                          ) : (
+                            <>
+                              {/* Mention dropdown - Original preserved */}
+                              {showMentionDropdown &&
+                                mentionList.length > 0 && (
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      bottom: "100%",
+                                      left: "14px",
+                                      width: "260px",
+                                      maxHeight: "180px",
+                                      backgroundColor: "white",
+                                      borderRadius: "10px",
+                                      boxShadow: "0 -4px 20px rgba(0,0,0,0.15)",
+                                      border: "1px solid #e2e8f0",
+                                      overflowY: "auto",
+                                      zIndex: 1000,
+                                      marginBottom: "8px",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        padding: "6px 10px",
+                                        fontSize: "9px",
+                                        fontWeight: "800",
+                                        color: "#94a3b8",
+                                        borderBottom: "1px solid #f1f5f9",
+                                        position: "sticky",
+                                        top: 0,
+                                        backgroundColor: "white",
+                                      }}
+                                    >
+                                      ASSIGNED TO THIS VESSEL
+                                    </div>
+                                    {mentionList
+                                      .filter((u) =>
+                                        u.full_name
+                                          ?.toLowerCase()
+                                          .includes(mentionFilter),
+                                      )
+                                      .map((u, i) => (
+                                        <div
+                                          key={i}
+                                          onClick={() =>
+                                            applyMention(u.full_name)
+                                          }
+                                          style={{
+                                            padding: "8px 14px",
+                                            cursor: "pointer",
+                                            borderBottom: "1px solid #f8fafc",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                          }}
+                                        >
+                                          <span
+                                            style={{
+                                              fontSize: "0.82rem",
+                                              fontWeight: "700",
+                                              color: "#1e293b",
+                                            }}
+                                          >
+                                            {u.full_name}
+                                          </span>
+                                          <span
+                                            style={{
+                                              fontSize: "0.68rem",
+                                              color: "#64748b",
+                                            }}
+                                          >
+                                            {u.job_title || "User"} {u.role}
+                                          </span>
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
+
+                              {chatMode === "internal" && (
+                                <div
+                                  style={{
+                                    marginBottom: "6px",
+                                    fontSize: "10px",
+                                    color: "#3b82f6",
+                                    fontWeight: "800",
+                                  }}
+                                >
+                                  INTERNAL NOTE (SHORE ONLY)
+                                </div>
+                              )}
+
+                              {/* Input row - Original preserved */}
+                              <div
+                                style={{
+                                  backgroundColor: "#1e293b",
+                                  borderRadius: "10px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  padding: "5px 12px",
+                                  gap: "10px",
+                                  border:
+                                    chatMode === "internal"
+                                      ? "2px solid #3b82f6"
+                                      : "none",
+                                }}
+                              >
+                                <textarea
+                                  ref={chatInputRef}
+                                  value={
+                                    chatMode === "internal"
+                                      ? internalDraft
+                                      : amIShore
+                                        ? remarksData.office
+                                        : remarksData.officer
+                                  }
+                                  onChange={(e) =>
+                                    handleInputChange(e.target.value)
+                                  }
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && !e.shiftKey) {
+                                      if (
+                                        showMentionDropdown &&
+                                        mentionList.length > 0
+                                      ) {
+                                        const filtered = mentionList.filter(
+                                          (u) =>
+                                            u.full_name
+                                              .toLowerCase()
+                                              .includes(mentionFilter),
+                                        );
+                                        if (filtered.length > 0) {
+                                          e.preventDefault();
+                                          applyMention(filtered[0].full_name);
+                                        }
+                                      } else {
+                                        e.preventDefault();
+                                        handleSendMessage();
+                                      }
+                                    }
+                                    if (e.key === "Escape")
+                                      setShowMentionDropdown(false);
+                                  }}
+                                  placeholder={
+                                    chatMode === "internal"
+                                      ? "Type an internal note..."
+                                      : "Type a message..."
+                                  }
+                                  style={{
+                                    flex: 1,
+                                    backgroundColor: "transparent",
+                                    border: "none",
+                                    color: "white",
+                                    outline: "none",
+                                    resize: "none",
+                                    minHeight: "28px",
+                                    maxHeight: "120px",
+                                    fontFamily: "inherit",
+                                    fontSize: "0.9rem",
+                                  }}
+                                />
+                                <button
+                                  onClick={handleSendMessage}
+                                  style={{
+                                    backgroundColor:
+                                      chatMode === "internal"
+                                        ? "#3b82f6"
+                                        : "#2563eb",
+                                    color: "white",
+                                    border: "none",
+                                    borderRadius: "8px",
+                                    padding: "6px",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <SendHorizontal
+                                    size={18}
+                                    color="white"
+                                    strokeWidth={2.5}
+                                  />
+                                </button>
+                              </div>
+
+                              {/* Footer meta row - Original preserved */}
+                              <div
+                                style={{
+                                  marginTop: "6px",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  color: "#94a3b8",
+                                  fontSize: "0.65rem",
+                                  fontWeight: "600",
+                                }}
+                              >
+                                <span>
+                                  ACCESSIBLE:{" "}
+                                  <strong
+                                    style={{
+                                      color:
+                                        chatMode === "internal"
+                                          ? "#3b82f6"
+                                          : "#64748b",
+                                    }}
+                                  >
+                                    {chatMode === "internal"
+                                      ? "INTERNAL TEAM"
+                                      : amIShore
+                                        ? "OFFICE & SHORE"
+                                        : "VESSEL"}
+                                  </strong>
+                                </span>
+                                <span>Enter to send</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+              </div>
+            </div>
+            {/* â”€â”€ END THREE-PANEL ROW â”€â”€ */}
+          </div>
+          {/* â”€â”€ END OUTER MODAL SHELL â”€â”€ */}
+        </div>
+      )}
+      {/* ----------------- MODAL END ----------------- */}
+      {/* ----------------- VESSEL LIST MODAL ----------------- */}
+      {/* ----------------- VESSEL LIST MODAL (FULLY UPDATED) ----------------- */}
+      {listModal.isOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.7)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10001,
+          }}
+        >
+          <div
+            style={{
+              marginTop: "60px", // Push down to avoid Top Nav Header
+              backgroundColor: "white",
+              width: "90%",
+              maxWidth: "500px",
+              borderRadius: "16px",
+              padding: "0",
+              overflow: "hidden",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+              display: "flex",
+              flexDirection: "column",
+              maxHeight: "80vh",
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: "20px 24px",
+                background: "#f8fafc",
+                borderBottom: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: "1.1rem",
+                    color: "#0f172a",
+                    fontWeight: "700",
+                  }}
+                >
+                  {listModal.type === "Configured"
+                    ? "Fleet Configuration"
+                    : listModal.type === "Warning"
+                      ? "Action Required"
+                      : listModal.type}{" "}
+                  Vessels
+                </h3>
+                <p
+                  style={{
+                    margin: "2px 0 0 0",
+                    fontSize: "0.8rem",
+                    color: "#64748b",
+                  }}
+                >
+                  {listModal.vessels.length}{" "}
+                  {listModal.vessels.length === 1 ? "vessel" : "vessels"}{" "}
+                  {/* ðŸ”¥ Logic change for configured label */}
+                  {listModal.type === "Configured"
+                    ? "in fleet overview"
+                    : "requiring attention"}
+                </p>
+              </div>
+              <button
+                onClick={() => setListModal({ ...listModal, isOpen: false })}
+                style={{
+                  border: "none",
+                  background: "none",
+                  cursor: "pointer",
+                  color: "#94a3b8",
+                  padding: "4px",
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* List Body Area - Optimized for Scrolling 10+ items */}
+            <div
+              className="vessel-modal-scroll-area"
+              style={{
+                padding: "16px",
+                maxHeight: "500px",
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+                scrollbarWidth: "thin",
+                scrollbarColor: "#cbd5e1 transparent",
+              }}
+            >
+              {listModal.vessels.length > 0 ? (
+                listModal.vessels.map((v, idx) => (
+                  <OverdueVesselRow
+                    key={idx}
+                    v={v}
+                    modalType={listModal.type}
+                    amIShore={amIShore} // Pass the shore check here
+                    onUpload={handleVesselManualReportUpload}
+                    /* ðŸ”¥ THIS ADDITION HANDLES THE REDIRECT */
+                    onViewClick={(vesselName, item) => {
+                      // 1. Close the current Pending/Overdue list window
+                      setListModal((prev) => ({ ...prev, isOpen: false }));
+
+                      // 2. Identify the full machinery cell from the master matrix
+                      // item.code is the equipment key (e.g., 'ME.SYS')
+                      const cellData =
+                        normalizedTable.rows[vesselName][item.code];
+
+                      // 3. specificSample is the rawData we stored in handleCardClick
+                      const specificSample = item.rawData;
+
+                      // 4. Trigger the Technical Communication Modal
+                      // This uses your existing logic to open the 3-panel modal and load the PDF
+                      handleSelectSample(vesselName, cellData, specificSample);
+                    }}
+                  />
+                ))
+              ) : (
+                <div style={{ padding: "60px 20px", textAlign: "center" }}>
+                  <CheckCircle
+                    size={40}
+                    color="#22c55e"
+                    style={{ opacity: 0.2, marginBottom: "12px" }}
+                  />
+                  <p style={{ color: "#94a3b8", margin: 0 }}>
+                    No vessels in this category.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            {/* <div
         style={{
           padding: "16px 24px",
           borderTop: "1px solid #e2e8f0",
@@ -8670,1293 +8816,1348 @@ const LuboilAnalysis = () => {
           Close
         </Button>
       </div> */}
-                    </div>
-                </div>
-            )}
-            {trendModal.isOpen && (
-                <div
-                    style={{
-                        position: "fixed",
-                        marginTop: "60px", // Push down to avoid Top Nav Header
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: "rgba(15, 23, 42, 0.8)",
-                        backdropFilter: "blur(6px)",
-                        display: "flex",
-                        alignItems: "center", // This centers it vertically
-                        justifyContent: "center", // This centers it horizontally
-                        zIndex: 99999, // High z-index to cover your Top Nav Header
-                        padding: "40px 20px", // Extra padding at top/bottom to prevent collisions
-                    }}
+          </div>
+        </div>
+      )}
+      {trendModal.isOpen && (
+        <div
+          style={{
+            position: "fixed",
+            marginTop: "60px", // Push down to avoid Top Nav Header
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.8)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center", // This centers it vertically
+            justifyContent: "center", // This centers it horizontally
+            zIndex: 99999, // High z-index to cover your Top Nav Header
+            padding: "40px 20px", // Extra padding at top/bottom to prevent collisions
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "white",
+              borderRadius: "12px",
+              width: "100%",
+              maxWidth: "1000px",
+              maxHeight: "84vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)",
+              overflow: "hidden",
+              position: "relative",
+            }}
+          >
+            {/* Header - More Compact */}
+            <div
+              style={{
+                padding: "16px 24px",
+                borderBottom: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                backgroundColor: "#f8fafc",
+              }}
+            >
+              <div>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: "1rem",
+                    color: "#0f172a",
+                    fontWeight: "700",
+                  }}
                 >
-                    <div
-                        style={{
-                            backgroundColor: "white",
-                            borderRadius: "12px",
-                            width: "100%",
-                            maxWidth: "1000px",
-                            maxHeight: "84vh",
-                            display: "flex",
-                            flexDirection: "column",
-                            boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)",
-                            overflow: "hidden",
-                            position: "relative",
-                        }}
+                  {trendModal.title}
+                </h3>
+                <p
+                  style={{
+                    margin: "2px 0 0 0",
+                    fontSize: "0.75rem",
+                    color: "#64748b",
+                  }}
+                >
+                  Historical Trend Analysis
+                </p>
+              </div>
+              <button
+                onClick={() => setTrendModal({ ...trendModal, isOpen: false })}
+                style={{
+                  cursor: "pointer",
+                  border: "none",
+                  background: "none",
+                  color: "#94a3b8",
+                  transition: "color 0.2s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div
+              style={{
+                padding: "20px",
+                overflowY: "auto",
+                flex: 1,
+                backgroundColor: "#fff",
+              }}
+            >
+              {loadingTrend ? (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    height: "300px",
+                  }}
+                >
+                  <div className="loading-spinner"></div>
+                </div>
+              ) : trendModal.data && trendModal.data.length > 0 ? (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))",
+                    gap: "16px",
+                  }}
+                >
+                  {/* 1. PHYSICAL CHARACTERISTICS */}
+                  <div
+                    style={{
+                      border: "1px solid #f1f5f9",
+                      borderRadius: "8px",
+                      padding: "12px",
+                      backgroundColor: "#fff",
+                    }}
+                  >
+                    <h4
+                      style={{
+                        fontSize: "0.8rem",
+                        fontWeight: "600",
+                        color: "#475569",
+                        marginBottom: "12px",
+                        borderLeft: "3px solid #2563eb",
+                        paddingLeft: "8px",
+                      }}
                     >
-                        {/* Header - More Compact */}
-                        <div
-                            style={{
-                                padding: "16px 24px",
-                                borderBottom: "1px solid #e2e8f0",
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                backgroundColor: "#f8fafc",
-                            }}
-                        >
-                            <div>
-                                <h3
-                                    style={{
-                                        margin: 0,
-                                        fontSize: "1rem",
-                                        color: "#0f172a",
-                                        fontWeight: "700",
-                                    }}
-                                >
-                                    {trendModal.title}
-                                </h3>
-                                <p
-                                    style={{
-                                        margin: "2px 0 0 0",
-                                        fontSize: "0.75rem",
-                                        color: "#64748b",
-                                    }}
-                                >
-                                    Historical Trend Analysis
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => setTrendModal({ ...trendModal, isOpen: false })}
-                                style={{
-                                    cursor: "pointer",
-                                    border: "none",
-                                    background: "none",
-                                    color: "#94a3b8",
-                                    transition: "color 0.2s",
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
-                                onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
-                            >
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        {/* Body */}
-                        <div
-                            style={{
-                                padding: "20px",
-                                overflowY: "auto",
-                                flex: 1,
-                                backgroundColor: "#fff",
-                            }}
-                        >
-                            {loadingTrend ? (
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        justifyContent: "center",
-                                        alignItems: "center",
-                                        height: "300px",
-                                    }}
-                                >
-                                    <div className="loading-spinner"></div>
-                                </div>
-                            ) : trendModal.data && trendModal.data.length > 0 ? (
-                                <div
-                                    style={{
-                                        display: "grid",
-                                        gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))",
-                                        gap: "16px",
-                                    }}
-                                >
-                                    {/* 1. PHYSICAL CHARACTERISTICS */}
-                                    <div
-                                        style={{
-                                            border: "1px solid #f1f5f9",
-                                            borderRadius: "8px",
-                                            padding: "12px",
-                                            backgroundColor: "#fff",
-                                        }}
-                                    >
-                                        <h4
-                                            style={{
-                                                fontSize: "0.8rem",
-                                                fontWeight: "600",
-                                                color: "#475569",
-                                                marginBottom: "12px",
-                                                borderLeft: "3px solid #2563eb",
-                                                paddingLeft: "8px",
-                                            }}
-                                        >
-                                            Physical Characteristics
-                                        </h4>
-                                        <ResponsiveContainer width="100%" height={180}>
-                                            <LineChart
-                                                data={trendModal.data}
-                                                margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
-                                            >
-                                                <CartesianGrid
-                                                    strokeDasharray="3 3"
-                                                    vertical={false}
-                                                    stroke="#f1f5f9"
-                                                />
-                                                <XAxis
-                                                    dataKey="date"
-                                                    tickFormatter={(d) =>
-                                                        d.split("-")[1] + "/" + d.split("-")[0].slice(2)
-                                                    }
-                                                    fontSize={9}
-                                                    tick={{ fill: "#94a3b8" }}
-                                                />
-                                                <YAxis
-                                                    yAxisId="left"
-                                                    fontSize={9}
-                                                    tick={{ fill: "#2563eb" }}
-                                                />
-                                                <YAxis
-                                                    yAxisId="right"
-                                                    orientation="right"
-                                                    fontSize={9}
-                                                    tick={{ fill: "#7c3aed" }}
-                                                />
-                                                <Tooltip
-                                                    contentStyle={{
-                                                        fontSize: "11px",
-                                                        borderRadius: "8px",
-                                                        border: "none",
-                                                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                                                    }}
-                                                />
-                                                <Legend
-                                                    verticalAlign="top"
-                                                    height={36}
-                                                    iconType="circle"
-                                                    iconSize={8}
-                                                    wrapperStyle={{ fontSize: "10px" }}
-                                                />
-                                                <Line
-                                                    yAxisId="left"
-                                                    type="monotone"
-                                                    dataKey="viscosity_40c"
-                                                    stroke="#2563eb"
-                                                    name="Visc 40C"
-                                                    strokeWidth={2}
-                                                    dot={{ r: 3 }}
-                                                    activeDot={{ r: 5 }}
-                                                />
-                                                <Line
-                                                    yAxisId="right"
-                                                    type="monotone"
-                                                    dataKey="tan"
-                                                    stroke="#7c3aed"
-                                                    name="TAN"
-                                                    strokeWidth={2}
-                                                    dot={{ r: 3 }}
-                                                    activeDot={{ r: 5 }}
-                                                />
-                                                <Line
-                                                    yAxisId="right"
-                                                    type="monotone"
-                                                    dataKey="tbn"
-                                                    stroke="#db2777"
-                                                    name="TBN"
-                                                    strokeWidth={2}
-                                                    dot={{ r: 3 }}
-                                                    activeDot={{ r: 5 }}
-                                                />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    </div>
-
-                                    {/* 2. WEAR METALS */}
-                                    <div
-                                        style={{
-                                            border: "1px solid #f1f5f9",
-                                            borderRadius: "8px",
-                                            padding: "12px",
-                                            backgroundColor: "#fff",
-                                        }}
-                                    >
-                                        <h4
-                                            style={{
-                                                fontSize: "0.8rem",
-                                                fontWeight: "600",
-                                                color: "#475569",
-                                                marginBottom: "12px",
-                                                borderLeft: "3px solid #ef4444",
-                                                paddingLeft: "8px",
-                                            }}
-                                        >
-                                            Wear Metals (ppm)
-                                        </h4>
-                                        <ResponsiveContainer width="100%" height={180}>
-                                            <LineChart
-                                                data={trendModal.data}
-                                                margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
-                                            >
-                                                <CartesianGrid
-                                                    strokeDasharray="3 3"
-                                                    vertical={false}
-                                                    stroke="#f1f5f9"
-                                                />
-                                                <XAxis
-                                                    dataKey="date"
-                                                    tickFormatter={(d) =>
-                                                        d.split("-")[1] + "/" + d.split("-")[0].slice(2)
-                                                    }
-                                                    fontSize={9}
-                                                    tick={{ fill: "#94a3b8" }}
-                                                />
-                                                <YAxis fontSize={9} tick={{ fill: "#64748b" }} />
-                                                <Tooltip
-                                                    contentStyle={{
-                                                        fontSize: "11px",
-                                                        borderRadius: "8px",
-                                                        border: "none",
-                                                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                                                    }}
-                                                />
-                                                <Legend
-                                                    verticalAlign="top"
-                                                    height={36}
-                                                    iconType="circle"
-                                                    iconSize={8}
-                                                    wrapperStyle={{ fontSize: "10px" }}
-                                                />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="iron"
-                                                    stroke="#ef4444"
-                                                    name="Iron (Fe)"
-                                                    strokeWidth={2}
-                                                    dot={{ r: 3 }}
-                                                    activeDot={{ r: 5 }}
-                                                />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="copper"
-                                                    stroke="#f59e0b"
-                                                    name="Copper (Cu)"
-                                                    strokeWidth={2}
-                                                    dot={{ r: 3 }}
-                                                    activeDot={{ r: 5 }}
-                                                />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="aluminium"
-                                                    stroke="#94a3b8"
-                                                    name="Aluminium"
-                                                    strokeWidth={2}
-                                                    dot={{ r: 3 }}
-                                                    activeDot={{ r: 5 }}
-                                                />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    </div>
-
-                                    {/* 3. CONTAMINATION */}
-                                    <div
-                                        style={{
-                                            border: "1px solid #f1f5f9",
-                                            borderRadius: "8px",
-                                            padding: "12px",
-                                            backgroundColor: "#fff",
-                                        }}
-                                    >
-                                        <h4
-                                            style={{
-                                                fontSize: "0.8rem",
-                                                fontWeight: "600",
-                                                color: "#475569",
-                                                marginBottom: "12px",
-                                                borderLeft: "3px solid #0891b2",
-                                                paddingLeft: "8px",
-                                            }}
-                                        >
-                                            Contamination
-                                        </h4>
-                                        <ResponsiveContainer width="100%" height={180}>
-                                            <LineChart
-                                                data={trendModal.data}
-                                                margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
-                                            >
-                                                <CartesianGrid
-                                                    strokeDasharray="3 3"
-                                                    vertical={false}
-                                                    stroke="#f1f5f9"
-                                                />
-                                                <XAxis
-                                                    dataKey="date"
-                                                    tickFormatter={(d) =>
-                                                        d.split("-")[1] + "/" + d.split("-")[0].slice(2)
-                                                    }
-                                                    fontSize={9}
-                                                    tick={{ fill: "#94a3b8" }}
-                                                />
-                                                <YAxis
-                                                    yAxisId="left"
-                                                    fontSize={9}
-                                                    tick={{ fill: "#0891b2" }}
-                                                />
-                                                <YAxis
-                                                    yAxisId="right"
-                                                    orientation="right"
-                                                    fontSize={9}
-                                                    tick={{ fill: "#0ea5e9" }}
-                                                />
-                                                <Tooltip
-                                                    contentStyle={{
-                                                        fontSize: "11px",
-                                                        borderRadius: "8px",
-                                                        border: "none",
-                                                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                                                    }}
-                                                />
-                                                <Legend
-                                                    verticalAlign="top"
-                                                    height={36}
-                                                    iconType="circle"
-                                                    iconSize={8}
-                                                    wrapperStyle={{ fontSize: "10px" }}
-                                                />
-                                                <Line
-                                                    yAxisId="left"
-                                                    type="monotone"
-                                                    dataKey="sodium"
-                                                    stroke="#0891b2"
-                                                    name="Sodium"
-                                                    strokeWidth={2}
-                                                    dot={{ r: 3 }}
-                                                    activeDot={{ r: 5 }}
-                                                />
-                                                <Line
-                                                    yAxisId="left"
-                                                    type="monotone"
-                                                    dataKey="silicon"
-                                                    stroke="#4b5563"
-                                                    name="Silicon"
-                                                    strokeWidth={2}
-                                                    dot={{ r: 3 }}
-                                                    activeDot={{ r: 5 }}
-                                                />
-                                                <Line
-                                                    yAxisId="right"
-                                                    type="monotone"
-                                                    dataKey="water"
-                                                    stroke="#0ea5e9"
-                                                    name="Water %"
-                                                    strokeWidth={2}
-                                                    dot={{ r: 3 }}
-                                                    activeDot={{ r: 5 }}
-                                                />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    </div>
-
-                                    {/* 4. ADDITIVES */}
-                                    <div
-                                        style={{
-                                            border: "1px solid #f1f5f9",
-                                            borderRadius: "8px",
-                                            padding: "12px",
-                                            backgroundColor: "#fff",
-                                        }}
-                                    >
-                                        <h4
-                                            style={{
-                                                fontSize: "0.8rem",
-                                                fontWeight: "600",
-                                                color: "#475569",
-                                                marginBottom: "12px",
-                                                borderLeft: "3px solid #10b981",
-                                                paddingLeft: "8px",
-                                            }}
-                                        >
-                                            Additives
-                                        </h4>
-                                        <ResponsiveContainer width="100%" height={180}>
-                                            <LineChart
-                                                data={trendModal.data}
-                                                margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
-                                            >
-                                                <CartesianGrid
-                                                    strokeDasharray="3 3"
-                                                    vertical={false}
-                                                    stroke="#f1f5f9"
-                                                />
-                                                <XAxis
-                                                    dataKey="date"
-                                                    tickFormatter={(d) =>
-                                                        d.split("-")[1] + "/" + d.split("-")[0].slice(2)
-                                                    }
-                                                    fontSize={9}
-                                                    tick={{ fill: "#94a3b8" }}
-                                                />
-                                                <YAxis fontSize={9} tick={{ fill: "#64748b" }} />
-                                                <Tooltip
-                                                    contentStyle={{
-                                                        fontSize: "11px",
-                                                        borderRadius: "8px",
-                                                        border: "none",
-                                                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                                                    }}
-                                                />
-                                                <Legend
-                                                    verticalAlign="top"
-                                                    height={36}
-                                                    iconType="circle"
-                                                    iconSize={8}
-                                                    wrapperStyle={{ fontSize: "10px" }}
-                                                />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="calcium"
-                                                    stroke="#10b981"
-                                                    name="Calcium %"
-                                                    strokeWidth={2}
-                                                    dot={{ r: 3 }}
-                                                    activeDot={{ r: 5 }}
-                                                />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="magnesium"
-                                                    stroke="#f97316"
-                                                    name="Magnesium"
-                                                    strokeWidth={2}
-                                                    dot={{ r: 3 }}
-                                                    activeDot={{ r: 5 }}
-                                                />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="zinc"
-                                                    stroke="#6366f1"
-                                                    name="Zinc"
-                                                    strokeWidth={2}
-                                                    dot={{ r: 3 }}
-                                                    activeDot={{ r: 5 }}
-                                                />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        height: "300px",
-                                        color: "#94a3b8",
-                                    }}
-                                >
-                                    <TrendingUp
-                                        size={40}
-                                        style={{ opacity: 0.3, marginBottom: "12px" }}
-                                    />
-                                    <p style={{ fontSize: "0.9rem" }}>
-                                        No historical analysis data found for this equipment.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-            {isCloseModalOpen && (
-                <div
-                    style={{
-                        position: "fixed",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: "rgba(15, 23, 42, 0.85)",
-                        zIndex: 100005,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: "20px",
-                    }}
-                >
-                    {/* CALCULATE GATING LOGIC INSIDE MODAL */}
-                    {(() => {
-                        const isVesselUser = !amIShore;
-                        const currentSampleDate = new Date(
-                            selectedCell?.data?.date || selectedCell?.data?.sample_date,
-                        );
-
-                        // 1. Image Check: Satisfied if not required OR file chosen now OR file already in gallery
-                        const evidenceExistsInGallery =
-                            selectedCell?.data?.attachment_url &&
-                            selectedCell.data.attachment_url.trim().length > 0;
-                        const imageRequirementMet =
-                            !selectedCell?.data?.is_image_required ||
-                            evidenceExistsInGallery ||
-                            selectedCloseFile;
-
-                        // 2. Resampling Check: Satisfied if not required OR a report in history is newer than this sample
-                        const hasNewerReport = selectedCell?.data?.history?.some(
-                            (h) => new Date(h.date) > currentSampleDate,
-                        );
-                        const resamplingRequirementMet =
-                            !selectedCell?.data?.is_resampling_required || hasNewerReport;
-
-                        // 3. Final State logic
-                        const canVesselSubmit =
-                            imageRequirementMet && resamplingRequirementMet;
-                        const isCloseSubmitDisabled =
-                            isSubmittingClose ||
-                            (closeRemarksText?.length || 0) < 50 ||
-                            (isVesselUser && !canVesselSubmit);
-
-                        return (
-                            <div
-                                style={{
-                                    backgroundColor: "white",
-                                    width: "100%",
-                                    maxWidth: "550px",
-                                    borderRadius: "16px",
-                                    overflow: "hidden",
-                                    maxHeight: "88vh",
-                                    marginTop: "60px", // Push down to avoid Top Nav Header
-                                    overflowY: "scroll",
-                                    boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)",
-                                }}
-                            >
-                                {/* Header */}
-                                <div
-                                    style={{
-                                        padding: "20px",
-                                        borderBottom: "1px solid #e2e8f0",
-                                        backgroundColor: "#f8fafc",
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                    }}
-                                >
-                                    <h3
-                                        style={{ margin: 0, fontSize: "1.1rem", fontWeight: "800" }}
-                                    >
-                                        Equipment Resolution Detail
-                                    </h3>
-                                    <X
-                                        size={20}
-                                        style={{ cursor: "pointer", color: "#94a3b8" }}
-                                        onClick={() => setIsCloseModalOpen(false)}
-                                    />
-                                </div>
-
-                                <div style={{ padding: "24px" }}>
-                                    <p
-                                        style={{
-                                            margin: "0 0 16px 0",
-                                            fontSize: "0.85rem",
-                                            color: "#475569",
-                                            lineHeight: "1.5",
-                                        }}
-                                    >
-                                        Documenting resolution for{" "}
-                                        <b>
-                                            {selectedCell.vessel} - {selectedCell.machinery}
-                                        </b>
-                                        .
-                                        <br />
-                                        <span style={{ fontSize: "0.75rem" }}>
-                                            Current Status:{" "}
-                                            <b
-                                                style={{
-                                                    color: getStatusColor(selectedCell.data.status),
-                                                }}
-                                            >
-                                                {selectedCell.data.status}
-                                            </b>
-                                        </span>
-                                    </p>
-
-                                    {/* Text Area with Character Counter */}
-                                    <div style={{ marginBottom: "20px" }}>
-                                        <label
-                                            style={{
-                                                display: "block",
-                                                fontSize: "0.65rem",
-                                                fontWeight: "800",
-                                                color: "#64748b",
-                                                marginBottom: "8px",
-                                                textTransform: "uppercase",
-                                            }}
-                                        >
-                                            Correction / Action Remarks (Min 50 Chars)
-                                        </label>
-                                        <textarea
-                                            value={closeRemarksText}
-                                            onChange={(e) => setCloseRemarksText(e.target.value)}
-                                            placeholder="Describe the corrective maintenance or investigation performed..."
-                                            style={{
-                                                width: "100%",
-                                                height: "140px",
-                                                padding: "12px",
-                                                borderRadius: "10px",
-                                                border: `2px solid ${closeRemarksText.length >= 50 ? "#10b981" : "#e2e8f0"}`,
-                                                fontSize: "0.9rem",
-                                                resize: "none",
-                                                transition: "all 0.2s",
-                                            }}
-                                        />
-                                        <div
-                                            style={{
-                                                textAlign: "right",
-                                                marginTop: "6px",
-                                                fontSize: "0.7rem",
-                                                fontWeight: "700",
-                                                color:
-                                                    closeRemarksText.length >= 50 ? "#10b981" : "#ef4444",
-                                            }}
-                                        >
-                                            {closeRemarksText.length} / 50 characters
-                                        </div>
-                                    </div>
-
-                                    {/* --- IMAGE MANDATORY STATUS BANNER (BUG FIX: Checks gallery) --- */}
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "5px",
-                                            padding: "10px",
-                                            borderRadius: "8px",
-                                            backgroundColor: imageRequirementMet
-                                                ? "#f0fdf4"
-                                                : "#fee2e2",
-                                            border: `1px solid ${imageRequirementMet ? "#bbf7d0" : "#fecaca"}`,
-                                            marginBottom: "10px",
-                                        }}
-                                    >
-                                        {imageRequirementMet ? (
-                                            <CheckCircle size={18} color="#16a34a" />
-                                        ) : (
-                                            <AlertTriangle size={18} color="#dc2626" />
-                                        )}
-                                        <div>
-                                            <div
-                                                style={{
-                                                    fontSize: "0.75rem",
-                                                    fontWeight: "800",
-                                                    color: imageRequirementMet ? "#166534" : "#991b1b",
-                                                }}
-                                            >
-                                                {selectedCell.data.is_image_required
-                                                    ? imageRequirementMet
-                                                        ? "EVIDENCE VERIFIED"
-                                                        : "EVIDENCE UPLOAD MANDATORY"
-                                                    : "EVIDENCE UPLOAD OPTIONAL"}
-                                            </div>
-                                            <p
-                                                style={{
-                                                    margin: 0,
-                                                    fontSize: "0.65rem",
-                                                    color: imageRequirementMet ? "#15803d" : "#b91c1c",
-                                                }}
-                                            >
-                                                {evidenceExistsInGallery
-                                                    ? "Requirement satisfied via existing gallery evidence."
-                                                    : selectedCell.data.is_image_required
-                                                        ? imageRequirementMet
-                                                            ? "File attached successfully."
-                                                            : "Vessel must provide a file to resolve."
-                                                        : "No mandatory image request for this report."}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* --- NEW: RESAMPLING MANDATORY STATUS BANNER --- */}
-                                    {selectedCell.data.is_resampling_required && (
-                                        <div
-                                            style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: "10px",
-                                                padding: "12px",
-                                                borderRadius: "8px",
-                                                backgroundColor: resamplingRequirementMet
-                                                    ? "#f0fdf4"
-                                                    : "#fee2e2",
-                                                border: `1px solid ${resamplingRequirementMet ? "#bbf7d0" : "#fecaca"}`,
-                                                marginBottom: "20px",
-                                            }}
-                                        >
-                                            {resamplingRequirementMet ? (
-                                                <CheckCircle size={18} color="#16a34a" />
-                                            ) : (
-                                                <History size={18} color="#dc2626" />
-                                            )}
-                                            <div>
-                                                <div
-                                                    style={{
-                                                        fontSize: "0.75rem",
-                                                        fontWeight: "800",
-                                                        color: resamplingRequirementMet
-                                                            ? "#166534"
-                                                            : "#991b1b",
-                                                    }}
-                                                >
-                                                    {resamplingRequirementMet
-                                                        ? "RESAMPLE REPORT DETECTED"
-                                                        : "RESAMPLING REQUIRED"}
-                                                </div>
-                                                <p
-                                                    style={{
-                                                        margin: 0,
-                                                        fontSize: "0.65rem",
-                                                        color: resamplingRequirementMet
-                                                            ? "#15803d"
-                                                            : "#b91c1c",
-                                                    }}
-                                                >
-                                                    {resamplingRequirementMet
-                                                        ? "A newer report was found in history (Resampling Done)."
-                                                        : "Cannot close until a follow-up report is uploaded."}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Upload Section */}
-                                    <div style={{ marginBottom: "24px" }}>
-                                        <label
-                                            style={{
-                                                display: "block",
-                                                fontSize: "0.65rem",
-                                                fontWeight: "800",
-                                                color: "#64748b",
-                                                marginBottom: "8px",
-                                                textTransform: "uppercase",
-                                            }}
-                                        >
-                                            Attach Evidence / File
-                                        </label>
-                                        <input
-                                            type="file"
-                                            onChange={(e) => {
-                                                const file = e.target.files[0];
-                                                if (file) {
-                                                    // ðŸ”¥ NEW: Size Restriction check
-                                                    if (file.size > 1024 * 1024) {
-                                                        alert(
-                                                            "âŒ File too large. Maximum allowed size is 1MB.",
-                                                        );
-                                                        e.target.value = ""; // Clear the input
-                                                        return;
-                                                    }
-                                                    setSelectedCloseFile(file);
-                                                }
-                                            }}
-                                            style={{ fontSize: "0.8rem", width: "100%" }}
-                                        />
-                                    </div>
-
-                                    {/* Modal Buttons */}
-                                    <div style={{ display: "flex", gap: "12px" }}>
-                                        <button
-                                            onClick={handleResolutionSubmit}
-                                            disabled={isCloseSubmitDisabled}
-                                            style={{
-                                                flex: 1,
-                                                padding: "12px",
-                                                borderRadius: "8px",
-                                                border: "none",
-                                                backgroundColor: isCloseSubmitDisabled
-                                                    ? "#cbd5e1"
-                                                    : "#059669",
-                                                color: "white",
-                                                fontWeight: "700",
-                                                cursor: isCloseSubmitDisabled
-                                                    ? "not-allowed"
-                                                    : "pointer",
-                                                transition: "all 0.2s",
-                                            }}
-                                        >
-                                            {isVesselUser && !resamplingRequirementMet
-                                                ? "WAITING FOR NEW REPORT"
-                                                : isVesselUser && !imageRequirementMet
-                                                    ? "ATTACH FILE TO CLOSE"
-                                                    : "CLOSE REPORT"}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })()}
-                </div>
-            )}
-            {previewImage && (
-                <div
-                    style={{
-                        position: "fixed",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        zIndex: 100000,
-                        backgroundColor: "rgba(0,0,0,0.9)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                    }}
-                    onClick={() => setPreviewImage(null)}
-                >
-                    <div
-                        style={{ position: "relative", maxWidth: "90%", maxHeight: "90%" }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <img
-                            src={previewImage}
-                            style={{ width: "100%", borderRadius: "8px" }}
+                      Physical Characteristics
+                    </h4>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <LineChart
+                        data={trendModal.data}
+                        margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          vertical={false}
+                          stroke="#f1f5f9"
                         />
-                        <button
-                            onClick={() => setPreviewImage(null)}
-                            style={{
-                                position: "absolute",
-                                top: "-40px",
-                                right: 0,
-                                color: "white",
-                                background: "none",
-                                border: "none",
-                                cursor: "pointer",
-                            }}
-                        >
-                            <X size={32} />
-                        </button>
-                    </div>
-                </div>
-            )}
-            {isEvidenceModalOpen && (
-                <div
+                        <XAxis
+                          dataKey="timestamp"
+                          type="number"
+                          domain={["dataMin", "dataMax"]}
+                          tickFormatter={(unixTime) => {
+                            const d = new Date(unixTime);
+                            // Correctly adds 1 to the month and pads with zero
+                            const day = d.getDate().toString().padStart(2, "0");
+                            const month = (d.getMonth() + 1)
+                              .toString()
+                              .padStart(2, "0");
+                            return `${day}/${month}`;
+                          }}
+                          fontSize={9}
+                          tick={{ fill: "#94a3b8" }}
+                        />
+                        <YAxis
+                          yAxisId="left"
+                          fontSize={9}
+                          tick={{ fill: "#2563eb" }}
+                        />
+                        <YAxis
+                          yAxisId="right"
+                          orientation="right"
+                          fontSize={9}
+                          tick={{ fill: "#7c3aed" }}
+                        />
+                        <Tooltip
+                          // This finds the "dateLabel" in your data for that column
+                          labelFormatter={(value, payload) => {
+                            if (payload && payload.length > 0) {
+                              return payload[0].payload.dateLabel;
+                            }
+                            return value;
+                          }}
+                          contentStyle={{
+                            fontSize: "11px",
+                            borderRadius: "8px",
+                            border: "none",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                          }}
+                        />
+                        <Legend
+                          verticalAlign="top"
+                          height={36}
+                          iconType="circle"
+                          iconSize={8}
+                          wrapperStyle={{ fontSize: "10px" }}
+                        />
+                        <Line
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="viscosity_40c"
+                          stroke="#2563eb"
+                          name="Visc 40C"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          activeDot={{ r: 5 }}
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="tan"
+                          stroke="#7c3aed"
+                          name="TAN"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          activeDot={{ r: 5 }}
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="tbn"
+                          stroke="#db2777"
+                          name="TBN"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          activeDot={{ r: 5 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* 2. WEAR METALS */}
+                  <div
                     style={{
-                        position: "fixed",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        zIndex: 100001,
-                        backgroundColor: "rgba(15, 23, 42, 0.95)", // Dark backdrop
-                        display: "flex",
+                      border: "1px solid #f1f5f9",
+                      borderRadius: "8px",
+                      padding: "12px",
+                      backgroundColor: "#fff",
                     }}
-                    onClick={() => {
-                        setIsEvidenceModalOpen(false);
-                        setPreviewImage(null);
-                        setSelectedGalleryItems([]);
-                    }}
-                >
-                    {/* LEFT SIDEBAR: GALLERY LIST */}
-                    <div
-                        style={{
-                            width: "350px",
-                            height: "100%",
-                            backgroundColor: "white",
-                            boxShadow: "4px 0 15px rgba(0,0,0,0.2)",
-                            display: "flex",
-                            flexDirection: "column",
-                            animation: "slideInLeft 0.3s ease",
-                        }}
-                        onClick={(e) => e.stopPropagation()}
+                  >
+                    <h4
+                      style={{
+                        fontSize: "0.8rem",
+                        fontWeight: "600",
+                        color: "#475569",
+                        marginBottom: "12px",
+                        borderLeft: "3px solid #ef4444",
+                        paddingLeft: "8px",
+                      }}
                     >
-                        <div
-                            style={{
-                                padding: "20px",
-                                borderBottom: "1px solid #e2e8f0",
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                            }}
-                        >
-                            <h4
-                                style={{
-                                    margin: 0,
-                                    fontSize: "1.1rem",
-                                    fontWeight: "800",
-                                    color: "#1e293b",
-                                }}
-                            >
-                                Evidence Gallery
-                            </h4>
-                            <X
-                                size={20}
-                                onClick={() => {
-                                    setIsEvidenceModalOpen(false);
-                                    setPreviewImage(null);
-                                    setSelectedGalleryItems([]);
-                                }}
-                                style={{ cursor: "pointer" }}
-                            />
-                        </div>
+                      Wear Metals (ppm)
+                    </h4>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <LineChart
+                        data={trendModal.data}
+                        margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          vertical={false}
+                          stroke="#f1f5f9"
+                        />
+                        <XAxis
+                          dataKey="timestamp"
+                          type="number"
+                          domain={["dataMin", "dataMax"]}
+                          tickFormatter={(unixTime) => {
+                            const d = new Date(unixTime);
+                            // Correctly adds 1 to the month and pads with zero
+                            const day = d.getDate().toString().padStart(2, "0");
+                            const month = (d.getMonth() + 1)
+                              .toString()
+                              .padStart(2, "0");
+                            return `${day}/${month}`;
+                          }}
+                          fontSize={9}
+                          tick={{ fill: "#94a3b8" }}
+                        />
+                        <YAxis fontSize={9} tick={{ fill: "#64748b" }} />
+                        <Tooltip
+                          // This finds the "dateLabel" in your data for that column
+                          labelFormatter={(value, payload) => {
+                            if (payload && payload.length > 0) {
+                              return payload[0].payload.dateLabel;
+                            }
+                            return value;
+                          }}
+                          contentStyle={{
+                            fontSize: "11px",
+                            borderRadius: "8px",
+                            border: "none",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                          }}
+                        />
+                        <Legend
+                          verticalAlign="top"
+                          height={36}
+                          iconType="circle"
+                          iconSize={8}
+                          wrapperStyle={{ fontSize: "10px" }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="iron"
+                          stroke="#ef4444"
+                          name="Iron (Fe)"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          activeDot={{ r: 5 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="copper"
+                          stroke="#f59e0b"
+                          name="Copper (Cu)"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          activeDot={{ r: 5 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="aluminium"
+                          stroke="#94a3b8"
+                          name="Aluminium"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          activeDot={{ r: 5 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
 
-                        <div
-                            style={{
-                                flex: 1,
-                                overflowY: "auto",
-                                padding: "16px",
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "16px",
-                            }}
-                        >
-                            {/* ðŸ”¥ UPDATED FILTER: Now looks for both prefixes */}
-                            {selectedCell.data.conversation?.filter(
-                                (m) =>
-                                    m.message.includes("ATTACHED_IMAGE:") ||
-                                    m.message.includes("ATTACHED_PDF:"),
-                            ).length > 0 ? (
-                                selectedCell.data.conversation
-                                    .filter(
-                                        (m) =>
-                                            m.message.includes("ATTACHED_IMAGE:") ||
-                                            m.message.includes("ATTACHED_PDF:"),
-                                    )
-                                    .map((msg, i) => {
-                                        const isPdf = msg.message.includes("ATTACHED_PDF:");
-                                        const prefix = isPdf
-                                            ? "ATTACHED_PDF: "
-                                            : "ATTACHED_IMAGE: ";
+                  {/* 3. CONTAMINATION */}
+                  <div
+                    style={{
+                      border: "1px solid #f1f5f9",
+                      borderRadius: "8px",
+                      padding: "12px",
+                      backgroundColor: "#fff",
+                    }}
+                  >
+                    <h4
+                      style={{
+                        fontSize: "0.8rem",
+                        fontWeight: "600",
+                        color: "#475569",
+                        marginBottom: "12px",
+                        borderLeft: "3px solid #0891b2",
+                        paddingLeft: "8px",
+                      }}
+                    >
+                      Contamination
+                    </h4>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <LineChart
+                        data={trendModal.data}
+                        margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          vertical={false}
+                          stroke="#f1f5f9"
+                        />
+                        <XAxis
+                          dataKey="timestamp"
+                          type="number"
+                          domain={["dataMin", "dataMax"]}
+                          tickFormatter={(unixTime) => {
+                            const d = new Date(unixTime);
+                            // Correctly adds 1 to the month and pads with zero
+                            const day = d.getDate().toString().padStart(2, "0");
+                            const month = (d.getMonth() + 1)
+                              .toString()
+                              .padStart(2, "0");
+                            return `${day}/${month}`;
+                          }}
+                          fontSize={9}
+                          tick={{ fill: "#94a3b8" }}
+                        />
+                        <YAxis
+                          yAxisId="left"
+                          fontSize={9}
+                          tick={{ fill: "#0891b2" }}
+                        />
+                        <YAxis
+                          yAxisId="right"
+                          orientation="right"
+                          fontSize={9}
+                          tick={{ fill: "#0ea5e9" }}
+                        />
+                        <Tooltip
+                          // This finds the "dateLabel" in your data for that column
+                          labelFormatter={(value, payload) => {
+                            if (payload && payload.length > 0) {
+                              return payload[0].payload.dateLabel;
+                            }
+                            return value;
+                          }}
+                          contentStyle={{
+                            fontSize: "11px",
+                            borderRadius: "8px",
+                            border: "none",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                          }}
+                        />
+                        <Legend
+                          verticalAlign="top"
+                          height={36}
+                          iconType="circle"
+                          iconSize={8}
+                          wrapperStyle={{ fontSize: "10px" }}
+                        />
+                        <Line
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="sodium"
+                          stroke="#0891b2"
+                          name="Sodium"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          activeDot={{ r: 5 }}
+                        />
+                        <Line
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="silicon"
+                          stroke="#4b5563"
+                          name="Silicon"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          activeDot={{ r: 5 }}
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="water"
+                          stroke="#0ea5e9"
+                          name="Water %"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          activeDot={{ r: 5 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
 
-                                        // Extract URL accurately even if it contains colons (SAS tokens)
-                                        const url = msg.message.substring(
-                                            msg.message.indexOf(prefix) + prefix.length,
-                                        );
+                  {/* 4. ADDITIVES */}
+                  <div
+                    style={{
+                      border: "1px solid #f1f5f9",
+                      borderRadius: "8px",
+                      padding: "12px",
+                      backgroundColor: "#fff",
+                    }}
+                  >
+                    <h4
+                      style={{
+                        fontSize: "0.8rem",
+                        fontWeight: "600",
+                        color: "#475569",
+                        marginBottom: "12px",
+                        borderLeft: "3px solid #10b981",
+                        paddingLeft: "8px",
+                      }}
+                    >
+                      Additives
+                    </h4>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <LineChart
+                        data={trendModal.data}
+                        margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          vertical={false}
+                          stroke="#f1f5f9"
+                        />
+                        <XAxis
+                          dataKey="timestamp"
+                          type="number"
+                          domain={["dataMin", "dataMax"]}
+                          tickFormatter={(unixTime) => {
+                            const d = new Date(unixTime);
+                            // Correctly adds 1 to the month and pads with zero
+                            const day = d.getDate().toString().padStart(2, "0");
+                            const month = (d.getMonth() + 1)
+                              .toString()
+                              .padStart(2, "0");
+                            return `${day}/${month}`;
+                          }}
+                          fontSize={9}
+                          tick={{ fill: "#94a3b8" }}
+                        />
+                        <YAxis fontSize={9} tick={{ fill: "#64748b" }} />
+                        <Tooltip
+                          // This finds the "dateLabel" in your data for that column
+                          labelFormatter={(value, payload) => {
+                            if (payload && payload.length > 0) {
+                              return payload[0].payload.dateLabel;
+                            }
+                            return value;
+                          }}
+                          contentStyle={{
+                            fontSize: "11px",
+                            borderRadius: "8px",
+                            border: "none",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                          }}
+                        />
+                        <Legend
+                          verticalAlign="top"
+                          height={36}
+                          iconType="circle"
+                          iconSize={8}
+                          wrapperStyle={{ fontSize: "10px" }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="calcium"
+                          stroke="#10b981"
+                          name="Calcium %"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          activeDot={{ r: 5 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="magnesium"
+                          stroke="#f97316"
+                          name="Magnesium"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          activeDot={{ r: 5 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="zinc"
+                          stroke="#6366f1"
+                          name="Zinc"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          activeDot={{ r: 5 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    height: "300px",
+                    color: "#94a3b8",
+                  }}
+                >
+                  <TrendingUp
+                    size={40}
+                    style={{ opacity: 0.3, marginBottom: "12px" }}
+                  />
+                  <p style={{ fontSize: "0.9rem" }}>
+                    No historical analysis data found for this equipment.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {isCloseModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.85)",
+            zIndex: 100005,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          {/* CALCULATE GATING LOGIC INSIDE MODAL */}
+          {(() => {
+            const isVesselUser = !amIShore;
+            const currentSampleDate = new Date(
+              selectedCell?.data?.date || selectedCell?.data?.sample_date,
+            );
 
-                                        // Use the URL as the unique identifier for selection (safer than date)
-                                        const isChecked = selectedGalleryItems.some(
-                                            (item) => item.url === url,
-                                        );
-                                        const uploaderName =
-                                            msg.message.match(/\] (.*?):/)?.[1] || msg.role;
+            // 1. Image Check: Satisfied if not required OR file chosen now OR file already in gallery
+            const evidenceExistsInGallery =
+              selectedCell?.data?.attachment_url &&
+              selectedCell.data.attachment_url.trim().length > 0;
+            const imageRequirementMet =
+              !selectedCell?.data?.is_image_required ||
+              evidenceExistsInGallery ||
+              selectedCloseFile;
 
-                                        return (
-                                            <div
-                                                key={i}
-                                                // PDFs open in new tab, Images preview on the right
-                                                onClick={() =>
-                                                    isPdf
-                                                        ? window.open(url, "_blank")
-                                                        : setPreviewImage(url)
-                                                }
-                                                style={{
-                                                    padding: "12px",
-                                                    cursor: "pointer",
-                                                    border:
-                                                        previewImage === url
-                                                            ? "2px solid #2563eb"
-                                                            : "1px solid #e2e8f0",
-                                                    borderRadius: "12px",
-                                                    backgroundColor: isChecked
-                                                        ? "#fff1f2"
-                                                        : previewImage === url
-                                                            ? "#eff6ff"
-                                                            : "#f8fafc",
-                                                    transition: "all 0.2s",
-                                                    position: "relative",
-                                                }}
-                                            >
-                                                {/* Selection Checkbox */}
-                                                <div
-                                                    style={{
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        gap: "8px",
-                                                        marginBottom: "8px",
-                                                    }}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isChecked}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        onChange={() => {
-                                                            setSelectedGalleryItems((prev) =>
-                                                                isChecked
-                                                                    ? prev.filter((item) => item.url !== url)
-                                                                    : [...prev, { ...msg, url }],
-                                                            );
-                                                        }}
-                                                        style={{
-                                                            cursor: "pointer",
-                                                            width: "18px",
-                                                            height: "18px",
-                                                        }}
-                                                    />
-                                                    <span
-                                                        style={{
-                                                            fontSize: "0.7rem",
-                                                            fontWeight: "800",
-                                                            color: isChecked ? "#ef4444" : "#64748b",
-                                                        }}
-                                                    >
-                                                        {isChecked
-                                                            ? "SELECTED"
-                                                            : `SELECT ${isPdf ? "FILE" : "IMAGE"}`}
-                                                    </span>
-                                                </div>
+            // 2. Resampling Check: Satisfied if not required OR a report in history is newer than this sample
+            const hasNewerReport = selectedCell?.data?.history?.some(
+              (h) => new Date(h.date) > currentSampleDate,
+            );
+            const resamplingRequirementMet =
+              !selectedCell?.data?.is_resampling_required || hasNewerReport;
 
-                                                <div
-                                                    style={{
-                                                        fontSize: "0.7rem",
-                                                        color: "#64748b",
-                                                        marginBottom: "8px",
-                                                        fontWeight: "700",
-                                                    }}
-                                                >
-                                                    Uploaded by:{" "}
-                                                    <span style={{ color: "#1e293b" }}>
-                                                        {uploaderName}
-                                                    </span>{" "}
-                                                    <br /> {msg.date}
-                                                </div>
+            // 3. Final State logic
+            const canVesselSubmit =
+              imageRequirementMet && resamplingRequirementMet;
+            const isCloseSubmitDisabled =
+              isSubmittingClose ||
+              (closeRemarksText?.length || 0) < 50 ||
+              (isVesselUser && !canVesselSubmit);
 
-                                                {/* UI Branch: PDF Icon vs Image Thumbnail */}
-                                                {isPdf ||
-                                                    url.toLowerCase().includes(".xls") ||
-                                                    url.toLowerCase().includes(".doc") ? (
-                                                    <div
-                                                        style={{
-                                                            width: "100%",
-                                                            height: "130px",
-                                                            backgroundColor: "#f1f5f9",
-                                                            borderRadius: "8px",
-                                                            border: "1px solid #cbd5e1",
-                                                            display: "flex",
-                                                            flexDirection: "column",
-                                                            alignItems: "center",
-                                                            justifyContent: "center",
-                                                            gap: "8px",
-                                                        }}
-                                                    >
-                                                        {/* Dynamic Icon based on type */}
-                                                        {url.toLowerCase().includes(".xls") ? (
-                                                            <TrendingUp size={40} color="#16a34a" /> // Green for Excel
-                                                        ) : (
-                                                            <FileText size={40} color="#2563eb" /> // Blue for others
-                                                        )}
-                                                        <span
-                                                            style={{
-                                                                fontSize: "0.6rem",
-                                                                fontWeight: "800",
-                                                                color: "#475569",
-                                                            }}
-                                                        >
-                                                            CLICK TO PREVIEW FILE
-                                                        </span>
-                                                    </div>
-                                                ) : (
-                                                    <img
-                                                        src={url}
-                                                        alt="evidence"
-                                                        style={{
-                                                            width: "100%",
-                                                            height: "130px",
-                                                            objectFit: "cover",
-                                                            borderRadius: "8px",
-                                                            border: "1px solid #cbd5e1",
-                                                        }}
-                                                    />
-                                                )}
-                                            </div>
-                                        );
-                                    })
-                            ) : (
-                                <div
-                                    style={{
-                                        textAlign: "center",
-                                        padding: "40px 20px",
-                                        color: "#94a3b8",
-                                    }}
-                                >
-                                    No attachments found.
-                                </div>
-                            )}
-                        </div>
+            return (
+              <div
+                style={{
+                  backgroundColor: "white",
+                  width: "100%",
+                  maxWidth: "550px",
+                  borderRadius: "16px",
+                  overflow: "hidden",
+                  maxHeight: "88vh",
+                  marginTop: "60px", // Push down to avoid Top Nav Header
+                  overflowY: "scroll",
+                  boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)",
+                }}
+              >
+                {/* Header */}
+                <div
+                  style={{
+                    padding: "20px",
+                    borderBottom: "1px solid #e2e8f0",
+                    backgroundColor: "#f8fafc",
+                    display: "flex",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <h3
+                    style={{ margin: 0, fontSize: "1.1rem", fontWeight: "800" }}
+                  >
+                    Equipment Resolution Detail
+                  </h3>
+                  <X
+                    size={20}
+                    style={{ cursor: "pointer", color: "#94a3b8" }}
+                    onClick={() => setIsCloseModalOpen(false)}
+                  />
+                </div>
 
-                        {/* SIDEBAR FOOTER */}
-                        <div
-                            style={{
-                                padding: "16px",
-                                borderTop: "1px solid #e2e8f0",
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "10px",
-                            }}
-                        >
-                            {selectedGalleryItems.length > 0 && (
-                                <button
-                                    onClick={handleBulkDelete}
-                                    style={{
-                                        width: "100%",
-                                        backgroundColor: "#ef4444",
-                                        color: "white",
-                                        border: "none",
-                                        padding: "12px",
-                                        borderRadius: "8px",
-                                        fontWeight: "800",
-                                        cursor: "pointer",
-                                        boxShadow: "0 4px 6px rgba(239, 68, 68, 0.2)",
-                                    }}
-                                >
-                                    DELETE SELECTED ({selectedGalleryItems.length})
-                                </button>
-                            )}
-                            <Button
-                                onClick={() => {
-                                    setIsEvidenceModalOpen(false);
-                                    setPreviewImage(null);
-                                    setSelectedGalleryItems([]);
-                                }}
-                                style={{
-                                    width: "100%",
-                                    backgroundColor: "#0f172a",
-                                    color: "white",
-                                    fontWeight: "700",
-                                }}
-                            >
-                                Close Gallery
-                            </Button>
-                        </div>
-                    </div>
-
-                    {/* RIGHT SIDE: FULL PREVIEW AREA */}
-                    <div
+                <div style={{ padding: "24px" }}>
+                  <p
+                    style={{
+                      margin: "0 0 16px 0",
+                      fontSize: "0.85rem",
+                      color: "#475569",
+                      lineHeight: "1.5",
+                    }}
+                  >
+                    Documenting resolution for{" "}
+                    <b>
+                      {selectedCell.vessel} - {selectedCell.machinery}
+                    </b>
+                    .
+                    <br />
+                    <span style={{ fontSize: "0.75rem" }}>
+                      Current Status:{" "}
+                      <b
                         style={{
-                            flex: 1,
+                          color: getStatusColor(selectedCell.data.status),
+                        }}
+                      >
+                        {selectedCell.data.status}
+                      </b>
+                    </span>
+                  </p>
+
+                  {/* Text Area with Character Counter */}
+                  <div style={{ marginBottom: "20px" }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.65rem",
+                        fontWeight: "800",
+                        color: "#64748b",
+                        marginBottom: "8px",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Correction / Action Remarks (Min 50 Chars)
+                    </label>
+                    <textarea
+                      value={closeRemarksText}
+                      onChange={(e) => setCloseRemarksText(e.target.value)}
+                      placeholder="Describe the corrective maintenance or investigation performed..."
+                      style={{
+                        width: "100%",
+                        height: "140px",
+                        padding: "12px",
+                        borderRadius: "10px",
+                        border: `2px solid ${closeRemarksText.length >= 50 ? "#10b981" : "#e2e8f0"}`,
+                        fontSize: "0.9rem",
+                        resize: "none",
+                        transition: "all 0.2s",
+                      }}
+                    />
+                    <div
+                      style={{
+                        textAlign: "right",
+                        marginTop: "6px",
+                        fontSize: "0.7rem",
+                        fontWeight: "700",
+                        color:
+                          closeRemarksText.length >= 50 ? "#10b981" : "#ef4444",
+                      }}
+                    >
+                      {closeRemarksText.length} / 50 characters
+                    </div>
+                  </div>
+
+                  {/* --- IMAGE MANDATORY STATUS BANNER (BUG FIX: Checks gallery) --- */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "5px",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      backgroundColor: imageRequirementMet
+                        ? "#f0fdf4"
+                        : "#fee2e2",
+                      border: `1px solid ${imageRequirementMet ? "#bbf7d0" : "#fecaca"}`,
+                      marginBottom: "10px",
+                    }}
+                  >
+                    {imageRequirementMet ? (
+                      <CheckCircle size={18} color="#16a34a" />
+                    ) : (
+                      <AlertTriangle size={18} color="#dc2626" />
+                    )}
+                    <div>
+                      <div
+                        style={{
+                          fontSize: "0.75rem",
+                          fontWeight: "800",
+                          color: imageRequirementMet ? "#166534" : "#991b1b",
+                        }}
+                      >
+                        {selectedCell.data.is_image_required
+                          ? imageRequirementMet
+                            ? "EVIDENCE VERIFIED"
+                            : "EVIDENCE UPLOAD MANDATORY"
+                          : "EVIDENCE UPLOAD OPTIONAL"}
+                      </div>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: "0.65rem",
+                          color: imageRequirementMet ? "#15803d" : "#b91c1c",
+                        }}
+                      >
+                        {evidenceExistsInGallery
+                          ? "Requirement satisfied via existing gallery evidence."
+                          : selectedCell.data.is_image_required
+                            ? imageRequirementMet
+                              ? "File attached successfully."
+                              : "Vessel must provide a file to resolve."
+                            : "No mandatory image request for this report."}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* --- NEW: RESAMPLING MANDATORY STATUS BANNER --- */}
+                  {selectedCell.data.is_resampling_required && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        padding: "12px",
+                        borderRadius: "8px",
+                        backgroundColor: resamplingRequirementMet
+                          ? "#f0fdf4"
+                          : "#fee2e2",
+                        border: `1px solid ${resamplingRequirementMet ? "#bbf7d0" : "#fecaca"}`,
+                        marginBottom: "20px",
+                      }}
+                    >
+                      {resamplingRequirementMet ? (
+                        <CheckCircle size={18} color="#16a34a" />
+                      ) : (
+                        <History size={18} color="#dc2626" />
+                      )}
+                      <div>
+                        <div
+                          style={{
+                            fontSize: "0.75rem",
+                            fontWeight: "800",
+                            color: resamplingRequirementMet
+                              ? "#166534"
+                              : "#991b1b",
+                          }}
+                        >
+                          {resamplingRequirementMet
+                            ? "RESAMPLE REPORT DETECTED"
+                            : "RESAMPLING REQUIRED"}
+                        </div>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: "0.65rem",
+                            color: resamplingRequirementMet
+                              ? "#15803d"
+                              : "#b91c1c",
+                          }}
+                        >
+                          {resamplingRequirementMet
+                            ? "A newer report was found in history (Resampling Done)."
+                            : "Cannot close until a follow-up report is uploaded."}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Upload Section */}
+                  <div style={{ marginBottom: "24px" }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.65rem",
+                        fontWeight: "800",
+                        color: "#64748b",
+                        marginBottom: "8px",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Attach Evidence / File
+                    </label>
+                    <input
+                      type="file"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          // ðŸ”¥ NEW: Size Restriction check
+                          if (file.size > 1024 * 1024) {
+                            alert(
+                              "âŒ File too large. Maximum allowed size is 1MB.",
+                            );
+                            e.target.value = ""; // Clear the input
+                            return;
+                          }
+                          setSelectedCloseFile(file);
+                        }
+                      }}
+                      style={{ fontSize: "0.8rem", width: "100%" }}
+                    />
+                  </div>
+
+                  {/* Modal Buttons */}
+                  <div style={{ display: "flex", gap: "12px" }}>
+                    <button
+                      onClick={handleResolutionSubmit}
+                      disabled={isCloseSubmitDisabled}
+                      style={{
+                        flex: 1,
+                        padding: "12px",
+                        borderRadius: "8px",
+                        border: "none",
+                        backgroundColor: isCloseSubmitDisabled
+                          ? "#cbd5e1"
+                          : "#059669",
+                        color: "white",
+                        fontWeight: "700",
+                        cursor: isCloseSubmitDisabled
+                          ? "not-allowed"
+                          : "pointer",
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      {isVesselUser && !resamplingRequirementMet
+                        ? "WAITING FOR NEW REPORT"
+                        : isVesselUser && !imageRequirementMet
+                          ? "ATTACH FILE TO CLOSE"
+                          : "CLOSE REPORT"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+      {previewImage && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 100000,
+            backgroundColor: "rgba(0,0,0,0.9)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            style={{ position: "relative", maxWidth: "90%", maxHeight: "90%" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={previewImage}
+              style={{ width: "100%", borderRadius: "8px" }}
+            />
+            <button
+              onClick={() => setPreviewImage(null)}
+              style={{
+                position: "absolute",
+                top: "-40px",
+                right: 0,
+                color: "white",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              <X size={32} />
+            </button>
+          </div>
+        </div>
+      )}
+      {isEvidenceModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 100001,
+            backgroundColor: "rgba(15, 23, 42, 0.95)", // Dark backdrop
+            display: "flex",
+          }}
+          onClick={() => {
+            setIsEvidenceModalOpen(false);
+            setPreviewImage(null);
+            setSelectedGalleryItems([]);
+          }}
+        >
+          {/* LEFT SIDEBAR: GALLERY LIST */}
+          <div
+            style={{
+              width: "350px",
+              height: "100%",
+              backgroundColor: "white",
+              boxShadow: "4px 0 15px rgba(0,0,0,0.2)",
+              display: "flex",
+              flexDirection: "column",
+              animation: "slideInLeft 0.3s ease",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                padding: "20px",
+                borderBottom: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <h4
+                style={{
+                  margin: 0,
+                  fontSize: "1.1rem",
+                  fontWeight: "800",
+                  color: "#1e293b",
+                }}
+              >
+                Evidence Gallery
+              </h4>
+              <X
+                size={20}
+                onClick={() => {
+                  setIsEvidenceModalOpen(false);
+                  setPreviewImage(null);
+                  setSelectedGalleryItems([]);
+                }}
+                style={{ cursor: "pointer" }}
+              />
+            </div>
+
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "16px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+              }}
+            >
+              {/* ðŸ”¥ UPDATED FILTER: Now looks for both prefixes */}
+              {selectedCell.data.conversation?.filter(
+                (m) =>
+                  m.message.includes("ATTACHED_IMAGE:") ||
+                  m.message.includes("ATTACHED_PDF:"),
+              ).length > 0 ? (
+                selectedCell.data.conversation
+                  .filter(
+                    (m) =>
+                      m.message.includes("ATTACHED_IMAGE:") ||
+                      m.message.includes("ATTACHED_PDF:"),
+                  )
+                  .map((msg, i) => {
+                    const isPdf = msg.message.includes("ATTACHED_PDF:");
+                    const prefix = isPdf
+                      ? "ATTACHED_PDF: "
+                      : "ATTACHED_IMAGE: ";
+
+                    // Extract URL accurately even if it contains colons (SAS tokens)
+                    const url = msg.message.substring(
+                      msg.message.indexOf(prefix) + prefix.length,
+                    );
+
+                    // Use the URL as the unique identifier for selection (safer than date)
+                    const isChecked = selectedGalleryItems.some(
+                      (item) => item.url === url,
+                    );
+                    const uploaderName =
+                      msg.message.match(/\] (.*?):/)?.[1] || msg.role;
+
+                    return (
+                      <div
+                        key={i}
+                        // PDFs open in new tab, Images preview on the right
+                        onClick={() =>
+                          isPdf
+                            ? window.open(url, "_blank")
+                            : setPreviewImage(url)
+                        }
+                        style={{
+                          padding: "12px",
+                          cursor: "pointer",
+                          border:
+                            previewImage === url
+                              ? "2px solid #2563eb"
+                              : "1px solid #e2e8f0",
+                          borderRadius: "12px",
+                          backgroundColor: isChecked
+                            ? "#fff1f2"
+                            : previewImage === url
+                              ? "#eff6ff"
+                              : "#f8fafc",
+                          transition: "all 0.2s",
+                          position: "relative",
+                        }}
+                      >
+                        {/* Selection Checkbox */}
+                        <div
+                          style={{
                             display: "flex",
                             alignItems: "center",
-                            justifyContent: "center",
-                            position: "relative",
-                            padding: "120px 60px 60px 60px",
-                            backgroundColor: "#0f172a",
-                            backgroundImage: "none",
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {previewImage ? (
-                            <div
-                                style={{
-                                    position: "relative",
-                                    maxWidth: "100%",
-                                    maxHeight: "100%",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                }}
+                            gap: "8px",
+                            marginBottom: "8px",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={() => {
+                              setSelectedGalleryItems((prev) =>
+                                isChecked
+                                  ? prev.filter((item) => item.url !== url)
+                                  : [...prev, { ...msg, url }],
+                              );
+                            }}
+                            style={{
+                              cursor: "pointer",
+                              width: "18px",
+                              height: "18px",
+                            }}
+                          />
+                          <span
+                            style={{
+                              fontSize: "0.7rem",
+                              fontWeight: "800",
+                              color: isChecked ? "#ef4444" : "#64748b",
+                            }}
+                          >
+                            {isChecked
+                              ? "SELECTED"
+                              : `SELECT ${isPdf ? "FILE" : "IMAGE"}`}
+                          </span>
+                        </div>
+
+                        <div
+                          style={{
+                            fontSize: "0.7rem",
+                            color: "#64748b",
+                            marginBottom: "8px",
+                            fontWeight: "700",
+                          }}
+                        >
+                          Uploaded by:{" "}
+                          <span style={{ color: "#1e293b" }}>
+                            {uploaderName}
+                          </span>{" "}
+                          <br /> {msg.date}
+                        </div>
+
+                        {/* UI Branch: PDF Icon vs Image Thumbnail */}
+                        {isPdf ||
+                        url.toLowerCase().includes(".xls") ||
+                        url.toLowerCase().includes(".doc") ? (
+                          <div
+                            style={{
+                              width: "100%",
+                              height: "130px",
+                              backgroundColor: "#f1f5f9",
+                              borderRadius: "8px",
+                              border: "1px solid #cbd5e1",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "8px",
+                            }}
+                          >
+                            {/* Dynamic Icon based on type */}
+                            {url.toLowerCase().includes(".xls") ? (
+                              <TrendingUp size={40} color="#16a34a" /> // Green for Excel
+                            ) : (
+                              <FileText size={40} color="#2563eb" /> // Blue for others
+                            )}
+                            <span
+                              style={{
+                                fontSize: "0.6rem",
+                                fontWeight: "800",
+                                color: "#475569",
+                              }}
                             >
-                                <button
-                                    onClick={() => setPreviewImage(null)}
-                                    style={{
-                                        position: "absolute",
-                                        right: "0px",
-                                        backgroundColor: "white",
-                                        border: "none",
-                                        borderRadius: "50%",
-                                        width: "50px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        cursor: "pointer",
-                                        boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.5)",
-                                        zIndex: 10,
-                                    }}
-                                >
-                                    <X size={22} color="#0f172a" />
-                                </button>
-                                {(() => {
-                                    const urlLower = previewImage.toLowerCase().split("?")[0]; // Ignore SAS token for extension check
-                                    const isExcel =
-                                        urlLower.endsWith(".xlsx") ||
-                                        urlLower.endsWith(".xls") ||
-                                        urlLower.endsWith(".csv");
-                                    const isDoc =
-                                        urlLower.endsWith(".docx") || urlLower.endsWith(".doc");
-                                    const isPdf = urlLower.endsWith(".pdf");
-
-                                    // ðŸ”¥ SHARED STYLE OBJECT: This ensures Image, Excel, and PDF look identical
-                                    const frameStyle = {
-                                        width: isExcel || isDoc || isPdf ? "80vw" : "auto",
-                                        maxWidth: "100%",
-                                        height: isExcel || isDoc || isPdf ? "75vh" : "auto",
-                                        maxHeight: "75vh",
-                                        borderRadius: "12px",
-                                        boxShadow: "0 25px 50px -12px rgba(0,0,0,0.8)",
-                                        border: "6px solid white", // Same border as your image layout
-                                        backgroundColor: "white", // Ensures a clean background behind docs
-                                        objectFit: "contain",
-                                        display: "block",
-                                    };
-
-                                    // Case 1: Excel or Word Documents (Use Microsoft Viewer)
-                                    if (isExcel || isDoc) {
-                                        return (
-                                            <iframe
-                                                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewImage)}`}
-                                                style={frameStyle}
-                                                title="Office Preview"
-                                            />
-                                        );
-                                    }
-
-                                    // Case 2: PDF Files (Use standard iframe)
-                                    if (isPdf) {
-                                        return (
-                                            <iframe
-                                                src={previewImage}
-                                                style={frameStyle}
-                                                title="PDF Preview"
-                                            />
-                                        );
-                                    }
-
-                                    // Case 3: Images (Uses the same shared style object)
-                                    return (
-                                        <img
-                                            src={previewImage}
-                                            alt="Full view"
-                                            style={frameStyle}
-                                        />
-                                    );
-                                })()}
-                            </div>
+                              CLICK TO PREVIEW FILE
+                            </span>
+                          </div>
                         ) : (
-                            <div
-                                style={{ textAlign: "center", color: "rgba(255,255,255,0.2)" }}
-                            >
-                                <Activity
-                                    size={100}
-                                    style={{ marginBottom: "20px", opacity: 0.1 }}
-                                />
-                                <p style={{ fontSize: "1.5rem", fontWeight: "600" }}>
-                                    Select an image card to preview
-                                </p>
-                                <p style={{ fontSize: "0.9rem", opacity: 0.6 }}>
-                                    PDFs will open in a new browser tab when clicked.
-                                </p>
-                            </div>
+                          <img
+                            src={url}
+                            alt="evidence"
+                            style={{
+                              width: "100%",
+                              height: "130px",
+                              objectFit: "cover",
+                              borderRadius: "8px",
+                              border: "1px solid #cbd5e1",
+                            }}
+                          />
                         )}
-                    </div>
+                      </div>
+                    );
+                  })
+              ) : (
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "40px 20px",
+                    color: "#94a3b8",
+                  }}
+                >
+                  No attachments found.
                 </div>
+              )}
+            </div>
+
+            {/* SIDEBAR FOOTER */}
+            <div
+              style={{
+                padding: "16px",
+                borderTop: "1px solid #e2e8f0",
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+              }}
+            >
+              {selectedGalleryItems.length > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  style={{
+                    width: "100%",
+                    backgroundColor: "#ef4444",
+                    color: "white",
+                    border: "none",
+                    padding: "12px",
+                    borderRadius: "8px",
+                    fontWeight: "800",
+                    cursor: "pointer",
+                    boxShadow: "0 4px 6px rgba(239, 68, 68, 0.2)",
+                  }}
+                >
+                  DELETE SELECTED ({selectedGalleryItems.length})
+                </button>
+              )}
+              <Button
+                onClick={() => {
+                  setIsEvidenceModalOpen(false);
+                  setPreviewImage(null);
+                  setSelectedGalleryItems([]);
+                }}
+                style={{
+                  width: "100%",
+                  backgroundColor: "#0f172a",
+                  color: "white",
+                  fontWeight: "700",
+                }}
+              >
+                Close Gallery
+              </Button>
+            </div>
+          </div>
+
+          {/* RIGHT SIDE: FULL PREVIEW AREA */}
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
+              padding: "120px 60px 60px 60px",
+              backgroundColor: "#0f172a",
+              backgroundImage: "none",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {previewImage ? (
+              <div
+                style={{
+                  position: "relative",
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                }}
+              >
+                <button
+                  onClick={() => setPreviewImage(null)}
+                  style={{
+                    position: "absolute",
+                    right: "0px",
+                    backgroundColor: "white",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: "50px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.5)",
+                    zIndex: 10,
+                  }}
+                >
+                  <X size={22} color="#0f172a" />
+                </button>
+                {(() => {
+                  const urlLower = previewImage.toLowerCase().split("?")[0]; // Ignore SAS token for extension check
+                  const isExcel =
+                    urlLower.endsWith(".xlsx") ||
+                    urlLower.endsWith(".xls") ||
+                    urlLower.endsWith(".csv");
+                  const isDoc =
+                    urlLower.endsWith(".docx") || urlLower.endsWith(".doc");
+                  const isPdf = urlLower.endsWith(".pdf");
+
+                  // ðŸ”¥ SHARED STYLE OBJECT: This ensures Image, Excel, and PDF look identical
+                  const frameStyle = {
+                    width: isExcel || isDoc || isPdf ? "80vw" : "auto",
+                    maxWidth: "100%",
+                    height: isExcel || isDoc || isPdf ? "75vh" : "auto",
+                    maxHeight: "75vh",
+                    borderRadius: "12px",
+                    boxShadow: "0 25px 50px -12px rgba(0,0,0,0.8)",
+                    border: "6px solid white", // Same border as your image layout
+                    backgroundColor: "white", // Ensures a clean background behind docs
+                    objectFit: "contain",
+                    display: "block",
+                  };
+
+                  // Case 1: Excel or Word Documents (Use Microsoft Viewer)
+                  if (isExcel || isDoc) {
+                    return (
+                      <iframe
+                        src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewImage)}`}
+                        style={frameStyle}
+                        title="Office Preview"
+                      />
+                    );
+                  }
+
+                  // Case 2: PDF Files (Use standard iframe)
+                  if (isPdf) {
+                    return (
+                      <iframe
+                        src={previewImage}
+                        style={frameStyle}
+                        title="PDF Preview"
+                      />
+                    );
+                  }
+
+                  // Case 3: Images (Uses the same shared style object)
+                  return (
+                    <img
+                      src={previewImage}
+                      alt="Full view"
+                      style={frameStyle}
+                    />
+                  );
+                })()}
+              </div>
+            ) : (
+              <div
+                style={{ textAlign: "center", color: "rgba(255,255,255,0.2)" }}
+              >
+                <Activity
+                  size={100}
+                  style={{ marginBottom: "20px", opacity: 0.1 }}
+                />
+                <p style={{ fontSize: "1.5rem", fontWeight: "600" }}>
+                  Select an image card to preview
+                </p>
+                <p style={{ fontSize: "0.9rem", opacity: 0.6 }}>
+                  PDFs will open in a new browser tab when clicked.
+                </p>
+              </div>
             )}
+          </div>
         </div>
-    );
+      )}
+    </div>
+  );
 };
 
 export default LuboilAnalysis;
-
-
-
-
-

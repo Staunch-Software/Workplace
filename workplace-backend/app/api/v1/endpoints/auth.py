@@ -39,7 +39,12 @@ async def login(
     await db.commit()
 
     return Token(
-        access_token=create_access_token(subject=str(user.id)),
+        access_token=create_access_token(
+            subject=str(user.id),
+            role=user.role,                     # ✅ SHORE/VESSEL/ADMIN from DB
+            full_name=user.full_name,
+            permissions=user.permissions or {}
+        ),
         id=str(user.id),
         full_name=user.full_name,
         email=user.email,

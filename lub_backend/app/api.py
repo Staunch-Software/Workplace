@@ -70,52 +70,44 @@ class NotificationReadResponse(BaseModel):
     is_read: bool
 
 def get_allowed_vessel_imos(db, current_user):
-    from app.core.database_control import SessionControl
     from app.models.control.user import User
     from app.models.control.vessel import Vessel as ControlVessel
     import uuid
 
-    roles_list = current_user.get("roles", [])
-    role = (roles_list[0] if roles_list else "user")
-    role_upper = role.upper()
+    # ✅ Standardized: Read 'id' and 'role' from the JWT payload
+    user_id_raw = current_user.get("id") 
+    role = str(current_user.get("role") or "").upper()
 
-    logger.info(f"🔍 current_user payload: {current_user}")
-    logger.info(f"🔍 roles_list: {roles_list}, role: {role}, role_upper: {role_upper}")
+    logger.info(f"🔍 Resolved Identity - Role: '{role}', ID: {user_id_raw}")
 
     control_db = SessionControl()
     try:
-        if role_upper in ("ADMIN", "SUPERUSER"):
+        # ✅ Standardized Shore Check
+        if role in ("ADMIN", "SUPERUSER", "SHORE", "SUPERINTENDENT"):
             all_vessels = control_db.query(ControlVessel.imo).all()
             imos = [v[0] for v in all_vessels]
-            logger.info(f"✅ Admin path — vessels: {imos}")
             return imos, role
 
-        user_id = current_user.get("sub") or current_user.get("id")
-        logger.info(f"🔍 user_id from token: {user_id}")
-
-        if not user_id:
-            logger.error("❌ No user_id found in token")
+        if not user_id_raw:
             return [], role
 
+        # ✅ UUID Conversion for New Table
         try:
             db_user = control_db.query(User).filter(
-                User.id == uuid.UUID(str(user_id))
+                User.id == uuid.UUID(str(user_id_raw))
             ).first()
         except Exception as e:
-            logger.error(f"❌ UUID conversion failed: {e}")
+            logger.error(f"❌ UUID conversion error: {e}")
             return [], role
 
-        logger.info(f"🔍 db_user found: {db_user}")
         if not db_user:
-            logger.error(f"❌ No user found in control DB for id: {user_id}")
             return [], role
 
+        # ✅ Relationship Logic (Many-to-Many)
         imos = [v.imo for v in db_user.vessels]
-        logger.info(f"✅ User vessels: {imos}")
         return imos, role
     finally:
         control_db.close()
-
 
 def inject_attachments_to_chat(attachment_string, sample_date, target_list, status_log=None):
     if not attachment_string:
@@ -595,14 +587,21 @@ async def update_luboil_remarks(
 
         # --- SAFER ROLE DETECTION (Fixes 'NoneType' Error) ---
         userData = current_user.get('user') if isinstance(current_user, dict) and 'user' in current_user else current_user
-        if isinstance(userData, dict):
-            uAccess = str(userData.get('access_type') or "").upper()
-            uRole = str(userData.get('role') or "").upper()
-        else:
-            uAccess = str(getattr(userData, 'access_type', "") or "").upper()
-            uRole = str(getattr(userData, 'role', "") or "").upper()
         
-        is_shore_user = uAccess == "SHORE" or uRole in ["ADMIN", "SUPERUSER"]
+        uRole = ""
+        if isinstance(userData, dict):
+            uRole = str(userData.get('role') or userData.get('uRole') or "").upper()
+            if not uRole:
+                roles_list = userData.get('roles', [])
+                uRole = str(roles_list[0]).upper() if roles_list else ""
+        else:
+            uRole = str(getattr(userData, 'role', "") or getattr(userData, 'uRole', "") or "").upper()
+
+        is_shore_user = uRole in ("SHORE", "ADMIN", "SUPERUSER", "SUPERINTENDENT", "SUPER")
+        
+        # Log this to verify in your terminal
+        logger.info(f"👤 Detected Role: '{uRole}' | Is Shore: {is_shore_user}")
+        
 
         # 3. Apply Update Fields
         if request.officer_remarks is not None:
@@ -695,7 +694,7 @@ async def update_luboil_remarks(
         elif is_shore_user and request.is_resolved is True:
             sample.is_resolved = True
             if hasattr(sample, 'is_approval_pending'):
-                sample.is_approval_pending = False
+                sample.is_approval_pending = False 
             sample.resolution_remarks = request.resolution_remarks
             
             line_1 = f"âœ… ISSUE CLOSED BY SHORE - {vessel.name}"
@@ -1787,7 +1786,9 @@ async def get_vessel_mentions(
 
         # 4. Internal mode: shore only
         if chat_mode == "internal":
-            query = query.filter(User.role.in_(["SHORE", "ADMIN"]))
+            # Match the exact roles from your new table data
+            query = query.filter(User.role.in_(["SHORE", "ADMIN", "SUPERUSER", "SUPERINTENDENT"]))
+
 
         users = query.all()
     finally:
@@ -1813,7 +1814,7 @@ async def get_notifications(
     # ðŸ”¥ FIX: Robust ID detection (Handles both Object and Dictionary)
     user_id = None
     if hasattr(current_user, 'id'):
-        user_id = current_user.id
+        user_id = current_user.get("id")
     elif isinstance(current_user, dict):
         user_id = current_user.get('id') or current_user.get('sub') or current_user.get('user_id')
 
@@ -1874,7 +1875,7 @@ async def get_luboil_live_feed(
     # 1. ROBUST USER ID EXTRACTION
     user_id = None
     if hasattr(current_user, 'id'):
-        user_id = current_user.id
+        user_id = current_user.get("id")
     elif isinstance(current_user, dict):
         user_id = current_user.get('id') or current_user.get('user_id') or current_user.get('sub')
 
@@ -1946,7 +1947,7 @@ async def mark_event_read(
     # ROBUST USER ID EXTRACTION
     user_id = None
     if hasattr(current_user, 'id'):
-        user_id = current_user.id
+        user_id = current_user.get("id")
     elif isinstance(current_user, dict):
         user_id = current_user.get('id') or current_user.get('sub') or current_user.get('user_id')
 
@@ -1984,7 +1985,15 @@ async def upload_vessel_config_report(
     current_user: Any = Depends(auth.get_current_user)
 ):
     # Security: Shore users only
-    if (current_user.get('access_type') or "").upper() != "SHORE":
+    if isinstance(current_user, dict):
+        u_role = str(current_user.get('role') or "").upper()
+        if not u_role:
+            roles_list = current_user.get('roles', [])
+            u_role = str(roles_list[0]).upper() if roles_list else ""
+    else:
+        u_role = str(getattr(current_user, 'role', "") or "").upper()
+
+    if u_role not in ("SHORE", "ADMIN", "SUPERUSER"):
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     contents = await file.read()

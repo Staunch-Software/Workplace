@@ -6,6 +6,9 @@ from typing import Dict, Any
 from fastapi import HTTPException, status
 from jose import JWTError, jwt as jose_jwt
 from app.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Cache for Microsoft public keys
 _ms_keys_cache = None
@@ -145,18 +148,20 @@ def create_application_jwt(user_data: Dict[str, Any]) -> str:
     payload = {
         "sub": user_data["id"],
         "email": user_data["email"],
-        "name": user_data["name"],
+        # ✅ REMOVED "name": user_data["name"] — crashes if key missing, new model uses full_name only
         "oid": user_data.get("oid"),
-        "auth_type": user_data.get("auth_type", "unknown"),
-        "roles": user_data.get("roles", ["user"]),
-        "access_type": user_data.get("access_type", "VESSEL"),
-        "organization_id": user_data.get("organization_id", 1),  # ← Add this line
+        # ✅ REMOVED "auth_type" — not in new User model
+        "full_name": user_data.get("full_name"),
+        "role": user_data.get("role", "VESSEL"),
+        # ✅ REMOVED "organization_id" — not in new User model
         "permissions": user_data.get("permissions", {}),
         "iat": now,
         "exp": expires,
         "iss": "ship-engine-app",
     }
-    
+
+    logger.info(f"[JWT CREATE] role going into token: '{user_data.get('role')}'")
+
     token = jwt.encode(
         payload,
         settings.APP_JWT_SECRET,
@@ -164,6 +169,7 @@ def create_application_jwt(user_data: Dict[str, Any]) -> str:
     )
     
     return token
+
 
 def verify_application_jwt(token: str) -> Dict[str, Any]:
     try:
@@ -173,18 +179,25 @@ def verify_application_jwt(token: str) -> Dict[str, Any]:
             algorithms=["HS256"],
             options={"verify_iss": False}
         )
-        # Normalize Workplace token claims → lub_backend expected shape
-        role = payload.get("role", "VESSEL")
+
+        # Normalize role to consistent uppercase
+        raw_role = payload.get("role", "VESSEL")
+        role = str(raw_role).upper() if raw_role else "VESSEL"
+
+        logger.info(f"[JWT VERIFY] raw_role='{raw_role}', normalized='{role}'")
+
         return {
             "sub": payload.get("sub"),
             "id": payload.get("sub"),
             "email": payload.get("email", payload.get("sub", "")),
-            "name": payload.get("full_name", payload.get("email", "")),
-            "roles": ["admin"] if role in ("ADMIN", "SUPERUSER") else ["user"],
-            "access_type": role,
+            "full_name": payload.get("full_name"),
+            "role": role,                           # ✅ always uppercase SHORE/VESSEL/ADMIN
+            # ✅ REMOVED "access_type" — leftover from old model
+            # ✅ REMOVED hardcoded "organization_id": 1 — not in new model
             "permissions": payload.get("permissions", {}),
-            "organization_id": 1,
+            "oid": payload.get("oid"),              # ✅ kept — needed for SSO /me response
         }
+
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
