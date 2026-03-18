@@ -7676,7 +7676,8 @@ const LuboilAnalysis = () => {
                             </span>
                           </div>
                           <iframe
-                            src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                            src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                            // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
                             style={{ width: "100%", flex: 1, border: "none" }}
                             title="Opened View"
                           />
@@ -7734,7 +7735,8 @@ const LuboilAnalysis = () => {
                                 </span>
                               </div>
                               <iframe
-                                src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
+                                src={`/lub/api/luboil/view-specific-page/${targetId}`}
+                                // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
                                 style={{
                                   width: "100%",
                                   flex: 1,
@@ -7748,7 +7750,8 @@ const LuboilAnalysis = () => {
                       </div>
                     ) : selectedCell.data.report_url ? (
                       <iframe
-                        src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                        src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                        // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
                         style={{ width: "100%", flex: 1, border: "none" }}
                         title="Original Report"
                       />
