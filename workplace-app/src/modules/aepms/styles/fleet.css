@@ -1,0 +1,481 @@
+/* styles/fleet.css (FIXED - Modal Z-Index & Sidebar Glitches Resolved) */
+
+/* --- Base Styles & Fleet Hub Layout --- */
+
+.fleet-hub-container {
+  display: flex;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, 
+                Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", 
+                sans-serif, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  /* background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); */
+  background-size: 200% 200%;
+  animation: gradientShift 15s ease infinite;
+  color: #1e293b;
+  position: relative;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.fleet-hub-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 260px;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  z-index: 0;
+}
+
+/* --- Sidebar Styles (BLACK/ASH Theme - FIXED Z-INDEX) --- */
+.fleet-hub-sidebar {
+  width: 260px;
+  background: linear-gradient(180deg, #1a1a1a 0%, #2a2a2a 100%);
+  border-right: 1px solid #3a3a3a;
+  padding: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.3);
+  z-index: 2; /* ⬅️ CRITICAL FIX: Lowered from 10 to allow modals (z-index: 999999) to appear above */
+  animation: slideInLeft 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.sidebar-header {
+  padding: 32px 24px;
+  border-bottom: 1px solid #3a3a3a;
+  background: #1a1a1a;
+}
+
+.sidebar-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+  margin: 0;
+  text-shadow: none;
+  animation: fadeInDown 0.8s ease;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Sidebar Navigation (FIXED - Clean Interactions) */
+.sidebar-nav {
+  padding: 20px 0;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 24px;
+  color: #a3a3a3;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+  border-left: 3px solid transparent;
+  overflow: hidden;
+}
+
+.sidebar-item:hover {
+  background: #2a2a2a;
+  color: #ffffff;
+  border-left-color: #525252;
+}
+
+.sidebar-item.active {
+  background: #2a2a2a;
+  color: #ffffff;
+  font-weight: 600;
+  border-left-color: #3b82f6;
+  box-shadow: inset 0 0 20px rgba(59, 130, 246, 0.1);
+}
+
+.sidebar-item svg {
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.sidebar-item:hover svg {
+  transform: scale(1.1);
+}
+
+/* --- Main Content Area --- */
+.fleet-hub-content {
+  flex: 1;
+  padding: 40px;
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
+  background: #ffffff;
+  animation: fadeIn 0.8s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* --- Typography --- */
+
+.fleet-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  color: #1a1a1a;
+  animation: slideInRight 0.6s ease;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.fleet-subtitle {
+  font-size: 0.875rem;
+  color: #737373;
+  margin: 0 0 24px 0;
+  animation: slideInRight 0.8s ease;
+}
+
+/* --- Enhanced Filters --- */
+
+.fleet-filters {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  margin: 20px 0 32px 0;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: scaleIn 0.5s ease;
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* --- Enhanced Cards --- */
+
+.ships-grid {
+  display: grid;
+  gap: 28px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.ship-card {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+}
+
+.ship-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  transform: rotate(45deg);
+  transition: all 0.6s;
+  opacity: 0;
+}
+
+.ship-card:hover::before {
+  left: 100%;
+  opacity: 1;
+}
+
+.ship-card:hover {
+  box-shadow: 0 20px 60px rgba(102, 126, 234, 0.25);
+  transform: translateY(-8px) scale(1.02);
+  border-color: rgba(102, 126, 234, 0.4);
+}
+
+/* --- Enhanced Shop Trial Table --- */
+
+.shop-trial-overview {
+  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.summary-table-enhanced {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  font-size: 0.95rem;
+  position: relative;
+}
+
+.summary-table-enhanced thead tr {
+  background: #1a1a1a;
+  position: relative;
+}
+
+.summary-table-enhanced th {
+  padding: 18px 14px;
+  text-align: left;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  border-bottom: none;
+  position: sticky;
+  top: 0;
+  background: inherit;
+  text-shadow: none;
+  z-index: 10;
+}
+
+.summary-table-enhanced tbody tr {
+  transition: all 0.2s ease;
+  position: relative;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.summary-table-enhanced tbody tr:hover {
+  background: #f5f5f5;
+  transform: translateX(2px);
+}
+
+.summary-table-enhanced td {
+  padding: 16px 14px;
+  border-bottom: none;
+  color: #525252;
+  transition: color 0.2s ease;
+}
+
+.summary-table-enhanced tbody tr:hover td {
+  color: #1e293b;
+}
+
+.summary-table-enhanced td:first-child {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+/* --- Performance Dashboard --- */
+
+.card-content-enhanced {
+  animation: fadeIn 0.6s ease;
+}
+
+@keyframes indicatorPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+  }
+  50% {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 6px rgba(220, 38, 38, 0);
+  }
+}
+
+.legend-container {
+  margin-top: 32px;
+  padding: 20px 24px;
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(10px);
+  animation: fadeInUp 1s ease;
+}
+
+/* --- Responsive Design (FIXED) --- */
+
+@media (max-width: 1024px) {
+  .fleet-hub-sidebar {
+    width: 220px;
+  }
+  
+  .fleet-hub-container::before {
+    left: 220px;
+  }
+  
+  .fleet-hub-content {
+    padding: 28px;
+  }
+}
+
+@media (max-width: 768px) {
+  .fleet-hub-container {
+    flex-direction: column;
+    background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .fleet-hub-container::before {
+    left: 0;
+    top: 80px;
+  }
+  
+  .fleet-hub-sidebar {
+    width: 100%;
+    height: auto;
+    position: static;
+    border-right: none;
+    border-bottom: 2px solid #3a3a3a;
+    animation: slideInDown 0.6s ease;
+    z-index: 2; /* Maintain same z-index on mobile */
+  }
+
+  @keyframes slideInDown {
+    from {
+      opacity: 0;
+      transform: translateY(-30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .sidebar-header {
+    padding: 20px;
+  }
+  
+  .sidebar-title {
+    font-size: 1.2rem;
+  }
+  
+  .sidebar-nav {
+    display: flex;
+    overflow-x: auto;
+    padding: 8px 12px;
+    justify-content: flex-start;
+  }
+  
+  .sidebar-item {
+    white-space: nowrap;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    padding: 12px 16px;
+  }
+  
+  .sidebar-item.active {
+    border-left: none;
+    border-bottom-color: #3b82f6;
+  }
+  
+  .sidebar-item:hover {
+    transform: translateY(-2px);
+  }
+  
+  .fleet-hub-content {
+    padding: 20px;
+  }
+  
+  .fleet-title {
+    font-size: 1.6rem;
+  }
+}
+
+/* --- Loading State --- */
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  font-size: 1.1rem;
+  color: #64748b;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* --- Smooth Scrollbar --- */
+
+.fleet-hub-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.fleet-hub-content::-webkit-scrollbar-track {
+  background: #f5f5f5;
+  border-radius: 10px;
+}
+
+.fleet-hub-content::-webkit-scrollbar-thumb {
+  background: #525252;
+  border-radius: 10px;
+}
+
+.fleet-hub-content::-webkit-scrollbar-thumb:hover {
+  background: #404040;
+}
+/* NUCLEAR OPTION: Force modal above everything */
+.fleet-hub-content {
+  z-index: 1 !important;
+  /* Remove position: relative if possible, or keep it but lower z-index */
+}
+
+.fleet-hub-sidebar {
+  z-index: 2 !important;
+}
+
+/* Target modal by its inline styles */
+body > div[style*="position: fixed"][style*="zIndex: 999999"] {
+  z-index: 999999 !important;
+}

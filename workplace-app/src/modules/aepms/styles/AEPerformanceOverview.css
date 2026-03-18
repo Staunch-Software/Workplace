@@ -1,0 +1,545 @@
+/* ==========================================================================
+   AE PERFORMANCE OVERVIEW - FINAL HEADER & FOOTER FIXES
+   ========================================================================== */
+.me-performance-header{
+    background-color: #f8f9fa;
+}
+.me-performance-container {
+    padding: 24px;
+    background-color: #f8f9fa;
+    min-height: 100vh;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* --- CARDS & HEADERS --- */
+.performance-data-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+    margin-bottom: 24px;
+}
+
+/* Flex container for Icon + Text Block */
+.card-header-enhanced {
+    padding: 20px 24px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center; /* Center vertically */
+    gap: 16px; /* Space between Icon and Text */
+    background: #fff;
+}
+
+/* Icon Wrapper */
+.card-icon-badge {
+    color: #3b82f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background-color: #eff6ff; /* Light blue bg like page header */
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+.header-icon-wrapper{
+    height: 64px;
+    width: 64px;
+}
+/* Text Block Wrapper */
+.card-header-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.card-title-performance {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.card-description {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin: 4px 0 0 0;
+    font-weight: 400;
+}
+
+/* --- TABLE SCROLL WRAPPER --- */
+.performance-table-wrapper {
+    width: 100%;
+    max-height: 410px;
+    overflow: auto;
+    position: relative;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.performance-table-modern {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.85rem;
+    color: #374151;
+}
+
+/* =========================================
+   STICKY HEADERS (TOP)
+   ========================================= */
+.performance-table-modern thead th {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background-color: #fff;
+    color: #6b7280;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 16px 12px;
+    border-bottom: 1px solid #e5e7eb;
+    white-space: nowrap;
+}
+
+.sticky-col-header {
+    position: sticky;
+    left: 0;
+    top: 0;
+    z-index: 50 !important;
+    background-color: #fff !important;
+    /* border-right: 1px solid #e5e7eb; */
+    box-shadow: 2px 0 4px rgba(0,0,0,0.02);
+}
+
+/* =========================================
+   STICKY FOOTER (BOTTOM)
+   ========================================= */
+.performance-table-modern tfoot td {
+    position: sticky;
+    bottom: 0;
+    z-index: 40;
+    background-color: #fff;
+    border-top: 1px solid #e5e7eb;
+    padding: 0;
+}
+
+/* ✅ FIXED: Removed Top Border to fix the visual glitch in bottom-left corner */
+.sticky-col-footer {
+    position: sticky;
+    left: 0;
+    bottom: 0;
+    /* z-index: 50 !important; */
+    background-color: #fff;
+    /* border-right: 1px solid #e5e7eb; */
+    border-top: none; /* <--- REMOVED BORDER HERE */
+}
+
+/* Footer Month Labels */
+.footer-month-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #4b5563;
+    text-align: center;
+    text-transform: uppercase;
+    padding: 12px 0;
+    white-space: nowrap;
+    background-color: #f9fafb;
+    border-right: 1px solid #e5e7eb;
+}
+
+.footer-month-label:last-child {
+    border-right: none;
+}
+
+/* Highlight for Latest Month */
+.footer-month-label.current-month {
+    background-color: #eff6ff !important;
+    color: #1e3a8a !important;
+    border-top: 2px solid #3b82f6; 
+    padding-top: 10px; 
+}
+
+/* =========================================
+   BODY ROWS & CELLS
+   ========================================= */
+.vessel-name-col {
+    position: sticky;
+    left: 0;
+    z-index: 0;
+    background-color: #fff;
+    /* border-right: 1px solid #e5e7eb; */
+    border-bottom: 1px solid #cbd5e1 !important;
+    vertical-align: middle;
+    font-weight: 600;
+    color: #374151;
+    padding: 12px 24px;
+    box-shadow: 2px 0 4px rgba(0,0,0,0.02);
+}
+
+.table-row-enhanced td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f3f4f6;
+    color: #4b5563;
+    vertical-align: middle;
+    background-color: #fff;
+}
+
+.table-row-enhanced:nth-child(3n) td {
+    border-bottom: 1px solid #cbd5e1;
+}
+
+.gen-name-cell {
+    background-color: #f9fafb !important;
+    font-weight: 600;
+    color: #6b7280;
+    font-size: 0.8rem;
+    border-right: 1px solid #f3f4f6;
+}
+
+/* --- DOT CELLS --- */
+.dot-cell {
+    text-align: center;
+    height: 40px;
+    padding: 0 !important;
+    border-right: 1px solid #e5e7eb;
+    border-bottom: none !important; 
+}
+
+/* Re-add bottom border for last generator row to separate vessels */
+.table-row-enhanced:nth-child(3n) .dot-cell {
+    border-bottom: 1px solid #cbd5e1 !important;
+}
+
+.dot-cell.latest-month-col {
+    background-color: #eff6ff !important;
+    border-right: 1px solid #bfdbfe;
+}
+
+.status-dot { font-size: 1.4rem; line-height: 0; cursor: pointer; }
+.dot-normal { color: #10b981; }
+.dot-warning { color: #f59e0b; }
+.dot-critical { color: #ef4444; }
+.dot-empty { color: #e5e7eb; font-size: 2rem; cursor: default; }
+
+/* --- OTHER COMPONENTS --- */
+.timeline-header-flex { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.header-scroll-btn { background: transparent; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer; padding: 2px; display: flex; align-items: center; color: #374151; }
+.header-scroll-btn.disabled { opacity: 0.3; cursor: default; }
+
+.days-badge { padding: 2px 8px;  font-size: 0.8rem; font-weight: 600; display: inline-block; padding: 4px 8px 4px 8px; box-shadow: none;}
+.days-success { background: #dcfce7; color: #166534; }
+.days-warning { background: #fef3c7; color: #b45309; }
+.days-critical { background: #fee2e2; color: #991b1b; }
+.days-default { background: #f3f4f6; color: #9ca3af; }
+
+.date-col { font-variant-numeric: tabular-nums; color: #374151; }
+.margin-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+.margin-success { color: #15803d; }
+.margin-warning { color: #b45309; }
+.margin-critical { color: #b91c1c; }
+.margin-default { color: #94a3b8; }
+
+
+/* ===== Mini Page Header Style for Cards ===== */
+.section-header {
+    background: #f8fafc;
+    /* border-radius: 12px; */
+    padding: 18px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    border: 1px solid #eef2f7;
+    cursor: pointer;
+}
+
+.section-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.section-header-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: #eff6ff;
+    color: #3b82f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.section-header-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.section-title {
+    margin: 0;
+    font-size: 1.08rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.section-subtitle {
+    margin: 2px 0 0 0;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.section-toggle-btn {
+    background: transparent;
+    border: none;
+    padding: 6px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    color: #475569;
+}
+
+.section-toggle-btn:hover {
+    background: #f3f4f6;
+}
+
+.section-toggle-btn {
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 4px;
+  cursor: pointer;
+  transition: transform 0.25s ease, background 0.25s ease;
+  display: flex;
+  align-items: center;
+}
+
+.section-toggle-btn:hover {
+  background: #f3f4f6;
+}
+
+/* Collapse animation */
+/* .performance-table-wrapper {
+  max-height: 500px;
+  overflow: hidden;
+  transition: max-height 0.35s ease;
+} */
+
+.performance-table-wrapper.collapsed {
+  max-height: 0;
+  border-bottom: none;
+}
+
+/* Rotate icon when opened */
+.section-toggle-btn.open svg {
+  transform: rotate(180deg);
+}
+.collapsed ~ .section-subtitle {
+  opacity: 0;
+  transition: opacity .5s ease;
+}
+
+/* ... keep your existing table/header styles above ... */
+
+/* ==========================================================================
+   MODAL & REPORT DETAILS STYLES (FIXED)
+   ========================================================================== */
+
+/* The dark overlay background */
+.perf-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100000; /* Must be higher than sticky-col-header (50) */
+}
+
+/* The Modal Box */
+.perf-modal-container {
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    width: 900px;
+    max-width: 95vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    animation: modalFadeIn 0.2s ease-out;
+}
+
+/* Header */
+.perf-modal-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f9fafb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.perf-modal-title {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.perf-status-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.perf-close-btn {
+    border: none;
+    background: #e5e7eb;
+    padding: 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.perf-close-btn:hover {
+    background: #d1d5db;
+}
+
+/* Table Content Area */
+.perf-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    position: relative;
+}
+
+.perf-modal-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.perf-modal-table thead th {
+    position: sticky;
+    top: 0;
+    background: #f8fafc;
+    z-index: 10;
+    color: #64748b;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    padding: 12px 24px;
+    text-align: center;
+    border-bottom: 2px solid #e5e7eb;
+}
+.perf-modal-table thead th:first-child {
+    text-align: left;
+}
+
+.perf-modal-table td {
+    padding: 12px 24px;
+    border-bottom: 1px solid #f1f5f9;
+    text-align: center;
+}
+
+/* Footer */
+.perf-modal-footer {
+    padding: 16px 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    border-top: 1px solid #e5e7eb;
+    background: #fff;
+}
+
+.pdf-preview-btn, .pdf-download-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid #e5e7eb;
+}
+
+.pdf-preview-btn { background: #fff; color: #374151; }
+.pdf-download-btn { background: #2563eb; color: #fff; border: 1px solid #2563eb; }
+.pdf-preview-btn:hover { background: #f9fafb; }
+.pdf-download-btn:hover { background: #1d4ed8; }
+
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+/* Container for the AE Header to ensure layout is consistent */
+.ae-custom-header {
+    display: flex !important;
+    align-items: center !important;
+    background-color: #ffffff;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background-color 0.2s ease;
+}
+
+.ae-custom-header:hover {
+    background-color: #fafafa;
+}
+
+/* Specific styling for the Large Chevron Wrapper on the right */
+.ae-header-toggle-wrapper {
+    margin-left: auto; /* Pushes to far right */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.ae-header-toggle-wrapper:hover {
+    background-color: #f1f5f9;
+    transform: scale(1.05);
+}
+
+.ae-header-toggle-wrapper:active {
+    transform: scale(0.95);
+}
+
+/* Ensure Dropdown alignment next to title is clean */
+.ae-custom-header .vessel-filter-wrapper {
+    margin-bottom: 0 !important;
+}
+
+/* Adjust the title margin for horizontal flow */
+.ae-custom-header .section-header-text {
+    min-width: fit-content;
+}
+
+/* Mobile Responsiveness: ensure dropdown doesn't crush the title */
+@media (max-width: 768px) {
+    .ae-custom-header .section-header-left {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .ae-custom-header .vessel-filter-wrapper {
+        margin-left: 0 !important;
+        width: 100%;
+    }
+}

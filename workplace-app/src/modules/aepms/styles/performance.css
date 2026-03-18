@@ -1,0 +1,549 @@
+/* styles/performance.css - Performance page specific styles - Merged version */
+.performance-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background-color: #fbf6f6;
+}
+
+.performance-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.header-info {
+  flex: 1;
+  min-width: 300px;
+}
+
+.performance-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: var(--foreground);
+}
+
+.performance-subtitle {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  margin: 0 0 8px 0;
+}
+
+.deviation-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.deviation-label {
+  color: var(--muted-foreground);
+}
+
+.deviation-value {
+  font-family: ui-monospace, SFMono-Regular, 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+  font-weight: 600;
+}
+
+.deviation-value.negative {
+  color: #dc2626;
+}
+
+.deviation-value.positive {
+  color: #16a34a;
+}
+
+.summary-table-card {
+  margin-bottom: 24px;
+  page-break-inside: avoid; /* Helps prevent table breaking across pages */
+}
+
+.performance-summary-table {
+  width: 100%;
+  border-collapse: collapse; /* ✅ fix: make columns align perfectly */
+  border-spacing: 0;
+  table-layout: fixed; /* ✅ fix: consistent width in PDF */
+  margin-top: 16px;
+}
+
+.performance-summary-table th,
+.performance-summary-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border: 1px solid #e5e7eb;
+  vertical-align: middle;
+  word-wrap: break-word;
+}
+
+.performance-summary-table th {
+  background-color: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+  text-align: center;
+}
+
+.performance-summary-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+.performance-summary-table td:first-child {
+  text-align: left; /* Parameter column stays left aligned */
+}
+
+.delta-positive,
+.deviation-positive {
+  color: #dc2626;
+  /* Red for worse performance */
+  font-weight: 500;
+}
+
+.delta-negative,
+.deviation-negative {
+  color: #16a34a;
+  /* Green for better performance */
+  font-weight: 500;
+}
+
+.summary-table-card {
+  margin-bottom: 24px;
+  page-break-inside: avoid;
+}
+  /* Helps prevent table breaking across pages */
+/* Inline chart legend styles */
+.inline-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  background: rgba(248, 250, 252, 0.8);
+  border-radius: 4px;
+  font-size: 12px;
+  margin-top: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.legend-item-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.legend-line {
+  width: 20px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.legend-cross {
+  font-size: 16px;
+  font-weight: bold;
+  width: 16px;
+  text-align: center;
+  line-height: 1;
+}
+
+.legend-text {
+  font-size: 12px;
+}
+
+/* Enhanced tooltip styles */
+.custom-tooltip {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 8px 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  font-size: 12px;
+}
+
+.tooltip-label {
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: #374151;
+}
+
+.custom-tooltip p {
+  margin: 2px 0;
+  font-weight: 500;
+}
+
+.performance-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.ship-select,
+.metric-select,
+.time-filter {
+  min-width: 150px;
+}
+
+.file-upload-wrapper {
+  position: relative;
+}
+
+.file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.chart-card {
+  width: 100%;
+  min-height: 400px;
+}
+
+.chart-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.main-chart-container {
+  height: 420px;
+  width: 100%;
+}
+
+/* Fixed charts grid to prevent shrinking */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+  width: 100%;
+}
+
+/* Fixed chart container height for consistency */
+.chart-container {
+  height: 280px;
+  width: 100%;
+  min-height: 280px;
+}
+
+.info-cards {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+}
+
+
+@media print {
+
+  .summary-table-card,
+  .charts-grid {
+    transform: none !important;
+    -webkit-transform: none !important;
+  }
+}
+
+@media print {
+  .performance-summary-table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  .performance-summary-table th,
+  .performance-summary-table td {
+    border: 1px solid #000;
+    padding: 8px;
+  }
+}
+
+@media (max-width: 768px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .chart-container {
+    height: 240px;
+    min-height: 240px;
+  }
+  
+  .legend-items {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .legend-item {
+    min-width: auto;
+    width: 100%;
+  }
+}
+
+@media (min-width: 640px) {
+  .info-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .charts-grid {
+    grid-template-columns: repeat(2, minmax(450px, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .charts-grid {
+    grid-template-columns: repeat(2, minmax(500px, 1fr));
+    gap: 24px;
+  }
+  
+  .chart-container {
+    height: 300px;
+    min-height: 300px;
+  }
+}
+
+@media print {
+  .performance-summary-table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  
+  .performance-summary-table th,
+  .performance-summary-table td {
+    border: 1px solid #000;
+    padding: 8px;
+  }
+  
+  .summary-table-card {
+    page-break-inside: avoid;
+  }
+  
+  .chart-card {
+    page-break-inside: avoid;
+  }
+}
+
+.ship-info {
+  font-size: 14px;
+  color: var(--muted-foreground);
+}
+
+.monthly-data {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.data-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.data-value {
+  font-family: ui-monospace, SFMono-Regular, 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+  color: var(--foreground);
+}
+
+.awaiting-upload {
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+
+.deviation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  font-size: 14px;
+}
+
+.deviation-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.deviation-label-text {
+  color: var(--muted-foreground);
+}
+
+.deviation-number {
+  font-family: ui-monospace, SFMono-Regular, 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+  color: var(--foreground);
+}
+
+.deviation-number.negative {
+  color: #dc2626;
+}
+
+.deviation-number.positive {
+  color: #16a34a;
+}
+
+.no-deviation {
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+
+/* Historical data related styles */
+.historical-summary {
+  padding: 8px 0;
+}
+
+.chart-container {
+  height: 300px;
+  width: 100%;
+}
+
+.months-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.month-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background-color: rgba(202, 138, 4, 0.1);
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.month-label {
+  font-weight: 500;
+  color: #374151;
+}
+
+.month-load {
+  color: #ca8a04;
+  font-weight: 500;
+}
+
+.more-months {
+  text-align: center;
+  font-style: italic;
+  color: #6b7280;
+  font-size: 0.8rem;
+  padding: 4px;
+}
+
+.no-data {
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+  padding: 12px;
+}
+
+/* Loading state indicator */
+.performance-subtitle {
+  position: relative;
+}
+
+.performance-controls .time-filter:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Enhanced chart descriptions with loading states */
+.chart-card .card-description {
+  min-height: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Historical data points styling - override for multiple months */
+.recharts-reference-dot {
+  opacity: 0.9;
+  cursor: pointer;
+}
+
+.recharts-reference-dot:hover {
+  opacity: 1;
+  filter: brightness(1.1);
+}
+
+/* Different markers for different time periods */
+.month-marker-current {
+  fill: #dc2626;
+  stroke: #dc2626;
+}
+
+.month-marker-historical {
+  fill: #2563eb;
+  opacity: 0.8;
+  stroke: #2563eb;
+}
+
+/* Enhanced X marker visibility */
+.recharts-reference-dot line {
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+/* Responsive legend adjustments */
+@media (max-width: 480px) {
+  .inline-chart-legend {
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+  }
+  
+  .legend-item-inline {
+    justify-content: center;
+  }
+}
+/* --- ADD THIS TO YOUR styles CONSTANT --- */
+  .chevron-icon {
+    display: inline-block;
+    transition: transform 0.3s ease; /* Smooth rotation */
+    font-size: 0.8rem;
+    color: #64748b;
+  }
+
+  .chevron-icon.open {
+    transform: rotate(180deg); /* Flips 180 degrees */
+  }
+
+  .chevron-icon.rotate-90 {
+    transform: rotate(90deg); /* Rotates 90 degrees (for side tabs) */
+  }
+  /* --- DROPDOWN ANIMATION STYLES --- */
+  .chevron-icon {
+    display: inline-block;
+    transition: transform 0.3s ease;
+    font-size: 0.7rem; /* Adjusted for smaller dropdowns */
+    color: #64748b;
+    margin-left: 8px;
+  }
+
+  .chevron-icon.open {
+    transform: rotate(180deg);
+  }

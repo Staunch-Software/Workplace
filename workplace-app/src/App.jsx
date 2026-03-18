@@ -10,6 +10,7 @@ import Navbar from './components/Navbar';
 const DrsModule = lazy(() => import('./modules/drs/DrsModule'));
 const LubModule = lazy(() => import('./modules/lubeoil/Lubmodule'));
 const JiraModule = lazy(() => import('./modules/jira/JiraModule'));
+const AepmsModule = lazy(() => import('./modules/aepms/AepmsModule'));
 const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
 
 function App() {
@@ -81,6 +82,15 @@ function App() {
             <ProtectedRoute allowedRoles={['SHORE', 'ADMIN', 'VESSEL']}>
               <Suspense fallback={<div className="p-10 text-center">Loading JIRA...</div>}>
                 <JiraModule />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+
+
+          <Route path="/aepms/*" element={
+            <ProtectedRoute allowedRoles={['SHORE', 'ADMIN', 'VESSEL']}>
+              <Suspense fallback={<div className="p-10 text-center">Loading AEPMS...</div>}>
+                <AepmsModule />
               </Suspense>
             </ProtectedRoute>
           } />

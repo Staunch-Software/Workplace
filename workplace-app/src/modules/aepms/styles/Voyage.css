@@ -1,0 +1,215 @@
+/* Variables scoped only to this component */
+.vessel-analytics-wrapper {
+  --v-bg: #0f172a;
+  --v-card: #1e293b;
+  --v-accent: #0891b2;
+  --v-text: #f1f5f9;
+  --v-muted: #94a3b8;
+  --v-border: #334155;
+  --v-success: #22c55e;
+  --v-warning: #f59e0b;
+  --nav-height: 70px; /* Adjust based on your PerformanceNav height */
+
+  background-color: var(--v-bg);
+  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
+  color: var(--v-text);
+}
+
+.voyage-scroll-container {
+  height: calc(100vh - var(--nav-height));
+  overflow-y: auto;
+}
+
+/* Header fix: Ensures it sits below PerformanceNav */
+.voyage-header {
+  background: #020617;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--v-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* Explicit White Text Helper */
+.white-text { color: #ffffff !important; }
+.cyan-text { color: #22d3ee !important; }
+
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand h1 { font-size: 1.2rem; font-weight: 700; margin: 0; }
+.brand h1 span { color: var(--v-accent); }
+.brand-icon { color: var(--v-accent); }
+
+.vessel-selector-main label {
+  font-size: 0.7rem;
+  color: var(--v-muted);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.vessel-selector-main select {
+  background: var(--v-card);
+  color: white;
+  border: 1px solid var(--v-accent);
+  padding: 8px 12px;
+  border-radius: 4px;
+  min-width: 250px;
+}
+
+/* Sections */
+.dashboard-section {
+  max-width: 1400px;
+  margin: 20px auto;
+  padding: 0 20px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  border-left: 4px solid var(--v-accent);
+  padding-left: 15px;
+  cursor: pointer;
+}
+
+.section-header h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: 1px; margin: 0; }
+
+/* Grid for Details */
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+}
+
+.details-card {
+  background: var(--v-card);
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid var(--v-border);
+}
+
+.data-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  padding: 8px 0;
+  border-bottom: 1px solid #2d3748;
+}
+
+.data-row:last-child { border-bottom: none; }
+.data-row span { color: var(--v-muted); }
+
+/* Emission Cards */
+.collapsible-tag {
+  background: #fef08a;
+  color: #854d0e;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: bold;
+  border-radius: 4px;
+}
+
+.year-select {
+  background: #020617;
+  color: white;
+  border: 1px solid var(--v-border);
+  padding: 5px 10px;
+  margin-right: 15px;
+  border-radius: 4px;
+}
+
+.emission-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  background: #020617;
+  padding: 30px;
+  border: 1px solid var(--v-border);
+  border-radius: 8px;
+  margin-top: 10px;
+}
+
+.emission-card { text-align: center; border-right: 1px solid var(--v-border); }
+.emission-card:last-child { border-right: none; }
+.emission-card label { color: var(--v-muted); font-size: 0.75rem; display: block; }
+.emission-card .value { font-size: 2rem; font-weight: 800; margin: 10px 0; }
+.rating-b { color: var(--v-success); }
+.credit-plus { color: #22d3ee; }
+
+/* Vessel Review Bar */
+.review-action-bar {
+  max-width: 1360px;
+  margin: 40px auto;
+  padding: 25px;
+  background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
+  border: 1px solid var(--v-accent);
+  border-radius: 12px;
+}
+
+.filter-row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+  margin-top: 20px;
+}
+
+.input-group { flex: 1; }
+.input-group label { display: block; font-size: 0.75rem; color: var(--v-muted); margin-bottom: 8px; }
+.input-group select, .input-group input {
+  width: 100%;
+  background: #020617;
+  border: 1px solid var(--v-border);
+  padding: 10px;
+  color: white;
+  border-radius: 6px;
+}
+
+.toggle-group { display: flex; background: #020617; padding: 4px; border-radius: 6px; border: 1px solid var(--v-border); }
+.toggle-group button {
+  flex: 1; border: none; background: transparent; color: var(--v-muted);
+  padding: 8px; font-size: 10px; font-weight: bold; cursor: pointer; border-radius: 4px;
+}
+.toggle-group button.active { background: var(--v-accent); color: white; }
+
+.apply-btn {
+  background: var(--v-accent);
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.apply-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Charts */
+.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+.chart-container { background: var(--v-card); padding: 20px; border-radius: 12px; border: 1px solid var(--v-border); }
+.chart-container h4 { margin-top: 0; font-size: 0.9rem; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+
+/* Table */
+.table-container { background: var(--v-card); border-radius: 12px; border: 1px solid var(--v-border); overflow: hidden; }
+.analysis-table { width: 100%; border-collapse: collapse; }
+.analysis-table th { background: #020617; padding: 15px; text-align: left; font-size: 0.8rem; border-bottom: 1px solid var(--v-border); }
+.analysis-table td { padding: 15px; border-bottom: 1px solid var(--v-border); font-size: 0.9rem; }
+.pos { color: var(--v-success); font-weight: bold; }
+
+.badge-ok { background: rgba(34, 197, 94, 0.1); color: var(--v-success); padding: 4px 10px; border-radius: 4px; font-size: 11px; }
+
+/* Animations */
+.animate-fade-in { animation: fadeIn 0.4s ease-out; }
+.animate-slide-down { animation: slideDown 0.3s ease-out; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+.empty-state {
+  text-align: center;
+  padding: 100px 0;
+  color: var(--v-muted);
+}

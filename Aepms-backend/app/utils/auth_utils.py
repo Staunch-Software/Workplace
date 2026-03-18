@@ -137,53 +137,12 @@ def validate_microsoft_token(id_token: str) -> Dict[str, Any]:
         )
 
 
-def create_application_jwt(user_data: Dict[str, Any]) -> str:
-    """Create application-specific JWT token."""
-    now = datetime.utcnow()
-    expires = now + timedelta(minutes=settings.APP_JWT_EXPIRE_MINUTES)
-    
-    payload = {
-        "sub": user_data["id"],
-        "email": user_data["email"],
-        "name": user_data["name"],
-        "oid": user_data.get("oid"),
-        "auth_type": user_data.get("auth_type", "unknown"),
-        "roles": user_data.get("roles", ["user"]),
-        "access_type": user_data.get("access_type", "VESSEL"),
-        "organization_id": user_data.get("organization_id", 1),  # ← Add this line
-        "permissions": user_data.get("permissions", {}),
-        "iat": now,
-        "exp": expires,
-        "iss": "ship-engine-app",
-    }
-    
-    token = jwt.encode(
-        payload,
-        settings.APP_JWT_SECRET,
-        algorithm=settings.APP_JWT_ALGORITHM
-    )
-    
-    return token
-
 def verify_application_jwt(token: str) -> Dict[str, Any]:
-    """
-    Verify application JWT token.
-    
-    Args:
-        token: JWT token string
-        
-    Returns:
-        Decoded token payload
-        
-    Raises:
-        HTTPException if token is invalid or expired
-    """
     try:
         payload = jwt.decode(
             token,
-            settings.APP_JWT_SECRET,
-            algorithms=[settings.APP_JWT_ALGORITHM],
-            issuer="ship-engine-app"
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
         )
         return payload
     except jwt.ExpiredSignatureError:

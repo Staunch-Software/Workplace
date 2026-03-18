@@ -83,7 +83,7 @@ const Home = () => {
     }
 
     if (appId === 'engine') {
-      window.open('/engine', '_blank');
+      window.open('/aepms', '_blank');
     }
   };
 

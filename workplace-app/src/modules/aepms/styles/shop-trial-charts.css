@@ -1,0 +1,66 @@
+/* src/styles/shop-trial-charts.css (FULL REPLACEMENT - Chart Layout Fixed to 2 Columns) */
+
+.shop-trial-charts-view {
+    /* Container for the single-ship charts */
+    padding-top: 1px;
+}
+
+.dashboard-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: #1e293b; /* Base dark color */
+}
+
+.dashboard-subtitle {
+  font-size: 14px;
+  color: #64748b; /* Muted foreground */
+  margin: 4px 0 20px 0;
+}
+
+/* KPIs Grid (Copied from original dashboard.css) */
+.kpi-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin-bottom: 32px;
+}
+.kpi-card-title { font-size: 14px !important; }
+.kpi-label { font-size: 12px; color: #64748b; }
+.kpi-value-large { font-size: 18px; }
+.kpi-value-xl { font-size: 30px; font-weight: 600; }
+.kpi-unit { font-size: 16px; font-weight: 400; }
+.health-stats { display: flex; align-items: flex-end; gap: 16px; }
+.health-stat { display: flex; flex-direction: column; }
+.health-label { font-size: 12px; color: #64748b; }
+.health-value { font-size: 24px; font-weight: 600; }
+
+/* Charts Grid (UPDATED to enforce 2 columns on most screens) */
+.charts-grid {
+  display: grid;
+  gap: 16px;
+  /* Default 1 column on very small screens */
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+@media (min-width: 768px) {
+    .charts-grid {
+        /* 2 columns on tablets and larger screens */
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* On very large screens (1400px+), it will still be 2 columns */
+/* If you wanted 3 columns on ultra-wide, you would set: 
+@media (min-width: 1600px) { .charts-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+But sticking to 2 columns as requested for "more visually feasible" */
+
+
+.chart-title { font-size: 16px !important; }
+.chart-container { height: 220px; width: 100%; }
+
+.charts-loading {
+    padding: 20px;
+    text-align: center;
+    color: #64748b;
+}
