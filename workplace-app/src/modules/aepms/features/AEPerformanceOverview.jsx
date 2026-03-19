@@ -21,7 +21,7 @@ import "../styles/AEPerformanceOverview.css";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import ozellarLogo from "../assets/250714_OzellarMarine-Logo-Final.png";
+// import ozellarLogo from "../assets/250714_OzellarMarine-Logo-Final.png";
 import PerformanceNav from "./PerformanceNav";
 
 // --- CONSTANTS ---
@@ -1283,11 +1283,11 @@ useEffect(() => {
       const doc = new jsPDF();
 
       // --- 2. HEADER & LOGO ---
-      try {
-        doc.addImage(ozellarLogo, "PNG", 14, 10, 35, 14);
-      } catch (e) {
-        console.warn("Logo not found");
-      }
+      // try {
+      //   doc.addImage(ozellarLogo, "PNG", 14, 10, 35, 14);
+      // } catch (e) {
+      //   console.warn("Logo not found");
+      // }
 
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
