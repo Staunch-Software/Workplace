@@ -158,9 +158,18 @@ def load_luboil_config(file_path: str):
 
             # B. UPSERT NAME MAPPING (Source Preserved)
             if name:
-                mapping = db.query(LuboilNameMapping).filter_by(lab_raw_string=name).first()
+            variants = [name]
+            if "before fine filter" in name.lower():
+                variants.append(name.lower().replace("before fine filter", "before fine").strip())
+                variants.append(name.lower().replace("before fine filter", "before fine").strip() + " am umang")
+            if "after fine filter" in name.lower():
+                variants.append(name.lower().replace("after fine filter", "after fine").strip())
+                variants.append(name.lower().replace("after fine filter", "after fine").strip() + " am umang")
+            
+            for variant in variants:
+                mapping = db.query(LuboilNameMapping).filter_by(lab_raw_string=variant).first()
                 if not mapping:
-                    db.add(LuboilNameMapping(lab_raw_string=name, equipment_code=code))
+                    db.add(LuboilNameMapping(lab_raw_string=variant, equipment_code=code))
                     stats["mappings_added"] += 1
 
             # C. UPSERT VESSEL CONFIGS (Logic Preserved + Header IMO Priority)
