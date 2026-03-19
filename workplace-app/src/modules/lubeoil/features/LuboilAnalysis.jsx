@@ -485,6 +485,12 @@ const LuboilAnalysis = () => {
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [isClosed, setIsClosed] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
+  const [uploadProgress, setUploadProgress] = useState({ 
+    current: 0, 
+    total: 0, 
+    currentFile: "" 
+  });
+
   const [machineryStats, setMachineryStats] = useState({
     normal: 0,
     warning: 0,
@@ -2386,7 +2392,7 @@ const LuboilAnalysis = () => {
       rows[vessel] = {};
       if (vData.machineries) {
         Object.entries(vData.machineries).forEach(([rawName, mData]) => {
-          const cleanName = rawName.replace(/\s-\s\d+.*$/, "");
+          const cleanName = rawName;
           headers.add(cleanName);
 
           // 1. Prepare History
@@ -2726,79 +2732,125 @@ const LuboilAnalysis = () => {
   }, []);
 
   const handleFileUpload = async (e) => {
-    // 1. Convert FileList to an Array
-    const files = Array.from(e.target.files);
-    if (files.length === 0) return;
+  // 1. Convert FileList to an Array
+  const files = Array.from(e.target.files);
+  if (files.length === 0) return;
 
-    setUploading(true);
+  setUploading(true);
+  setUploadProgress({ current: 0, total: files.length, currentFile: "" });
 
-    // 2. Initialize tracking for the summary report
-    let successCount = 0;
-    let duplicateCount = 0;
-    let errorCount = 0;
-    let detailedSummary = [];
+  // 2. Initialize tracking for the summary report
+  let successCount = 0;
+  let duplicateCount = 0;
+  let errorCount = 0;
+  let detailedSummary = [];
 
-    try {
-      // 3. Process files sequentially using for...of
-      // This ensures we don't overwhelm the parser and processed data is saved correctly
-      for (const file of files) {
-        try {
-          const res = (
-            await axiosLub.post(
-              "/api/upload-luboil-report/",
-              (() => {
-                const fd = new FormData();
-                fd.append("file", file);
-                return fd;
-              })(),
-              { headers: { "Content-Type": "multipart/form-data" } },
-            )
-          ).data;
+  try {
+    // 3. Process files sequentially using for...of
+    // This ensures we don't overwhelm the parser and processed data is saved correctly
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
 
-          if (res.is_duplicate) {
-            duplicateCount++;
-          } else {
-            successCount++;
-          }
+      // 🔥 Live progress update
+      setUploadProgress({
+        current: i + 1,
+        total: files.length,
+        currentFile: file.name,
+      });
 
-          // 4. Preserve all original data points for the summary
-          detailedSummary.push(
-            `${res.is_duplicate ? "âš ï¸ [DUP]" : "âœ… [NEW]"} ${file.name}\n` +
-              `   Vessel: ${res.vessel} | Date: ${res.report_date}\n` +
-              `   Summary: ${res.alert_summary} | Machineries: ${res.sample_count}`,
-          );
-        } catch (fileError) {
-          errorCount++;
-          detailedSummary.push(
-            `âŒ ${file.name}: Upload Failed - ${fileError.message}`,
-          );
+      try {
+        const res = (
+          await axiosLub.post(
+            "/api/upload-luboil-report/",
+            (() => {
+              const fd = new FormData();
+              fd.append("file", file);
+              return fd;
+            })(),
+            { headers: { "Content-Type": "multipart/form-data" } },
+          )
+        ).data;
+
+        if (res.is_duplicate) {
+          duplicateCount++;
+        } else {
+          successCount++;
         }
+
+        // 4. Preserve all original data points for the summary
+        detailedSummary.push({
+          status: res.is_duplicate ? "dup" : "new",
+          filename: file.name,
+          vessel: res.vessel,
+          date: res.report_date,
+          summary: res.alert_summary,
+          count: res.sample_count,
+        });
+
+      } catch (fileError) {
+        errorCount++;
+        detailedSummary.push({
+          status: "error",
+          filename: file.name,
+          error: fileError.message,
+        });
       }
 
-      // 5. Construct the final Alert Message (Aggregated from your original template)
-      const finalReport =
-        `BULK UPLOAD COMPLETE\n` +
-        `----------------------------------\n` +
-        `Total Files: ${files.length}\n` +
-        `Successfully Processed: ${successCount}\n` +
-        `Duplicates (Updated): ${duplicateCount}\n` +
-        `Errors: ${errorCount}\n\n` +
-        `DETAILED BREAKDOWN:\n` +
-        detailedSummary.join("\n\n");
-
-      alert(finalReport);
-
-      // 6. Refresh the Matrix
-      loadData();
-    } catch (globalError) {
-      console.error("Bulk Upload Error:", globalError);
-      alert("âŒ A critical error occurred during bulk processing.");
-    } finally {
-      setUploading(false);
-      // 7. Reset the input so the user can upload the same files again if needed
-      e.target.value = null;
+      // 🔥 300ms delay between files prevents DB race condition
+      if (i < files.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
     }
-  };
+
+    // 5. Reset progress
+    setUploadProgress({ current: 0, total: 0, currentFile: "" });
+
+    // 6. Show styled result modal instead of plain alert
+    const newItems = detailedSummary.filter((d) => d.status === "new");
+    const dupItems = detailedSummary.filter((d) => d.status === "dup");
+    const errItems = detailedSummary.filter((d) => d.status === "error");
+
+    const buildSection = (items, label, icon) => {
+      if (items.length === 0) return "";
+      return (
+        `\n${icon} ${label} (${items.length})\n` +
+        "─".repeat(40) + "\n" +
+        items.map((d) =>
+          d.status === "error"
+            ? `  • ${d.filename}\n    ❗ ${d.error}`
+            : `  • ${d.vessel} — ${d.date}\n    ${d.summary} | ${d.count} machineries\n    File: ${d.filename}`
+        ).join("\n\n")
+      );
+    };
+
+    const finalReport =
+      `╔══════════════════════════════════════╗\n` +
+      `       BULK UPLOAD COMPLETE            \n` +
+      `╚══════════════════════════════════════╝\n\n` +
+      `  📁 Total Files   : ${files.length}\n` +
+      `  ✅ New Reports   : ${successCount}\n` +
+      `  ⚠️  Duplicates   : ${duplicateCount}\n` +
+      `  ❌ Failed        : ${errorCount}\n` +
+      `\n` +
+      buildSection(newItems, "NEW REPORTS PROCESSED", "✅") +
+      buildSection(dupItems, "DUPLICATE REPORTS (UPDATED)", "⚠️") +
+      buildSection(errItems, "FAILED UPLOADS", "❌");
+
+    alert(finalReport);
+
+    // 7. Refresh the Matrix
+    loadData();
+
+  } catch (globalError) {
+    console.error("Bulk Upload Error:", globalError);
+    alert("❌ A critical error occurred during bulk processing.");
+  } finally {
+    setUploading(false);
+    setUploadProgress({ current: 0, total: 0, currentFile: "" });
+    // 8. Reset the input so the user can upload the same files again if needed
+    e.target.value = null;
+  }
+};
 
   // Helper for Status Icons/Colors
   const getStatusBadge = (status) => {
@@ -3566,7 +3618,11 @@ const LuboilAnalysis = () => {
                 disabled={uploading}
               >
                 <Upload size={18} style={{ marginRight: "8px" }} />
-                {uploading ? "Processing..." : "Upload Report (PDF)"}
+                {uploading && uploadProgress.total > 0
+                  ? `${uploadProgress.current}/${uploadProgress.total} Processing...`
+                  : uploading
+                  ? "Processing..."
+                  : "Upload Report (PDF)"}
               </Button>
             </div>
           </div>
@@ -7676,8 +7732,8 @@ const LuboilAnalysis = () => {
                             </span>
                           </div>
                           <iframe
-                            // src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
-                            src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                            src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                            // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
                             style={{ width: "100%", flex: 1, border: "none" }}
                             title="Opened View"
                           />
@@ -7735,8 +7791,8 @@ const LuboilAnalysis = () => {
                                 </span>
                               </div>
                               <iframe
-                                // src={`/lub/api/luboil/view-specific-page/${targetId}`}
-                                src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
+                                src={`/lub/api/luboil/view-specific-page/${targetId}`}
+                                // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
                                 style={{
                                   width: "100%",
                                   flex: 1,
@@ -7750,8 +7806,8 @@ const LuboilAnalysis = () => {
                       </div>
                     ) : selectedCell.data.report_url ? (
                       <iframe
-                        // src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
-                        src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                        src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                        // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
                         style={{ width: "100%", flex: 1, border: "none" }}
                         title="Original Report"
                       />
