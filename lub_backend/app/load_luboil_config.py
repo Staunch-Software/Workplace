@@ -158,7 +158,7 @@ def load_luboil_config(file_path: str):
 
             # B. UPSERT NAME MAPPING (Source Preserved)
             if name:
-            variants = [name]
+                variants = [name]
             if "before fine filter" in name.lower():
                 variants.append(name.lower().replace("before fine filter", "before fine").strip())
                 variants.append(name.lower().replace("before fine filter", "before fine").strip() + " am umang")
