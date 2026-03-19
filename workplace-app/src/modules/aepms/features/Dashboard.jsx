@@ -2,13 +2,13 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import axiosAepms from '../api/axiosAepms';
+import AppHeader from '../components/AppHeader';
 import {
     Ship, Cpu, Wrench, Clock, ChevronRight, TrendingUp, UploadCloud,
     FileText, X, CheckCircle, RefreshCw, Eye, Settings, AlertCircle
 } from 'lucide-react';
 import '../styles/dashboard.css';
 import '../styles/MEPerformanceOverview.css';
-import PerformanceNav from './PerformanceNav';
 const formatVesselName = (name) => {
     if (!name) return "";
     return name.replace(/^(?:MV|M\.V\.|M\.V|M\/V)\s*/i, "").trim();
@@ -203,7 +203,6 @@ const ShopTrialModal = ({ isOpen, onClose, data, type }) => {
 export default function Dashboard() {
     const navigate = useNavigate();
     const location = useLocation();
-    const [activeView, setActiveView] = useState('configuration');
 
     const [showMeConfigDetails, setShowMeConfigDetails] = useState(false);
     const fileInputRef = useRef(null);
@@ -229,7 +228,7 @@ export default function Dashboard() {
             try {
                 // 1. Fetch Fleet and Sort Alphabetically
                 const fleetResponse = await axiosAepms.getFleet();
-                const sortedFleet = (fleetResponse.fleet || []).sort((a, b) => 
+                const sortedFleet = (fleetResponse.fleet || []).sort((a, b) =>
                     formatVesselName(a.name).localeCompare(formatVesselName(b.name))
                 );
                 setFleet(sortedFleet);
@@ -237,12 +236,12 @@ export default function Dashboard() {
                 // 2. Fetch Config Summary and Sort Unconfigured lists
                 const configResponse = await axiosAepms.getFleetConfigurationSummary();
                 if (configResponse.me_unconfigured_list) {
-                    configResponse.me_unconfigured_list.sort((a, b) => 
+                    configResponse.me_unconfigured_list.sort((a, b) =>
                         formatVesselName(a.name).localeCompare(formatVesselName(b.name))
                     );
                 }
                 if (configResponse.ae_unconfigured_list) {
-                    configResponse.ae_unconfigured_list.sort((a, b) => 
+                    configResponse.ae_unconfigured_list.sort((a, b) =>
                         formatVesselName(a.name).localeCompare(formatVesselName(b.name))
                     );
                 }
@@ -425,50 +424,50 @@ export default function Dashboard() {
     const renderMeConfigurationDetails = () => (
         <div className="enhanced-card card-animated">
             <div className="card-header-me">
-    <div className="card-title-wrapper">
-  <h3 className="card-title-enhanced flex-items-xl">
-    <Cpu className="text-blue-600" size={24} />
-    Main Engine Configuration Details
-  </h3>
-  <p className="card-description-enhanced text-slate-600">
-    Manage Shop Trial data and view configured vessel reports
-  </p>
-</div>
+                <div className="card-title-wrapper">
+                    <h3 className="card-title-enhanced flex-items-xl">
+                        <Cpu className="text-blue-600" size={24} />
+                        Main Engine Configuration Details
+                    </h3>
+                    <p className="card-description-enhanced text-slate-600">
+                        Manage Shop Trial data and view configured vessel reports
+                    </p>
+                </div>
 
-    <div className="header-controls-me">
-        <div className="select-wrapper-me">
-            <select
-                className="select-input-me"
-                value={selectedUploadImo}
-                onChange={(e) => setSelectedUploadImo(e.target.value)}
-                onMouseDown={(e) => {
-                    e.currentTarget.parentElement.toggleAttribute("data-open");
-                }}
-                onBlur={(e) => {
-                    e.currentTarget.parentElement.removeAttribute("data-open");
-                }}
-            >
-                <option value="" disabled>
-                    Select Vessel to Upload PDF...
-                </option>
-                {fleet.map(ship => {
-                    const isConfigured = !meUnconfiguredList.find(u => u.id === ship.id);
-                    return (
-                        <option key={ship.id} value={ship.imo || ship.imo_number}>
-                            {formatVesselName(ship.name)} {isConfigured ? "(Update PDF)" : "(New Setup)"}
-                        </option>
-                    );
-                })}
-            </select>
-        </div>
+                <div className="header-controls-me">
+                    <div className="select-wrapper-me">
+                        <select
+                            className="select-input-me"
+                            value={selectedUploadImo}
+                            onChange={(e) => setSelectedUploadImo(e.target.value)}
+                            onMouseDown={(e) => {
+                                e.currentTarget.parentElement.toggleAttribute("data-open");
+                            }}
+                            onBlur={(e) => {
+                                e.currentTarget.parentElement.removeAttribute("data-open");
+                            }}
+                        >
+                            <option value="" disabled>
+                                Select Vessel to Upload PDF...
+                            </option>
+                            {fleet.map(ship => {
+                                const isConfigured = !meUnconfiguredList.find(u => u.id === ship.id);
+                                return (
+                                    <option key={ship.id} value={ship.imo || ship.imo_number}>
+                                        {formatVesselName(ship.name)} {isConfigured ? "(Update PDF)" : "(New Setup)"}
+                                    </option>
+                                );
+                            })}
+                        </select>
+                    </div>
 
-        <button onClick={handleUploadClick} disabled={isUploading || !selectedUploadImo} className="btn-upload-me">
-            {isUploading ? <RefreshCw className="animate-spin" size={18} /> : <UploadCloud size={18} />}
-            <span>{isUploading ? 'Uploading...' : 'Upload Shop Trial'}</span>
-        </button>
-        <button onClick={() => setShowMeConfigDetails(false)} className="close-btn-me"><X size={22} /></button>
-    </div>
-</div>
+                    <button onClick={handleUploadClick} disabled={isUploading || !selectedUploadImo} className="btn-upload-me">
+                        {isUploading ? <RefreshCw className="animate-spin" size={18} /> : <UploadCloud size={18} />}
+                        <span>{isUploading ? 'Uploading...' : 'Upload Shop Trial'}</span>
+                    </button>
+                    <button onClick={() => setShowMeConfigDetails(false)} className="close-btn-me"><X size={22} /></button>
+                </div>
+            </div>
             <div className="card-content-enhanced p-6">
                 <div className="vessel-table-wrapper">
                     <table className="vessel-table-enhanced">
@@ -503,184 +502,183 @@ export default function Dashboard() {
     );
 
     const renderAeConfigurationDetails = () => (
-    <div className="enhanced-card">
-        <div className="card-header-ae">
-            {/* TITLE BLOCK */}
-            <div>
-                <h3 className="card-title-enhanced">
-                    <Wrench className="text-purple-600" size={24} />
-                    Auxiliary Engine Configuration
-                </h3>
-                <p className="card-description-enhanced">
-                    Manage AE Shop Trial PDFs for each generator
-                </p>
-            </div>
-
-            {/* CONTROLS CONTAINER */}
-            <div className="header-controls-ae">
-
-                {/* ROW 1: VESSEL SELECT + GENERATOR SELECT + BUTTONS (All devices) */}
-                <div className="ae-controls-row-1">
-                    {/* VESSEL SELECT */}
-                    <div className="ae-select-wrapper-vessel">
-                        <select
-                            className="select-vessel-ae"
-                            value={selectedAeUploadShip}
-                            onChange={(e) => setSelectedAeUploadShip(e.target.value)}
-                            onMouseDown={(e) => e.currentTarget.parentElement.toggleAttribute("data-open")}
-                            onBlur={(e) => e.currentTarget.parentElement.removeAttribute("data-open")}
-                        >
-                            <option value="" disabled>
-                                Select Vessel...
-                            </option>
-                            {fleet.map((ship) => (
-                                <option key={ship.id} value={ship.imo || ship.imo_number}>
-                                    {formatVesselName(ship.name)}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* GENERATOR SELECT – Desktop shows here, Mobile hides via CSS */}
-                    <div className="ae-select-wrapper-gen">
-                        <select
-                            className="select-gen-ae"
-                            value={selectedAeUploadGen}
-                            onChange={(e) => setSelectedAeUploadGen(e.target.value)}
-                            disabled={!selectedAeUploadShip}
-                            onMouseDown={(e) => e.currentTarget.parentElement.toggleAttribute("data-open")}
-                            onBlur={(e) => e.currentTarget.parentElement.removeAttribute("data-open")}
-                        >
-                            <option value="" disabled>
-                                Select Generator...
-                            </option>
-                            {availableGenerators.map((gen) => (
-                                <option key={gen.generator_id} value={gen.generator_id}>
-                                    {gen.designation} ({gen.engine_model})
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* UPLOAD BUTTON */}
-                    <button
-                        className="btn-upload-ae"
-                        onClick={handleAeUploadClick}
-                        disabled={isUploading || !selectedAeUploadGen}
-                        title="Upload Shop Trial PDF"
-                    >
-                        {isUploading ? (
-                            <RefreshCw className="animate-spin" size={18} />
-                        ) : (
-                            <UploadCloud size={18} />
-                        )}
-                        <span>Upload</span>
-                    </button>
-
-                    {/* CLOSE BUTTON */}
-                    <button
-                        className="close-btn-ae"
-                        onClick={() => setShowAeConfigDetails(false)}
-                        title="Close AE Configuration"
-                    >
-                        <X size={22} />
-                    </button>
+        <div className="enhanced-card">
+            <div className="card-header-ae">
+                {/* TITLE BLOCK */}
+                <div>
+                    <h3 className="card-title-enhanced">
+                        <Wrench className="text-purple-600" size={24} />
+                        Auxiliary Engine Configuration
+                    </h3>
+                    <p className="card-description-enhanced">
+                        Manage AE Shop Trial PDFs for each generator
+                    </p>
                 </div>
 
-                {/* ROW 2: GENERATOR SELECT (Mobile only - shown via CSS) */}
-                <div className="ae-controls-row-2">
-                    <div className="ae-select-wrapper-gen">
-                        <select
-                            className="select-gen-ae"
-                            value={selectedAeUploadGen}
-                            onChange={(e) => setSelectedAeUploadGen(e.target.value)}
-                            disabled={!selectedAeUploadShip}
-                            onMouseDown={(e) => e.currentTarget.parentElement.toggleAttribute("data-open")}
-                            onBlur={(e) => e.currentTarget.parentElement.removeAttribute("data-open")}
-                        >
-                            <option value="" disabled>
-                                Select Generator...
-                            </option>
-                            {availableGenerators.map((gen) => (
-                                <option key={gen.generator_id} value={gen.generator_id}>
-                                    {gen.designation} ({gen.engine_model})
+                {/* CONTROLS CONTAINER */}
+                <div className="header-controls-ae">
+
+                    {/* ROW 1: VESSEL SELECT + GENERATOR SELECT + BUTTONS (All devices) */}
+                    <div className="ae-controls-row-1">
+                        {/* VESSEL SELECT */}
+                        <div className="ae-select-wrapper-vessel">
+                            <select
+                                className="select-vessel-ae"
+                                value={selectedAeUploadShip}
+                                onChange={(e) => setSelectedAeUploadShip(e.target.value)}
+                                onMouseDown={(e) => e.currentTarget.parentElement.toggleAttribute("data-open")}
+                                onBlur={(e) => e.currentTarget.parentElement.removeAttribute("data-open")}
+                            >
+                                <option value="" disabled>
+                                    Select Vessel...
                                 </option>
-                            ))}
-                        </select>
+                                {fleet.map((ship) => (
+                                    <option key={ship.id} value={ship.imo || ship.imo_number}>
+                                        {formatVesselName(ship.name)}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* GENERATOR SELECT – Desktop shows here, Mobile hides via CSS */}
+                        <div className="ae-select-wrapper-gen">
+                            <select
+                                className="select-gen-ae"
+                                value={selectedAeUploadGen}
+                                onChange={(e) => setSelectedAeUploadGen(e.target.value)}
+                                disabled={!selectedAeUploadShip}
+                                onMouseDown={(e) => e.currentTarget.parentElement.toggleAttribute("data-open")}
+                                onBlur={(e) => e.currentTarget.parentElement.removeAttribute("data-open")}
+                            >
+                                <option value="" disabled>
+                                    Select Generator...
+                                </option>
+                                {availableGenerators.map((gen) => (
+                                    <option key={gen.generator_id} value={gen.generator_id}>
+                                        {gen.designation} ({gen.engine_model})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* UPLOAD BUTTON */}
+                        <button
+                            className="btn-upload-ae"
+                            onClick={handleAeUploadClick}
+                            disabled={isUploading || !selectedAeUploadGen}
+                            title="Upload Shop Trial PDF"
+                        >
+                            {isUploading ? (
+                                <RefreshCw className="animate-spin" size={18} />
+                            ) : (
+                                <UploadCloud size={18} />
+                            )}
+                            <span>Upload</span>
+                        </button>
+
+                        {/* CLOSE BUTTON */}
+                        <button
+                            className="close-btn-ae"
+                            onClick={() => setShowAeConfigDetails(false)}
+                            title="Close AE Configuration"
+                        >
+                            <X size={22} />
+                        </button>
                     </div>
+
+                    {/* ROW 2: GENERATOR SELECT (Mobile only - shown via CSS) */}
+                    <div className="ae-controls-row-2">
+                        <div className="ae-select-wrapper-gen">
+                            <select
+                                className="select-gen-ae"
+                                value={selectedAeUploadGen}
+                                onChange={(e) => setSelectedAeUploadGen(e.target.value)}
+                                disabled={!selectedAeUploadShip}
+                                onMouseDown={(e) => e.currentTarget.parentElement.toggleAttribute("data-open")}
+                                onBlur={(e) => e.currentTarget.parentElement.removeAttribute("data-open")}
+                            >
+                                <option value="" disabled>
+                                    Select Generator...
+                                </option>
+                                {availableGenerators.map((gen) => (
+                                    <option key={gen.generator_id} value={gen.generator_id}>
+                                        {gen.designation} ({gen.engine_model})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
                 </div>
-
             </div>
-        </div>
 
-        {/* TABLE CONTENT */}
-        <div className="card-content-enhanced">
-            <div className="vessel-table-wrapper">
-                <table className="vessel-table-enhanced">
-                    <thead>
-                        <tr>
-                            <th>Vessel Name</th>
-                            <th>IMO Number</th>
-                            <th className="text-center">Generators & Reports</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {fleet.length === 0 ? (
+            {/* TABLE CONTENT */}
+            <div className="card-content-enhanced">
+                <div className="vessel-table-wrapper">
+                    <table className="vessel-table-enhanced">
+                        <thead>
                             <tr>
-                                <td colSpan="3" className="empty-state">
-                                    No vessels found in fleet.
-                                </td>
+                                <th>Vessel Name</th>
+                                <th>IMO Number</th>
+                                <th className="text-center">Generators & Reports</th>
                             </tr>
-                        ) : (
-                            fleet.map((vessel) => (
-                                <AeVesselRow
-                                    key={vessel.id || vessel.imo}
-                                    vessel={vessel}
-                                    onViewData={handleViewAEShopTrialData}
-                                    onViewPdf={handleViewAEShopTrialPDF}
-                                />
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {fleet.length === 0 ? (
+                                <tr>
+                                    <td colSpan="3" className="empty-state">
+                                        No vessels found in fleet.
+                                    </td>
+                                </tr>
+                            ) : (
+                                fleet.map((vessel) => (
+                                    <AeVesselRow
+                                        key={vessel.id || vessel.imo}
+                                        vessel={vessel}
+                                        onViewData={handleViewAEShopTrialData}
+                                        onViewPdf={handleViewAEShopTrialPDF}
+                                    />
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-    </div>
-);
+    );
 
     if (loading) return (<div className="dashboard-container"><div className="loading-state-enhanced"><div className="loading-spinner"></div><p>Loading dashboard data...</p></div></div>);
 
     return (
-    <>
-        {/* Modal FIRST - outside all containers */}
-        <ShopTrialModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} data={modalData} type={modalType} />
-        
-        {/* Now the padded content wrapper */}
-        <div style={{ }}>
-            <div className="dashboard-container-enhanced">
-                <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".pdf" onChange={handleFileChange} />
-                <input type="file" ref={aeFileInputRef} style={{ display: 'none' }} accept=".pdf" onChange={handleAeFileChange} />
+        <>
+            <AppHeader />
+            {/* Modal FIRST - outside all containers */}
+            <ShopTrialModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} data={modalData} type={modalType} />
 
-                <PerformanceNav activeView={activeView} setActiveView={setActiveView} isDashboard={location.pathname === '/dashboard'} />
+            {/* Now the padded content wrapper */}
+            <div style={{}}>
+                <div className="dashboard-container-enhanced">
+                    <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".pdf" onChange={handleFileChange} />
+                    <input type="file" ref={aeFileInputRef} style={{ display: 'none' }} accept=".pdf" onChange={handleAeFileChange} />
 
-                <div className="performance-content-wrapper">
-                    {/* KPI Cards and other content */}
-                    <div className="kpi-grid-enhanced mb-8">
-                        {renderKpiCard(<Ship size={32} />, "Total Fleet Ships", fleetShips, "Active vessels in system", 0)}
-                        {renderKpiCard(<Cpu size={32} />, "ME Configured", meConfiguredCount, `${fleetShips - meConfiguredCount} pending setup`, 1, 'ME_CONFIG')}
-                        {renderKpiCard(<Wrench size={32} />, "AE Configured", aeConfiguredCount, `${fleetShips - aeConfiguredCount} pending setup`, 2, 'AE_CONFIG')}
-                        {renderKpiCard(<Clock size={32} />, "Config. Gaps", (fleetShips - meConfiguredCount) + (fleetShips - aeConfiguredCount), "Total configurations needed", 3)}
-                    </div>
-
-                    {showMeConfigDetails ? renderMeConfigurationDetails() : showAeConfigDetails ? renderAeConfigurationDetails() : (
-                        <div className="tables-grid-enhanced animate-in fade-in slide-in-from-bottom-2 duration-500">
-                            {renderUnconfiguredVesselTable(meUnconfiguredList, 'ME', 0)}
-                            {renderUnconfiguredVesselTable(aeUnconfiguredList, 'AE', 1)}
+                    <div className="performance-content-wrapper">
+                        {/* KPI Cards and other content */}
+                        <div className="kpi-grid-enhanced mb-8">
+                            {renderKpiCard(<Ship size={32} />, "Total Fleet Ships", fleetShips, "Active vessels in system", 0)}
+                            {renderKpiCard(<Cpu size={32} />, "ME Configured", meConfiguredCount, `${fleetShips - meConfiguredCount} pending setup`, 1, 'ME_CONFIG')}
+                            {renderKpiCard(<Wrench size={32} />, "AE Configured", aeConfiguredCount, `${fleetShips - aeConfiguredCount} pending setup`, 2, 'AE_CONFIG')}
+                            {renderKpiCard(<Clock size={32} />, "Config. Gaps", (fleetShips - meConfiguredCount) + (fleetShips - aeConfiguredCount), "Total configurations needed", 3)}
                         </div>
-                    )}
+
+                        {showMeConfigDetails ? renderMeConfigurationDetails() : showAeConfigDetails ? renderAeConfigurationDetails() : (
+                            <div className="tables-grid-enhanced animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                {renderUnconfiguredVesselTable(meUnconfiguredList, 'ME', 0)}
+                                {renderUnconfiguredVesselTable(aeUnconfiguredList, 'AE', 1)}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
-        </div>
-    </>
-);
+        </>
+    );
 }

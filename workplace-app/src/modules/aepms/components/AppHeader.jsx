@@ -25,8 +25,8 @@ export default function AppHeader() {
   const nav = [
     { href: "/aepms", label: "Dashboard" },
     { href: "/aepms/me-performance", label: "Performance" },
-    { href: "/aepms/fleet", label: "Fleet" },
-    { href: "/aepms/voyage", label: "Voyage" },
+    // { href: "/aepms/fleet", label: "Fleet" },
+    // { href: "/aepms/voyage", label: "Voyage" },
   ];
 
   const [theme, setTheme] = useState("light");
@@ -36,21 +36,7 @@ export default function AppHeader() {
 
   const menuRef = useRef(null);
 
-  const isActive = (path) => {
-    if (path === "/performance-cockpit") {
-      return location.pathname === "/performance-cockpit";
-    }
-    if (path === "/dashboard") {
-      const dashboardRoutes = [
-        "/dashboard",
-        "/me-performance",
-        "/ae-performance",
-        "/luboil-analysis",
-      ];
-      return dashboardRoutes.includes(location.pathname);
-    }
-    return location.pathname === path;
-  };
+  const isActive = (path) => location.pathname === path;
 
   useEffect(() => {
     const stored = localStorage.getItem("theme");

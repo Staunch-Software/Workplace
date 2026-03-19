@@ -54,6 +54,7 @@ from app.models import (
 )
 
 from app.model.control.user import User
+from app.model.control.vessel import Vessel 
 from app.generator_models import (
     VesselGenerator,
     GeneratorBaselineData,
