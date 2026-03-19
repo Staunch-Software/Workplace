@@ -4106,6 +4106,7 @@ const LuboilAnalysis = () => {
           >
             {/* NEW HEADER FOR TABLE */}
             <CardHeader
+              onClick={() => setIsTableOpen(!isTableOpen)}
               style={{
                 display: "flex",
                 flexDirection: "row",
