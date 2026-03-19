@@ -5,7 +5,7 @@ import ReactDOM from 'react-dom';
 import Select from './ui/Select';
 import Button from './ui/Button';
 import jsPDF from "jspdf";
-import OzellarLogo from "../assets/250714_OzellarMarine-Logo-Final.jpg";
+// import OzellarLogo from "../assets/250714_OzellarMarine-Logo-Final.jpg";
 
 // =======================================================================
 // DESIGN SYSTEM & CONSTANTS
@@ -745,19 +745,19 @@ const exportAEPDF = async (
 let logoWidth = 45;
 let logoHeight = 20;
 
-try {
-  const base64Logo = await toBase64(OzellarLogo);
+// try {
+//   const base64Logo = await toBase64(OzellarLogo);
 
-  // Header area vertical centering
-  const headerTopY = 12;    
-  const headerBottomY = 52; 
-  const headerCenterY = (headerTopY + headerBottomY) / 2;
-  const logoY = headerCenterY - (logoHeight / 2);  // perfect vertical alignment
+//   // Header area vertical centering
+//   const headerTopY = 12;    
+//   const headerBottomY = 52; 
+//   const headerCenterY = (headerTopY + headerBottomY) / 2;
+//   const logoY = headerCenterY - (logoHeight / 2);  // perfect vertical alignment
 
-  doc.addImage(base64Logo, "JPEG", leftMargin, logoY, logoWidth, logoHeight);
-} catch (err) {
-  console.warn("Logo load failed:", err);
-}
+//   doc.addImage(base64Logo, "JPEG", leftMargin, logoY, logoWidth, logoHeight);
+// } catch (err) {
+//   console.warn("Logo load failed:", err);
+// }
 
 
   // -------------------------------
