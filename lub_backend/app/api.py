@@ -6,6 +6,7 @@ import shutil
 import tempfile
 from fastapi.responses import JSONResponse
 from pypdf import PdfReader, PdfWriter
+from sqlalchemy import Column, Integer, String, Text
 import os
 import zipfile
 from fastapi.responses import StreamingResponse
@@ -378,7 +379,7 @@ async def upload_luboil_report(
         pdf_stream = io.BytesIO(contents)
 
         # 2. Process Data (Extract values to DB)
-        logger.info("âš™ï¸ Parsing PDF Data...")
+        logger.info(" Parsing PDF Data...")
         result = save_luboil_report(
             pdf_file_stream=pdf_stream,
             filename=file.filename,
@@ -387,10 +388,10 @@ async def upload_luboil_report(
         
         report_id = result.get("report_id")
         if not report_id:
-            logger.error("âŒ Parser failed to return a Report ID.")
+            logger.error("Parser failed to return a Report ID.")
             raise HTTPException(status_code=500, detail="Report saved but ID not returned.")
 
-        logger.info(f"âœ… DB Record Created with ID: {report_id}")
+        logger.info(f"DB Record Created with ID: {report_id}")
 
         # 3. Upload Raw File to Azure Blob
         blob_url = None
@@ -2005,6 +2006,19 @@ async def upload_vessel_config_report(
     if vessel:
         vessel.vessel_report_url = blob_url
         db.commit()
+
+    # Save to Control DB vessels table
+    control_db = SessionControl()
+    try:
+        from app.models.control.vessel import Vessel as ControlVessel
+        control_vessel = control_db.query(ControlVessel).filter(
+            ControlVessel.imo == str(imo)
+        ).first()
+        if control_vessel:
+            control_vessel.vessel_report_url = blob_url
+            control_db.commit()
+    finally:
+        control_db.close()
     
     return {"url": blob_url}
 
