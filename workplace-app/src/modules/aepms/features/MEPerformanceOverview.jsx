@@ -1802,7 +1802,7 @@ export default function MEPerformanceOverview() {
                             flexDirection: "column",
                             gap: "12px",
                             animation: `fadeIn 0.3s ease forwards ${index * 0.05}s`,
-                            opacity: 0,
+                            // opacity: 0,
                             position: "relative",
                             transition: "transform 0.2s, box-shadow 0.2s",
                           }}

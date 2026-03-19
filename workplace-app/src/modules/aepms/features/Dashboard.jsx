@@ -227,7 +227,7 @@ export default function Dashboard() {
         const loadData = async () => {
             try {
                 // 1. Fetch Fleet and Sort Alphabetically
-                const fleetResponse = await axiosAepms.getFleet();
+                const fleetResponse = await axiosAepms.getFleetConfigurationSummary();
                 const sortedFleet = (fleetResponse.fleet || []).sort((a, b) =>
                     formatVesselName(a.name).localeCompare(formatVesselName(b.name))
                 );

@@ -165,3 +165,21 @@ DETAIL:  A field with precision 5, scale 2 must round to an absolute value less 
 2025-11-28 17:40:24,097 [INFO] app.report_processor: Processing monthly report: 1.TE-07 ME Performance Sheet - GCL Sabarmati.pdf
 2025-11-28 17:40:25,493 [INFO] app.report_processor: Alert Summary - N:5, W:1, C:7
 2025-11-28 17:40:25,495 [INFO] app.report_processor: Dominant Status Determined: Critical
+2026-03-19 15:00:16,744 [INFO] app.report_processor: Processing monthly report: 3. TE-07 ME Performance.pdf
+2026-03-19 15:00:18,136 [INFO] app.report_processor: Alert Summary Counts - Normal: 8, Warning: 4, Critical: 1
+2026-03-19 15:00:18,137 [INFO] app.report_processor: Final Dominant Status Determined: Critical
+2026-03-19 15:03:12,708 [INFO] app.report_processor: Processing monthly report: 08. TECH - 07 ME Performance Sheet.pdf
+2026-03-19 15:03:13,452 [INFO] app.report_processor: Alert Summary Counts - Normal: 6, Warning: 2, Critical: 5
+2026-03-19 15:03:13,453 [INFO] app.report_processor: Final Dominant Status Determined: Critical
+2026-03-19 15:05:11,005 [INFO] app.report_processor: Processing monthly report: 08. TECH-07 ME Performance Sheet.pdf
+2026-03-19 15:05:11,464 [INFO] app.report_processor: Alert Summary Counts - Normal: 9, Warning: 4, Critical: 0
+2026-03-19 15:05:11,465 [INFO] app.report_processor: Final Dominant Status Determined: Warning
+2026-03-19 15:06:05,625 [INFO] app.report_processor: Processing monthly report: 12. TECH-07 ME Performance Sheet.pdf
+2026-03-19 15:06:06,136 [INFO] app.report_processor: Alert Summary Counts - Normal: 7, Warning: 3, Critical: 3
+2026-03-19 15:06:06,137 [INFO] app.report_processor: Final Dominant Status Determined: Critical
+2026-03-19 15:07:04,099 [INFO] app.report_processor: Processing monthly report: 12. TECH-07 ME Performance Sheet - Dec 2025.pdf
+2026-03-19 15:07:04,590 [INFO] app.report_processor: Alert Summary Counts - Normal: 8, Warning: 4, Critical: 1
+2026-03-19 15:07:04,590 [INFO] app.report_processor: Final Dominant Status Determined: Critical
+2026-03-19 15:19:52,269 [INFO] app.report_processor: Processing monthly report: TECH - 07 ME Performance Sheet DEC 2025 BIO FUEL.pdf
+2026-03-19 15:19:52,999 [INFO] app.report_processor: Alert Summary Counts - Normal: 10, Warning: 2, Critical: 1
+2026-03-19 15:19:52,999 [INFO] app.report_processor: Final Dominant Status Determined: Critical

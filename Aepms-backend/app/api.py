@@ -54,6 +54,7 @@ from app.models import (
 )
 
 from app.model.control.user import User
+from app.core.database_control import get_control_db
 from app.model.control.vessel import Vessel 
 from app.generator_models import (
     VesselGenerator,
@@ -1392,7 +1393,6 @@ async def get_baseline_performance(imo_number: int, db: Session = Depends(get_db
 # ============================================
 # REMAINING ENDPOINTS (Fleet, Alerts, Dashboard, etc.)
 # ============================================
-
 @app.get("/api/fleet/config-summary-live")
 async def get_fleet_configuration_summary_live(db: Session = Depends(get_db)):
     """Executes live SQL queries to get configuration counts and unconfigured lists."""
@@ -1823,7 +1823,7 @@ async def get_propeller_margin_trend(db: Session = Depends(get_db)) -> Dict[str,
     ).filter(
         subquery.c.rn <= 12 
     ).order_by(
-         VesselInfo.display_order.asc(),
+        VesselInfo.display_order.asc(),
         VesselInfo.vessel_name,
         subquery.c.report_date.asc() # Sort ascending for the graph (Oldest -> Newest)
     ).all()
