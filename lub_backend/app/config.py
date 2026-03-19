@@ -52,6 +52,27 @@ class SSOSettings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080
 
+    # Luboil DB
+    LUBOIL_DATABASE_URL: str = ""
+
+    # Blob Storage
+    AZURE_STORAGE_CONNECTION_STRING: str = ""
+    AZURE_CONTAINER_NAME: str = "pdf-repository"
+    AZURITE_CONNECTION_STRING: str = ""
+    IS_VESSEL_INSTANCE: bool = False
+
+    # Sync
+    SYNC_API_KEY: str = ""
+    CLOUD_BASE_URL: str = "https://workplace.ozellar.com/lub/api/v1"
+    WORKPLACE_BASE_URL: str = "https://workplace.ozellar.com/api/v1"
+    CLOUD_HEALTH_URL: str = "https://workplace.ozellar.com/health"
+    VESSEL_IMO: str = ""
+    NETWORK_TIMEOUT_SECONDS: int = 10
+    SYNC_RETRY_INTERVAL: int = 30
+    MAX_SYNC_RETRIES: int = 5
+    SYNC_BATCH_SIZE: int = 20
+    CONFIG_SYNC_INTERVAL: int = 86400
+
     class Config:
         env_file = ".env"
         case_sensitive = True

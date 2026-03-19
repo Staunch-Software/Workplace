@@ -5,7 +5,7 @@ from typing import Optional, List
 from app.core.database_control import get_control_db as get_db
 from app.models.control.user import User
 from datetime import datetime
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 import bcrypt
 import logging
 from app.utils.auth_utils import (
@@ -75,14 +75,13 @@ def require_admin(current_user: dict = Depends(get_current_user)):
 @router.post("/sso/microsoft", response_model=TokenResponse)
 async def microsoft_sso_login(
     request: MicrosoftSSORequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     try:
-        # Validate Microsoft token
+        from sqlalchemy import select
         ms_user_info = validate_microsoft_token(request.id_token)
-
-        # Check if user exists in database
-        user = db.query(User).filter_by(email=ms_user_info["email"]).first()
+        result = await db.execute(select(User).where(User.email == ms_user_info["email"]))
+        user = result.scalars().first()
 
         if not user:
             # NEW USER - Create as INACTIVE
@@ -97,7 +96,7 @@ async def microsoft_sso_login(
             )
 
             db.add(user)
-            db.commit()
+            await db.commit()
 
             raise HTTPException(
                 status_code=403,
@@ -119,7 +118,7 @@ async def microsoft_sso_login(
             )
 
         user.last_login = datetime.utcnow()
-        db.commit()
+        await db.commit()
 
         logger.info(f"[SSO LOGIN] user: {user.email}, role from DB: '{user.role}'")
 
@@ -157,7 +156,7 @@ async def microsoft_sso_login(
 @router.post("/local/login", response_model=TokenResponse)
 async def local_login(
     request: LocalLoginRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Local authentication endpoint."""
 
@@ -186,7 +185,9 @@ async def local_login(
         )
     # --------------------------------
 
-    user = db.query(User).filter_by(email=request.email).first()
+    from sqlalchemy import select
+    result = await db.execute(select(User).where(User.email == request.email))
+    user = result.scalars().first()
 
     # ✅ Moved null check BEFORE logger to prevent crash on missing user
     if not user:
@@ -207,7 +208,7 @@ async def local_login(
         raise HTTPException(status_code=403, detail="Account not activated")
 
     user.last_login = datetime.utcnow()
-    db.commit()
+    await db.commit()
 
     # ✅ Removed auth_type and organization_id — not in new model
     app_token = create_application_jwt({

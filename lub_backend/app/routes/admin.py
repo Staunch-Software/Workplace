@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.core.database_control import get_control_db as get_db
 from app.models.control.user import User
 from app.models.control.vessel import Vessel as ControlVessel
@@ -37,7 +38,7 @@ class CreateLocalUserWithPermsRequest(BaseModel):
 
 @router.get("/users")
 async def list_users(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     admin: dict = Depends(require_admin)
 ):
     try:
@@ -45,7 +46,8 @@ async def list_users(
         logger.info(f"📋 Fetching users - Role: {admin_role}")
 
         # Superuser and Admin can see all users
-        users = db.query(User).all()
+        result = await db.execute(select(User))
+        users = result.scalars().all()
 
         return {
             "users": [
@@ -57,10 +59,9 @@ async def list_users(
                     "job_title": u.job_title,
                     "is_active": u.is_active,
                     "permissions": u.permissions or {},
-                    "can_self_assign_vessels": u.can_self_assign_vessels,
-                    "created_at": u.created_at.isoformat() if u.created_at else None,
-                    "created_by": str(u.created_by) if u.created_by else "System"
-                }
+                    "can_self_assign_vessels": getattr(u, 'can_self_assign_vessels', False),
+                    "created_at": u.created_at.isoformat() if getattr(u, 'created_at', None) else None,
+                    "created_by": str(u.created_by) if getattr(u, 'created_by', None) else "System"                }
                 for u in users
             ]
         }
@@ -71,19 +72,20 @@ async def list_users(
 
 @router.post("/users/{user_id}/activate")
 async def activate_user(
-    user_id: str,                           # ✅ UUID string now, not int
+    user_id: str,
     request: ActivateUserRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     admin: dict = Depends(require_admin)
 ):
     try:
-        user = db.query(User).filter(User.id == uuid.UUID(user_id)).first()
+        result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+        user = result.scalars().first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
         user.is_active = True
-        user.role = request.role.upper()    # ✅ normalize to uppercase
-        db.commit()
+        user.role = request.role.upper()
+        await db.commit()
         return {"message": "User activated", "user": {"id": str(user.id), "role": user.role}}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -91,19 +93,20 @@ async def activate_user(
 
 @router.post("/users/{user_id}/deactivate")
 async def deactivate_user(
-    user_id: str,                           # ✅ UUID string now, not int
-    db: Session = Depends(get_db),
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
     admin: dict = Depends(require_admin)
 ):
     try:
-        user = db.query(User).filter(User.id == uuid.UUID(user_id)).first()
+        result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+        user = result.scalars().first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         if str(user.id) == admin.get("id"):
             raise HTTPException(status_code=400, detail="Cannot deactivate yourself")
 
         user.is_active = False
-        db.commit()
+        await db.commit()
         return {"message": "User deactivated"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -111,11 +114,12 @@ async def deactivate_user(
 
 @router.get("/summary")
 async def get_summary(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     admin: dict = Depends(require_admin)
 ):
     try:
-        users = db.query(User).all()
+        result = await db.execute(select(User))
+        users = result.scalars().all()
         total = len(users)
         active = len([u for u in users if u.is_active])
 
@@ -133,13 +137,14 @@ async def get_summary(
 @router.post("/local-users")
 async def create_local_user_with_permissions(
     request: CreateLocalUserWithPermsRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     admin: dict = Depends(require_admin)
 ):
     try:
         logger.info(f"👤 Creating local user: {request.email}")
 
-        existing = db.query(User).filter_by(email=request.email).first()
+        result = await db.execute(select(User).where(User.email == request.email))
+        existing = result.scalars().first()
         if existing:
             raise HTTPException(status_code=400, detail="Email already exists")
 
@@ -169,16 +174,14 @@ async def create_local_user_with_permissions(
         )
 
         db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
+        await db.commit()
+        await db.refresh(new_user)
 
-        # ✅ Handle vessel assignments via user_vessel_link (replaces assigned_vessels column)
         if request.assigned_vessels:
-            vessels = db.query(ControlVessel).filter(
-                ControlVessel.id.in_(request.assigned_vessels)
-            ).all()
+            res = await db.execute(select(ControlVessel).where(ControlVessel.id.in_(request.assigned_vessels)))
+            vessels = res.scalars().all()
             new_user.vessels = vessels
-            db.commit()
+            await db.commit()
 
         logger.info(f"✅ User created: {new_user.email}, role: {new_user.role}")
         return {
@@ -202,16 +205,17 @@ async def create_local_user_with_permissions(
 async def update_user_permissions(
     user_id: str,
     permissions: dict,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     admin: dict = Depends(require_admin)
 ):
     try:
-        user = db.query(User).filter(User.id == uuid.UUID(user_id)).first()
+        result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+        user = result.scalars().first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
         user.permissions = permissions
-        db.commit()
+        await db.commit()
         return {"message": "Permissions updated", "permissions": user.permissions}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -221,20 +225,20 @@ async def update_user_permissions(
 async def update_user_vessels(
     user_id: str,
     vessel_ids: List[str],
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     admin: dict = Depends(require_admin)
 ):
     """Assign vessels to a user via user_vessel_link (replaces old assigned_vessels column)."""
     try:
-        user = db.query(User).filter(User.id == uuid.UUID(user_id)).first()
+        result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+        user = result.scalars().first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        vessels = db.query(ControlVessel).filter(
-            ControlVessel.id.in_(vessel_ids)
-        ).all()
+        res = await db.execute(select(ControlVessel).where(ControlVessel.id.in_(vessel_ids)))
+        vessels = res.scalars().all()
         user.vessels = vessels
-        db.commit()
+        await db.commit()
 
         return {
             "message": "Vessels updated",
