@@ -30,6 +30,8 @@ if sys.platform == 'win32':
     except Exception as e:
         print(f"Warning: Could not set multiprocessing start method: {e}")
 from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select as sa_select
 import io
 import logging
 from typing import BinaryIO, Dict, Any, List, Optional
@@ -185,29 +187,34 @@ app.add_middleware(
 # Include routers
 # app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 # app.include_router(admin.router, tags=["Admin"])  
+from app.routers.sync import router as sync_router
+app.include_router(sync_router, prefix="/sync", tags=["Sync"])
 
 # Database Initialization
 @app.on_event("startup")
 async def startup_event():
     """Event handler that runs when the FastAPI application starts up."""
     logger.info("Application startup: Initializing database...")
-    try:
-        create_all_tables()
-        logger.info("Database tables checked/created successfully.")
-        run_startup_migrations()
-        from app.database import SessionLocal
-        from app.core.database_control import SessionControl
-        db = SessionLocal()
-        try:
-            from app.database import create_superuser_if_not_exists
-            # from app.core.database_control import SessionControl
-            create_superuser_if_not_exists(db)
-        finally:
-            db.close()
-    except Exception as e:
-        logger.error(f"Failed to initialize database on startup: {e}", exc_info=True)
-
-
+    import os, asyncio
+    if os.getenv("IS_VESSEL_INSTANCE", "false").lower() == "true":
+        from app.services.sync_worker import start_background_sync
+        asyncio.create_task(start_background_sync())
+        logger.info("Sync worker started (vessel instance).")
+    # try:
+    #     create_all_tables()
+    #     logger.info("Database tables checked/created successfully.")
+    #     run_startup_migrations()
+    #     from app.database import SessionLocal
+    #     from app.core.database_control import SessionControl
+    #     db = SessionLocal()
+    #     try:
+    #         from app.database import create_superuser_if_not_exists
+    #         # from app.core.database_control import SessionControl
+    #         create_superuser_if_not_exists(db)
+    #     finally:
+    #         db.close()
+    # except Exception as e:
+    #     logger.error(f"Failed to initialize database on startup: {e}", exc_info=True)
 
 
 # ============================================
@@ -218,7 +225,7 @@ async def upload_generated_report(
     file: UploadFile = File(...),
     report_type: str = Form(...), 
     report_id: Optional[int] = Form(None), # Made Optional for Luboil if ID isn't passed
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     try:
         file_content = await file.read()
@@ -252,7 +259,8 @@ async def upload_generated_report(
 
         # 2. Fetch Report Details (If report_id is provided)
         if report_id and model:
-            report = db.query(model).filter(pk_field == report_id).first()
+            result = await db.execute(sa_select(model).where(pk_field == report_id))
+            report = result.scalars().first()
             if report:
                 if report_type == 'mainEngine':
                     imo_number = report.imo_number
@@ -280,7 +288,7 @@ async def upload_generated_report(
             # Update DB URL if linked to a specific report
             if report_id and model and report:
                 report.generated_report_url = blob_url
-                db.commit()
+                await db.commit()
             
             # For Lube Oil, we might just log it or save to a History Log table if you have one
             logger.info(f"âœ… Uploaded {report_type} to {blob_url}")
@@ -303,7 +311,7 @@ async def upload_generated_report(
 @app.get("/api/luboil/reports/{imo_number}", tags=["Lube Oil"])
 async def get_luboil_reports(
     imo_number: int, 
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: Any = Depends(auth.get_current_user)
 ):
     """
@@ -322,16 +330,19 @@ async def get_luboil_reports(
         # --- ðŸ”¥ END OF SECURITY GATE ---
 
         # Fetch samples joined with report info (Source preserved exactly)
-        results = db.query(
-            LuboilReport.report_id,
-            LuboilReport.file_name,
-            LuboilReport.report_url,
-            LuboilReport.report_date
-        ).filter(
-            LuboilReport.imo_number == str(imo_number)
-        ).order_by(
-            desc(LuboilReport.report_date)
-        ).limit(20).all()
+        from sqlalchemy import select as sa_select
+        stmt = (
+            sa_select(
+                LuboilReport.report_id,
+                LuboilReport.file_name,
+                LuboilReport.report_url,
+                LuboilReport.report_date
+            )
+            .where(LuboilReport.imo_number == str(imo_number))
+            .order_by(desc(LuboilReport.report_date))
+            .limit(20)
+        )
+        results = (await db.execute(stmt)).all()
 
         data = []
         seen_ids = set()
@@ -364,7 +375,7 @@ async def get_luboil_reports(
 @app.post("/api/upload-luboil-report/", tags=["Lube Oil"])
 async def upload_luboil_report(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     logger.info(f"Received Lube Oil upload: {file.filename}")
 
@@ -415,12 +426,13 @@ async def upload_luboil_report(
                 logger.info(f"ðŸŽ‰ Azure Upload Success. URL: {blob_url}")
                 
                 # 4. UPDATE THE DATABASE RECORD WITH THE URL
-                report_record = db.query(LuboilReport).filter(LuboilReport.report_id == report_id).first()
-                
+                res = await db.execute(sa_select(LuboilReport).where(LuboilReport.report_id == report_id))
+                report_record = res.scalars().first()
+
                 if report_record:
                     report_record.report_url = blob_url
-                    db.commit() # Commit the update
-                    db.refresh(report_record) # Refresh to confirm
+                    await db.commit()
+                    await db.refresh(report_record)
                     logger.info(f"ðŸ’¾ Database Updated with URL for Report ID: {report_id}")
                 else:
                     logger.error(f"âŒ Critical: Report ID {report_id} not found in DB during update.")
@@ -470,7 +482,7 @@ async def upload_luboil_report(
                 created_at=datetime.utcnow() 
             )
             db.add(new_event)
-            db.commit()
+            await db.commit()
             logger.info(f"ðŸ“¡ Live Feed updated for {vessel_name} (Duplicate: {is_duplicate})")
         except Exception as feed_err:
             logger.error(f"âš ï¸ Failed to add upload event to Live Feed: {feed_err}")
@@ -534,7 +546,7 @@ def sign_luboil_url(msg_text):
 @app.post("/api/luboil/remarks/update", tags=["Lube Oil"])
 async def update_luboil_remarks(
     request: LuboilRemarksRequest, 
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(auth.get_current_user) 
 ):
     # Local imports to prevent potential circular dependency crashes
@@ -565,17 +577,21 @@ async def update_luboil_remarks(
         # 2. TARGET THE SPECIFIC SAMPLE
         sample = None
         if request.sample_id:
-            sample = db.query(LuboilSample).filter(LuboilSample.sample_id == request.sample_id).first()
-        
+            res = await db.execute(sa_select(LuboilSample).where(LuboilSample.sample_id == request.sample_id))
+            sample = res.scalars().first()
+
         if not sample:
-            sample_query = db.query(LuboilSample).join(
-                LuboilReport, LuboilSample.report_id == LuboilReport.report_id
-            ).filter(LuboilReport.imo_number == str(str(vessel.imo)),
-                LuboilSample.sample_date == request.sample_date
+            base_stmt = (
+                sa_select(LuboilSample)
+                .join(LuboilReport, LuboilSample.report_id == LuboilReport.report_id)
+                .where(LuboilReport.imo_number == str(vessel.imo))
+                .where(LuboilSample.sample_date == request.sample_date)
             )
-            sample = sample_query.filter(LuboilSample.equipment_code == request.machinery_name).first()
+            res = await db.execute(base_stmt.where(LuboilSample.equipment_code == request.machinery_name))
+            sample = res.scalars().first()
             if not sample:
-                sample = sample_query.filter(LuboilSample.machinery_name == request.machinery_name).first()
+                res = await db.execute(base_stmt.where(LuboilSample.machinery_name == request.machinery_name))
+                sample = res.scalars().first()
 
         if not sample: 
             logger.error(f"âŒ Sample for IMO {str(vessel.imo)} on {request.sample_date} not found.")
@@ -910,10 +926,11 @@ async def update_luboil_remarks(
             except Exception as feed_err:
                 logger.error(f"Live feed commit failed (non-fatal): {feed_err}", exc_info=True)
 
-        db.commit()
+        await db.commit()
 
         # 4. REBUILD HISTORY
-        history_sample = db.query(LuboilSample).filter(LuboilSample.sample_id == sample.sample_id).first()
+        res = await db.execute(sa_select(LuboilSample).where(LuboilSample.sample_id == sample.sample_id))
+        history_sample = res.scalars().first()
         updated_conversation = []
         unique_tracker = set()
 
@@ -969,12 +986,12 @@ async def update_luboil_remarks(
     except HTTPException as he: raise he
     except Exception as e:
         logger.error(f"âŒ [DB ERROR] update failed: {e}", exc_info=True)
-        db.rollback()
+        await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/v1/fleet/luboil-overview", tags=["Lube Oil"])
 async def get_luboil_fleet_overview(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: Any = Depends(auth.get_current_user) # ðŸ”¥ ADD THIS LINE HERE
 ):
     """
@@ -1017,14 +1034,15 @@ async def get_luboil_fleet_overview(
         finally:
             control_db.close()
 
-        all_master_equipment = db.query(LuboilEquipmentType).order_by(LuboilEquipmentType.sort_order).all()
+        res = await db.execute(sa_select(LuboilEquipmentType).order_by(LuboilEquipmentType.sort_order))
+        all_master_equipment = res.scalars().all()
 
-        # 2. Fetch Active Configurations (RESTRICTED)
-        active_configs = db.query(LuboilVesselConfig.imo_number, LuboilVesselConfig.equipment_code, LuboilVesselConfig.lab_analyst_code)\
-            .filter(
-                LuboilVesselConfig.is_active == True,
-                LuboilVesselConfig.imo_number.in_(allowed_imos) # Restriction applied
-            ).all()
+        res = await db.execute(
+            sa_select(LuboilVesselConfig.imo_number, LuboilVesselConfig.equipment_code, LuboilVesselConfig.lab_analyst_code)
+            .where(LuboilVesselConfig.is_active == True)
+            .where(LuboilVesselConfig.imo_number.in_(allowed_imos))
+        )
+        active_configs = res.all()
         
         config_map = {
             (r.imo_number, r.equipment_code): r.lab_analyst_code 
@@ -1045,40 +1063,40 @@ async def get_luboil_fleet_overview(
             visible_equipment = all_master_equipment
 
         # 3. Fetch ALL Samples (RESTRICTED via Join)
-        raw_samples = db.query(
-            LuboilReport.imo_number,
-            LuboilReport.report_url,
-            LuboilSample.equipment_code,
-            LuboilSample.machinery_name,
-            LuboilSample.status,
-            LuboilSample.sample_date,
-            LuboilReport.report_date,
-            LuboilSample.sample_id,
-            LuboilSample.officer_remarks,
-            LuboilSample.office_remarks,
-            LuboilSample.internal_remarks,
-            LuboilSample.status_change_log,
-            LuboilSample.viscosity_100c,
-            LuboilSample.water_content_pct,
-            LuboilSample.lab_diagnosis,
-            LuboilSample.summary_error,
-            LuboilSample.attachment_url,     
-            LuboilSample.is_image_required,
-            LuboilSample.is_resampling_required,
-            LuboilSample.is_resolved,
-            LuboilSample.resolution_remarks,
-            LuboilSample.is_approval_pending,
-            LuboilSample.pdf_page_index,    
-            LuboilSample.viscosity_40c,     
-            LuboilSample.tan,               
-            LuboilSample.tbn     
-        ).join(
-            LuboilReport, LuboilSample.report_id == LuboilReport.report_id
-        ).filter(
-            LuboilReport.imo_number.in_(allowed_imos) # ðŸ”¥ Restriction applied to sample data
-        ).order_by(
-            LuboilSample.sample_date.desc()
-        ).all()
+        res = await db.execute(
+            sa_select(
+                LuboilReport.imo_number,
+                LuboilReport.report_url,
+                LuboilSample.equipment_code,
+                LuboilSample.machinery_name,
+                LuboilSample.status,
+                LuboilSample.sample_date,
+                LuboilReport.report_date,
+                LuboilSample.sample_id,
+                LuboilSample.officer_remarks,
+                LuboilSample.office_remarks,
+                LuboilSample.internal_remarks,
+                LuboilSample.status_change_log,
+                LuboilSample.viscosity_100c,
+                LuboilSample.water_content_pct,
+                LuboilSample.lab_diagnosis,
+                LuboilSample.summary_error,
+                LuboilSample.attachment_url,
+                LuboilSample.is_image_required,
+                LuboilSample.is_resampling_required,
+                LuboilSample.is_resolved,
+                LuboilSample.resolution_remarks,
+                LuboilSample.is_approval_pending,
+                LuboilSample.pdf_page_index,
+                LuboilSample.viscosity_40c,
+                LuboilSample.tan,
+                LuboilSample.tbn
+            )
+            .join(LuboilReport, LuboilSample.report_id == LuboilReport.report_id)
+            .where(LuboilReport.imo_number.in_(allowed_imos))
+            .order_by(LuboilSample.sample_date.desc())
+        )
+        raw_samples = res.all()
 
         # 4. Group Samples
         sample_map = defaultdict(list)
@@ -1208,12 +1226,14 @@ async def get_luboil_fleet_overview(
                         # CHANGE: Set cooldown to 15 days
                         cooldown_overdue = datetime.utcnow() - timedelta(days=15)
                         
-                        existing_alert = db.query(LuboilEvent).filter(
-                            LuboilEvent.imo == v.imo,
-                            LuboilEvent.equipment_code == code,
-                            LuboilEvent.event_type == "SCHEDULE_ALERT",
-                            LuboilEvent.created_at >= cooldown_overdue
-                        ).first()
+                        res = await db.execute(
+                            sa_select(LuboilEvent)
+                            .where(LuboilEvent.imo == v.imo)
+                            .where(LuboilEvent.equipment_code == code)
+                            .where(LuboilEvent.event_type == "SCHEDULE_ALERT")
+                            .where(LuboilEvent.created_at >= cooldown_overdue)
+                        )
+                        existing_alert = res.scalars().first()
 
                         if not existing_alert:
                             clean_v_name = format_vessel_name(v.name)
@@ -1233,19 +1253,21 @@ async def get_luboil_fleet_overview(
                                 sample_id=latest_sample.sample_id,
                                 created_at=datetime.utcnow()
                             ))
-                            db.commit()
+                            await db.commit()
 
                     # --- 2. RESAMPLING MANDATORY REMINDER (Every 15 Days until Resolved) ---
                     if latest_sample.is_resampling_required and not latest_sample.is_resolved:
                         # Set cooldown to 15 days
                         cooldown_resample = datetime.utcnow() - timedelta(days=15)
                         
-                        existing_resample = db.query(LuboilEvent).filter(
-                            LuboilEvent.imo == v.imo,
-                            LuboilEvent.equipment_code == code,
-                            LuboilEvent.event_type == "RESAMPLE_REMINDER",
-                            LuboilEvent.created_at >= cooldown_resample
-                        ).first()
+                        res = await db.execute(
+                            sa_select(LuboilEvent)
+                            .where(LuboilEvent.imo == v.imo)
+                            .where(LuboilEvent.equipment_code == code)
+                            .where(LuboilEvent.event_type == "RESAMPLE_REMINDER")
+                            .where(LuboilEvent.created_at >= cooldown_resample)
+                        )
+                        existing_resample = res.scalars().first()
 
                         if not existing_resample:
                             clean_v_name = format_vessel_name(v.name)
@@ -1264,7 +1286,7 @@ async def get_luboil_fleet_overview(
                                 sample_id=latest_sample.sample_id,
                                 created_at=datetime.utcnow()
                             ))
-                            db.commit()
+                            await db.commit()
                     # =========================================================
                     
                     processed_history = [
@@ -1348,7 +1370,7 @@ async def get_luboil_fleet_overview(
 def admin_data_sync(
     file: UploadFile = File(...),
     engine_type: str = Form(...),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Admin endpoint to sync Excel data.
@@ -1425,13 +1447,14 @@ class BatchDownloadRequest(BaseModel):
 @app.post("/api/performance/batch-raw-download-links")
 async def get_batch_raw_download_links(
     request: BatchDownloadRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Fetches multiple secure SAS URLs at once."""
     results = []
     model = MonthlyReportHeader if request.engine_type == 'mainEngine' else GeneratorMonthlyReportHeader
     
-    reports = db.query(model).filter(model.report_id.in_(request.report_ids)).all()
+    res = await db.execute(sa_select(model).where(model.report_id.in_(request.report_ids)))
+    reports = res.scalars().all()
     
     for r in reports:
         if r.raw_report_url:
@@ -1451,7 +1474,7 @@ async def get_batch_raw_download_links(
 @app.post("/api/performance/batch-download-zip")
 async def download_reports_zip(
     request: BatchDownloadRequest, 
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: Any = Depends(auth.get_current_user) # ðŸ”¥ ADD THIS
 ):
     allowed_imos, _ = get_allowed_vessel_imos(db, current_user)
@@ -1465,7 +1488,8 @@ async def download_reports_zip(
     else:
         raise HTTPException(status_code=400, detail="Invalid engine type")
 
-    reports = db.query(model).filter(model.report_id.in_(request.report_ids)).all()
+    res = await db.execute(sa_select(model).where(model.report_id.in_(request.report_ids)))
+    reports = res.scalars().all()
 
     if request.engine_type == 'lubeOil':
         for r in reports:
@@ -1524,7 +1548,7 @@ async def download_reports_zip(
 async def get_luboil_machinery_trend(
     imo: int, 
     equipment_code: str, 
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: Any = Depends(auth.get_current_user) # ðŸ”¥ ADD THIS
 ):
     """
@@ -1537,12 +1561,15 @@ async def get_luboil_machinery_trend(
 
     three_years_ago = datetime.now() - timedelta(days=1095) 
     
-    results = db.query(LuboilSample).join(
-        LuboilReport, LuboilSample.report_id == LuboilReport.report_id
-    ).filter(LuboilReport.imo_number == str(imo),
-        LuboilSample.equipment_code == equipment_code,
-        LuboilSample.sample_date >= three_years_ago 
-    ).order_by(LuboilSample.sample_date.asc()).all()
+    res = await db.execute(
+        sa_select(LuboilSample)
+        .join(LuboilReport, LuboilSample.report_id == LuboilReport.report_id)
+        .where(LuboilReport.imo_number == str(imo))
+        .where(LuboilSample.equipment_code == equipment_code)
+        .where(LuboilSample.sample_date >= three_years_ago)
+        .order_by(LuboilSample.sample_date.asc())
+    )
+    results = res.scalars().all()
 
     # Format the data for charting libraries
     history = []
@@ -1578,7 +1605,7 @@ async def upload_luboil_attachment(
     equipment_code: str = Form(...),
     sample_date: str = Form(...),
     sample_id: Optional[int] = Form(None), # Targeted Sample ID from Frontend
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: Any = Depends(auth.get_current_user) # ðŸ”¥ Added uploader dependency
 ):
 
@@ -1606,15 +1633,18 @@ async def upload_luboil_attachment(
         # 2. Find the specific machinery sample record
         sample = None
         if sample_id:
-            # Primary search: Use the unique ID provided by the frontend
-            sample = db.query(LuboilSample).filter(LuboilSample.sample_id == sample_id).first()
-        
+            res = await db.execute(sa_select(LuboilSample).where(LuboilSample.sample_id == sample_id))
+            sample = res.scalars().first()
+
         if not sample:
-            # Fallback: Use the old composite key if sample_id is missing
-            sample = db.query(LuboilSample).join(LuboilReport).filter(LuboilReport.imo_number == str(imo),
-                LuboilSample.equipment_code == equipment_code,
-                LuboilSample.sample_date == sample_date
-            ).first()
+            res = await db.execute(
+                sa_select(LuboilSample)
+                .join(LuboilReport)
+                .where(LuboilReport.imo_number == str(imo))
+                .where(LuboilSample.equipment_code == equipment_code)
+                .where(LuboilSample.sample_date == sample_date)
+            )
+            sample = res.scalars().first()
         
         if sample:
             # 3. Store the raw URL in the database (APPEND logic for multiple files)
@@ -1659,7 +1689,7 @@ async def upload_luboil_attachment(
             except Exception as feed_err:
                 logger.error(f"âš ï¸ Failed to add evidence event to Live Feed: {feed_err}")
             
-            db.commit()
+            await db.commit()
             
             # 4. Generate a signed SAS URL for the file just uploaded
             signed_url = generate_sas_url(blob_url)
@@ -1680,11 +1710,11 @@ async def upload_luboil_attachment(
         raise he
     except Exception as e:
         logger.error(f"âŒ Upload attachment failed: {str(e)}", exc_info=True)
-        db.rollback() 
+        await db.rollback() 
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 @app.get("/api/blob/freshen-url")
-async def freshen_blob_url(blob_url: str, db: Session = Depends(get_db)):
+async def freshen_blob_url(blob_url: str, db: AsyncSession = Depends(get_db)):
     """Generate a fresh SAS token for an existing Azure Blob URL (used when cached tokens expire)"""
     try:
         # Strip any existing expired SAS token (?sv=...) - keep only the base blob URL
@@ -1710,14 +1740,16 @@ async def freshen_blob_url(blob_url: str, db: Session = Depends(get_db)):
 @app.get("/api/luboil/view-specific-page/{sample_id}")
 async def get_specific_page_pdf(
     sample_id: int, 
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     # 1. DATA RETRIEVAL (No Auth/Token logic needed)
-    sample = db.query(LuboilSample).filter(LuboilSample.sample_id == sample_id).first()
+    res = await db.execute(sa_select(LuboilSample).where(LuboilSample.sample_id == sample_id))
+    sample = res.scalars().first()
     if not sample or sample.pdf_page_index is None:
         raise HTTPException(status_code=404, detail="Sample or Page Index not found")
-    
-    report = db.query(LuboilReport).filter(LuboilReport.report_id == sample.report_id).first()
+
+    res = await db.execute(sa_select(LuboilReport).where(LuboilReport.report_id == sample.report_id))
+    report = res.scalars().first()
     if not report:
         raise HTTPException(status_code=404, detail="Report file not found")
 
@@ -1752,7 +1784,7 @@ async def get_specific_page_pdf(
 async def get_vessel_mentions(
     imo: int, 
     chat_mode: str = "external", # "external" or "internal"
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: Any = Depends(auth.get_current_user) # ðŸ”¥ Added auth dependency
 ):
     """
@@ -1807,7 +1839,7 @@ async def get_vessel_mentions(
 
 @app.get("/api/notifications", tags=["Notifications"])
 async def get_notifications(
-    db: Session = Depends(get_db), 
+    db: AsyncSession = Depends(get_db), 
     current_user: Any = Depends(auth.get_current_user)
 ):
     from app.luboil_model import Notification
@@ -1827,16 +1859,21 @@ async def get_notifications(
     user_id = str(user_id)
 
     # Query notifications for Seenu (or whoever is logged in)
-    notif_records = db.query(Notification).filter(
-        Notification.recipient_id == user_id,
-        Notification.is_hidden == False  # ðŸ”¥ ADD THIS
-    ).order_by(desc(Notification.created_at)).all()
-    
-    unread_count = db.query(Notification).filter(
-        Notification.recipient_id == user_id,
-        Notification.is_read == False,
-        Notification.is_hidden == False  # ðŸ”¥ ADD THIS
-    ).count()
+    res = await db.execute(
+        sa_select(Notification)
+        .where(Notification.recipient_id == user_id)
+        .where(Notification.is_hidden == False)
+        .order_by(desc(Notification.created_at))
+    )
+    notif_records = res.scalars().all()
+
+    res = await db.execute(
+        sa_select(func.count()).select_from(Notification)
+        .where(Notification.recipient_id == user_id)
+        .where(Notification.is_read == False)
+        .where(Notification.is_hidden == False)
+    )
+    unread_count = res.scalar()
 
     # Explicit conversion to clean JSON list
     formatted_notifs = []
@@ -1858,19 +1895,20 @@ async def get_notifications(
     }
 
 @app.patch("/api/notifications/{notif_id}/read", tags=["Notifications"])
-async def mark_notification_read(notif_id: int, db: Session = Depends(get_db)):
+async def mark_notification_read(notif_id: int, db: AsyncSession = Depends(get_db)):
     """Clear the notification badge by marking it as read."""
-    notif = db.query(Notification).filter(Notification.id == notif_id).first()
+    res = await db.execute(sa_select(Notification).where(Notification.id == notif_id))
+    notif = res.scalars().first()
     if notif:
         notif.is_read = True
-        db.commit()
+        await db.commit()
         return {"status": "success"}
     raise HTTPException(status_code=404, detail="Notification not found")
 
 @app.get("/api/luboil/live-feed", tags=["Lube Oil"])
 async def get_luboil_live_feed(
     feed_mode: str = "FLEET",  # "FLEET" or "MY_FEED"
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: Any = Depends(auth.get_current_user)
 ):
     # 1. ROBUST USER ID EXTRACTION
@@ -1894,31 +1932,25 @@ async def get_luboil_live_feed(
     allowed_imos, _ = get_allowed_vessel_imos(db, current_user)
 
     # 2. BASE QUERY CONSTRUCTION
-    query = db.query(
-        LuboilEvent,
-        LuboilEventReadState.is_read
-    ).outerjoin(
-        LuboilEventReadState, 
-        and_(
-            LuboilEventReadState.event_id == LuboilEvent.event_id, 
-            LuboilEventReadState.user_id == user_id
+    stmt = (
+        sa_select(LuboilEvent, LuboilEventReadState.is_read)
+        .outerjoin(
+            LuboilEventReadState,
+            and_(
+                LuboilEventReadState.event_id == LuboilEvent.event_id,
+                LuboilEventReadState.user_id == user_id
+            )
         )
+        .where(LuboilEvent.imo.in_(allowed_imos))
     )
 
-    # --- ðŸ”¥ GLOBAL SECURITY FILTER ---
-    # This restricts every event returned to be within the user's allowed vessels
-    query = query.filter(LuboilEvent.imo.in_(allowed_imos))
-
-    # 3. BRANCHING FILTER LOGIC FOR TABS (Original logic preserved)
     if feed_mode == "MY_FEED":
-        logger.info(f"DEBUG: Fetching private feed for User ID: {user_id}")
-        query = query.filter(LuboilEvent.recipient_id == user_id)
+        stmt = stmt.where(LuboilEvent.recipient_id == user_id)
     else:
-        # Fleet mode: Show global events where recipient_id is NULL
-        query = query.filter(LuboilEvent.recipient_id == None)
+        stmt = stmt.where(LuboilEvent.recipient_id == None)
 
-    # 4. EXECUTION & FORMATTING (Original structure preserved)
-    results = query.order_by(desc(LuboilEvent.created_at)).all()
+    stmt = stmt.order_by(desc(LuboilEvent.created_at))
+    results = (await db.execute(stmt)).all()
 
     events = []
     for event, is_read in results:
@@ -1942,7 +1974,7 @@ async def get_luboil_live_feed(
 @app.patch("/api/luboil/live-feed/{event_id}/read")
 async def mark_event_read(
     event_id: int, 
-    db: Session = Depends(get_db), 
+    db: AsyncSession = Depends(get_db), 
     current_user: Any = Depends(auth.get_current_user)
 ):
     # ROBUST USER ID EXTRACTION
@@ -1957,24 +1989,30 @@ async def mark_event_read(
 
     user_id = str(user_id)
     
-    read_state = db.query(LuboilEventReadState).filter_by(event_id=event_id, user_id=user_id).first()
+    res = await db.execute(
+        sa_select(LuboilEventReadState)
+        .where(LuboilEventReadState.event_id == event_id)
+        .where(LuboilEventReadState.user_id == user_id)
+    )
+    read_state = res.scalars().first()
     if not read_state:
         read_state = LuboilEventReadState(event_id=event_id, user_id=user_id, is_read=True, read_at=datetime.utcnow())
         db.add(read_state)
     else:
         read_state.is_read = True
         read_state.read_at = datetime.utcnow()
-    
-    db.commit()
+
+    await db.commit()
     return {"status": "success"}
 
 @app.patch("/api/notifications/{notif_id}/hide", tags=["Notifications"])
-async def hide_notification(notif_id: int, db: Session = Depends(get_db)):
+async def hide_notification(notif_id: int, db: AsyncSession = Depends(get_db)):
     """Permanently hide a notification from the user's view (soft delete)."""
-    notif = db.query(Notification).filter(Notification.id == notif_id).first()
+    res = await db.execute(sa_select(Notification).where(Notification.id == notif_id))
+    notif = res.scalars().first()
     if notif:
         notif.is_hidden = True
-        db.commit()
+        await db.commit()
         return {"status": "success"}
     raise HTTPException(status_code=404, detail="Notification not found")
 
@@ -1982,7 +2020,7 @@ async def hide_notification(notif_id: int, db: Session = Depends(get_db)):
 async def upload_vessel_config_report(
     imo: int = Form(...),
     file: UploadFile = File(...),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: Any = Depends(auth.get_current_user)
 ):
     # Security: Shore users only
@@ -2002,10 +2040,11 @@ async def upload_vessel_config_report(
     blob_url = upload_file_to_azure(contents, file.filename, f"lube_oil/vessel_docs/{imo}")
 
     # Save to DB
-    vessel = db.query(LuboilVessel).filter_by(imo_number=imo).first()
+    res = await db.execute(sa_select(LuboilVessel).where(LuboilVessel.imo_number == imo))
+    vessel = res.scalars().first()
     if vessel:
         vessel.vessel_report_url = blob_url
-        db.commit()
+        await db.commit()
 
     # Save to Control DB vessels table
     control_db = SessionControl()

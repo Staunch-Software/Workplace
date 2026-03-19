@@ -18,18 +18,64 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 AZURE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+AZURITE_CONNECTION_STRING = os.getenv("AZURITE_CONNECTION_STRING")
 CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME", "pdf-repository")
+IS_VESSEL_INSTANCE = os.getenv("IS_VESSEL_INSTANCE", "false").lower() == "true"
 
 def get_blob_service_client():
+    """Returns the cloud Azure client. Used by generate_sas_url, download_blob_bytes."""
     if not AZURE_CONNECTION_STRING:
         raise ValueError("Azure Connection String is not set.")
     return BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
 
+def get_local_blob_service_client():
+    """Returns the Azurite client for vessel-local storage."""
+    if not AZURITE_CONNECTION_STRING:
+        raise ValueError("Azurite Connection String is not set.")
+    return BlobServiceClient.from_connection_string(AZURITE_CONNECTION_STRING)
+
+def upload_file_locally(file_data: bytes, filename: str, folder_path: str, content_type=None) -> str:
+    """
+    Uploads bytes to Azurite (local vessel storage).
+    Returns the local blob URL (no SAS).
+    """
+    try:
+        if not content_type:
+            content_type, _ = mimetypes.guess_type(filename)
+            if not content_type:
+                if filename.lower().endswith('.pdf'):
+                    content_type = "application/pdf"
+                elif filename.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
+                    content_type = "image/jpeg"
+                else:
+                    content_type = "application/octet-stream"
+
+        blob_service_client = get_local_blob_service_client()
+        blob_path = f"{folder_path}/{filename}".replace("\\", "/").replace("//", "/")
+        blob_client = blob_service_client.get_blob_client(container=CONTAINER_NAME, blob=blob_path)
+
+        blob_client.upload_blob(
+            file_data,
+            overwrite=True,
+            content_settings=ContentSettings(content_type=content_type)
+        )
+
+        logger.info(f"✅ Uploaded to Azurite (local): {blob_path}")
+        return blob_client.url
+
+    except Exception as e:
+        logger.error(f"❌ Azurite Upload Failed: {e}")
+        return None
+
 def upload_file_to_azure(file_data: bytes, filename: str, folder_path: str, content_type=None) -> str:
     """
-    Uploads bytes to Azure Blob Storage with automatic Content-Type detection.
+    Uploads bytes to Azure Blob Storage (cloud) or Azurite (vessel local).
+    Controlled by IS_VESSEL_INSTANCE env var.
     Returns the CLEAN URL (No SAS).
     """
+    if IS_VESSEL_INSTANCE:
+        return upload_file_locally(file_data, filename, folder_path, content_type)
+
     try:
         # 🔥 Detect the correct mime type (e.g., image/jpeg, application/pdf)
         if not content_type:

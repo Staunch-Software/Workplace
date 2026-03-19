@@ -60,7 +60,9 @@ class LuboilReport(Base):
     uploaded_at = Column(TIMESTAMP, default=func.current_timestamp(), nullable=False)
     updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=False)
     report_url = Column(String(500), nullable=True, comment="Azure Blob URL for the raw PDF")
-
+    version = Column(Integer, default=1, nullable=False)
+    origin = Column(String(20), default="CLOUD", nullable=True)
+    
     # Relationships
     luboil_vessel = relationship("LuboilVessel", back_populates="reports",
                           primaryjoin="foreign(LuboilReport.imo_number) == cast(LuboilVessel.imo_number, String)",
@@ -149,6 +151,10 @@ class LuboilSample(Base):
     resolution_remarks = Column(TEXT, nullable=True, comment="The 50+ character maintenance/correction narrative")
     
     created_at = Column(TIMESTAMP, default=func.current_timestamp(), nullable=False)
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=True)
+    
+    version = Column(Integer, default=1, nullable=False)
+    origin = Column(String(20), default="CLOUD", nullable=True)
 
     # Relationships
     report = relationship("LuboilReport", back_populates="samples")
@@ -213,6 +219,9 @@ class LuboilVesselConfig(Base):
                           foreign_keys="[LuboilVesselConfig.imo_number]")
     equipment_type = relationship("LuboilEquipmentType", back_populates="configs")
 
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=True)
+    version = Column(Integer, default=1, nullable=False)
+    origin = Column(String(20), default="CLOUD", nullable=True)
     # Constraints: One config per equipment per vessel
     __table_args__ = (
         UniqueConstraint('imo_number', 'equipment_code', name='uq_vessel_equip_config'),
@@ -255,6 +264,10 @@ class Notification(Base):
     is_read = Column(Boolean, default=False)
     is_hidden = Column(Boolean, default=False)
     created_at = Column(TIMESTAMP, default=func.current_timestamp())
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=True)
+
+    version = Column(Integer, default=1, nullable=False)
+    origin = Column(String(20), default="CLOUD", nullable=True)
 
 # Add to your models file
 class LuboilEvent(Base):
@@ -272,7 +285,10 @@ class LuboilEvent(Base):
     sample_id = Column(Integer, nullable=True) # For deep navigation
     recipient_id = Column(UUID(as_uuid=True), nullable=True, index=True)  # FK dropped — cross-DB
     created_at = Column(TIMESTAMP, default=func.current_timestamp())
-
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=True)
+    version = Column(Integer, default=1, nullable=False)
+    origin = Column(String(20), default="CLOUD", nullable=True)
+    
 class LuboilEventReadState(Base):
     """Tracks if a specific user has read a specific fleet event."""
     __tablename__ = 'luboil_event_read_state'
@@ -282,5 +298,9 @@ class LuboilEventReadState(Base):
     user_id = Column(UUID(as_uuid=True), nullable=True)  # FK dropped — cross-DB
     is_read = Column(Boolean, default=False)
     read_at = Column(DateTime, nullable=True)
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=True)
 
+    version = Column(Integer, default=1, nullable=False)
+    origin = Column(String(20), default="CLOUD", nullable=True)
+    
     __table_args__ = (UniqueConstraint('event_id', 'user_id', name='uq_user_event_read'),)
