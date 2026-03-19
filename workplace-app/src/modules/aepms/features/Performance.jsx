@@ -36,7 +36,7 @@ import "../styles/performance.css";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import html2canvas from "html2canvas";
-import ozellarLogo from "../assets/250714_OzellarMarine-Logo-Final.png";
+// import ozellarLogo from "../assets/250714_OzellarMarine-Logo-Final.png";
 const SUMMARY_TABLE_SCHEMA = {
   mainEngine: [
     { key: "EngSpeed", label: "Engine RPM" },
@@ -7263,9 +7263,9 @@ export default function Performance() {
           );
 
           // --- TOP LEFT: Logo ---
-          try {
-            doc.addImage(ozellarLogo, "PNG", margin, yPos + 3, 28, 12);
-          } catch (e) {}
+          // try {
+          //   doc.addImage(ozellarLogo, "PNG", margin, yPos + 3, 28, 12);
+          // } catch (e) {}
 
           // --- CENTER: Titles & Period ---
           doc.setTextColor(0, 0, 0);

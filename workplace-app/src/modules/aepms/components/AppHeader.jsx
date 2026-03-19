@@ -14,7 +14,7 @@ import Select from "./ui/Select";
 import Button from "./ui/Button";
 import "../styles/components.css";
 import "../styles/header.css";
-import logo from "../assets/250714_OzellarMarine-Logo-Final.png";
+// import logo from "../assets/250714_OzellarMarine-Logo-Final.png";
 
 export default function AppHeader() {
   const location = useLocation();

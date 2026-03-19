@@ -12,6 +12,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import './Login.css';
 import ozellarLogo from '../../assets/ozellar-marine-global-logo.gif';
+import shipImage from '../../assets/AM_Tarang.jpeg';
 
 const Login = () => {
   // ── YOUR EXISTING STATE & LOGIC (unchanged) ──
@@ -57,7 +58,7 @@ const Login = () => {
     <div className={"login-container" + (mounted ? " fade-in" : "")}>
 
       {/* ── LEFT PANEL ── */}
-      <div className="left-panel">
+      <div className="left-panel" style={{ backgroundImage: `url(${shipImage})` }}>
         <div className="bg-animation" />
 
         <div className="brand-header">
@@ -121,11 +122,7 @@ const Login = () => {
               <path d="M12 22V8"/>
               <path d="M5 12H2a10 10 0 0 0 20 0h-3"/>
             </svg>
-            <img
-              src={ozellarLogo}
-              alt="Ozellar Marine"
-              className="brand-logo"
-            />
+            <img src={ozellarLogo} alt="Ozellar Marine" className="brand-logo" />
             <h2 className="login-title">Welcome back</h2>
             <p className="login-subtitle">Sign in to your account</p>
           </div>

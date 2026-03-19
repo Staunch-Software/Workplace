@@ -5,7 +5,7 @@ import ReactDOM from 'react-dom';
 import Select from './ui/Select';
 import Button from './ui/Button';
 import jsPDF from "jspdf";
-import OzellarLogo from "../assets/250714_OzellarMarine-Logo-Final.jpg";
+// import OzellarLogo from "../assets/250714_OzellarMarine-Logo-Final.jpg";
 
 // =======================================================================
 // DESIGN SYSTEM - BLACK/ASH/GRAY Color System
@@ -768,18 +768,18 @@ const exportModalPDF = async (reportDate) => {
   const logoX = 10;
   const logoY = 15;
 
-  try {
-    const img = new Image();
-    img.src = OzellarLogo;
-    await new Promise((resolve) => (img.onload = resolve));
+  // try {
+  //   const img = new Image();
+  //   img.src = OzellarLogo;
+  //   await new Promise((resolve) => (img.onload = resolve));
 
-    const scale = logoW / img.width;
-    logoH = img.height * scale;
+  //   const scale = logoW / img.width;
+  //   logoH = img.height * scale;
 
-    doc.addImage(await toBase64(OzellarLogo), "PNG", logoX, logoY, logoW, logoH);
-  } catch (err) {
-    console.warn("Logo load failed:", err);
-  }
+  //   doc.addImage(await toBase64(OzellarLogo), "PNG", logoX, logoY, logoW, logoH);
+  // } catch (err) {
+  //   console.warn("Logo load failed:", err);
+  // }
 
   // ============================================
   // 4. TEXT AREA ALIGNMENT (RIGHT SIDE ONLY)

@@ -45,28 +45,39 @@ body, html {
 ════════════════════════════════════════ */
 .left-panel {
   flex: 0 0 60%;
-  background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-mid) 100%);
   padding: 4rem;
   display: flex;
   flex-direction: column;
   color: var(--white);
   position: relative;
   overflow: hidden;
+  background-image: url('../../assets/ship.png');
+  background-size: cover;
+  background-position: center right;
 }
 
+/* Layer 1: warm orange tint over the entire image */
+.left-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(160, 55, 0, 0.5);
+  z-index: 0;
+}
+
+/* Layer 2: solid orange on left fading to transparent on right — the split effect */
 .bg-animation {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(218,119,86,0.15) 0%, transparent 50%);
-  background-size: 200% 200%;
-  animation: pulse 15s ease infinite;
+  background: linear-gradient(to right,
+    #b84a00 0%,
+    #cc5500 25%,
+    rgba(204, 85, 0, 0.75) 50%,
+    rgba(204, 85, 0, 0.1) 75%,
+    rgba(204, 85, 0, 0.0) 100%
+  );
+  z-index: 1;
   pointer-events: none;
-}
-
-@keyframes pulse {
-  0%   { background-position: 0% 0%; }
-  50%  { background-position: 100% 100%; }
-  100% { background-position: 0% 0%; }
 }
 
 /* Brand */
@@ -76,7 +87,7 @@ body, html {
   gap: 1rem;
   font-size: 2rem;
   font-weight: 700;
-  z-index: 1;
+  z-index: 2;
 }
 
 .brand-icon {
@@ -89,7 +100,7 @@ body, html {
 .hero-content {
   margin-top: auto;
   margin-bottom: auto;
-  z-index: 1;
+  z-index: 2;
 }
 
 .hero-title {
@@ -138,7 +149,7 @@ body, html {
 .footer-text {
   font-size: 0.875rem;
   color: var(--gray-400);
-  z-index: 1;
+  z-index: 2;
 }
 
 /* ════════════════════════════════════════

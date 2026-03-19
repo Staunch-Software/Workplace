@@ -25,7 +25,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import "../styles/MEPerformanceOverview.css";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import ozellarLogo from "../assets/250714_OzellarMarine-Logo-Final.png";
+// import ozellarLogo from "../assets/250714_OzellarMarine-Logo-Final.png";
 import PerformanceNav from "./PerformanceNav";
 import AEPerformanceOverview from "./AEPerformanceOverview";
 import Performance from "./UnifiedPerformance.jsx";
@@ -794,18 +794,18 @@ export default function MEPerformanceOverview() {
 
       const logoWidth = 35;
       const logoHeight = 14;
-      try {
-        pdf.addImage(
-          ozellarLogo,
-          "PNG",
-          margin,
-          currentY,
-          logoWidth,
-          logoHeight,
-        );
-      } catch (e) {
-        console.warn("Logo missing");
-      }
+      // try {
+      //   pdf.addImage(
+      //     ozellarLogo,
+      //     "PNG",
+      //     margin,
+      //     currentY,
+      //     logoWidth,
+      //     logoHeight,
+      //   );
+      // } catch (e) {
+      //   console.warn("Logo missing");
+      // }
 
       const rightX = pageWidth - margin;
       const lineHeight = 5;
