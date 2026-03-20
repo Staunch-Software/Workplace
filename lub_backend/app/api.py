@@ -1228,7 +1228,7 @@ async def get_luboil_fleet_overview(
                         
                         res = await db.execute(
                             sa_select(LuboilEvent)
-                            .where(LuboilEvent.imo == v.imo)
+                            .where(LuboilEvent.imo == int(v.imo))
                             .where(LuboilEvent.equipment_code == code)
                             .where(LuboilEvent.event_type == "SCHEDULE_ALERT")
                             .where(LuboilEvent.created_at >= cooldown_overdue)
@@ -1244,7 +1244,7 @@ async def get_luboil_fleet_overview(
                             
                             db.add(LuboilEvent(
                                 vessel_name=v.name,
-                                imo=v.imo,
+                                imo=int(v.imo),
                                 machinery_name=eq.ui_label,
                                 equipment_code=code,
                                 event_type="SCHEDULE_ALERT",
@@ -1262,7 +1262,7 @@ async def get_luboil_fleet_overview(
                         
                         res = await db.execute(
                             sa_select(LuboilEvent)
-                            .where(LuboilEvent.imo == v.imo)
+                            .where(LuboilEvent.imo == int(v.imo))
                             .where(LuboilEvent.equipment_code == code)
                             .where(LuboilEvent.event_type == "RESAMPLE_REMINDER")
                             .where(LuboilEvent.created_at >= cooldown_resample)
@@ -1277,7 +1277,7 @@ async def get_luboil_fleet_overview(
                             
                             db.add(LuboilEvent(
                                 vessel_name=v.name,
-                                imo=v.imo,
+                                imo=int(v.imo),
                                 machinery_name=eq.ui_label,
                                 equipment_code=code,
                                 event_type="RESAMPLE_REMINDER",
