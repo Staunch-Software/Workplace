@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     AZURE_TENANT_ID: str = ""
     AZURE_CLIENT_ID: str = ""
     AZURE_CLIENT_SECRET: str = ""
-    MAIL_SENDER: str = "defect.reporting@ozellar.com"
+    MAIL_SENDER: str = "techdevops@ozellar.com"
     PLATFORM_URL: str = "https://workplace.ozellar.com"
     
     class Config:

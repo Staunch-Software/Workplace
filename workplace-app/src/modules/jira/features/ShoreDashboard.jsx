@@ -131,7 +131,7 @@ export default function ShoreDashboard() {
   }, [search])
 
   useEffect(() => {
-    axiosJira.get('/api/vessels').then(r => setVessels(r.data)).catch(console.error)
+    axiosJira.get('/api/vessels').then(r => setVessels(Array.isArray(r.data) ? r.data : [])).catch(console.error)
   }, [])
 
   const fetchTickets = useCallback(async (page = 1) => {
@@ -151,8 +151,8 @@ export default function ShoreDashboard() {
       }
 
       const res = await axiosJira.get('/api/tickets', { params })
-      setTickets(res.data.tickets)
-      setPagination(res.data.pagination)
+      setTickets(Array.isArray(res.data.tickets) ? res.data.tickets : [])
+      setPagination(res.data.pagination ?? { page: 1, limit: 15, total: 0, totalPages: 0 })
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }, [vesselName, statusMode, selectedStatuses, priority, searchDebounce, sortBy, sortOrder])

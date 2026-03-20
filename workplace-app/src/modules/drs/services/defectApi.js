@@ -114,7 +114,7 @@ export const defectApi = {
   getDefects: async (vesselImo = "") => {
     const params = vesselImo ? { vessel_imo: vesselImo } : {};
     const response = await api.get("/defects/", { params });
-    return response.data;
+    return Array.isArray(response.data) ? response.data : (response.data?.results ?? response.data?.defects ?? []);
   },
 
   getDefectById: async (defectId) => {
@@ -435,10 +435,10 @@ export const defectApi = {
   },
 
   // Add to defectApi object:
-getLiveFeed: () => 
+  getLiveFeed: () =>
     api.get("/users/live-feed").then((r) => r.data),
 
-  markFeedRead: (id) => 
+  markFeedRead: (id) =>
     api.patch(`/users/live-feed/${id}/read`).then((r) => r.data),
   // ============================================
   // VESSEL USERS
@@ -467,7 +467,7 @@ getLiveFeed: () =>
     try {
       console.log("🚢 [API] Fetching all vessels from database...");
       const response = await api.get("/vessels/");
-      return response.data; // This will be an array of {imo_number, name, ...}
+      return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
       console.error("❌ [API] Error fetching vessel list:", error);
       throw error;
@@ -541,7 +541,7 @@ getLiveFeed: () =>
 
   getNotifications: async () => {
     const response = await api.get("/users/me/notifications");
-    return response.data;
+    return Array.isArray(response.data) ? response.data : [];
   },
 
   markNotificationsRead: async () => {

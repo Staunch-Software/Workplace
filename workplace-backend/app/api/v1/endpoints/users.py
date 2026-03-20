@@ -36,6 +36,7 @@ async def list_users(
             job_title=u.job_title,
             role=u.role,
             is_active=u.is_active,
+            can_self_assign_vessels=u.can_self_assign_vessels,
             permissions=u.permissions,
             assigned_vessels=[{"imo": v.imo, "name": v.name} for v in u.vessels],
             last_login=u.last_login,
@@ -61,6 +62,7 @@ async def create_user(
         job_title=payload.job_title,
         role=payload.role,
         permissions=payload.permissions,
+        can_self_assign_vessels=payload.can_self_assign_vessels,
         created_by=admin.id,
         updated_at=datetime.utcnow(),  # ← ADD
     )
@@ -144,6 +146,7 @@ async def assign_vessels(
         job_title=user.job_title,
         role=user.role,
         is_active=user.is_active,
+        can_self_assign_vessels=user.can_self_assign_vessels,
         permissions=user.permissions,
         assigned_vessels=[{"imo": v.imo, "name": v.name} for v in user.vessels],
     )

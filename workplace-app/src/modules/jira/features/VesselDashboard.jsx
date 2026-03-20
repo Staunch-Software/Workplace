@@ -18,8 +18,8 @@ export default function VesselDashboard() {
     setLoading(true)
     try {
       const res = await axiosJira.get('/api/tickets', { params: { status, page, limit: 10 } })
-      setTickets(res.data.tickets)
-      setPagination(res.data.pagination)
+      setTickets(Array.isArray(res.data.tickets) ? res.data.tickets : [])
+      setPagination(res.data.pagination ?? { page: 1, limit: 15, total: 0, totalPages: 0 })
     } catch (err) {
       console.error(err)
     } finally {
