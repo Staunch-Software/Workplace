@@ -187,7 +187,7 @@ app.add_middleware(
 # Include routers
 # app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 # app.include_router(admin.router, tags=["Admin"])  
-from app.routers.sync import router as sync_router
+from app.routes.sync import router as sync_router
 app.include_router(sync_router, prefix="/sync", tags=["Sync"])
 
 # Database Initialization
