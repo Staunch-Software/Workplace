@@ -9,12 +9,19 @@ from sqlalchemy.orm import Session
 # Ensure we can import from 'app'
 sys.path.append(os.getcwd())
 
-from app.database import SessionLocal
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from app.luboil_model import LuboilVessel, LuboilEquipmentType, LuboilVesselConfig, LuboilNameMapping
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+def _get_sync_session():
+    from app.config import settings
+    _url = settings.LUBOIL_DATABASE_URL.replace("postgresql+asyncpg", "postgresql+psycopg2")
+    _engine = create_engine(_url, pool_pre_ping=True)
+    return sessionmaker(bind=_engine, autocommit=False, autoflush=False)()
 
 def normalize_string(name):
     """
@@ -56,7 +63,7 @@ def load_luboil_config(file_path: str):
         df = pd.read_excel(file_path, header=header_idx)
         
         # 4. MERGE HEADERS & PRE-REGISTER VESSELS (FIX FOR FOREIGN KEY ERROR)
-        db: Session = SessionLocal() # Open DB early to register vessels
+        db: Session = _get_sync_session() # Open DB early to register vessels
         column_to_imo = {}
         new_headers = []
         
