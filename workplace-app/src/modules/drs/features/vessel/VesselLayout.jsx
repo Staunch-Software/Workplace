@@ -30,10 +30,11 @@ const VesselLayout = () => {
     || user?.assignedVessels?.[0]?.imo;
 
   // Fetch Vessel Details for Header
-  const { data: vessels = [] } = useQuery({
+  const { data: rawVessels } = useQuery({
     queryKey: ['vessels'],
     queryFn: getVessels
   });
+  const vessels = Array.isArray(rawVessels) ? rawVessels : rawVessels?.items ?? rawVessels?.data ?? [];
 
   // --- NOTIFICATIONS LOGIC ---
   const { data: notifications = [] } = useQuery({

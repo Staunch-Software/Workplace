@@ -1196,10 +1196,11 @@ const VesselDashboard = () => {
   const [closureDefect, setClosureDefect] = useState(null);
   const [closureValidation, setClosureValidation] = useState(null);
 
-  const { data: defects = [], isLoading } = useQuery({
+  const { data: rawDefects, isLoading } = useQuery({
     queryKey: ['defects', vesselImo],
     queryFn: () => defectApi.getDefects(vesselImo),
   });
+  const defects = Array.isArray(rawDefects) ? rawDefects : rawDefects?.items ?? rawDefects?.data ?? [];
 
   const { data: userPreferences, isLoading: preferencesLoading } = useQuery({
     queryKey: ['user-preferences'],

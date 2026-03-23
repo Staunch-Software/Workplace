@@ -1384,10 +1384,12 @@ const ShoreDashboard = () => {
 
   const { onMouseDown } = useColumnResize(setColumnWidths);
   // --- QUERY: FETCH ALL DEFECTS ---
-  const { data: defects = [], isLoading } = useQuery({
+  const { data: rawDefects, isLoading } = useQuery({
     queryKey: ['defects', 'global-list'],
     queryFn: () => defectApi.getDefects()
   });
+
+  const defects = Array.isArray(rawDefects) ? rawDefects : rawDefects?.items ?? rawDefects?.data ?? [];
 
   const { data: userPreferences, isLoading: preferencesLoading } = useQuery({
     queryKey: ['user-preferences'],
