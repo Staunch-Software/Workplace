@@ -19,10 +19,10 @@ TICKET_ENTITY_MAP = {
 }
 
 # CONFIG scope models pulled from workplace-backend
-CONFIG_ENTITY_MAP = {
-    "users": User,
-    "vessels": Vessel,
-}
+# CONFIG_ENTITY_MAP = {
+#     "users": User,
+#     "vessels": Vessel,
+# }
 
 
 class SyncProcessor:
@@ -156,60 +156,60 @@ class SyncProcessor:
 
     # ── PULL: CONFIG scope ────────────────────────────────────────────────
 
-    async def pull_config_from_cloud(self):
-        """Pull users/vessels from workplace-backend. Runs every 24h + startup."""
-        state = await self._get_sync_state("CONFIG")
-        last_pull = state.last_pull_at if state else datetime(2000, 1, 1)
+    # async def pull_config_from_cloud(self):
+    #     """Pull users/vessels from workplace-backend. Runs every 24h + startup."""
+    #     state = await self._get_sync_state("CONFIG")
+    #     last_pull = state.last_pull_at if state else datetime(2000, 1, 1)
 
-        headers = {"X-Sync-API-Key": settings.SYNC_API_KEY}
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{settings.WORKPLACE_BASE_URL}/sync/config/changes",
-                params={"since": last_pull.isoformat()},
-                headers=headers,
-                timeout=settings.NETWORK_TIMEOUT_SECONDS * 2,
-            )
-            if resp.status_code != 200:
-                logger.error(f"Config pull failed: {resp.status_code} {resp.text}")
-                return
-            changes = resp.json()
+    #     headers = {"X-Sync-API-Key": settings.SYNC_API_KEY}
+    #     async with httpx.AsyncClient() as client:
+    #         resp = await client.get(
+    #             f"{settings.WORKPLACE_BASE_URL}/sync/config/changes",
+    #             params={"since": last_pull.isoformat()},
+    #             headers=headers,
+    #             timeout=settings.NETWORK_TIMEOUT_SECONDS * 2,
+    #         )
+    #         if resp.status_code != 200:
+    #             logger.error(f"Config pull failed: {resp.status_code} {resp.text}")
+    #             return
+    #         changes = resp.json()
 
-        for key, items in changes.items():
-            model_class = CONFIG_ENTITY_MAP.get(key)
-            if not model_class:
-                logger.warning(f"Config Pull: Unknown entity type '{key}', skipping.")
-                continue
-            for item in items:
-                try:
-                    entity_id = item.get("id") or item.get("imo")
-                    await SyncService.apply_snapshot(
-                        self.db, model_class, entity_id, item.get("version", 1), item
-                    )
-                except Exception as e:
-                    logger.error(f"Config Pull: Failed to apply {key} id={item.get('id')}: {e}")
+    #     for key, items in changes.items():
+    #         model_class = CONFIG_ENTITY_MAP.get(key)
+    #         if not model_class:
+    #             logger.warning(f"Config Pull: Unknown entity type '{key}', skipping.")
+    #             continue
+    #         for item in items:
+    #             try:
+    #                 entity_id = item.get("id") or item.get("imo")
+    #                 await SyncService.apply_snapshot(
+    #                     self.db, model_class, entity_id, item.get("version", 1), item
+    #                 )
+    #             except Exception as e:
+    #                 logger.error(f"Config Pull: Failed to apply {key} id={item.get('id')}: {e}")
 
-        await self.db.commit()
-        await self._update_sync_state(state, "CONFIG")
-        logger.info("Config Pull complete.")
+    #     await self.db.commit()
+    #     await self._update_sync_state(state, "CONFIG")
+    #     logger.info("Config Pull complete.")
 
-    # ── helpers ───────────────────────────────────────────────────────────
+    # # ── helpers ───────────────────────────────────────────────────────────
 
-    async def _get_sync_state(self, scope: str):
-        stmt = select(SyncState).where(
-            SyncState.vessel_imo == settings.VESSEL_IMO,
-            SyncState.sync_scope == scope,
-        )
-        return (await self.db.execute(stmt)).scalars().first()
+    # async def _get_sync_state(self, scope: str):
+    #     stmt = select(SyncState).where(
+    #         SyncState.vessel_imo == settings.VESSEL_IMO,
+    #         SyncState.sync_scope == scope,
+    #     )
+    #     return (await self.db.execute(stmt)).scalars().first()
 
-    async def _update_sync_state(self, state, scope: str):
-        now = datetime.utcnow()
-        if not state:
-            state = SyncState(
-                vessel_imo=settings.VESSEL_IMO,
-                last_pull_at=now,
-                sync_scope=scope,
-            )
-            self.db.add(state)
-        else:
-            state.last_pull_at = now
-        await self.db.commit()
+    # async def _update_sync_state(self, state, scope: str):
+    #     now = datetime.utcnow()
+    #     if not state:
+    #         state = SyncState(
+    #             vessel_imo=settings.VESSEL_IMO,
+    #             last_pull_at=now,
+    #             sync_scope=scope,
+    #         )
+    #         self.db.add(state)
+    #     else:
+    #         state.last_pull_at = now
+    #     await self.db.commit()

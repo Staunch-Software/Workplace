@@ -5,6 +5,7 @@ from app.services.sync_processor import SyncProcessor
 from app.core.database import SessionLocal # Import your session factory
 from app.core.config import settings 
 from app.core.database_control import AsyncSessionControl  
+from datetime import datetime
 
 logger = logging.getLogger("drs.sync")
 
@@ -28,46 +29,13 @@ async def run_defect_sync_cycle():
             await db.close()
 
 
-async def run_config_sync_cycle():
-    """PULL users + vessels from workplace_backend. Runs every 24h + startup."""
-    status = await network_service.get_network_status()
-    if status == "OFFLINE":
-        logger.debug("Vessel is OFFLINE. Config sync deferred.")
-        return
-
-    logger.info("Starting CONFIG sync cycle...")
-    async with SessionLocal() as db, AsyncSessionControl() as control_db:
-        try:
-            processor = SyncProcessor(db, control_db=control_db)  # ← pass control_db
-            await processor.pull_config_from_cloud()
-            logger.info("Config sync cycle complete.")
-        except Exception as e:
-            logger.error(f"Config sync cycle error: {e}")
-        finally:
-            await db.close()
-            await control_db.close()
-
-
 async def start_background_sync():
-    logger.info("Sync Worker Started.")
-
-    # Run config sync once on startup
-    try:
-        await run_config_sync_cycle()
-    except Exception as e:
-        logger.error(f"Startup config sync failed: {e}")
-
-    last_config_sync = asyncio.get_event_loop().time()
+    logger.info("DRS Sync Worker Started. Handling DEFECT scope only.")
 
     while True:
+        print(f"Sync loop tick: {datetime.utcnow().isoformat()}")
         try:
             await run_defect_sync_cycle()
-
-            now = asyncio.get_event_loop().time()
-            if now - last_config_sync >= settings.CONFIG_SYNC_INTERVAL:
-                await run_config_sync_cycle()
-                last_config_sync = now
-
         except Exception as e:
             logger.error(f"Sync Worker Loop crash prevented: {e}")
 

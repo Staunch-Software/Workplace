@@ -27,44 +27,12 @@ async def run_ticket_sync_cycle():
             await db.close()
 
 
-async def run_config_sync_cycle():
-    """PULL users + vessels from workplace-backend. Runs every 24h + startup."""
-    if await network_service.get_network_status() == "OFFLINE":
-        logger.debug("Vessel is OFFLINE. Config sync deferred.")
-        return
-
-    logger.info("Starting CONFIG sync cycle...")
-    async with SessionLocal() as db:
-        try:
-            processor = SyncProcessor(db)
-            await processor.pull_config_from_cloud()
-            logger.info("Config sync cycle complete.")
-        except Exception as e:
-            logger.error(f"Config sync cycle error: {e}")
-        finally:
-            await db.close()
-
-
 async def start_background_sync():
-    logger.info("Jira Sync Worker started.")
-
-    # Config sync on startup
-    try:
-        await run_config_sync_cycle()
-    except Exception as e:
-        logger.error(f"Startup config sync failed: {e}")
-
-    last_config_sync = asyncio.get_event_loop().time()
+    logger.info("Jira Sync Worker started. Handling TICKET scope only.")
 
     while True:
         try:
             await run_ticket_sync_cycle()
-
-            now = asyncio.get_event_loop().time()
-            if now - last_config_sync >= settings.CONFIG_SYNC_INTERVAL:
-                await run_config_sync_cycle()
-                last_config_sync = now
-
         except Exception as e:
             logger.error(f"Sync Worker loop error prevented crash: {e}")
 
