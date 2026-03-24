@@ -58,9 +58,16 @@ async def get_changes(
         "comment": Comment,
     }
 
+    UPDATE_FIELD_MAP = {
+        "ticket": "updatedAt",
+        "comment": "updatedAt",
+    }
+    
     results = {}
     for key, model in models.items():
-        stmt = select(model).where(model.updated_at > since)
+        field_name = UPDATE_FIELD_MAP.get(key, "updated_at")
+        update_field = getattr(model, field_name)
+        stmt = select(model).where(update_field > since)
         items = (await db.execute(stmt)).scalars().all()
         results[key] = [
             {c.name: getattr(i, c.name) for c in i.__table__.columns}
