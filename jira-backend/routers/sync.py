@@ -49,7 +49,7 @@ async def get_changes(
 ):
     # Normalise to UTC
     if since.tzinfo is None:
-        since = since.replace(tzinfo=timezone.utc)
+        since = since.replace(tzinfo=None)
     else:
         since = since.astimezone(timezone.utc)
 
