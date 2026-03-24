@@ -60,7 +60,7 @@ async def get_changes(
 
     UPDATE_FIELD_MAP = {
         "ticket": "updatedAt",
-        "comment": "updatedAt",
+        "comment": "createdAt",
     }
     
     results = {}
