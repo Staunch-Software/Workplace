@@ -313,9 +313,9 @@ const OverdueVesselRow = ({
                       Report Date:{" "}
                       {item.reportDate
                         ? new Date(item.reportDate).toLocaleDateString(
-                            "en-GB",
-                            { day: "2-digit", month: "short", year: "numeric" },
-                          )
+                          "en-GB",
+                          { day: "2-digit", month: "short", year: "numeric" },
+                        )
                         : "N/A"}
                     </span>
                   )}
@@ -485,10 +485,10 @@ const LuboilAnalysis = () => {
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [isClosed, setIsClosed] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
-  const [uploadProgress, setUploadProgress] = useState({ 
-    current: 0, 
-    total: 0, 
-    currentFile: "" 
+  const [uploadProgress, setUploadProgress] = useState({
+    current: 0,
+    total: 0,
+    currentFile: ""
   });
 
   const [machineryStats, setMachineryStats] = useState({
@@ -2732,125 +2732,125 @@ const LuboilAnalysis = () => {
   }, []);
 
   const handleFileUpload = async (e) => {
-  // 1. Convert FileList to an Array
-  const files = Array.from(e.target.files);
-  if (files.length === 0) return;
+    // 1. Convert FileList to an Array
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
 
-  setUploading(true);
-  setUploadProgress({ current: 0, total: files.length, currentFile: "" });
+    setUploading(true);
+    setUploadProgress({ current: 0, total: files.length, currentFile: "" });
 
-  // 2. Initialize tracking for the summary report
-  let successCount = 0;
-  let duplicateCount = 0;
-  let errorCount = 0;
-  let detailedSummary = [];
+    // 2. Initialize tracking for the summary report
+    let successCount = 0;
+    let duplicateCount = 0;
+    let errorCount = 0;
+    let detailedSummary = [];
 
-  try {
-    // 3. Process files sequentially using for...of
-    // This ensures we don't overwhelm the parser and processed data is saved correctly
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    try {
+      // 3. Process files sequentially using for...of
+      // This ensures we don't overwhelm the parser and processed data is saved correctly
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
 
-      // 🔥 Live progress update
-      setUploadProgress({
-        current: i + 1,
-        total: files.length,
-        currentFile: file.name,
-      });
+        // 🔥 Live progress update
+        setUploadProgress({
+          current: i + 1,
+          total: files.length,
+          currentFile: file.name,
+        });
 
-      try {
-        const res = (
-          await axiosLub.post(
-            "/api/upload-luboil-report/",
-            (() => {
-              const fd = new FormData();
-              fd.append("file", file);
-              return fd;
-            })(),
-            { headers: { "Content-Type": "multipart/form-data" } },
-          )
-        ).data;
+        try {
+          const res = (
+            await axiosLub.post(
+              "/api/upload-luboil-report/",
+              (() => {
+                const fd = new FormData();
+                fd.append("file", file);
+                return fd;
+              })(),
+              { headers: { "Content-Type": "multipart/form-data" } },
+            )
+          ).data;
 
-        if (res.is_duplicate) {
-          duplicateCount++;
-        } else {
-          successCount++;
+          if (res.is_duplicate) {
+            duplicateCount++;
+          } else {
+            successCount++;
+          }
+
+          // 4. Preserve all original data points for the summary
+          detailedSummary.push({
+            status: res.is_duplicate ? "dup" : "new",
+            filename: file.name,
+            vessel: res.vessel,
+            date: res.report_date,
+            summary: res.alert_summary,
+            count: res.sample_count,
+          });
+
+        } catch (fileError) {
+          errorCount++;
+          detailedSummary.push({
+            status: "error",
+            filename: file.name,
+            error: fileError.message,
+          });
         }
 
-        // 4. Preserve all original data points for the summary
-        detailedSummary.push({
-          status: res.is_duplicate ? "dup" : "new",
-          filename: file.name,
-          vessel: res.vessel,
-          date: res.report_date,
-          summary: res.alert_summary,
-          count: res.sample_count,
-        });
-
-      } catch (fileError) {
-        errorCount++;
-        detailedSummary.push({
-          status: "error",
-          filename: file.name,
-          error: fileError.message,
-        });
+        // 🔥 300ms delay between files prevents DB race condition
+        if (i < files.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
       }
 
-      // 🔥 300ms delay between files prevents DB race condition
-      if (i < files.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 300));
-      }
+      // 5. Reset progress
+      setUploadProgress({ current: 0, total: 0, currentFile: "" });
+
+      // 6. Show styled result modal instead of plain alert
+      const newItems = detailedSummary.filter((d) => d.status === "new");
+      const dupItems = detailedSummary.filter((d) => d.status === "dup");
+      const errItems = detailedSummary.filter((d) => d.status === "error");
+
+      const buildSection = (items, label, icon) => {
+        if (items.length === 0) return "";
+        return (
+          `\n${icon} ${label} (${items.length})\n` +
+          "─".repeat(40) + "\n" +
+          items.map((d) =>
+            d.status === "error"
+              ? `  • ${d.filename}\n    ❗ ${d.error}`
+              : `  • ${d.vessel} — ${d.date}\n    ${d.summary} | ${d.count} machineries\n    File: ${d.filename}`
+          ).join("\n\n")
+        );
+      };
+
+      const finalReport =
+        `╔══════════════════════════════════════╗\n` +
+        `       BULK UPLOAD COMPLETE            \n` +
+        `╚══════════════════════════════════════╝\n\n` +
+        `  📁 Total Files   : ${files.length}\n` +
+        `  ✅ New Reports   : ${successCount}\n` +
+        `  ⚠️  Duplicates   : ${duplicateCount}\n` +
+        `  ❌ Failed        : ${errorCount}\n` +
+        `\n` +
+        buildSection(newItems, "NEW REPORTS PROCESSED", "✅") +
+        buildSection(dupItems, "DUPLICATE REPORTS (UPDATED)", "⚠️") +
+        buildSection(errItems, "FAILED UPLOADS", "❌");
+
+      alert(finalReport);
+
+      // 7. Refresh the Matrix
+      loadData();
+
+    } catch (globalError) {
+      console.error("Bulk Upload Error:", globalError);
+      alert("❌ A critical error occurred during bulk processing.");
+    } finally {
+      setUploading(false);
+      setUploadProgress({ current: 0, total: 0, currentFile: "" });
+      // 8. Reset the input so the user can upload the same files again if needed
+      e.target.value = null;
     }
-
-    // 5. Reset progress
-    setUploadProgress({ current: 0, total: 0, currentFile: "" });
-
-    // 6. Show styled result modal instead of plain alert
-    const newItems = detailedSummary.filter((d) => d.status === "new");
-    const dupItems = detailedSummary.filter((d) => d.status === "dup");
-    const errItems = detailedSummary.filter((d) => d.status === "error");
-
-    const buildSection = (items, label, icon) => {
-      if (items.length === 0) return "";
-      return (
-        `\n${icon} ${label} (${items.length})\n` +
-        "─".repeat(40) + "\n" +
-        items.map((d) =>
-          d.status === "error"
-            ? `  • ${d.filename}\n    ❗ ${d.error}`
-            : `  • ${d.vessel} — ${d.date}\n    ${d.summary} | ${d.count} machineries\n    File: ${d.filename}`
-        ).join("\n\n")
-      );
-    };
-
-    const finalReport =
-      `╔══════════════════════════════════════╗\n` +
-      `       BULK UPLOAD COMPLETE            \n` +
-      `╚══════════════════════════════════════╝\n\n` +
-      `  📁 Total Files   : ${files.length}\n` +
-      `  ✅ New Reports   : ${successCount}\n` +
-      `  ⚠️  Duplicates   : ${duplicateCount}\n` +
-      `  ❌ Failed        : ${errorCount}\n` +
-      `\n` +
-      buildSection(newItems, "NEW REPORTS PROCESSED", "✅") +
-      buildSection(dupItems, "DUPLICATE REPORTS (UPDATED)", "⚠️") +
-      buildSection(errItems, "FAILED UPLOADS", "❌");
-
-    alert(finalReport);
-
-    // 7. Refresh the Matrix
-    loadData();
-
-  } catch (globalError) {
-    console.error("Bulk Upload Error:", globalError);
-    alert("❌ A critical error occurred during bulk processing.");
-  } finally {
-    setUploading(false);
-    setUploadProgress({ current: 0, total: 0, currentFile: "" });
-    // 8. Reset the input so the user can upload the same files again if needed
-    e.target.value = null;
-  }
-};
+  };
 
   // Helper for Status Icons/Colors
   const getStatusBadge = (status) => {
@@ -3215,17 +3215,17 @@ const LuboilAnalysis = () => {
                     {sortedHistory.filter(
                       (h) => (h.date || h.sample_date) !== latestDate,
                     ).length === 0 && (
-                      <div
-                        style={{
-                          padding: "15px",
-                          textAlign: "center",
-                          color: "#94a3b8",
-                          fontSize: "0.7rem",
-                        }}
-                      >
-                        No previous reports found
-                      </div>
-                    )}
+                        <div
+                          style={{
+                            padding: "15px",
+                            textAlign: "center",
+                            color: "#94a3b8",
+                            fontSize: "0.7rem",
+                          }}
+                        >
+                          No previous reports found
+                        </div>
+                      )}
                   </div>
                 )}
               </div>
@@ -3621,8 +3621,8 @@ const LuboilAnalysis = () => {
                 {uploading && uploadProgress.total > 0
                   ? `${uploadProgress.current}/${uploadProgress.total} Processing...`
                   : uploading
-                  ? "Processing..."
-                  : "Upload Report (PDF)"}
+                    ? "Processing..."
+                    : "Upload Report (PDF)"}
               </Button>
             </div>
           </div>
@@ -4182,7 +4182,7 @@ const LuboilAnalysis = () => {
                       {selectedVesselsFilter.length === 0
                         ? "Select the vessel"
                         : selectedVesselsFilter.length ===
-                            availableVessels.length
+                          availableVessels.length
                           ? " All Vessels"
                           : ` ${selectedVesselsFilter.length} Selected`}
                     </span>
@@ -4398,12 +4398,12 @@ const LuboilAnalysis = () => {
                                   transition: "background 0.2s",
                                 }}
                                 onMouseEnter={(e) =>
-                                  (e.currentTarget.style.backgroundColor =
-                                    "#eff6ff")
+                                (e.currentTarget.style.backgroundColor =
+                                  "#eff6ff")
                                 }
                                 onMouseLeave={(e) =>
-                                  (e.currentTarget.style.backgroundColor =
-                                    "#f8fafc")
+                                (e.currentTarget.style.backgroundColor =
+                                  "#f8fafc")
                                 }
                               >
                                 <div
@@ -4475,7 +4475,7 @@ const LuboilAnalysis = () => {
                             );
                             const fullName = vesselWithInfo
                               ? normalizedTable.rows[vesselWithInfo][colCode]
-                                  .description
+                                .description
                               : columnLabels[colCode] || colCode;
 
                             return (
@@ -4613,7 +4613,7 @@ const LuboilAnalysis = () => {
                                   // --- CONDITION 3: DATA AVAILABLE ---
                                   const interval =
                                     typeof cell.interval === "number" &&
-                                    cell.interval > 0
+                                      cell.interval > 0
                                       ? cell.interval
                                       : 3;
                                   const sampleDate = new Date(cell.last_sample);
@@ -4627,7 +4627,11 @@ const LuboilAnalysis = () => {
                                       month: "short",
                                       year: "2-digit",
                                     });
-
+                                  const limitDays = interval * 30;
+                                  const daysElapsed = Math.ceil(
+                                    (today - sampleDate) / (1000 * 60 * 60 * 24)
+                                  );
+                                  const daysOverdue = daysElapsed - limitDays;
                                   const hasRemarks =
                                     cell.officer_remarks || cell.office_remarks;
                                   const isNormal =
@@ -4644,17 +4648,22 @@ const LuboilAnalysis = () => {
                                       //   const latestSample = cell.history && cell.history.length > 0 ? cell.history[0] : null;
                                       //   handleSelectSample(vesselName, cell, latestSample);
                                       // }}
-                                    //   style={{
-                                    //     ...cellBaseStyle,
-                                    //     cursor: isNormal
-                                    //       ? "default"
-                                    //       : "pointer",
-                                    //     transition: "background 0.2s",
-                                    //   }}
+                                      //   style={{
+                                      //     ...cellBaseStyle,
+                                      //     cursor: isNormal
+                                      //       ? "default"
+                                      //       : "pointer",
+                                      //     transition: "background 0.2s",
+                                      //   }}
                                       style={{
                                         ...cellBaseStyle,
-                                        cursor: "pointer", // Always show pointer
+                                        cursor: "pointer",
                                         transition: "background 0.2s",
+                                        backgroundColor: daysOverdue > 60
+                                          ? "#fee2e2"  // red
+                                          : daysOverdue > 30
+                                            ? "#fff7ed"  // amber
+                                            : "#ffffff",  // plain white for normal
                                       }}
                                       className={
                                         isNormal ? "" : "hover:bg-slate-50"
@@ -4938,14 +4947,14 @@ const LuboilAnalysis = () => {
                                                         report.report_id,
                                                       )
                                                         ? prev.filter(
-                                                            (id) =>
-                                                              id !==
-                                                              report.report_id,
-                                                          )
-                                                        : [
-                                                            ...prev,
+                                                          (id) =>
+                                                            id !==
                                                             report.report_id,
-                                                          ],
+                                                        )
+                                                        : [
+                                                          ...prev,
+                                                          report.report_id,
+                                                        ],
                                                   );
                                                 }}
                                                 style={{
@@ -4963,15 +4972,15 @@ const LuboilAnalysis = () => {
                                               >
                                                 {report.report_date
                                                   ? new Date(
-                                                      report.report_date,
-                                                    ).toLocaleDateString(
-                                                      "en-GB",
-                                                      {
-                                                        day: "2-digit",
-                                                        month: "short",
-                                                        year: "numeric",
-                                                      },
-                                                    )
+                                                    report.report_date,
+                                                  ).toLocaleDateString(
+                                                    "en-GB",
+                                                    {
+                                                      day: "2-digit",
+                                                      month: "short",
+                                                      year: "numeric",
+                                                    },
+                                                  )
                                                   : "Unknown Date"}
                                               </span>
                                             </label>
@@ -4990,7 +4999,7 @@ const LuboilAnalysis = () => {
                                         <button
                                           disabled={
                                             selectedFooterReports.length ===
-                                              0 || isFooterDownloading
+                                            0 || isFooterDownloading
                                           }
                                           onClick={() =>
                                             handleFooterBatchDownload(
@@ -5156,17 +5165,17 @@ const LuboilAnalysis = () => {
                             transition: "all 0.2s",
                             backgroundColor:
                               (feedMode === "MY_FEED" && mode === "MY FEED") ||
-                              (feedMode === "FLEET" && mode === "FLEET")
+                                (feedMode === "FLEET" && mode === "FLEET")
                                 ? "white"
                                 : "transparent",
                             color:
                               (feedMode === "MY_FEED" && mode === "MY FEED") ||
-                              (feedMode === "FLEET" && mode === "FLEET")
+                                (feedMode === "FLEET" && mode === "FLEET")
                                 ? "#2563eb"
                                 : "#64748b",
                             boxShadow:
                               (feedMode === "MY_FEED" && mode === "MY FEED") ||
-                              (feedMode === "FLEET" && mode === "FLEET")
+                                (feedMode === "FLEET" && mode === "FLEET")
                                 ? "0 2px 4px rgba(0,0,0,0.1)"
                                 : "none",
                           }}
@@ -6329,13 +6338,13 @@ const LuboilAnalysis = () => {
                       >
                         {report.report_date
                           ? new Date(report.report_date).toLocaleDateString(
-                              "en-GB",
-                              {
-                                day: "2-digit",
-                                month: "short",
-                                year: "2-digit",
-                              },
-                            )
+                            "en-GB",
+                            {
+                              day: "2-digit",
+                              month: "short",
+                              year: "2-digit",
+                            },
+                          )
                           : "N/A"}
                       </td>
                       <td style={{ padding: "12px 24px", textAlign: "left" }}>
@@ -6470,8 +6479,8 @@ const LuboilAnalysis = () => {
                   >
                     {new Date(
                       selectedCell.data.report_date ||
-                        selectedCell.data.date ||
-                        selectedCell.data.sample_date,
+                      selectedCell.data.date ||
+                      selectedCell.data.sample_date,
                     ).toLocaleDateString("en-GB", {
                       day: "2-digit",
                       month: "short",
@@ -7161,450 +7170,450 @@ const LuboilAnalysis = () => {
                       user?.role === "admin" ||
                       user?.role === "superuser" ||
                       user?.role === "shore") && (
-                      <div style={{ flexShrink: 0 }}>
-                        <button
-                          onClick={() => {
-                            if (isResamplingActive) {
-                              setRightPanelMode("report");
-                              setCompareIds([]);
-                              setIsLinkGenerated(false);
-                              setIsResamplingActive(false);
-                            } else {
-                              // Keep current sample ID as the first ID in comparison
-                              setCompareIds([selectedCell.data.sample_id]);
-                              setIsResamplingActive(true);
-                            }
-                          }}
-                          style={{
-                            width: "100%",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "6px",
-                            padding: "8px",
-                            borderRadius: "7px",
-                            cursor: "pointer",
-                            fontSize: "0.65rem",
-                            fontWeight: "800",
-                            backgroundColor: isResamplingActive
-                              ? "#fff1f2"
-                              : "#f8fafc",
-                            color: isResamplingActive ? "#ef4444" : "#1e293b",
-                            border: isResamplingActive
-                              ? "1px solid #fecaca"
-                              : "1px solid #e2e8f0",
-                            transition: "all 0.2s",
-                          }}
-                        >
-                          <History size={13} />
-                          {isResamplingActive
-                            ? "CANCEL"
-                            : "LINK WITH RESAMPLING"}
-                        </button>
-
-                        {isResamplingActive && (
-                          <div
+                        <div style={{ flexShrink: 0 }}>
+                          <button
+                            onClick={() => {
+                              if (isResamplingActive) {
+                                setRightPanelMode("report");
+                                setCompareIds([]);
+                                setIsLinkGenerated(false);
+                                setIsResamplingActive(false);
+                              } else {
+                                // Keep current sample ID as the first ID in comparison
+                                setCompareIds([selectedCell.data.sample_id]);
+                                setIsResamplingActive(true);
+                              }
+                            }}
                             style={{
-                              marginTop: "8px",
-                              padding: "10px",
-                              backgroundColor: "white",
-                              borderRadius: "8px",
-                              border: "1px solid #e2e8f0",
-                              animation: "fadeIn 0.2s ease",
+                              width: "100%",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              padding: "8px",
+                              borderRadius: "7px",
+                              cursor: "pointer",
+                              fontSize: "0.65rem",
+                              fontWeight: "800",
+                              backgroundColor: isResamplingActive
+                                ? "#fff1f2"
+                                : "#f8fafc",
+                              color: isResamplingActive ? "#ef4444" : "#1e293b",
+                              border: isResamplingActive
+                                ? "1px solid #fecaca"
+                                : "1px solid #e2e8f0",
+                              transition: "all 0.2s",
                             }}
                           >
-                            {!isLinkGenerated ? (
-                              <>
-                                <p
-                                  style={{
-                                    margin: "0 0 6px 0",
-                                    fontSize: "0.6rem",
-                                    fontWeight: "800",
-                                    color: "#64748b",
-                                    textTransform: "uppercase",
-                                  }}
-                                >
-                                  Select Report:
-                                </p>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: "5px",
-                                  }}
-                                >
-                                  {(() => {
-                                    // 1. Get the date of the current selected report
-                                    const currentReportDate = new Date(
-                                      selectedCell.data.date ||
+                            <History size={13} />
+                            {isResamplingActive
+                              ? "CANCEL"
+                              : "LINK WITH RESAMPLING"}
+                          </button>
+
+                          {isResamplingActive && (
+                            <div
+                              style={{
+                                marginTop: "8px",
+                                padding: "10px",
+                                backgroundColor: "white",
+                                borderRadius: "8px",
+                                border: "1px solid #e2e8f0",
+                                animation: "fadeIn 0.2s ease",
+                              }}
+                            >
+                              {!isLinkGenerated ? (
+                                <>
+                                  <p
+                                    style={{
+                                      margin: "0 0 6px 0",
+                                      fontSize: "0.6rem",
+                                      fontWeight: "800",
+                                      color: "#64748b",
+                                      textTransform: "uppercase",
+                                    }}
+                                  >
+                                    Select Report:
+                                  </p>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: "5px",
+                                    }}
+                                  >
+                                    {(() => {
+                                      // 1. Get the date of the current selected report
+                                      const currentReportDate = new Date(
+                                        selectedCell.data.date ||
                                         selectedCell.data.last_sample,
-                                    );
+                                      );
 
-                                    // 2. Filter history for reports that occur AFTER the current one
-                                    const futureReports =
-                                      selectedCell.data.history?.filter((h) => {
-                                        const hDate = new Date(
-                                          h.date || h.sample_date,
-                                        );
-                                        // Ensure it's in the future and NOT the same sample
-                                        return (
-                                          hDate > currentReportDate &&
-                                          h.sample_id !==
+                                      // 2. Filter history for reports that occur AFTER the current one
+                                      const futureReports =
+                                        selectedCell.data.history?.filter((h) => {
+                                          const hDate = new Date(
+                                            h.date || h.sample_date,
+                                          );
+                                          // Ensure it's in the future and NOT the same sample
+                                          return (
+                                            hDate > currentReportDate &&
+                                            h.sample_id !==
                                             selectedCell.data.sample_id
-                                        );
-                                      });
+                                          );
+                                        });
 
-                                    if (
-                                      futureReports &&
-                                      futureReports.length > 0
-                                    ) {
-                                      return futureReports.map((item) => (
-                                        <label
-                                          key={item.sample_id}
-                                          style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "8px",
-                                            padding: "6px 8px",
-                                            borderRadius: "5px",
-                                            border: "1px solid #f1f5f9",
-                                            cursor: "pointer",
-                                            fontSize: "0.68rem",
-                                            backgroundColor:
-                                              compareIds.includes(
-                                                item.sample_id,
-                                              )
-                                                ? "#eff6ff"
-                                                : "transparent",
-                                          }}
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={compareIds.includes(
-                                              item.sample_id,
-                                            )}
-                                            onChange={() => {
-                                              if (
+                                      if (
+                                        futureReports &&
+                                        futureReports.length > 0
+                                      ) {
+                                        return futureReports.map((item) => (
+                                          <label
+                                            key={item.sample_id}
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: "8px",
+                                              padding: "6px 8px",
+                                              borderRadius: "5px",
+                                              border: "1px solid #f1f5f9",
+                                              cursor: "pointer",
+                                              fontSize: "0.68rem",
+                                              backgroundColor:
                                                 compareIds.includes(
                                                   item.sample_id,
                                                 )
-                                              ) {
-                                                // Reset back to just the current report if unchecked
-                                                setCompareIds([
-                                                  selectedCell.data.sample_id,
-                                                ]);
-                                              } else {
-                                                // Select this future report as the second comparison point
-                                                setCompareIds([
-                                                  selectedCell.data.sample_id,
-                                                  item.sample_id,
-                                                ]);
-                                              }
+                                                  ? "#eff6ff"
+                                                  : "transparent",
                                             }}
-                                            style={{
-                                              width: "13px",
-                                              height: "13px",
-                                            }}
-                                          />
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={compareIds.includes(
+                                                item.sample_id,
+                                              )}
+                                              onChange={() => {
+                                                if (
+                                                  compareIds.includes(
+                                                    item.sample_id,
+                                                  )
+                                                ) {
+                                                  // Reset back to just the current report if unchecked
+                                                  setCompareIds([
+                                                    selectedCell.data.sample_id,
+                                                  ]);
+                                                } else {
+                                                  // Select this future report as the second comparison point
+                                                  setCompareIds([
+                                                    selectedCell.data.sample_id,
+                                                    item.sample_id,
+                                                  ]);
+                                                }
+                                              }}
+                                              style={{
+                                                width: "13px",
+                                                height: "13px",
+                                              }}
+                                            />
+                                            <div
+                                              style={{
+                                                display: "flex",
+                                                flexDirection: "column",
+                                              }}
+                                            >
+                                              <span
+                                                style={{
+                                                  fontWeight: "700",
+                                                  fontSize: "0.68rem",
+                                                }}
+                                              >
+                                                {item.date}
+                                              </span>
+                                              <span
+                                                style={{
+                                                  fontSize: "0.58rem",
+                                                  color: getStatusColor(
+                                                    item.status,
+                                                  ),
+                                                }}
+                                              >
+                                                {item.status}
+                                              </span>
+                                            </div>
+                                          </label>
+                                        ));
+                                      } else {
+                                        // If no reports are newer than the currently selected one
+                                        return (
                                           <div
                                             style={{
-                                              display: "flex",
-                                              flexDirection: "column",
+                                              padding: "12px",
+                                              textAlign: "center",
+                                              border: "1px dashed #cbd5e1",
+                                              borderRadius: "6px",
+                                              backgroundColor: "#f8fafc",
                                             }}
                                           >
-                                            <span
+                                            <p
                                               style={{
-                                                fontWeight: "700",
-                                                fontSize: "0.68rem",
+                                                margin: 0,
+                                                fontSize: "0.7rem",
+                                                color: "#94a3b8",
+                                                fontWeight: "600",
                                               }}
                                             >
-                                              {item.date}
-                                            </span>
-                                            <span
-                                              style={{
-                                                fontSize: "0.58rem",
-                                                color: getStatusColor(
-                                                  item.status,
-                                                ),
-                                              }}
-                                            >
-                                              {item.status}
-                                            </span>
+                                              No Subsequent Reports Available.
+                                            </p>
                                           </div>
-                                        </label>
-                                      ));
-                                    } else {
-                                      // If no reports are newer than the currently selected one
+                                        );
+                                      }
+                                    })()}
+                                  </div>
+
+                                  <button
+                                    disabled={compareIds.length !== 2}
+                                    onClick={() => setIsLinkGenerated(true)}
+                                    style={{
+                                      width: "100%",
+                                      marginTop: "8px",
+                                      padding: "7px",
+                                      borderRadius: "5px",
+                                      border: "none",
+                                      backgroundColor:
+                                        compareIds.length === 2
+                                          ? "#2563eb"
+                                          : "#cbd5e1",
+                                      color: "white",
+                                      fontSize: "0.65rem",
+                                      fontWeight: "800",
+                                      cursor:
+                                        compareIds.length === 2
+                                          ? "pointer"
+                                          : "not-allowed",
+                                    }}
+                                  >
+                                    GENERATE LINK
+                                  </button>
+                                </>
+                              ) : (
+                                <div style={{ textAlign: "left" }}>
+                                  <p
+                                    style={{
+                                      fontSize: "0.58rem",
+                                      color: "#64748b",
+                                      fontWeight: "800",
+                                      marginBottom: "6px",
+                                      textTransform: "uppercase",
+                                    }}
+                                  >
+                                    Resampling Comparison:
+                                  </p>
+                                  <div
+                                    style={{
+                                      padding: "10px",
+                                      backgroundColor: "#f0f9ff",
+                                      border: "1px solid #bae6fd",
+                                      borderRadius: "8px",
+                                      marginBottom: "8px",
+                                    }}
+                                  >
+                                    {(() => {
+                                      // 1. Get the date of the primary opened report
+                                      const firstDate =
+                                        selectedCell.data.date ||
+                                        selectedCell.data.sample_date;
+
+                                      // 2. Find the date of the second selected report from the history array
+                                      const targetId = compareIds.find(
+                                        (id) =>
+                                          id !== selectedCell.data.sample_id,
+                                      );
+                                      const targetSample =
+                                        selectedCell.data.history?.find(
+                                          (h) => h.sample_id === targetId,
+                                        );
+                                      const secondDate =
+                                        targetSample?.date || "Subsequent";
+
+                                      // 3. Mixed Parameters String: Domain / Vessel / Machinery / Date & Date
+                                      const mixedLinkDisplay = `${window.location.origin} / ${selectedCell.vessel} / ${selectedCell.machinery} / ${firstDate} & ${secondDate}`;
+
                                       return (
-                                        <div
+                                        <a
+                                          href="#"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            setRightPanelMode("resampling_view");
+                                            setIsDiagExpanded(false);
+                                          }}
                                           style={{
-                                            padding: "12px",
-                                            textAlign: "center",
-                                            border: "1px dashed #cbd5e1",
-                                            borderRadius: "6px",
-                                            backgroundColor: "#f8fafc",
+                                            color: "#0369a1",
+                                            fontSize: "0.7rem",
+                                            textDecoration: "underline",
+                                            fontWeight: "800",
+                                            lineHeight: "1.4",
+                                            display: "block",
+                                            wordBreak: "break-word",
                                           }}
                                         >
-                                          <p
-                                            style={{
-                                              margin: 0,
-                                              fontSize: "0.7rem",
-                                              color: "#94a3b8",
-                                              fontWeight: "600",
-                                            }}
-                                          >
-                                            No Subsequent Reports Available.
-                                          </p>
-                                        </div>
+                                          {mixedLinkDisplay}
+                                        </a>
                                       );
-                                    }
-                                  })()}
+                                    })()}
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      setIsLinkGenerated(false);
+                                      setCompareIds([
+                                        selectedCell.data.sample_id,
+                                      ]);
+                                    }}
+                                    style={{
+                                      fontSize: "0.58rem",
+                                      color: "#ef4444",
+                                      background: "none",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      fontWeight: "700",
+                                    }}
+                                  >
+                                    Change Selected Reports
+                                  </button>
                                 </div>
-
-                                <button
-                                  disabled={compareIds.length !== 2}
-                                  onClick={() => setIsLinkGenerated(true)}
-                                  style={{
-                                    width: "100%",
-                                    marginTop: "8px",
-                                    padding: "7px",
-                                    borderRadius: "5px",
-                                    border: "none",
-                                    backgroundColor:
-                                      compareIds.length === 2
-                                        ? "#2563eb"
-                                        : "#cbd5e1",
-                                    color: "white",
-                                    fontSize: "0.65rem",
-                                    fontWeight: "800",
-                                    cursor:
-                                      compareIds.length === 2
-                                        ? "pointer"
-                                        : "not-allowed",
-                                  }}
-                                >
-                                  GENERATE LINK
-                                </button>
-                              </>
-                            ) : (
-                              <div style={{ textAlign: "left" }}>
-                                <p
-                                  style={{
-                                    fontSize: "0.58rem",
-                                    color: "#64748b",
-                                    fontWeight: "800",
-                                    marginBottom: "6px",
-                                    textTransform: "uppercase",
-                                  }}
-                                >
-                                  Resampling Comparison:
-                                </p>
-                                <div
-                                  style={{
-                                    padding: "10px",
-                                    backgroundColor: "#f0f9ff",
-                                    border: "1px solid #bae6fd",
-                                    borderRadius: "8px",
-                                    marginBottom: "8px",
-                                  }}
-                                >
-                                  {(() => {
-                                    // 1. Get the date of the primary opened report
-                                    const firstDate =
-                                      selectedCell.data.date ||
-                                      selectedCell.data.sample_date;
-
-                                    // 2. Find the date of the second selected report from the history array
-                                    const targetId = compareIds.find(
-                                      (id) =>
-                                        id !== selectedCell.data.sample_id,
-                                    );
-                                    const targetSample =
-                                      selectedCell.data.history?.find(
-                                        (h) => h.sample_id === targetId,
-                                      );
-                                    const secondDate =
-                                      targetSample?.date || "Subsequent";
-
-                                    // 3. Mixed Parameters String: Domain / Vessel / Machinery / Date & Date
-                                    const mixedLinkDisplay = `${window.location.origin} / ${selectedCell.vessel} / ${selectedCell.machinery} / ${firstDate} & ${secondDate}`;
-
-                                    return (
-                                      <a
-                                        href="#"
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          setRightPanelMode("resampling_view");
-                                          setIsDiagExpanded(false);
-                                        }}
-                                        style={{
-                                          color: "#0369a1",
-                                          fontSize: "0.7rem",
-                                          textDecoration: "underline",
-                                          fontWeight: "800",
-                                          lineHeight: "1.4",
-                                          display: "block",
-                                          wordBreak: "break-word",
-                                        }}
-                                      >
-                                        {mixedLinkDisplay}
-                                      </a>
-                                    );
-                                  })()}
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    setIsLinkGenerated(false);
-                                    setCompareIds([
-                                      selectedCell.data.sample_id,
-                                    ]);
-                                  }}
-                                  style={{
-                                    fontSize: "0.58rem",
-                                    color: "#ef4444",
-                                    background: "none",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    fontWeight: "700",
-                                  }}
-                                >
-                                  Change Selected Reports
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                   </div>
                 )}
                 {/* {selectedCell.data.status?.toLowerCase() !== "normal" && ( */}
+                <div
+                  style={{
+                    padding: "10px",
+                    borderTop: "1px solid #e2e8f0",
+                    backgroundColor: "#fff",
+                    flexShrink: 0,
+                    zIndex: 10,
+                  }}
+                >
                   <div
-                    style={{
-                      padding: "10px",
-                      borderTop: "1px solid #e2e8f0",
-                      backgroundColor: "#fff",
-                      flexShrink: 0,
-                      zIndex: 10,
-                    }}
+                    style={{ display: "flex", gap: "10px", width: "100%" }}
                   >
-                    <div
-                      style={{ display: "flex", gap: "10px", width: "100%" }}
-                    >
-                      {/* --- BUTTON 1: STATUS BUTTON (CLOSE / PENDING / CLOSED) --- */}
-                      <button
-                        // 1. Disable if resolved, awaiting approval, or submitting
-                        disabled={
-                          selectedCell.data.is_resolved ||
-                          selectedCell.data.is_approval_pending ||
-                          isSubmittingClose
+                    {/* --- BUTTON 1: STATUS BUTTON (CLOSE / PENDING / CLOSED) --- */}
+                    <button
+                      // 1. Disable if resolved, awaiting approval, or submitting
+                      disabled={
+                        selectedCell.data.is_resolved ||
+                        selectedCell.data.is_approval_pending ||
+                        isSubmittingClose
+                      }
+                      // 2. Only allow opening the modal if it's not already resolved or pending
+                      onClick={() => {
+                        if (
+                          !selectedCell.data.is_resolved &&
+                          !selectedCell.data.is_approval_pending
+                        ) {
+                          setIsCloseModalOpen(true);
                         }
-                        // 2. Only allow opening the modal if it's not already resolved or pending
-                        onClick={() => {
-                          if (
-                            !selectedCell.data.is_resolved &&
-                            !selectedCell.data.is_approval_pending
-                          ) {
-                            setIsCloseModalOpen(true);
-                          }
-                        }}
+                      }}
+                      style={{
+                        // ðŸ”¥ UPDATED: 50% width if Reopen button is present, otherwise 100%
+                        flex:
+                          selectedCell.data.is_resolved && amIShore ? 1 : 1,
+                        width:
+                          selectedCell.data.is_resolved && amIShore
+                            ? "50%"
+                            : "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px",
+                        padding: "12px",
+                        borderRadius: "8px",
+
+                        // 3. Dynamic Background Color (Preserved)
+                        backgroundColor: selectedCell.data.is_resolved
+                          ? "#94a3b8"
+                          : selectedCell.data.is_approval_pending
+                            ? "#f59e0b"
+                            : "#059669",
+
+                        color: "white",
+                        fontSize: "0.75rem",
+                        fontWeight: "800",
+                        border: "none",
+                        flexShrink: 0,
+
+                        // 4. Dynamic Cursor (Preserved)
+                        cursor:
+                          selectedCell.data.is_resolved ||
+                            selectedCell.data.is_approval_pending
+                            ? "not-allowed"
+                            : "pointer",
+
+                        boxShadow: "0 -2px 10px rgba(0,0,0,0.05)",
+
+                        // 5. Visual feedback (Preserved)
+                        opacity:
+                          selectedCell.data.is_resolved ||
+                            selectedCell.data.is_approval_pending
+                            ? 0.8
+                            : 1,
+                        transition: "all 0.3s ease",
+                      }}
+                    >
+                      {/* 6. Dynamic Icon & Text Logic (Preserved) */}
+                      {selectedCell.data.is_resolved ? (
+                        <>
+                          <CheckCircle size={16} />
+                          CLOSED
+                        </>
+                      ) : selectedCell.data.is_approval_pending ? (
+                        <>
+                          <Clock size={16} />
+                          PENDING APPROVAL
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle size={16} />
+                          CLOSE
+                        </>
+                      )}
+                    </button>
+
+                    {/* --- BUTTON 2: REOPEN BUTTON (ONLY FOR SHORE WHEN CLOSED) --- */}
+                    {selectedCell.data.is_resolved && amIShore && (
+                      <button
+                        onClick={handleReopenIssue}
+                        disabled={isSubmittingClose}
                         style={{
-                          // ðŸ”¥ UPDATED: 50% width if Reopen button is present, otherwise 100%
-                          flex:
-                            selectedCell.data.is_resolved && amIShore ? 1 : 1,
-                          width:
-                            selectedCell.data.is_resolved && amIShore
-                              ? "50%"
-                              : "100%",
+                          flex: 1,
+                          width: "50%",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           gap: "8px",
                           padding: "12px",
                           borderRadius: "8px",
-
-                          // 3. Dynamic Background Color (Preserved)
-                          backgroundColor: selectedCell.data.is_resolved
-                            ? "#94a3b8"
-                            : selectedCell.data.is_approval_pending
-                              ? "#f59e0b"
-                              : "#059669",
-
+                          backgroundColor: "#2563eb", // Blue color for Reopen
                           color: "white",
                           fontSize: "0.75rem",
                           fontWeight: "800",
                           border: "none",
-                          flexShrink: 0,
-
-                          // 4. Dynamic Cursor (Preserved)
-                          cursor:
-                            selectedCell.data.is_resolved ||
-                            selectedCell.data.is_approval_pending
-                              ? "not-allowed"
-                              : "pointer",
-
-                          boxShadow: "0 -2px 10px rgba(0,0,0,0.05)",
-
-                          // 5. Visual feedback (Preserved)
-                          opacity:
-                            selectedCell.data.is_resolved ||
-                            selectedCell.data.is_approval_pending
-                              ? 0.8
-                              : 1,
+                          cursor: isSubmittingClose
+                            ? "not-allowed"
+                            : "pointer",
+                          boxShadow: "0 4px 6px rgba(37, 99, 235, 0.2)",
                           transition: "all 0.3s ease",
                         }}
                       >
-                        {/* 6. Dynamic Icon & Text Logic (Preserved) */}
-                        {selectedCell.data.is_resolved ? (
-                          <>
-                            <CheckCircle size={16} />
-                            CLOSED
-                          </>
-                        ) : selectedCell.data.is_approval_pending ? (
-                          <>
-                            <Clock size={16} />
-                            PENDING APPROVAL
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle size={16} />
-                            CLOSE
-                          </>
-                        )}
+                        <History size={16} />
+                        REOPEN ISSUE
                       </button>
-
-                      {/* --- BUTTON 2: REOPEN BUTTON (ONLY FOR SHORE WHEN CLOSED) --- */}
-                      {selectedCell.data.is_resolved && amIShore && (
-                        <button
-                          onClick={handleReopenIssue}
-                          disabled={isSubmittingClose}
-                          style={{
-                            flex: 1,
-                            width: "50%",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "8px",
-                            padding: "12px",
-                            borderRadius: "8px",
-                            backgroundColor: "#2563eb", // Blue color for Reopen
-                            color: "white",
-                            fontSize: "0.75rem",
-                            fontWeight: "800",
-                            border: "none",
-                            cursor: isSubmittingClose
-                              ? "not-allowed"
-                              : "pointer",
-                            boxShadow: "0 4px 6px rgba(37, 99, 235, 0.2)",
-                            transition: "all 0.3s ease",
-                          }}
-                        >
-                          <History size={16} />
-                          REOPEN ISSUE
-                        </button>
-                      )}
-                    </div>
+                    )}
                   </div>
+                </div>
                 {/* )} */}
               </div>
 
@@ -9990,8 +9999,8 @@ const LuboilAnalysis = () => {
 
                         {/* UI Branch: PDF Icon vs Image Thumbnail */}
                         {isPdf ||
-                        url.toLowerCase().includes(".xls") ||
-                        url.toLowerCase().includes(".doc") ? (
+                          url.toLowerCase().includes(".xls") ||
+                          url.toLowerCase().includes(".doc") ? (
                           <div
                             style={{
                               width: "100%",
