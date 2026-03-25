@@ -13,6 +13,8 @@ export const assignVessels = (id, vessel_imos, plainPassword = null) =>
     plain_password: plainPassword,
   });
 
+export const resendWelcomeEmail = (id) => api.post(`/users/${id}/resend-welcome`);
+
 // ── Vessels ────────────────────────────────────────────
 export const getVessels = () => api.get('/vessels');
 
