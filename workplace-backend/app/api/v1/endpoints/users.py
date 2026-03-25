@@ -44,6 +44,42 @@ async def list_users(
         for u in users
     ]
 
+# ADD this new endpoint after the list_users endpoint:
+
+@router.post("/users/{user_id}/resend-welcome")
+async def resend_welcome_email(
+    user_id: uuid.UUID,
+    db: AsyncSession = Depends(get_control_db),
+    admin: User = Depends(get_current_admin),
+):
+    result = await db.execute(
+        select(User).where(User.id == user_id).options(selectinload(User.vessels))
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Reset password to default
+    default_password = "Ozellar@123"
+    user.password_hash = hash_password(default_password)
+    user.updated_at = datetime.utcnow()
+    await db.commit()
+
+    try:
+        await send_welcome_email(
+            to_email=user.email,
+            full_name=user.full_name,
+            password=default_password,
+            role=user.role,
+            assigned_vessels=[v.name for v in user.vessels],
+            permissions=user.permissions,
+            created_by=admin.full_name,
+        )
+    except Exception as e:
+        logger.error(f"Resend welcome email failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send email")
+
+    return {"message": "Password reset and welcome email sent successfully"}
 
 @router.post("/users", response_model=UserOut)
 async def create_user(
