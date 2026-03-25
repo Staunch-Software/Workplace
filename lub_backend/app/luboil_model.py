@@ -259,7 +259,7 @@ class Notification(Base):
     sender_name = Column(String(100))
     message = Column(String(500), nullable=False)
     notification_type = Column(String(50))  # 'mention', 'mandatory', 'status_change'
-    imo = Column(Integer, nullable=True)
+    imo = Column(String(7), nullable=True)
     equipment_code = Column(String(50), nullable=True)
     is_read = Column(Boolean, default=False)
     is_hidden = Column(Boolean, default=False)
@@ -276,7 +276,7 @@ class LuboilEvent(Base):
 
     event_id = Column(Integer, primary_key=True, autoincrement=True)
     vessel_name = Column(String(100))
-    imo = Column(Integer)
+    imo = Column(String(7))
     machinery_name = Column(String(100))
     equipment_code = Column(String(50))
     event_type = Column(String(50)) # 'STATUS_CHANGE', 'NEW_REPORT', 'EVIDENCE_UPLOAD', 'OVERDUE', 'MANDATORY'
