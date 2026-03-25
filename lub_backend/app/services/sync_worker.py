@@ -3,7 +3,6 @@ import logging
 from app.services.network_service import network_service
 from app.services.sync_processor import SyncProcessor
 from app.database import AsyncSessionLocal
-from app.core.database_control import AsyncSessionControl
 from app.config import settings
 
 logger = logging.getLogger("lub.sync")
@@ -27,42 +26,29 @@ async def run_luboil_sync_cycle():
             logger.error(f"Luboil sync cycle error: {e}")
 
 
-async def run_config_sync_cycle():
-    """PULL users + vessels from workplace-backend. Runs every 24h + startup."""
-    status = await network_service.get_network_status()
-    if status == "OFFLINE":
-        logger.debug("Vessel is OFFLINE. Config sync deferred.")
-        return
+# async def run_config_sync_cycle():
+#     """PULL users + vessels from workplace-backend. Runs every 24h + startup."""
+#     status = await network_service.get_network_status()
+#     if status == "OFFLINE":
+#         logger.debug("Vessel is OFFLINE. Config sync deferred.")
+#         return
 
-    logger.info("Starting CONFIG sync cycle...")
-    async with AsyncSessionLocal() as db, AsyncSessionControl() as control_db:
-        try:
-            processor = SyncProcessor(db, control_db=control_db)
-            await processor.pull_config_from_cloud()
-            logger.info("Config sync cycle complete.")
-        except Exception as e:
-            logger.error(f"Config sync cycle error: {e}")
+#     logger.info("Starting CONFIG sync cycle...")
+#     async with AsyncSessionLocal() as db, AsyncSessionControl() as control_db:
+#         try:
+#             processor = SyncProcessor(db, control_db=control_db)
+#             await processor.pull_config_from_cloud()
+#             logger.info("Config sync cycle complete.")
+#         except Exception as e:
+#             logger.error(f"Config sync cycle error: {e}")
 
 
 async def start_background_sync():
-    logger.info("Lub Sync Worker Started.")
-
-    try:
-        await run_config_sync_cycle()
-    except Exception as e:
-        logger.error(f"Startup config sync failed: {e}")
-
-    last_config_sync = asyncio.get_event_loop().time()
+    logger.info("Lub Sync Worker Started. Handling LUBOIL scope only.")
 
     while True:
         try:
             await run_luboil_sync_cycle()
-
-            now = asyncio.get_event_loop().time()
-            if now - last_config_sync >= settings.CONFIG_SYNC_INTERVAL:
-                await run_config_sync_cycle()
-                last_config_sync = now
-
         except Exception as e:
             logger.error(f"Sync Worker loop crash prevented: {e}")
 
