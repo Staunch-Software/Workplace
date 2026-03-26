@@ -188,7 +188,7 @@ app.add_middleware(
 # app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 # app.include_router(admin.router, tags=["Admin"])  
 from app.routes.sync import router as sync_router
-app.include_router(sync_router, prefix="/sync", tags=["Sync"])
+app.include_router(sync_router, prefix="/api/sync", tags=["Sync"])
 
 # Database Initialization
 @app.on_event("startup")

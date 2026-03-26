@@ -63,7 +63,7 @@ class SSOSettings(BaseSettings):
 
     # Sync
     SYNC_API_KEY: str = ""
-    CLOUD_BASE_URL: str = "https://workplace.ozellar.com/lub/api/v1"
+    CLOUD_BASE_URL: str = "https://workplace.ozellar.com/lub/api"
     WORKPLACE_BASE_URL: str = "https://workplace.ozellar.com/api/v1"
     CLOUD_HEALTH_URL: str = "https://workplace.ozellar.com/health"
     VESSEL_IMO: str = ""
