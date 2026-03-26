@@ -1,13 +1,13 @@
 import logging
 import httpx
 from datetime import datetime, timedelta
-from sqlalchemy import select
+from sqlalchemy import select, inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sync import SyncQueue, SyncState
 from app.luboil_model import (
     LuboilReport, LuboilSample, Notification,
-    LuboilEvent, LuboilEventReadState, LuboilVesselConfig
+    LuboilEvent, LuboilEventReadState, LuboilVesselConfig, LuboilNameMapping, LuboilEquipmentType
 )
 from app.models.control.user import User
 from app.models.control.vessel import Vessel
@@ -80,7 +80,10 @@ class SyncProcessor:
                 return
             changes = resp.json()
 
+        # Order matters — equipment types must exist before samples
         mapping = {
+            "luboil_equipment_types": LuboilEquipmentType,
+            "luboil_name_mappings": LuboilNameMapping,
             "luboil_reports": LuboilReport,
             "luboil_samples": LuboilSample,
             "notifications": Notification,
@@ -96,9 +99,15 @@ class SyncProcessor:
                 continue
             for item in items:
                 try:
+                    # Each model uses its own PK name (report_id, sample_id, etc.)
+                    pk_col = inspect(model_class).primary_key[0].name
+                    entity_id = item.get(pk_col) or item.get("id")
+                    if entity_id is None:
+                        logger.warning(f"Luboil Pull: No ID found for {key} item, skipping.")
+                        continue
                     await SyncService.apply_snapshot(
                         self.db, model_class,
-                        item["id"], item.get("version", 1), item
+                        entity_id, item.get("version", 1), item
                     )
                 except Exception as e:
                     logger.error(f"Luboil Pull: Failed {key} id={item.get('id')}: {e}")

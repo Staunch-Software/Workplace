@@ -10,7 +10,7 @@ from app.database import get_db
 from app.config import settings
 from app.luboil_model import (
     LuboilReport, LuboilSample, Notification,
-    LuboilEvent, LuboilEventReadState, LuboilVesselConfig
+    LuboilEvent, LuboilEventReadState, LuboilVesselConfig, LuboilEquipmentType, LuboilNameMapping
 )
 from app.models.control.user import User
 from app.models.control.vessel import Vessel
@@ -108,6 +108,8 @@ async def get_changes(
         since = since.astimezone(timezone.utc).replace(tzinfo=None)
 
     models = {
+        "luboil_equipment_types": LuboilEquipmentType,
+        "luboil_name_mappings": LuboilNameMapping,
         "luboil_reports": LuboilReport,
         "luboil_samples": LuboilSample,
         "notifications": Notification,
