@@ -184,6 +184,10 @@ class LuboilEquipmentType(Base):
     default_interval_months = Column(Integer, default=3, nullable=False, comment="Standard Interval (e.g., 3 or 6)")
     sort_order = Column(Integer, default=999, comment="Order of columns in the UI (1, 2, 3...)")
 
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=True)
+    version = Column(Integer, default=1, nullable=False)
+    origin = Column(String(20), default="CLOUD", nullable=True)
+    
     # Relationships
     configs = relationship("LuboilVesselConfig", back_populates="equipment_type")
     mappings = relationship("LuboilNameMapping", back_populates="equipment_type")
@@ -246,6 +250,10 @@ class LuboilNameMapping(Base):
     # The Clean Code it maps to
     equipment_code = Column(String(50), ForeignKey('luboil_equipment_type.code', ondelete='CASCADE'), nullable=False)
 
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=True)
+    version = Column(Integer, default=1, nullable=False)
+    origin = Column(String(20), default="CLOUD", nullable=True)
+    
     # Relationships
     equipment_type = relationship("LuboilEquipmentType", back_populates="mappings")
 
