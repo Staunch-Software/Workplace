@@ -104,10 +104,8 @@ async def get_changes(
     since: datetime = Query(...),
     db: AsyncSession = Depends(get_db)
 ):
-    if since.tzinfo is None:
-        since = since.replace(tzinfo=timezone.utc)
-    else:
-        since = since.astimezone(timezone.utc)
+    if since.tzinfo is not None:
+        since = since.astimezone(timezone.utc).replace(tzinfo=None)
 
     models = {
         "luboil_reports": LuboilReport,
