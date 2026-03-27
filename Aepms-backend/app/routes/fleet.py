@@ -5,6 +5,7 @@ from sqlalchemy import func, desc
 from typing import List, Optional
 from datetime import datetime, date
 import logging
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database_control import get_control_db  # workplace_control DB → vessels table
 from app.database import get_db as get_aepms_db       # workplace_engine DB → MonthlyReportHeader
@@ -20,13 +21,13 @@ router = APIRouter(prefix="/api/fleet", tags=["fleet"])
 @router.get("/")
 async def get_fleet(
     current_user: dict = Depends(get_current_user),    # ← added
-    control_db: Session = Depends(get_control_db),
+    control_db: AsyncSession = Depends(get_control_db),
     aepms_db: Session = Depends(get_aepms_db),
 ):
     """Get all vessels with their current status for the fleet overview."""
     try:
         # ── permission gate ──────────────────────────────────────────────────
-        allowed_imos, role = get_allowed_vessel_imos(current_user)
+        allowed_imos, role = await get_allowed_vessel_imos(current_user)
         logger.info(
             f"Fleet request — user={current_user.get('id')} "
             f"role={role} allowed_imos={allowed_imos}"
@@ -37,7 +38,9 @@ async def get_fleet(
             return {"fleet": []}
         # ────────────────────────────────────────────────────────────────────
 
-        vessels_query = control_db.query(Vessel).all()
+        from sqlalchemy import select
+        result = await control_db.execute(select(Vessel))
+        vessels_query = result.scalars().all()
 
         # Filter in Python after fetching — keeps all your existing logic intact.
         # allowed_imos == None would mean "no filter applied" but our helper

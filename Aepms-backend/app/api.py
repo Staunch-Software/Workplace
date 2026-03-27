@@ -4,6 +4,8 @@ import asyncio
 import multiprocessing 
 import shutil
 import tempfile
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from fastapi.responses import JSONResponse
 from pypdf import PdfReader, PdfWriter
 import os
@@ -92,56 +94,7 @@ VESSEL_ORDER_CONFIG = {
 }
 import logging
 logger = logging.getLogger(__name__)
-
-# In app/api.py (Update the get_allowed_vessel_imos definition near line 83)
-
-def get_allowed_vessel_imos(current_user):
-    from app.model.control.vessel import Vessel as ControlVessel
-    from app.core.database_control import SessionControl
-    from sqlalchemy import text
-
-    # Extract user ID from either 'id' or 'sub'
-    user_id_raw = current_user.get("id") or current_user.get("sub")
-    role = str(current_user.get("role") or "").upper()
-
-    # Create session directly — don't use next() on a generator
-    control_db = SessionControl()
-    try:
-        if not user_id_raw:
-            logger.warning("get_allowed_vessel_imos: no user_id in token")
-            return[], role
-
-        # Query assigned vessels for this user
-        query = text("""
-            SELECT vessel_imo 
-            FROM user_vessel_link 
-            WHERE user_id = CAST(:uid AS UUID)
-        """)
-        result = control_db.execute(query, {"uid": str(user_id_raw)}).fetchall()
-        clean_imos = [int(row[0]) for row in result if str(row[0]).isdigit()]
-
-        logger.info(f"User {user_id_raw} (role={role}) assigned IMOs: {clean_imos}")
-
-        if clean_imos:
-            return clean_imos, role
-
-        # Elevated roles get all vessels
-        if role in ("ADMIN", "SUPERUSER", "SHORE", "SUPERINTENDENT"):
-            all_vessels = control_db.query(ControlVessel).all()
-            all_imos =[int(v.imo) for v in all_vessels if str(v.imo).isdigit()]
-            logger.info(f"Elevated role {role} granted all IMOs: {all_imos}")
-            return all_imos, role
-
-        logger.warning(f"User {user_id_raw} has no assigned vessels and role {role} is not elevated")
-        return[], role
-
-    except Exception as e:
-        logger.error(f"get_allowed_vessel_imos error: {e}", exc_info=True)
-        return[], role
-    finally:
-        control_db.close()
-
-
+from app.core.permissions import get_allowed_vessel_imos
 def format_vessel_name(name: str) -> str:
     """
     Removes prefixes like 'MV', 'M.V.', 'M.V' from vessel names.
@@ -1029,7 +982,7 @@ async def get_generators_list(
     Retrieves the list of Auxiliary Engines (VesselGenerator) for a given IMO number.
     ðŸ”¥ FIXED: Returns engine_maker and engine_model (actual database column names)
     """
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)  # ADD
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)# ADD
     if str(imo_number) not in [str(x) for x in allowed_imos]:  # ADD
         raise HTTPException(status_code=403, detail="Access Denied")  # ADD
     try:
@@ -1070,7 +1023,7 @@ async def get_ae_graph_data(
             VesselGenerator.generator_id == report.generator_id
         ).first()
         if generator:
-            allowed_imos, _ = get_allowed_vessel_imos(current_user)
+            allowed_imos, _ = await get_allowed_vessel_imos(current_user)
             if str(generator.imo_number) not in [str(x) for x in allowed_imos]:
                 raise HTTPException(status_code=403, detail="Access Denied")
 
@@ -1102,7 +1055,7 @@ async def get_graph_data(
     """Get ME performance graph data for a specific report ID."""
     report = db.query(MonthlyReportHeader).filter_by(report_id=report_id).first()
     if report:
-        allowed_imos, _ = get_allowed_vessel_imos(current_user)
+        allowed_imos, _ = await get_allowed_vessel_imos(current_user)
         if str(report.imo_number) not in [str(x) for x in allowed_imos]:
             raise HTTPException(status_code=403, detail="Access Denied")
     try:
@@ -1133,7 +1086,7 @@ async def get_performance_history(
     current_user: Any = Depends(auth.get_current_user) 
 ):
     """Get historical monthly performance data for the specified vessel."""
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     if str(imo_number) not in [str(x) for x in allowed_imos]:
         raise HTTPException(status_code=403, detail="Access Denied: Not assigned to this vessel.")
     
@@ -1299,7 +1252,7 @@ async def get_ae_performance_history(
             VesselGenerator.generator_id == generator_id
         ).first()
 
-        allowed_imos, _ = get_allowed_vessel_imos(current_user)
+        allowed_imos, _ = await get_allowed_vessel_imos(current_user)
         if str(generator.imo_number) not in [str(x) for x in allowed_imos]:
             raise HTTPException(status_code=403, detail="Access Denied")
        
@@ -1403,7 +1356,7 @@ async def get_baseline_performance(
     current_user: Any = Depends(auth.get_current_user)  # ADD
 ):
     """Get baseline (shop trial) performance data for a vessel."""
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     if str(imo_number) not in [str(x) for x in allowed_imos]:
         raise HTTPException(status_code=403, detail="Access Denied")
     try:
@@ -1493,14 +1446,16 @@ async def get_baseline_performance(
 # REMAINING ENDPOINTS (Fleet, Alerts, Dashboard, etc.)
 # ============================================
 @app.get("/api/fleet/config-summary-live")
-async def get_fleet_configuration_summary_live(db: Session = Depends(get_db), control_db: Session = Depends(get_control_db), current_user: Any = Depends(auth.get_current_user)):
+async def get_fleet_configuration_summary_live(db: Session = Depends(get_db), control_db: AsyncSession = Depends(get_control_db), current_user: Any = Depends(auth.get_current_user)):
     """Executes live SQL queries to get configuration counts and unconfigured lists."""
     logger.info("Executing live fleet configuration summary queries.")
-    allowed_imos, role = get_allowed_vessel_imos(current_user)
+    allowed_imos, role = await get_allowed_vessel_imos(current_user)
     allowed_imos_str =[str(x) for x in allowed_imos]
     # Total ships from WORKPLACE vessel table (control DB)
-    total_ships_query = control_db.query(func.count(Vessel.imo)).filter(Vessel.imo.in_(allowed_imos_str)).scalar()
-    total_ships = total_ships_query if total_ships_query is not None else 0
+    total_ships_result = await control_db.execute(
+        select(func.count(Vessel.imo)).where(Vessel.imo.in_(allowed_imos_str))
+    )
+    total_ships = total_ships_result.scalar() or 0
 
     # ME configured count (from vessel_info joined with shop_trial_session)
     me_configured_imo_count = db.query(func.count(distinct(VesselInfo.imo_number))).join(
@@ -1515,9 +1470,10 @@ async def get_fleet_configuration_summary_live(db: Session = Depends(get_db), co
     ae_configured_ships = ae_configured_imo_count if ae_configured_imo_count is not None else 0
 
     # Get all vessels from control DB
-    all_control_vessels = control_db.query(Vessel).filter(
-        Vessel.imo.in_(allowed_imos_str)
-    ).all()
+    all_control_vessels_result = await control_db.execute(
+        select(Vessel).where(Vessel.imo.in_(allowed_imos_str))
+    )
+    all_control_vessels = all_control_vessels_result.scalars().all()
 
     # Get ME configured IMOs as strings for comparison
     me_configured_imos = set(
@@ -1564,7 +1520,7 @@ async def get_fleet_configuration_summary_live(db: Session = Depends(get_db), co
 @app.get("/performance/alerts/{report_id}")
 async def get_me_alerts(report_id: int, db: Session = Depends(get_db),current_user: Any = Depends(auth.get_current_user)):
     """Get categorized ME performance alerts for a specific report."""
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     report = db.query(MEAlertSummary).filter_by(report_id=report_id).first()
     if report and str(report.imo_number) not in [str(x) for x in allowed_imos]:
         raise HTTPException(status_code=403, detail="Access Denied")
@@ -1601,7 +1557,7 @@ async def get_me_alerts(report_id: int, db: Session = Depends(get_db),current_us
 async def get_me_alert_summary(report_id: int, db: Session = Depends(get_db),
     current_user: Any = Depends(auth.get_current_user)):
     """Get precomputed ME alert summary for a specific report."""
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     report = db.query(MEAlertSummary).filter_by(report_id=report_id).first()
     if report and str(report.imo_number) not in [str(x) for x in allowed_imos]:
         raise HTTPException(status_code=403, detail="Access Denied")
@@ -1649,7 +1605,7 @@ async def get_fleet_alert_summary(
     current_user: Any = Depends(auth.get_current_user)
 ):
     """Get ME alert summaries for entire fleet with optional filters."""
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     query = db.query(MEAlertSummary).filter(
         MEAlertSummary.imo_number.in_(allowed_imos)
     )
@@ -1723,7 +1679,7 @@ async def get_me_dashboard_summary(
     current_user: Any = Depends(auth.get_current_user)  # ADD
 ):
     """Returns ME performance status summaries for vessels."""
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)  # ADD
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)  # ADD
     # ADD at top of try block - filter by allowed IMOs:
     # if imo_number passed, verify it's allowed:
     if imo_number and str(imo_number) not in [str(x) for x in allowed_imos]:
@@ -1865,7 +1821,7 @@ async def get_me_dashboard_summary(
 async def get_propeller_margin_overview(db: Session = Depends(get_db),
     current_user: Any = Depends(auth.get_current_user)) -> Dict[str, Any]:
     """Retrieves the latest propeller margin percentage for every vessel."""
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     from sqlalchemy import func, desc
    
     logger.info("Executing fleet propeller margin overview query.")
@@ -1933,7 +1889,7 @@ async def get_propeller_margin_trend(
     UPDATED: Returns the raw Propeller Margin % directly from the database
     (No longer calculates deviation from 100).
     """
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)  
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)  
     from sqlalchemy import func, desc
     
     # 1. Subquery: Get last 12 reports for every vessel where margin is not null
@@ -2013,7 +1969,7 @@ async def get_ae_fleet_alert_summary(
     current_user: Any = Depends(auth.get_current_user)
 ):
     """Get AE alert summaries for entire fleet with optional filters."""
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     report = db.query(MEAlertSummary).filter_by(report_id=report_id).first()
     query = db.query(AEAlertSummary).filter(
         AEAlertSummary.imo_number.in_(allowed_imos)
@@ -2086,7 +2042,7 @@ async def get_ae_alert_summary_endpoint(
     current_user: Any = Depends(auth.get_current_user)
 ):
     """Get precomputed AE alert summary"""
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     report = db.query(MEAlertSummary).filter_by(report_id=report_id).first()
     if report and str(report.imo_number) not in [str(x) for x in allowed_imos]:
         raise HTTPException(status_code=403, detail="Access Denied")
@@ -2103,7 +2059,7 @@ async def get_ae_alert_summary_endpoint(
 @app.get("/performance/ae-alerts/{report_id}")
 async def get_ae_alerts(report_id: int, db: Session = Depends(get_db), current_user: Any = Depends(auth.get_current_user)):
     """Get all AE alerts for a specific report"""
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     report = db.query(MEAlertSummary).filter_by(report_id=report_id).first()
     if report and str(report.imo_number) not in [str(x) for x in allowed_imos]:
         raise HTTPException(status_code=403, detail="Access Denied")
@@ -2141,7 +2097,7 @@ async def get_ae_dashboard_summary(
     current_user: Any = Depends(auth.get_current_user)  # ADD
 ):
     """AE Dashboard Summary - mirrors ME dashboard structure"""
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)  # ADD
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)  # ADD
     if imo_number and str(imo_number) not in [str(x) for x in allowed_imos]:
         raise HTTPException(status_code=403, detail="Access Denied")
     from sqlalchemy import extract, and_, func, desc
@@ -2288,7 +2244,7 @@ async def get_days_elapsed_overview(db: Session = Depends(get_db),
     current_user: Any = Depends(auth.get_current_user)
 ) -> Dict[str, Any]:
     """Calculates days elapsed since the latest report date for each vessel."""
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     from sqlalchemy import extract
     from datetime import timedelta, date
    
@@ -2621,7 +2577,7 @@ async def get_ae_deviation_history_table(
         VesselGenerator.generator_id == generator_id
     ).first()
     if generator:
-        allowed_imos, _ = get_allowed_vessel_imos(current_user)
+        allowed_imos, _ = await get_allowed_vessel_imos(current_user)
         if str(generator.imo_number) not in [str(x) for x in allowed_imos]:
             raise HTTPException(status_code=403, detail="Access Denied")
     try:
@@ -2749,7 +2705,7 @@ async def get_me_alert_details_api(
         MonthlyReportHeader.report_id == report_id
     ).first()
     if raw_report:
-        allowed_imos, _ = get_allowed_vessel_imos(current_user)
+        allowed_imos, _ = await get_allowed_vessel_imos(current_user)
         if str(raw_report.imo_number) not in [str(x) for x in allowed_imos]:
             raise HTTPException(status_code=403, detail="Access Denied")
     try:
@@ -2910,7 +2866,7 @@ async def get_me_deviation_history_table(
     exactly matching the Summary Table values.
     """
 
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     if str(imo_number) not in [str(x) for x in allowed_imos]:
         raise HTTPException(status_code=403, detail="Access Denied")
     try:
@@ -3068,7 +3024,7 @@ async def get_me_baseline_reference(
     Baseline interpolation API for Main Engine.
     Fetches Shop Trial data to allow the frontend to calculate deviation at any load.
     """
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     if str(imo_number) not in [str(x) for x in allowed_imos]:
         raise HTTPException(status_code=403, detail="Access Denied")
     try:
@@ -3153,13 +3109,24 @@ async def get_me_baseline_reference(
 
 
 @app.get("/api/me-engine/alert-details/{report_id}")
-async def get_me_alert_details_api(report_id: int, db: Session = Depends(get_db)):
+async def get_me_alert_details_api(
+    report_id: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)  # ADD
+):
     """
     Get detailed ME parameters for a specific report.
     UPDATED MAPPING:
     - 'pmax' & 'pcomp': ACTUAL values (ISO Corrected or Observed).
     - 'pmax_dev' & 'pcomp_dev': DEVIATION values from 'me_deviation_history' table.
     """
+    raw_report = db.query(MonthlyReportHeader).filter(
+        MonthlyReportHeader.report_id == report_id
+    ).first()
+    if raw_report:
+        allowed_imos, _ = await get_allowed_vessel_imos(current_user)
+        if str(raw_report.imo_number) not in [str(x) for x in allowed_imos]:
+            raise HTTPException(status_code=403, detail="Access Denied")
     try:
         # 1. Fetch Data
         raw_report = db.query(MonthlyReportHeader).filter(MonthlyReportHeader.report_id == report_id).first()
@@ -3316,7 +3283,7 @@ async def get_ae_report_details(
             raise HTTPException(status_code=404, detail="AE Report not found")
 
         header, data, gen, vessel = result
-        allowed_imos, _ = get_allowed_vessel_imos(current_user)
+        allowed_imos, _ = await get_allowed_vessel_imos(current_user)
         if str(gen.imo_number) not in [str(x) for x in allowed_imos]:
             raise HTTPException(status_code=403, detail="Access Denied")
         # 2. Fetch Baseline Data
@@ -3414,7 +3381,7 @@ async def get_ae_performance_overview(
     2. Last 3 load percentages for history.
     3. Alert Status History for the last 12 months per generator (The Dots).
     """
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     if not allowed_imos:
         return {"running_hours_data": [], "load_history_data":[], "status_history_data":[]}
     from sqlalchemy import func, desc, and_
@@ -3719,7 +3686,7 @@ async def get_shop_trial_url(imo_number: int, db: Session = Depends(get_db), cur
     """
     Retrieves the SAS (Secure) URL for the Shop Trial PDF associated with a vessel.
     """
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     if str(imo_number) not in [str(x) for x in allowed_imos]:
         raise HTTPException(status_code=403, detail="Access Denied")
     try:
@@ -3762,7 +3729,7 @@ async def get_shop_trial_details(imo_number: int, db: Session = Depends(get_db),
     Fetches the raw Shop Trial performance data points for the latest session.
     Maps database columns exactly to frontend keys.
     """
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     if str(imo_number) not in [str(x) for x in allowed_imos]:
         raise HTTPException(status_code=403, detail="Access Denied")
     try:
@@ -3847,7 +3814,7 @@ async def get_shop_trial_details(imo_number: int, db: Session = Depends(get_db),
 # ADMIN DATA SYNC ENDPOINT
 # ============================================
 @app.post("/api/admin/data-sync", tags=["Admin"])
-def admin_data_sync(
+async def admin_data_sync(
     file: UploadFile = File(...),
     engine_type: str = Form(...),
     db: Session = Depends(get_db),
@@ -3856,7 +3823,7 @@ def admin_data_sync(
     """
     Admin endpoint to sync Excel data.
     """
-    _, role = get_allowed_vessel_imos(current_user)
+    _, role = await get_allowed_vessel_imos(current_user)
     if role not in ("ADMIN", "SUPERUSER"):
         raise HTTPException(status_code=403, detail="Admin access required")
     logger.info(f"Admin Data Sync initiated for {engine_type} with file: {file.filename}")
@@ -3933,7 +3900,7 @@ async def upload_baseline_data(
     - ME: Expects Excel (.xlsx) -> Database
     - AE: Expects PDF (.pdf) -> Extracts -> Appends to 'data/ae_shop_trial.xlsx'
     """
-    _, role = get_allowed_vessel_imos(current_user)
+    _, role = await get_allowed_vessel_imos(current_user)
     if role not in ("ADMIN", "SUPERUSER"):
         raise HTTPException(status_code=403, detail="Admin access required")
     logger.info(f"Baseline Upload: Type={engine_type}, IMO={imo_number}, File={file.filename}")
@@ -4068,7 +4035,7 @@ async def get_ae_shop_trial_details(generator_id: int, db: Session = Depends(get
     Fetches the raw Shop Trial performance data points for a specific Generator.
     Maps database columns to frontend keys.
     """
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     generator = db.query(VesselGenerator).filter_by(generator_id=generator_id).first()
     if generator and str(generator.imo_number) not in [str(x) for x in allowed_imos]:
         raise HTTPException(status_code=403, detail="Access Denied")
@@ -4146,7 +4113,7 @@ async def get_ae_shop_trial_url(generator_id: int, db: Session = Depends(get_db)
     """
     Retrieves the SAS (Secure) URL for the AE Shop Trial PDF.
     """
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     generator = db.query(VesselGenerator).filter_by(generator_id=generator_id).first()
     if generator and str(generator.imo_number) not in [str(x) for x in allowed_imos]:
         raise HTTPException(status_code=403, detail="Access Denied")
@@ -4195,7 +4162,7 @@ async def get_raw_report_download_link(
     Fetches the SECURE SAS URL for the ORIGINAL uploaded PDF 
     from the raw_report_url database column.
     """
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     try:
         url_in_db = None
         vessel_name = "Ship"
@@ -4241,7 +4208,7 @@ async def get_batch_raw_download_links(
     current_user: Any = Depends(auth.get_current_user)
 ):
     """Fetches multiple secure SAS URLs at once."""
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     results = []
     model = MonthlyReportHeader if request.engine_type == 'mainEngine' else GeneratorMonthlyReportHeader
     
@@ -4269,7 +4236,7 @@ async def download_reports_zip(
     current_user: Any = Depends(auth.get_current_user)
 ):
     # 1. Determine the Model (Expanded to support all 3 types)
-    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    allowed_imos, _ = await get_allowed_vessel_imos(current_user)
     if request.engine_type == 'mainEngine':
         model = MonthlyReportHeader
     elif request.engine_type == 'auxiliaryEngine':
@@ -4334,22 +4301,21 @@ async def download_reports_zip(
 
 @app.get("/api/v1/user/vessels", tags=["User"])
 async def get_user_assigned_vessels(
-    current_user: Any = Depends(auth.get_current_user)
+    current_user: Any = Depends(auth.get_current_user),
+    control_db: AsyncSession = Depends(get_control_db)  # inject properly as async dependency
 ):
     from app.model.control.vessel import Vessel as ControlVessel
-    from app.core.database_control import get_control_db
+    from sqlalchemy import select
 
-    allowed_imos, role = get_allowed_vessel_imos(current_user)
+    allowed_imos, role = await get_allowed_vessel_imos(current_user)
 
-    control_db = next(get_control_db())
-    try:
-        vessels = control_db.query(ControlVessel).filter(
-            ControlVessel.imo.in_(allowed_imos)
-        ).all()
-        return [
-            {"imo": v.imo, "name": v.name}
-            for v in vessels
-        ]
-    finally:
-        control_db.close()
+    result = await control_db.execute(
+        select(ControlVessel).where(ControlVessel.imo.in_(allowed_imos))
+    )
+    vessels = result.scalars().all()
+
+    return [
+        {"imo": v.imo, "name": v.name}
+        for v in vessels
+    ]
 

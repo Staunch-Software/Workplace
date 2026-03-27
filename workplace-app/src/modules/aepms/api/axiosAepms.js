@@ -1,6 +1,5 @@
 // lib/api.js - Updated API Client with Report-based Filtering and URL Parameter Cleansing
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8005';
-
 class ApiService {
   constructor() {
     this.baseURL = API_BASE_URL;
