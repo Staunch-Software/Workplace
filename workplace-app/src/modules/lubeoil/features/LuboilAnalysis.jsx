@@ -4627,7 +4627,11 @@ const LuboilAnalysis = () => {
                                       month: "short",
                                       year: "2-digit",
                                     });
-
+                                  const limitDays = interval * 30;
+                                  const daysElapsed = Math.ceil(
+                                      (today - sampleDate) / (1000 * 60 * 60 * 24)
+                                  );
+                                  const daysOverdue = daysElapsed - limitDays;
                                   const hasRemarks =
                                     cell.officer_remarks || cell.office_remarks;
                                   const isNormal =
@@ -4652,10 +4656,15 @@ const LuboilAnalysis = () => {
                                     //     transition: "background 0.2s",
                                     //   }}
                                       style={{
-                                        ...cellBaseStyle,
-                                        cursor: "pointer", // Always show pointer
-                                        transition: "background 0.2s",
-                                      }}
+    ...cellBaseStyle,
+    cursor: "pointer",
+    transition: "background 0.2s",
+    backgroundColor: daysOverdue > 60
+        ? "#fee2e2"  // red
+        : daysOverdue > 30
+        ? "#fff7ed"  // amber
+        : "#ffffff",  // plain white for normal
+}}
                                       className={
                                         isNormal ? "" : "hover:bg-slate-50"
                                       }

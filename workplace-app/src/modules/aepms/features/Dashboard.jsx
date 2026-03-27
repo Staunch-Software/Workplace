@@ -66,11 +66,10 @@ const AeVesselRow = ({ vessel, onViewPdf, onViewData }) => {
 
                             <div className="flex-center-gap">
                                 <button onClick={() => onViewData(gen)} className="view-button" title="View Data">
-                                    <Eye size={15} strokeWidth={2.0} />
+                                    <Eye size={18} strokeWidth={2.0} /> {/* Consistent size */}
                                 </button>
-
                                 <button onClick={() => onViewPdf(gen)} className="view-button" title="View PDF">
-                                    <FileText size={15} strokeWidth={2.0} />
+                                    <FileText size={18} strokeWidth={2.0} /> {/* Consistent size */}
                                 </button>
                             </div>
                         </div>
@@ -225,33 +224,34 @@ export default function Dashboard() {
 
     useEffect(() => {
         const loadData = async () => {
-            try {
-                // 1. Fetch Fleet and Sort Alphabetically
-                const fleetResponse = await axiosAepms.getFleetConfigurationSummary();
-                const sortedFleet = (fleetResponse.fleet || []).sort((a, b) =>
-                    formatVesselName(a.name).localeCompare(formatVesselName(b.name))
-                );
-                setFleet(sortedFleet);
+    try {
+        // Single API call - gets everything
+        const configResponse = await axiosAepms.getFleetConfigurationSummary();
 
-                // 2. Fetch Config Summary and Sort Unconfigured lists
-                const configResponse = await axiosAepms.getFleetConfigurationSummary();
-                if (configResponse.me_unconfigured_list) {
-                    configResponse.me_unconfigured_list.sort((a, b) =>
-                        formatVesselName(a.name).localeCompare(formatVesselName(b.name))
-                    );
-                }
-                if (configResponse.ae_unconfigured_list) {
-                    configResponse.ae_unconfigured_list.sort((a, b) =>
-                        formatVesselName(a.name).localeCompare(formatVesselName(b.name))
-                    );
-                }
-                setConfigSummary(configResponse);
-            } catch (error) {
-                console.error("Failed to load dashboard data:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+        // 1. Set full fleet from backend (all 9 vessels from control DB)
+        const sortedFleet = (configResponse.fleet || []).sort((a, b) =>
+            formatVesselName(a.name).localeCompare(formatVesselName(b.name))
+        );
+        setFleet(sortedFleet);
+
+        // 2. Sort unconfigured lists
+        if (configResponse.me_unconfigured_list) {
+            configResponse.me_unconfigured_list.sort((a, b) =>
+                formatVesselName(a.name).localeCompare(formatVesselName(b.name))
+            );
+        }
+        if (configResponse.ae_unconfigured_list) {
+            configResponse.ae_unconfigured_list.sort((a, b) =>
+                formatVesselName(a.name).localeCompare(formatVesselName(b.name))
+            );
+        }
+        setConfigSummary(configResponse);
+    } catch (error) {
+        console.error("Failed to load dashboard data:", error);
+    } finally {
+        setLoading(false);
+    }
+};
         loadData();
     }, []);
 
@@ -267,6 +267,14 @@ export default function Dashboard() {
         const filtered = fleet.filter(s => !unconfiguredImos.includes(String(s.imo || s.imo_number)));
         return filtered.sort((a, b) => formatVesselName(a.name).localeCompare(formatVesselName(b.name)));
     }, [fleet, meUnconfiguredList]);
+
+    const aeConfiguredList = useMemo(() => {
+        if (!fleet.length) return [];
+        const unconfiguredImos = aeUnconfiguredList.map(s => String(s.imo));
+        return fleet
+            .filter(s => !unconfiguredImos.includes(String(s.imo || s.imo_number)))
+            .sort((a, b) => formatVesselName(a.name).localeCompare(formatVesselName(b.name)));
+    }, [fleet, aeUnconfiguredList]);
 
     useEffect(() => {
         if (selectedAeUploadShip) {
@@ -336,16 +344,31 @@ export default function Dashboard() {
 
     const handleViewShopTrialData = async (vessel) => {
         try {
-            const imo = vessel.imo || vessel.imo_number;
+            // Ensure we have a valid IMO
+            const imo = vessel.imo || vessel.imo_number || vessel.id; 
+            console.log("Fetching ME Data for IMO:", imo); // Debugging
+
             const response = await axiosAepms.getShopTrialDataValues(imo);
-            if (response && response.data && response.data.length > 0) {
+            
+            // Workplace APIs often wrap data differently. 
+            // We check both response and response.data
+            const actualData = response?.data || response;
+
+            if (actualData && Array.isArray(actualData) && actualData.length > 0) {
                 setModalType('ME');
-                setModalData(response);
+                setModalData({
+                    vessel_name: vessel.name,
+                    engine_no: "Main Engine",
+                    data: actualData // Pass the array to the modal
+                });
                 setIsModalOpen(true);
             } else {
-                alert("No data points found in Shop Trial for this vessel.");
+                alert("No data points found for this vessel in the database.");
             }
-        } catch (error) { alert("Failed to load Shop Trial data values."); }
+        } catch (error) {
+            console.error("Fetch Error:", error);
+            alert("Failed to load Shop Trial data values.");
+        }
     };
 
     const handleAeUploadClick = () => {
@@ -379,16 +402,25 @@ export default function Dashboard() {
 
     const handleViewAEShopTrialData = async (gen) => {
         try {
+            console.log("Fetching AE Data for Gen ID:", gen.generator_id);
             const response = await axiosAepms.getAEShopTrialDataValues(gen.generator_id);
-            if (response && response.data && response.data.length > 0) {
+            
+            const actualData = response?.data || response;
+
+            if (actualData && Array.isArray(actualData) && actualData.length > 0) {
                 setModalType('AE');
-                setModalData(response);
+                setModalData({
+                    vessel_name: gen.vessel_name || "Vessel",
+                    engine_no: gen.designation,
+                    data: actualData
+                });
                 setIsModalOpen(true);
             } else {
-                alert(`No baseline data found for ${gen.designation}. Please upload shop trial.`);
+                alert(`No baseline data found for ${gen.designation}.`);
             }
         } catch (error) {
-            alert(`Failed to load data for ${gen.designation}: ` + error.message);
+            console.error("Fetch Error:", error);
+            alert(`Failed to load data for ${gen.designation}`);
         }
     };
 
@@ -450,14 +482,11 @@ export default function Dashboard() {
                             <option value="" disabled>
                                 Select Vessel to Upload PDF...
                             </option>
-                            {fleet.map(ship => {
-                                const isConfigured = !meUnconfiguredList.find(u => u.id === ship.id);
-                                return (
-                                    <option key={ship.id} value={ship.imo || ship.imo_number}>
-                                        {formatVesselName(ship.name)} {isConfigured ? "(Update PDF)" : "(New Setup)"}
-                                    </option>
-                                );
-                            })}
+                            {meConfiguredList.map(ship => (
+                                <option key={ship.imo} value={ship.imo}>
+                                    {formatVesselName(ship.name)} (Update PDF)
+                                </option>
+                            ))}
                         </select>
                     </div>
 
@@ -479,15 +508,13 @@ export default function Dashboard() {
                                         <td className="custom-cell"><div className="vessel-icon"><Ship size={17} /></div>{formatVesselName(vessel.name)}</td>
                                         <td className="vessel-imo">{vessel.imo || vessel.imo_number}</td>
                                         <td><span className="custom-badge"><CheckCircle size={13} /> Configured</span></td>
-                                        <td className="text-right">
-                                            <div className="flex items-center justify-evenly gap-2">
+                                        <td className="text-center py-4"> 
+                                            <div className="flex items-center justify-center gap-4"> {/* Increased gap to 4 */}
                                                 <button onClick={() => handleViewShopTrialData(vessel)} className="view-button" title="View Shop Trial Data">
                                                     <Eye size={18} strokeWidth={2.0} />
                                                 </button>
                                                 <button onClick={() => handleViewShopTrialPDF(vessel)} className="view-button" title="View Shop Trial PDF">
-                                                    <FileText size={18} strokeWidth={2.0
-
-                                                    } />
+                                                    <FileText size={18} strokeWidth={2.0} />
                                                 </button>
                                             </div>
                                         </td>
@@ -532,9 +559,10 @@ export default function Dashboard() {
                                 <option value="" disabled>
                                     Select Vessel...
                                 </option>
-                                {fleet.map((ship) => (
-                                    <option key={ship.id} value={ship.imo || ship.imo_number}>
-                                        {formatVesselName(ship.name)}
+                                
+                                {aeConfiguredList.map(ship => (
+                                    <option key={ship.imo} value={ship.imo}>
+                                        {formatVesselName(ship.name)} (Update PDF)
                                     </option>
                                 ))}
                             </select>
@@ -656,7 +684,7 @@ export default function Dashboard() {
             <ShopTrialModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} data={modalData} type={modalType} />
 
             {/* Now the padded content wrapper */}
-            <div style={{}}>
+            <div className="dashboard-page-wrapper">
                 <div className="dashboard-container-enhanced">
                     <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".pdf" onChange={handleFileChange} />
                     <input type="file" ref={aeFileInputRef} style={{ display: 'none' }} accept=".pdf" onChange={handleAeFileChange} />

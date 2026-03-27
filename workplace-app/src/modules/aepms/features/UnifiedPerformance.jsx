@@ -66,7 +66,7 @@ const SUMMARY_TABLE_SCHEMA = {
 // Add this RIGHT AFTER the imports and BEFORE const styles
 // --- NEW COMPONENT: Multi-Select Dropdown ---
 // --- NEW COMPONENT: Multi-Select Dropdown (Side Panel Layout) ---
-const MultiSelectDropdown = ({ options, selectedIds, onChange, label }) => {
+const MultiSelectDropdown = ({ options, selectedIds, onChange, label, isLoading = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeYear, setActiveYear] = useState(null);
   const containerRef = React.useRef(null);
@@ -129,7 +129,7 @@ const MultiSelectDropdown = ({ options, selectedIds, onChange, label }) => {
       {/* --- TRIGGER BUTTON --- */}
       <div
         onClick={() => {
-          if (!options.length) return;
+          if (!options.length || isLoading) return;
           setIsOpen(!isOpen);
         }}
         style={{
@@ -160,11 +160,13 @@ const MultiSelectDropdown = ({ options, selectedIds, onChange, label }) => {
             marginRight: "8px", // Gap before the arrow
           }}
         >
-          {options.length === 0
+          {isLoading && options.length === 0
             ? "Loading..."
+            : !isLoading && options.length === 0
+            ? "No reports available"
             : selectedIds.length === 0
-              ? label
-              : `${selectedIds.length} Selected`}
+            ? label
+            : `${selectedIds.length} Selected`}
         </span>
         {/* CHANGED: Used standard Chevron Down (▼) and applied rotation class */}
         {/* UPDATED: Changed to Right Arrow (▶) with horizontal rotation */}
@@ -548,19 +550,35 @@ const SingleSelectDropdown = ({
                     Diagnosis & Remedy
                   </div>
                   <div
-                    style={{
-                      backgroundColor: "white",
-                      padding: "12px",
-                      borderRadius: "8px",
-                      fontSize: "0.9rem",
-                      color: "#0f172a",
-                      fontWeight: "500",
-                      lineHeight: "1.5",
-                      border: "1px solid rgba(0,0,0,0.05)",
-                    }}
-                  >
-                    {item.remedy}
-                  </div>
+  style={{
+    backgroundColor: "white",
+    padding: "12px",
+    borderRadius: "8px",
+    fontSize: "0.9rem",
+    color: "#0f172a",
+    fontWeight: "500",
+    lineHeight: "1.5",
+    border: "1px solid rgba(0,0,0,0.05)",
+  }}
+>
+  <ul style={{
+    margin: 0,
+    paddingLeft: "16px",
+    fontSize: "0.9rem",
+    color: "#0f172a",
+    fontWeight: "500",
+    lineHeight: "1.7",
+  }}>
+    {item.remedy
+      .split('.')
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+      .map((point, i) => (
+        <li key={i}>{point}.</li>
+      ))
+    }
+  </ul>
+</div>
                 </div>
               </div>
             </div>
@@ -694,8 +712,6 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
   };
 
   // ─── Cylinder imbalance helper (reads from cylinder_readings) ─────────────
-  // Fires amber when any cyl deviates >±3 from ISO avg
-  // Fires critical when any cyl deviates >±5 from ISO avg
   const checkCylinderImbalance = (cylKey, isoAvg) => {
     if (!report.cylinder_readings) return null;
     const amberCyls = [];
@@ -714,10 +730,6 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
   };
 
   // ─── NEW: Cylinder vs Shop Trial helper ───────────────────────────────────
-  // Compares each cylinder's actual value against the interpolated shop trial
-  // baseline value at current load. Amber >±3, Red >±5 (same thresholds).
-  // cylKey     : key inside cylinder_readings (e.g. "pmax", "pcomp", "fuel_index", "exhaust_temp")
-  // shopTrialVal: interpolated baseline value at current load for that parameter
   const checkCylinderVsShopTrial = (cylKey, shopTrialVal) => {
     if (!report.cylinder_readings || shopTrialVal == null) return null;
     const amberCyls = [];
@@ -734,6 +746,34 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
       red: redCyls.length > 0 ? redCyls.join(", ") : null,
     };
   };
+
+  // ==========================================================================
+  // SECTION 9 — SFOC (ME only, UPPER SIDE ONLY)
+  // ==========================================================================
+  if (isME) {
+    const sfocAct = Number(report.SFOC);
+    const sfocBase = getBase("SFOC");
+    const sfocPct = pctDev(sfocAct, sfocBase);
+
+    // Direction Rule: Only flag when SFOC is HIGH (>= 5%)
+    if (sfocPct !== null && sfocPct >= 5) {
+      const isRed = sfocPct > 10;
+      concerns.push({
+        parameter: "SFOC",
+        severity: isRed ? "critical" : "warning",
+        comparedAgainst: "Shop Trial",
+        finding: `SFOC increased by +${sfocPct.toFixed(1)}% from baseline. Baseline: ${sfocBase?.toFixed(1)} g/kWh, Actual: ${sfocAct.toFixed(1)} g/kWh.`,
+        causes:[
+          "Poor fuel oil quality (low calorific value)",
+          "Worn or leaking fuel injectors",
+          "Air system fouling (TC, air cooler, filter)",
+        ],
+        remedy: isRed
+          ? "Urgently check fuel oil specifications. Pressure test all injectors. Perform TC water washing. Review injection timing."
+          : "Check fuel oil calorific value. Inspect injectors. Perform TC water washing. Monitor trends.",
+      });
+    }
+  }
 
   // ==========================================================================
   // SECTION 1 — ENGINE SPEED (ME only, Group A: ±3% amber / ±5% red)
@@ -762,28 +802,33 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
     }
   }
 
-  // ==========================================================================
-  // SECTION 2 — TURBOCHARGER SPEED (ME only, Absolute: ±500 RPM amber / ±1000 RPM red)
-  // ==========================================================================
+  // Pre-calculate Turbospeed delta for cross-reference in Scavenge Air
+  let turboDelta = null;
   if (isME) {
     const turboAct = Number(report.Turbospeed);
     const turboBase = getBase("Turbospeed");
-    const turboDelta = absDelta(turboAct, turboBase);
-
+    turboDelta = absDelta(turboAct, turboBase);
+    
+    // ==========================================================================
+    // SECTION 2 — TURBOCHARGER SPEED (ME only, Absolute: ±500 RPM amber / ±1000 RPM red)
+    // ==========================================================================
     if (turboDelta !== null && Math.abs(turboDelta) >= 500) {
       const isRed = Math.abs(turboDelta) >= 1000;
       concerns.push({
         parameter: "Turbocharger Speed",
         severity: isRed ? "critical" : "warning",
-        comparedAgainst: "Shop Trial ",
+        comparedAgainst: "Shop Trial",
         finding: `TC speed deviated ${turboDelta > 0 ? "+" : ""}${turboDelta.toFixed(0)} RPM from baseline. Baseline: ${turboBase?.toFixed(0)}, Actual: ${turboAct.toFixed(0)}.`,
-        causes: [
-          "Fouling of TC turbine or compressor blades",
-          "Clogged or damaged nozzle ring",
-          "TC bearing wear or deterioration",
-          "Air filter blockage reducing airflow",
-          "Exhaust gas leakage before TC",
-        ],
+        causes: turboDelta < 0
+          ?[
+              "TC compressor / turbine blade fouling",
+              "Clogged nozzle ring",
+              "Air filter blockage",
+            ]
+          :[
+              "Excessive exhaust energy (engine overload)",
+              "TC nozzle ring damage",
+            ],
         remedy:
           "Perform TC water washing (air and exhaust sides). Inspect nozzle ring for fouling or damage. Check TC bearings and air filter condition.",
       });
@@ -791,29 +836,25 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
   }
 
   // ==========================================================================
-  // SECTION 3 — PCOMP (Group A: ±3% amber / ±5% red + Cylinder imbalance)
+  // SECTION 3 — PCOMP (LOWER SIDE ONLY: <= -3% amber / <= -5% red)
   // ==========================================================================
   const pcompKey = isME ? "Pcomp" : "Pcomp";
   const pcompAct = Number(report.Pcomp);
   const pcompBase = getBase("Pcomp");
   const pcompPct = pctDev(pcompAct, pcompBase);
 
-  // 3a. Average deviation vs baseline
-  if (pcompPct !== null && Math.abs(pcompPct) >= 3) {
-    const isRed = Math.abs(pcompPct) > 5;
+  // 3a. Average deviation vs baseline (Direction Rule: Low only)
+  if (pcompPct !== null && pcompPct <= -3) {
+    const isRed = pcompPct <= -5;
     concerns.push({
       parameter: "Pcomp (Average)",
       severity: isRed ? "critical" : "warning",
       comparedAgainst: "Shop Trial",
-      finding: `Average Pcomp deviated ${pcompPct > 0 ? "+" : ""}${pcompPct.toFixed(1)}% from baseline. Baseline: ${pcompBase?.toFixed(1)} bar, Actual: ${pcompAct.toFixed(1)} bar.`,
-      causes: [
-        "Blow-by via leaking piston rings",
-        "Burnt or eroded piston crown",
+      finding: `Average Pcomp dropped by ${pcompPct.toFixed(1)}% from baseline. Baseline: ${pcompBase?.toFixed(1)} bar, Actual: ${pcompAct.toFixed(1)} bar.`,
+      causes:[
+        "Piston ring blow-by",
+        "Leaking exhaust valve",
         "Worn cylinder liner",
-        "Leaking or stuck exhaust valve",
-        "Poor scavenge air pressure",
-        isME ? "HCU malfunction (ME engines)" : "Fuel timing issue",
-        "Piston rod stuffing box leakage",
       ],
       remedy: isME
         ? "Check exhaust valve timing and damper arrangement. Inspect piston rings and liner. Overhaul stuffing box if air emitted from check funnel."
@@ -821,7 +862,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
     });
   }
 
-  // 3b. Cylinder imbalance vs ISO average (existing check — unchanged)
+  // 3b. Cylinder imbalance vs ISO average
   if (report.cylinder_readings) {
     const pcompImbal = checkCylinderImbalance("pcomp", pcompAct);
     if (pcompImbal?.red) {
@@ -830,10 +871,9 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "critical",
         comparedAgainst: "ISO Average (Report Cylinders)",
         finding: `${pcompImbal.red} deviate >±5 bar from ISO average Pcomp (${pcompAct.toFixed(1)} bar). Engine is severely imbalanced.`,
-        causes: [
+        causes:[
           "Leaking piston rings on affected cylinders",
           "Burnt piston crown on affected cylinders",
-          "Worn cylinder liner on affected units",
           "Leaking exhaust valve on affected cylinders",
         ],
         remedy:
@@ -845,7 +885,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "warning",
         comparedAgainst: "ISO Average (Report Cylinders)",
         finding: `${pcompImbal.amber} deviate >±3 bar from ISO average Pcomp (${pcompAct.toFixed(1)} bar). Monitor closely for developing imbalance.`,
-        causes: [
+        causes:[
           "Early-stage piston ring wear",
           "Developing exhaust valve leak",
           "Minor liner wear on affected cylinders",
@@ -855,8 +895,8 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
       });
     }
 
-    // 3c. NEW — Cylinder vs Shop Trial for Pcomp
-    const pcompShopVal = pcompBase; // interpolated shop trial value at current load
+    // 3c. Cylinder vs Shop Trial for Pcomp
+    const pcompShopVal = pcompBase;
     const pcompShopImbal = checkCylinderVsShopTrial("pcomp", pcompShopVal);
     if (pcompShopImbal?.red) {
       concerns.push({
@@ -864,10 +904,9 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "critical",
         comparedAgainst: "Shop Trial (Per Cylinder)",
         finding: `${pcompShopImbal.red} deviate >±5 bar from Shop Trial Pcomp (${pcompShopVal?.toFixed(1)} bar). Individual cylinder performance significantly below trial condition.`,
-        causes: [
+        causes:[
           "Severe piston ring blow-by on affected cylinders",
           "Burnt or eroded piston crown on affected cylinders",
-          "Significant liner wear on affected units",
           "Leaking exhaust valve on affected cylinders",
         ],
         remedy:
@@ -879,7 +918,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "warning",
         comparedAgainst: "Shop Trial (Per Cylinder)",
         finding: `${pcompShopImbal.amber} deviate >±3 bar from Shop Trial Pcomp (${pcompShopVal?.toFixed(1)} bar). Developing deviation from original trial condition.`,
-        causes: [
+        causes:[
           "Early-stage piston ring wear on affected cylinders",
           "Minor liner wear developing",
         ],
@@ -890,8 +929,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
   }
 
   // ==========================================================================
-  // SECTION 4 — PMAX (Group A: ±3% amber / ±5% red + Cylinder imbalance +
-  //              Injection diagnosis: High/Low/Both with Pcomp cross-check)
+  // SECTION 4 — PMAX
   // ==========================================================================
   const pmaxAct = Number(report.Pmax);
   const pmaxBase = getBase("Pmax");
@@ -906,41 +944,39 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
     const pcompAlsoLow = pcompPct !== null && pcompPct < -3;
 
     let finding = "";
-    let causes = [];
+    let causes =[];
     let remedy = "";
 
     if (pmaxPct > 3 && pcompNormal) {
       finding = `Pmax is ${pmaxPct.toFixed(1)}% above baseline while Pcomp is normal. Indicates early injection timing. Baseline: ${pmaxBase?.toFixed(1)} bar, Actual: ${pmaxAct.toFixed(1)} bar.`;
-      causes = [
-        "Too early fuel injection timing",
-        "Incorrect VIT-index setting",
+      causes =[
+        "Early fuel injection timing / VIT index error",
         "HCU timing fault (ME engines)",
+        "Incorrect fuel cam position",
       ];
       remedy =
         "Check VIT-index calibration. If in order, reduce the fuel pump lead.";
     } else if (pmaxPct < -3 && pcompNormal) {
       finding = `Pmax is ${Math.abs(pmaxPct).toFixed(1)}% below baseline while Pcomp is normal. Indicates retarded injection timing. Baseline: ${pmaxBase?.toFixed(1)} bar, Actual: ${pmaxAct.toFixed(1)} bar.`;
-      causes = [
-        "Delayed fuel injection timing",
+      causes =[
+        "Retarded fuel injection timing",
         "Poor fuel ignition quality (low CCAI)",
-        "Leaking or worn injector nozzles",
-        "Low fuel pressure at engine",
+        "Worn / leaking injector nozzle",
       ];
       remedy =
         "Check fuel pressure after filter. Check VIT-index. Increase fuel pump lead if fuel quality is poor. Pressure test fuel valves.";
     } else if (pmaxPct < -3 && pcompAlsoLow) {
-      finding = `Both Pmax (${pmaxPct.toFixed(1)}%) and Pcomp (${pcompPct?.toFixed(1)}%) are below baseline. Indicates significant mechanical or thermal loss.`;
-      causes = [
+      finding = `Both Pmax (${pmaxPct.toFixed(1)}%) and Pcomp (${pcompPct?.toFixed(1)}%) are below baseline. Indicates significant mechanical compression loss.`;
+      causes =[
         "Piston ring blow-by",
         "Leaking exhaust valve",
-        "Increased combustion space (burnt piston crown)",
-        "Fouling of exhaust or air system",
+        "Worn cylinder liner",
       ];
       remedy =
         "Inspect piston rings and exhaust valve seats. Check for system fouling. Perform compression test.";
     } else {
       finding = `Pmax deviated ${pmaxPct > 0 ? "+" : ""}${pmaxPct.toFixed(1)}% from baseline. Baseline: ${pmaxBase?.toFixed(1)} bar, Actual: ${pmaxAct.toFixed(1)} bar.`;
-      causes = [
+      causes =[
         "Fuel injection equipment wear",
         "Injection timing drift",
         "VIT / HCU malfunction",
@@ -959,7 +995,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
     });
   }
 
-  // 4b. Cylinder imbalance vs ISO average (existing check — unchanged)
+  // 4b. Cylinder imbalance vs ISO average
   if (report.cylinder_readings) {
     const pmaxImbal = checkCylinderImbalance("pmax", pmaxAct);
     if (pmaxImbal?.red) {
@@ -968,10 +1004,9 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "critical",
         comparedAgainst: "ISO Average (Report Cylinders)",
         finding: `${pmaxImbal.red} deviate >±5 bar from ISO average Pmax (${pmaxAct.toFixed(1)} bar). Injection severely imbalanced.`,
-        causes: [
+        causes:[
           "Fuel injection timing error on affected cylinders",
-          "Worn fuel pumps or fuel valves on affected units",
-          "Malfunction of HCU or tacho system",
+          "Worn fuel pumps or valves on affected units",
           "Blocked or leaking fuel nozzle",
         ],
         remedy:
@@ -983,7 +1018,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "warning",
         comparedAgainst: "ISO Average (Report Cylinders)",
         finding: `${pmaxImbal.amber} deviate >±3 bar from ISO average Pmax (${pmaxAct.toFixed(1)} bar). Monitor for developing injection imbalance.`,
-        causes: [
+        causes:[
           "Early-stage fuel valve wear on affected cylinders",
           "Minor injection timing drift",
         ],
@@ -992,7 +1027,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
       });
     }
 
-    // 4c. NEW — Cylinder vs Shop Trial for Pmax
+    // 4c. Cylinder vs Shop Trial for Pmax
     const pmaxShopVal = pmaxBase;
     const pmaxShopImbal = checkCylinderVsShopTrial("pmax", pmaxShopVal);
     if (pmaxShopImbal?.red) {
@@ -1001,11 +1036,10 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "critical",
         comparedAgainst: "Shop Trial (Per Cylinder)",
         finding: `${pmaxShopImbal.red} deviate >±5 bar from Shop Trial Pmax (${pmaxShopVal?.toFixed(1)} bar). Injection performance significantly below trial condition.`,
-        causes: [
+        causes:[
           "Worn or fouled fuel injectors on affected cylinders",
           "Significant injection timing drift on affected units",
           "Worn fuel pump elements on affected cylinders",
-          "HCU or tacho fault on affected units",
         ],
         remedy:
           "Pressure test fuel valves on affected cylinders. Compare with ISO average imbalance to determine if engine-wide or cylinder-specific issue.",
@@ -1016,7 +1050,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "warning",
         comparedAgainst: "Shop Trial (Per Cylinder)",
         finding: `${pmaxShopImbal.amber} deviate >±3 bar from Shop Trial Pmax (${pmaxShopVal?.toFixed(1)} bar). Developing injection deviation from original trial condition.`,
-        causes: [
+        causes:[
           "Early-stage fuel valve wear on affected cylinders",
           "Minor injection timing drift developing",
         ],
@@ -1027,7 +1061,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
   }
 
   // ==========================================================================
-  // SECTION 5 — PRESSURE RISE (Pmax − Pcomp) — kept as bonus engineering check
+  // SECTION 5 — PRESSURE RISE (Pmax − Pcomp)
   // ==========================================================================
   if (pmaxAct && pcompAct) {
     const pRise = pmaxAct - pcompAct;
@@ -1058,46 +1092,49 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
   }
 
   // ==========================================================================
-  // SECTION 6 — SCAVENGE AIR PRESSURE
-  // ME key: ScavAir  (Group B: ±5% amber / ±10% red)
-  // AE key: ScavAirPressure  (Group B: ±5% amber / ±10% red)
+  // SECTION 6 — SCAVENGE AIR PRESSURE (LOWER SIDE ONLY)
   // ==========================================================================
   const scavKey = isME ? "ScavAir" : "ScavAirPressure";
   const scavAct = Number(isME ? report.ScavAir : report.ScavAirPressure);
   const scavBase = getBase(scavKey);
   const scavPct = pctDev(scavAct, scavBase);
 
-  if (scavPct !== null && Math.abs(scavPct) >= 5) {
-    const isRed = Math.abs(scavPct) > 10;
+  // Direction Rule: Only flag when Scavenge Air is LOW (<= -5%)
+  if (scavPct !== null && scavPct <= -5) {
+    const isRed = scavPct <= -10;
+    const tcLow = turboDelta !== null && turboDelta <= -500;
+    
     concerns.push({
       parameter: "Scavenge Air Pressure",
       severity: isRed ? "critical" : "warning",
       comparedAgainst: "Shop Trial",
-      finding: `Scavenge air pressure deviated ${scavPct > 0 ? "+" : ""}${scavPct.toFixed(1)}% from baseline. Baseline: ${scavBase?.toFixed(3)}, Actual: ${scavAct.toFixed(3)} ${isME ? "kg/cm²" : "bar"}.`,
-      causes: [
-        "TC underperformance due to fouling",
-        "Fouled or blocked air cooler (air side)",
-        "Blocked TC air filter elements",
-        "Air leakage in scavenge system",
-        "TC nozzle ring blockage",
-      ],
+      finding: `Scavenge air pressure dropped by ${scavPct.toFixed(1)}% from baseline. Baseline: ${scavBase?.toFixed(3)}, Actual: ${scavAct.toFixed(3)} ${isME ? "kg/cm²" : "bar"}.`,
+      causes: tcLow 
+        ?[
+            "TC compressor / turbine blade fouling",
+            "Fouled air cooler air side",
+            "Air filter blockage",
+          ]
+        :[
+            "Fouled air cooler (air side)",
+            "Air leakage in scavenge manifold",
+            "Air filter blockage",
+          ],
       remedy:
         "Perform TC water washing. Clean air cooler air side. Check and clean TC air filter. Inspect scavenge system for leaks.",
     });
   }
 
-  // ME only: Scavenge vs Exhaust receiver logic check (bonus check)
+  // ME only: Scavenge vs Exhaust receiver logic check
   if (isME) {
     const exhRec = Number(report.exhaust_gas_receiver_pressure_kg_cm2);
     if (scavAct && exhRec && scavAct <= exhRec) {
       concerns.push({
         parameter: "Scavenge vs Exhaust Logic",
         severity: "critical",
-        comparedAgainst:
-          "Fixed Engineering Limit (Scav must exceed Exh Receiver)",
-        finding:
-          "Scavenge pressure is NOT greater than exhaust receiver pressure. This relationship must always hold.",
-        causes: [
+        comparedAgainst: "Fixed Engineering Limit (Scav must exceed Exh Receiver)",
+        finding: "Scavenge pressure is NOT greater than exhaust receiver pressure. This relationship must always hold.",
+        causes:[
           "Incorrect measurement or manometer failure",
           "Severe TC nozzle ring fouling",
           "Exhaust system obstruction",
@@ -1110,25 +1147,11 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
 
   // ==========================================================================
   // SECTION 7 — EXHAUST TEMPERATURES
-  // All three keys: Exh_T/C_inlet, Exh_T/C_outlet, Exh_Cylinder_outlet
-  // Rule: ±40°C amber / ±60°C red (absolute delta — same for ME and AE)
   // ==========================================================================
-  const exhaustParams = [
-    {
-      key: "Exh_T/C_inlet",
-      label: "Exh. T/C Inlet Temperature",
-      unit: "°C",
-    },
-    {
-      key: "Exh_T/C_outlet",
-      label: "Exh. T/C Outlet Temperature",
-      unit: "°C",
-    },
-    {
-      key: "Exh_Cylinder_outlet",
-      label: "Exh. Cylinder Outlet Temperature",
-      unit: "°C",
-    },
+  const exhaustParams =[
+    { key: "Exh_T/C_inlet", label: "Exh. T/C Inlet Temperature", unit: "°C" },
+    { key: "Exh_T/C_outlet", label: "Exh. T/C Outlet Temperature", unit: "°C" },
+    { key: "Exh_Cylinder_outlet", label: "Exh. Cylinder Outlet Temperature", unit: "°C" },
   ];
 
   exhaustParams.forEach(({ key, label }) => {
@@ -1137,30 +1160,30 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
     const delta = absDelta(exhAct, exhBase);
 
     if (delta !== null && Math.abs(delta) >= 40) {
-      const isRed = Math.abs(delta) > 60;
+      const isRed = Math.abs(delta) >= 60;
+      
+      let causes =[];
+      if (key === "Exh_T/C_inlet") {
+        causes = ["Individual cylinder combustion problem", "TC turbine fouling reducing airflow", "Poor fuel quality"];
+      } else if (key === "Exh_T/C_outlet") {
+        causes =["TC turbine efficiency loss (fouling)", "Fouled air cooler reducing charge air cooling"];
+      } else { // Exh_Cylinder_outlet
+        causes =["Worn / stuck fuel injector", "Incorrect injection timing", "Exhaust valve leakage"];
+      }
+
       concerns.push({
         parameter: label,
         severity: isRed ? "critical" : "warning",
-        comparedAgainst: "Shop Trial ",
-        finding: `${label} increased by ${delta > 0 ? "+" : ""}${delta.toFixed(1)}°C from baseline. Baseline: ${exhBase?.toFixed(1)}°C, Actual: ${exhAct.toFixed(1)}°C.`,
-        causes: [
-          "Worn or leaking fuel pumps / fuel valves",
-          "Fouled air cooler (air or water side)",
-          "TC turbine side fouling reducing airflow",
-          "Poor fuel quality affecting combustion",
-          key === "Exh_T/C_inlet"
-            ? "Increased exhaust gas temperature from cylinders"
-            : key === "Exh_T/C_outlet"
-              ? "TC turbine efficiency loss"
-              : "Individual cylinder combustion problem",
-        ],
+        comparedAgainst: "Shop Trial",
+        finding: `${label} deviated by ${delta > 0 ? "+" : ""}${delta.toFixed(1)}°C from baseline. Baseline: ${exhBase?.toFixed(1)}°C, Actual: ${exhAct.toFixed(1)}°C.`,
+        causes,
         remedy:
           "Pressure test fuel valves. Inspect air cooler air and water sides. Perform TC turbine water washing. Check fuel oil specifications.",
       });
     }
   });
 
-  // Exh Cylinder Outlet — cylinder-level imbalance vs ISO average (existing — unchanged)
+  // Exh Cylinder Outlet — cylinder-level imbalance
   if (report.cylinder_readings) {
     const exhCylAct = Number(report.Exh_Cylinder_outlet);
     const exhImbal = checkCylinderImbalance("exhaust_temp", exhCylAct);
@@ -1170,11 +1193,10 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "critical",
         comparedAgainst: "ISO Average (Report Cylinders)",
         finding: `${exhImbal.red} deviate >±5°C from ISO average exhaust temperature (${exhCylAct.toFixed(1)}°C). Combustion severely imbalanced.`,
-        causes: [
+        causes:[
           "Worn or stuck fuel injector on affected cylinders",
           "Incorrect fuel injection timing on affected units",
           "Exhaust valve leakage on affected cylinders",
-          "Poor scavenging of affected cylinders",
         ],
         remedy:
           "Pressure test and overhaul fuel injectors on affected cylinders. Check exhaust valve condition. Inspect scavenge ports on affected units.",
@@ -1185,7 +1207,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "warning",
         comparedAgainst: "ISO Average (Report Cylinders)",
         finding: `${exhImbal.amber} deviate >±3°C from ISO average exhaust temperature (${exhCylAct.toFixed(1)}°C). Monitor for developing combustion imbalance.`,
-        causes: [
+        causes:[
           "Early-stage fuel injector wear on affected cylinders",
           "Minor injection timing drift",
         ],
@@ -1194,23 +1216,19 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
       });
     }
 
-    // NEW — Cylinder vs Shop Trial for Exh Cylinder Outlet
+    // Cylinder vs Shop Trial for Exh Cylinder Outlet
     const exhCylShopVal = getBase("Exh_Cylinder_outlet");
-    const exhShopImbal = checkCylinderVsShopTrial(
-      "exhaust_temp",
-      exhCylShopVal,
-    );
+    const exhShopImbal = checkCylinderVsShopTrial("exhaust_temp", exhCylShopVal);
     if (exhShopImbal?.red) {
       concerns.push({
         parameter: "Exh. Cyl. Outlet vs Shop Trial (Cylinder)",
         severity: "critical",
         comparedAgainst: "Shop Trial (Per Cylinder)",
         finding: `${exhShopImbal.red} deviate >±5°C from Shop Trial exhaust temperature (${exhCylShopVal?.toFixed(1)}°C). Combustion significantly deteriorated from trial condition.`,
-        causes: [
+        causes:[
           "Severely worn or stuck fuel injector on affected cylinders",
           "Significant injection timing deterioration on affected units",
           "Exhaust valve leakage on affected cylinders",
-          "Poor scavenging of affected cylinders",
         ],
         remedy:
           "Pressure test and overhaul fuel injectors on affected cylinders. Compare with ISO imbalance check to identify if engine-wide or cylinder-specific.",
@@ -1221,7 +1239,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "warning",
         comparedAgainst: "Shop Trial(Per Cylinder)",
         finding: `${exhShopImbal.amber} deviate >±3°C from Shop Trial exhaust temperature (${exhCylShopVal?.toFixed(1)}°C). Developing deviation from original trial condition.`,
-        causes: [
+        causes:[
           "Early-stage injector wear on affected cylinders",
           "Minor injection timing drift developing",
         ],
@@ -1233,8 +1251,6 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
 
   // ==========================================================================
   // SECTION 8 — FUEL PUMP INDEX (FIPI)
-  // Group B: ±5% amber / ±10% red (same for ME and AE)
-  // Also: cylinder-level imbalance check
   // ==========================================================================
   const fipiAct = Number(report.FIPI);
   const fipiBase = getBase("FIPI");
@@ -1247,19 +1263,24 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
       severity: isRed ? "critical" : "warning",
       comparedAgainst: "Shop Trial",
       finding: `FIPI deviated ${fipiPct > 0 ? "+" : ""}${fipiPct.toFixed(1)}% from baseline. Baseline: ${fipiBase?.toFixed(2)} mm, Actual: ${fipiAct.toFixed(2)} mm.`,
-      causes: [
-        "Worn fuel pump plunger and barrel",
-        "Internal leakage in fuel pumps",
-        "Increased fuel viscosity",
-        "Fuel valve needle wear causing leakage",
-      ],
+      causes: fipiPct > 0 
+        ?[
+            "Worn fuel pump plunger / barrel",
+            "Internal leakage in fuel pumps",
+            "Increased fuel viscosity",
+          ]
+        :[
+            "Fuel starvation / restriction",
+            "Incorrect fuel temperature/viscosity",
+            "Fuel linkage issue",
+          ],
       remedy: isRed
         ? "Overhaul fuel pumps immediately. Pressure test all fuel valves. Check fuel oil viscosity."
         : "Plan fuel pump inspection. Pressure test fuel valves. Monitor at next report.",
     });
   }
 
-  // FIPI cylinder-level imbalance vs ISO average (existing — unchanged)
+  // FIPI cylinder-level imbalance
   if (report.cylinder_readings) {
     const fipiImbal = checkCylinderImbalance("fuel_index", fipiAct);
     if (fipiImbal?.red) {
@@ -1268,7 +1289,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "critical",
         comparedAgainst: "ISO Average (Report Cylinders)",
         finding: `${fipiImbal.red} deviate >±5 mm from ISO average fuel index (${fipiAct.toFixed(2)} mm). Fuel distribution severely imbalanced.`,
-        causes: [
+        causes:[
           "Worn fuel pump elements on affected cylinders",
           "Sticking fuel pump plunger on affected units",
           "Fuel linkage / rack sticking",
@@ -1282,7 +1303,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "warning",
         comparedAgainst: "ISO Average (Report Cylinders)",
         finding: `${fipiImbal.amber} deviate >±3 mm from ISO average fuel index (${fipiAct.toFixed(2)} mm). Fuel distribution imbalance developing.`,
-        causes: [
+        causes:[
           "Early-stage fuel pump wear on affected cylinders",
           "Minor fuel rack sticking",
         ],
@@ -1291,7 +1312,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
       });
     }
 
-    // NEW — Cylinder vs Shop Trial for FIPI
+    // Cylinder vs Shop Trial for FIPI
     const fipiShopVal = fipiBase;
     const fipiShopImbal = checkCylinderVsShopTrial("fuel_index", fipiShopVal);
     if (fipiShopImbal?.red) {
@@ -1300,7 +1321,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "critical",
         comparedAgainst: "Shop Trial (Per Cylinder)",
         finding: `${fipiShopImbal.red} deviate >±5 mm from Shop Trial fuel index (${fipiShopVal?.toFixed(2)} mm). Fuel pump delivery significantly deteriorated from trial condition.`,
-        causes: [
+        causes:[
           "Severely worn fuel pump elements on affected cylinders",
           "Sticking fuel pump plunger on affected units",
           "Fuel rack linkage issue on affected cylinders",
@@ -1314,7 +1335,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "warning",
         comparedAgainst: "Shop Trial (Per Cylinder)",
         finding: `${fipiShopImbal.amber} deviate >±3 mm from Shop Trial fuel index (${fipiShopVal?.toFixed(2)} mm). Developing deviation from original trial condition.`,
-        causes: [
+        causes:[
           "Early-stage fuel pump wear on affected cylinders",
           "Minor fuel rack sticking developing",
         ],
@@ -1325,38 +1346,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
   }
 
   // ==========================================================================
-  // SECTION 9 — SFOC (ME only, Group B: ±5% amber / ±10% red)
-  // ==========================================================================
-  if (isME) {
-    const sfocAct = Number(report.SFOC);
-    const sfocBase = getBase("SFOC");
-    const sfocPct = pctDev(sfocAct, sfocBase);
-
-    if (sfocPct !== null && Math.abs(sfocPct) >= 5) {
-      const isRed = Math.abs(sfocPct) > 10;
-      concerns.push({
-        parameter: "SFOC",
-        severity: isRed ? "critical" : "warning",
-        comparedAgainst: "Shop Trial ",
-        finding: `SFOC deviated ${sfocPct > 0 ? "+" : ""}${sfocPct.toFixed(1)}% from baseline. Baseline: ${sfocBase?.toFixed(1)} g/kWh, Actual: ${sfocAct.toFixed(1)} g/kWh.`,
-        causes: [
-          "Poor fuel oil quality (low calorific value)",
-          "Worn or leaking fuel injectors",
-          "Air system fouling (TC, air cooler, filter)",
-          "Injection timing retardation",
-          "Scavenge system inefficiency",
-          "Engine running in heavy propeller condition",
-        ],
-        remedy: isRed
-          ? "Urgently check fuel oil specifications. Pressure test all injectors. Perform TC water washing. Review injection timing."
-          : "Check fuel oil calorific value. Inspect injectors. Perform TC water washing. Monitor trends.",
-      });
-    }
-  }
-
-  // ==========================================================================
   // SECTION 10 — POWER MARGIN / PROPELLER MARGIN (ME only)
-  // Rule: 0→+5% amber (heavy running) / >+5% red (overload)
   // ==========================================================================
   if (isME) {
     let rawMargin = report.propeller_margin_percent;
@@ -1371,12 +1361,10 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
           severity: isRed ? "critical" : "warning",
           comparedAgainst: "Service Propeller Curve",
           finding: `Engine is running ${propDev.toFixed(1)}% above the service propeller curve. ${isRed ? "Heavy running overload detected." : "Approaching heavy running condition."}`,
-          causes: [
+          causes:[
             "Hull fouling increasing resistance",
             "Propeller fouling or damage",
-            "Shallow water or restricted channel effect",
             "Adverse weather or heavy sea conditions",
-            "Propeller pitch change or damage",
           ],
           remedy: isRed
             ? "Reduce speed if possible. Inspect propeller at next opportunity. Plan hull cleaning. Check propeller pitch."
@@ -1390,7 +1378,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
   // SECTION 11 — TC EXTENDED CHECKS (ME only, kept as bonus engineering checks)
   // ==========================================================================
   if (isME) {
-    // TC Efficiency (Compressor and Turbine)
+    // TC Efficiency
     ["TC_Compressor_Eff", "TC_Turbine_Eff"].forEach((key) => {
       const eff = Number(report[key]);
       if (eff > 0 && eff < 100) {
@@ -1399,21 +1387,16 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
           concerns.push({
             parameter: key.replace(/_/g, " "),
             severity: dev >= 5 ? "critical" : "warning",
-            comparedAgainst:
-              "Fixed Engineering Reference (100% ideal efficiency)",
+            comparedAgainst: "Fixed Engineering Reference (100% ideal efficiency)",
             finding: `${key.includes("Compressor") ? "Compressor" : "Turbine"} efficiency dropped by ${dev.toFixed(1)}%.`,
-            causes: [
-              "Fouling of turbine or compressor blades",
-              "Clogged nozzle ring",
-            ],
-            remedy:
-              "Perform TC water washing. Inspect nozzle ring for blockage.",
+            causes:["Fouling of turbine or compressor blades", "Clogged nozzle ring"],
+            remedy: "Perform TC water washing. Inspect nozzle ring for blockage.",
           });
         }
       }
     });
 
-    // TC LO Inlet Pressure (1.5 – 2.2 bar)
+    // TC LO Inlet Pressure
     const loPress = Number(report.tc_lo_inlet_pressure_bar);
     if (loPress > 0 && (loPress < 1.5 || loPress > 2.2)) {
       concerns.push({
@@ -1426,7 +1409,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
       });
     }
 
-    // TC Back Pressure > 300 mmWC
+    // TC Back Pressure
     const backPress = Number(report.tc_turbine_outlet_pressure_mmwc);
     if (backPress > 300) {
       concerns.push({
@@ -1434,17 +1417,12 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "critical",
         comparedAgainst: "Fixed Engineering Limit (300 mmWC max)",
         finding: `Turbine outlet pressure is ${backPress} mmWC (Limit: 300 mmWC).`,
-        causes: [
-          "Blockage in exhaust pipe",
-          "Clogged nozzle ring",
-          "Economizer or scrubber obstruction",
-        ],
-        remedy:
-          "Inspect exhaust piping and economizer or funnel for obstructions.",
+        causes: ["Blockage in exhaust pipe", "Economizer or scrubber obstruction"],
+        remedy: "Inspect exhaust piping and economizer or funnel for obstructions.",
       });
     }
 
-    // TC Air Filter ΔP > 150% of baseline
+    // TC Air Filter ΔP
     const filterDP = Number(report.tc_air_filter_diff_pressure_mmwc);
     const filterBase = getBase("tc_air_filter_diff_pressure_mmwc");
     if (filterDP && filterBase && filterDP > filterBase * 1.5) {
@@ -1458,7 +1436,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
       });
     }
 
-    // Air Cooler ΔP > 240 mmWC
+    // Air Cooler ΔP
     const coolerDP = Number(report.scav_air_cooler_diff_pressure_mmwc);
     if (coolerDP > 240) {
       concerns.push({
@@ -1466,12 +1444,12 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         severity: "critical",
         comparedAgainst: "Fixed Engineering Limit (240 mmWC max)",
         finding: `Air cooler pressure drop is ${coolerDP} mmWC (Limit: 240 mmWC).`,
-        causes: ["Clogged air side elements", "Fouling from oily mist"],
+        causes:["Clogged air side elements", "Fouling from oily mist"],
         remedy: "Air cooler is clogged. Clean air side immediately.",
       });
     }
 
-    // Air Cooler ΔT (Air Out – Water In > 14°C)
+    // Air Cooler ΔT
     const airOut = Number(report.scav_air_temp_after_cooler_c);
     const waterIn = Number(report.scav_air_cooler_cw_in_temp_c);
     if (airOut && waterIn && airOut - waterIn > 14) {
@@ -1488,253 +1466,1080 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
 
   return concerns;
 };
-const DiagnosisPanel = ({ report, baseline, analysisMode }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const concerns = getDetectedConcerns(report, baseline, analysisMode);
 
-  if (concerns.length === 0)
-    return (
-      <div
-        className="enhanced-card"
-        style={{
-          marginBottom: "32px",
-          borderLeft: "8px solid #16a34a",
-          backgroundColor: "#f0fdf4",
-          padding: "20px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <span style={{ fontSize: "1.5rem" }}>✅</span>
-          <span style={{ fontWeight: "700", color: "#166534" }}>
-            All analyzed parameters for {report.displayName} are within safety
-            and performance limits.
-          </span>
-        </div>
-      </div>
-    );
+const getTrendDiagnosisFindings = (availableReports, baseline, analysisMode) => {
+  if (!availableReports || availableReports.length < 2) return[];
+  if (!baseline || Object.keys(baseline).length === 0) return [];
+
+  const findings =[];
+  const isME = analysisMode === "mainEngine";
+  const xAxis = isME ? "load" : "load_percentage";
+
+  // ── Build deviation series per parameter ──────────────────────────────────
+  const PARAMS = isME
+    ?["SFOC", "Pmax", "Pcomp", "FIPI", "ScavAir", "Turbospeed",
+       "Exh_T/C_inlet", "Exh_T/C_outlet", "Exh_Cylinder_outlet", "EngSpeed"]
+    :["Pmax", "FIPI", "ScavAirPressure",
+       "Exh_T/C_inlet", "Exh_T/C_outlet", "Exh_Cylinder_outlet"];
+
+  const GROUP_A     =["Pmax", "Pcomp", "EngSpeed"];
+  const GROUP_B     =["FIPI", "ScavAir", "ScavAirPressure", "SFOC"];
+  const GROUP_TURBO = ["Turbospeed"];
+  const GROUP_EXHAUST =["Exh_T/C_inlet", "Exh_T/C_outlet", "Exh_Cylinder_outlet"];
+
+  const getThresholds = (key) => {
+    if (GROUP_TURBO.includes(key))   return { amber: 500,  red: 1000, isAbs: true };
+    if (GROUP_EXHAUST.includes(key)) return { amber: 40,   red: 60,   isAbs: true };
+    if (GROUP_A.includes(key))       return { amber: 3,    red: 5,    isAbs: false };
+    return                                  { amber: 5,    red: 10,   isAbs: false };
+  };
+
+  // ── DIRECTION RULES HELPER (Stops false alarms) ───────────────────────────
+  const getFaultMagnitude = (key, val) => {
+    if (val == null) return 0;
+    // Lower side only (Pcomp, Scav Air) -> ignore positive values
+    if (["Pcomp", "ScavAir", "ScavAirPressure"].includes(key)) {
+      return val < 0 ? Math.abs(val) : 0;
+    }
+    // Upper side only (SFOC) -> ignore negative values
+    if (key === "SFOC") {
+      return val > 0 ? val : 0;
+    }
+    // Both sides (Turbospeed, Pmax, Exhaust Temps, etc.)
+    return Math.abs(val);
+  };
+
+  const isWorseningStep = (key, prevVal, currVal) => {
+    if (prevVal == null || currVal == null) return false;
+    // Lower side only: must drop further into the negatives
+    if (["Pcomp", "ScavAir", "ScavAirPressure"].includes(key)) {
+      return currVal < prevVal && currVal < 0;
+    }
+    // Upper side only: must rise further into the positives
+    if (key === "SFOC") {
+      return currVal > prevVal && currVal > 0;
+    }
+    // Both sides: must be the same sign and growing in absolute magnitude
+    if (Math.sign(prevVal) !== Math.sign(currVal) && prevVal !== 0) return false;
+    return Math.abs(currVal) > Math.abs(prevVal);
+  };
+
+  // Sort oldest → newest
+  const sorted = [...availableReports]
+    .filter(r => r.report_date)
+    .sort((a, b) => new Date(a.report_date) - new Date(b.report_date));
+
+  if (sorted.length < 2) return [];
+
+  // Build devSeries: {[paramKey]: [{ date, val, devValue }] }
+  const devSeries = {};
+  PARAMS.forEach(key => {
+    const series = sorted.map(report => {
+      const load   = isME ? report.load : report.load_percentage;
+      const actual = report[key];
+      const base   = interpolateBaseline(baseline, load, key, xAxis);
+      if (actual == null || base == null || base === 0) return null;
+      const { isAbs } = getThresholds(key);
+      const devValue = isAbs ? (actual - base) : ((actual - base) / base) * 100;
+      return { date: report.displayName, report_date: report.report_date, val: devValue };
+    }).filter(Boolean);
+    if (series.length >= 2) devSeries[key] = series;
+  });
+
+  // ── PATTERN DETECTION ─────────────────────────────────────────────────────
+  const latestDevs = {}; // Store raw deviations to pass into causes/remedies
+
+  PARAMS.forEach(key => {
+    const series = devSeries[key];
+    if (!series || series.length < 2) return;
+
+    const { amber, red, isAbs } = getThresholds(key);
+    const latest = series[series.length - 1].val;
+    const prev   = series[series.length - 2].val;
+    
+    // Apply direction rules to get the effective fault magnitude
+    const latestMag = getFaultMagnitude(key, latest);
+    const prevMag   = getFaultMagnitude(key, prev);
+    
+    latestDevs[key] = latest;
+
+    // ── T5: Skip if latest is green (in the context of fault direction) ──────
+    if (latestMag < amber) return;
+
+    // ── T1: Last 3 values all worsening (in the correct fault direction) ─────
+    let allWorsening = false;
+    if (series.length >= 3) {
+      const v1 = series[series.length - 3].val;
+      const v2 = series[series.length - 2].val;
+      const v3 = series[series.length - 1].val;
+      allWorsening = isWorseningStep(key, v1, v2) && isWorseningStep(key, v2, v3);
+    }
+
+    // ── T3: Sudden spike ────────────────────────────────────────────────────
+    const suddenSpike = prevMag < amber && latestMag >= red;
+
+    const unit = isAbs ? (GROUP_TURBO.includes(key) ? " RPM" : "°C") : "%";
+    const sign = latest > 0 ? "+" : "";
+
+    // ── LABEL NORMALIZATION (Matches exactly what grouping searches for) ─────
+    const PARAM_LABELS = {
+      SFOC: "SFOC", 
+      Pmax: "Pmax", 
+      Pcomp: "Pcomp", 
+      FIPI: "Fuel Pump Index",
+      ScavAir: "Scavenge Air",
+      ScavAirPressure: "Scavenge Air",
+      Turbospeed: "Turbocharger Speed", 
+      EngSpeed: "Engine Speed",
+      "Exh_T/C_inlet": "Exh. T/C Inlet",
+      "Exh_T/C_outlet": "Exh. T/C Outlet",
+      Exh_Cylinder_outlet: "Exh. Cyl. Outlet",
+    };
+
+    const label = PARAM_LABELS[key] || key;
+    const trendValues = series.slice(-3).map(s => `${s.val > 0 ? "+" : ""}${s.val.toFixed(1)}${unit}`).join(" → ");
+    const severity = latestMag >= red ? "critical" : "warning";
+
+    // ── T1: Consistently worsening ───────────────────────────────────────────
+    if (allWorsening && latestMag >= amber) {
+      findings.push({
+        pattern: "T1",
+        parameter: label,
+        severity,
+        trendType: "Consistently Worsening",
+        comparedAgainst: "Trend (Last 3 Reports)",
+        finding: `${label} has been worsening consistently over the last 3 reports: ${trendValues}. Latest deviation: ${sign}${latest.toFixed(1)}${unit}.`,
+        causes: getCausesForParam(key, latest, latestDevs, isME),
+        remedy: getRemedyForParam(key, latest, isME),
+      });
+      return; // Don't double-report for same param
+    }
+
+    // ── T3: Sudden spike ─────────────────────────────────────────────────────
+    if (suddenSpike) {
+      findings.push({
+        pattern: "T3",
+        parameter: label,
+        severity: "critical",
+        trendType: "Sudden Spike",
+        comparedAgainst: "Trend (vs Previous Month)",
+        finding: `${label} suddenly spiked in the latest report: previous ${sign}${prev.toFixed(1)}${unit} → current ${sign}${latest.toFixed(1)}${unit}. Immediate investigation required.`,
+        causes: getCausesForParam(key, latest, latestDevs, isME),
+        remedy: getRemedyForParam(key, latest, isME),
+      });
+      return;
+    }
+
+    // ── T2: Gradual amber drift ───────────────────────────────────────────────
+    if (latestMag >= amber && latestMag < red) {
+      findings.push({
+        pattern: "T2",
+        parameter: label,
+        severity: "warning",
+        trendType: "Gradual Amber Drift",
+        comparedAgainst: "Trend (Last 2 Reports)",
+        finding: `${label} is drifting into amber zone: ${trendValues}. Monitor closely — degradation may be developing.`,
+        causes: getCausesForParam(key, latest, latestDevs, isME),
+        remedy: getRemedyForParam(key, latest, isME),
+      });
+    }
+  });
+
+  // Sort: T1/T3 highest priority
+  const getPriority = (f) => {
+    if (f.pattern === "T1") return 1;
+    if (f.pattern === "T3") return 2;
+    return 3;
+  };
+
+  return findings.sort((a, b) => getPriority(a) - getPriority(b));
+};
+
+// ── Helper: causes per parameter ──────────────────────────────────────────
+const getCausesForParam = (key, devVal, latestDevs, isME) => {
+  const causes = {
+    SFOC: ["Poor fuel oil quality (low LCV/calorific value)", "Worn or leaking fuel injectors", "Air system fouling (TC, air cooler, filter)", "Engine running in heavy propeller condition"],
+    Pmax: ["Fuel injection timing drift", "Worn fuel valves or injector nozzles", "VIT / HCU malfunction"],
+    Pcomp: ["Blow-by via leaking piston rings", "Burnt or eroded piston crown", "Worn cylinder liner", "Leaking or stuck exhaust valve"],
+    FIPI: ["Worn fuel pump plunger and barrel", "Internal leakage in fuel pumps", "Increased fuel viscosity"],
+    ScavAir: ["TC underperformance due to fouling", "Fouled or blocked air cooler (air side)", "Blocked TC air filter elements"],
+    ScavAirPressure: ["TC underperformance due to fouling", "Fouled air cooler", "Blocked TC air filter"],
+    Turbospeed: ["Fouling of TC turbine or compressor blades", "Clogged or damaged nozzle ring", "TC bearing wear", "Air filter blockage"],
+    "Exh_T/C_inlet": ["Worn or leaking fuel pumps/valves", "TC turbine fouling reducing airflow", "Poor fuel quality"],
+    "Exh_T/C_outlet": ["TC turbine efficiency loss", "Fouled air cooler reducing charge air cooling"],
+    Exh_Cylinder_outlet: ["Individual cylinder combustion problem", "Worn or stuck fuel injector", "Exhaust valve leakage"],
+    EngSpeed: ["Governor malfunction or mis-calibration", "Fuel rack or linkage issue", "Engine overload condition"],
+  };
+  return causes[key] || ["Parameter deviation detected — investigate root cause"];
+};
+
+// ── Helper: remedy per parameter ──────────────────────────────────────────
+const getRemedyForParam = (key, devVal, isME) => {
+  const remedies = {
+    SFOC: "Check fuel oil calorific value. Pressure test injectors. Perform TC water washing. Review injection timing.",
+    Pmax: "Pressure test fuel valves. Verify fuel pump lead and VIT adjustment. Check injection timing.",
+    Pcomp: "Inspect piston rings and liner. Check exhaust valve timing and condition. Perform scavenge port inspection.",
+    FIPI: "Plan fuel pump inspection. Pressure test fuel valves. Overhaul fuel pumps if index >10% from baseline.",
+    ScavAir: "Perform TC water washing. Clean air cooler air side. Check and clean TC air filter.",
+    ScavAirPressure: "Perform TC water washing. Clean air cooler. Check TC air filter.",
+    Turbospeed: "Perform TC water washing (air and exhaust sides). Inspect nozzle ring. Check TC bearings.",
+    "Exh_T/C_inlet": "Pressure test fuel valves. Inspect air cooler. Perform TC turbine water washing.",
+    "Exh_T/C_outlet": "Perform TC water washing. Check turbine efficiency.",
+    Exh_Cylinder_outlet: "Pressure test and overhaul fuel injectors on high-temp cylinders. Check exhaust valve condition.",
+    EngSpeed: "Check governor settings and fuel rack position. Verify tacho sensor calibration.",
+  };
+  return remedies[key] || "Investigate parameter deviation. Plan inspection at next opportunity.";
+};
+const SFOCDiagnosisCard = ({ findings }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [selectedIdx, setSelectedIdx] = useState(null);
+  const selectedItem = selectedIdx !== null ? findings[selectedIdx] : null;
+
+  const getTileColors = (item) => {
+    const isCross = item.pattern?.startsWith("X");
+    const isCritical = item.severity === "critical";
+    if (isCross) return { bg: "#1e1a3a", border: "#4c3f9f", titleColor: "#d4cefb", subColor: "#a89cf5", badgeBg: "#4c3f9f", badgeText: "#d4cefb", badgeLabel: "🔗 Cross-Corr" };
+    if (isCritical) return { bg: "#3d1a1a", border: "#7f2a2a", titleColor: "#f8d7d7", subColor: "#f09898", badgeBg: "#7f2a2a", badgeText: "#ffd0d0", badgeLabel: "🔴 Critical" };
+    return { bg: "#3a3210", border: "#6b5a14", titleColor: "#f5e9c0", subColor: "#d4b84a", badgeBg: "#6b5a14", badgeText: "#f5e0a0", badgeLabel: "🟡 Warning" };
+  };
 
   return (
-    <div
-      className="enhanced-card diagnosis-card"
-      style={{
-        marginBottom: "32px",
-        border: "1px solid #e2e8f0",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        onClick={() => setIsExpanded(!isExpanded)}
-        style={{
-          backgroundColor: "#fff7ed",
-          borderBottom: isExpanded ? "2px solid #ffedd5" : "none",
-          padding: "14px 24px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          cursor: "pointer",
-        }}
-      >
-        <h3
-          className="card-title-enhanced"
-          style={{
-            color: "#9a3412",
-            margin: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            fontSize: "1.1rem",
-          }}
-        >
-          <span style={{ fontSize: "1.4rem" }}>🔍</span> Troubleshooting &
-          Diagnosis Insights ({concerns.length} Findings)
+    <div style={{ marginBottom: "32px", borderRadius: "14px", overflow: "hidden", border: "1.5px solid #4a2800", backgroundColor: "#12121c", boxShadow: "0 4px 24px rgba(0,0,0,0.25)" }}>
+      {/* Header */}
+      <div onClick={() => setIsExpanded(!isExpanded)} style={{ backgroundColor: "#1e1200", borderBottom: isExpanded ? "1.5px solid #6b3a00" : "none", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }}>
+        <h3 style={{ margin: 0, color: "#ffe0b0", fontWeight: "800", fontSize: "1rem", display: "flex", alignItems: "center", gap: "10px" }}>
+          <span style={{ fontSize: "1.2rem" }}></span>
+          SFOC Diagnosis
+          <span style={{ backgroundColor: "#6b3a00", color: "#ffcc80", fontSize: "0.7rem", fontWeight: "700", padding: "2px 10px", borderRadius: "20px", border: "1px solid #ff8c00" }}>
+            {findings.length} Finding{findings.length !== 1 ? "s" : ""}
+          </span>
+          <span style={{ backgroundColor: "#ff8c0022", color: "#ff8c00", fontSize: "0.65rem", fontWeight: "800", padding: "2px 10px", borderRadius: "20px", border: "1px solid #ff8c0055", letterSpacing: "0.05em" }}>
+            PRIORITY
+          </span>
         </h3>
-        <span
-          style={{
-            fontSize: "1.2rem",
-            color: "#9a3412",
-            transition: "transform 0.3s ease",
-            transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-          }}
-        >
-          ▼
-        </span>
+        <span style={{ fontSize: "1.1rem", color: "#ffcc80", transition: "transform 0.3s ease", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", display: "inline-block" }}>▼</span>
       </div>
 
       {isExpanded && (
-        <div className="card-content-enhanced" style={{ padding: "24px" }}>
-          {/* --- WRAPPER FOR SCROLLING --- */}
-          <div className="diagnosis-scroll-container">
-            {concerns.map((item, idx) => (
-              <div
-                key={idx}
-                style={{
-                  borderRadius: "10px",
-                  border: `1.5px solid ${item.severity === "critical" ? "#fecdd3" : "#fde68a"}`,
-                  overflow: "hidden",
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.03)",
-                  flexShrink: 0,
-                }}
-              >
-                {/* ── CARD HEADER: severity + parameter + comparedAgainst badge ── */}
-                <div
-                  style={{
-                    padding: "8px 16px",
-                    backgroundColor:
-                      item.severity === "critical" ? "#fff1f2" : "#fffbeb",
-                    borderBottom: `1px solid ${item.severity === "critical" ? "#fecdd3" : "#fde68a"}`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "12px",
-                  }}
+        <div style={{ padding: "20px 24px" }}>
+          {/* Tile grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "12px", marginBottom: selectedItem ? "16px" : "0" }}>
+            {findings.map((item, idx) => {
+              const c = getTileColors(item);
+              const isSelected = selectedIdx === idx;
+              const causesSummary = Array.isArray(item.causes) ? item.causes.slice(0, 2).join(" / ") : "";
+              return (
+                <div key={idx} onClick={() => setSelectedIdx(isSelected ? null : idx)}
+                  style={{ backgroundColor: c.bg, border: `1.5px solid ${isSelected ? "#ffffff55" : c.border}`, borderRadius: "10px", padding: "16px", cursor: "pointer", userSelect: "none", position: "relative", height: "160px", boxSizing: "border-box", display: "flex", flexDirection: "column", justifyContent: "space-between", outline: isSelected ? `2px solid ${c.border}` : "none", outlineOffset: "2px", transition: "all 0.15s ease", boxShadow: isSelected ? `0 0 0 2px ${c.border}` : "none" }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.filter = "brightness(1.15)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.filter = "brightness(1)"; }}
                 >
-                  {/* Left: severity + parameter name */}
-                  <span
-                    style={{
-                      fontWeight: "900",
-                      fontSize: "0.85rem",
-                      color:
-                        item.severity === "critical" ? "#9f1239" : "#92400e",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {item.severity}: {item.parameter}
-                  </span>
-
-                  {/* Right: comparedAgainst badge */}
-                  {item.comparedAgainst && (
-                    <span
-                      style={{
-                        fontSize: "0.65rem",
-                        fontWeight: "700",
-                        color: "#64748b",
-                        backgroundColor: "#f1f5f9",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: "4px",
-                        padding: "2px 8px",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.03em",
-                        whiteSpace: "nowrap",
-                        flexShrink: 0,
-                      }}
-                    >
-                      vs {item.comparedAgainst}
-                    </span>
-                  )}
+                  <div style={{ position: "absolute", top: "10px", right: "10px", backgroundColor: c.badgeBg, color: c.badgeText, fontSize: "0.55rem", fontWeight: "700", padding: "2px 7px", borderRadius: "4px", textTransform: "uppercase", whiteSpace: "nowrap" }}>{c.badgeLabel}</div>
+                  <div style={{ color: c.titleColor, fontWeight: "800", fontSize: "0.88rem", lineHeight: "1.3", paddingRight: "70px", marginTop: "4px" }}>{item.parameter}</div>
+                  <div style={{ color: c.subColor, fontSize: "0.75rem", fontWeight: "500", lineHeight: "1.4", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", flex: 1, marginTop: "8px" }}>{causesSummary}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "5px", color: c.subColor, fontSize: "0.7rem", fontWeight: "700", marginTop: "10px" }}>
+                    <span style={{ transition: "transform 0.2s", transform: isSelected ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block" }}>▶</span>
+                    {isSelected ? "Hide details" : "View details"}
+                  </div>
                 </div>
+              );
+            })}
+          </div>
 
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1.2fr 1fr 1fr",
-                    backgroundColor: "white",
-                  }}
-                >
-                  {/* HEADERS */}
-                  <div
-                    style={{
-                      gridColumn: "1 / -1",
-                      display: "grid",
-                      gridTemplateColumns: "1.2fr 1fr 1fr",
-                      backgroundColor: "#f8fafc",
-                      borderBottom: "1px solid #e2e8f0",
-                    }}
-                  >
-                    <div
-                      style={{
-                        padding: "6px 16px",
-                        fontSize: "0.65rem",
-                        fontWeight: "800",
-                        color: "#64748b",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Observation
-                    </div>
-                    <div
-                      style={{
-                        padding: "6px 16px",
-                        fontSize: "0.65rem",
-                        fontWeight: "800",
-                        color: "#64748b",
-                        textTransform: "uppercase",
-                        borderLeft: "1px solid #e2e8f0",
-                      }}
-                    >
-                      Possible Causes
-                    </div>
-                    <div
-                      style={{
-                        padding: "6px 16px",
-                        fontSize: "0.65rem",
-                        fontWeight: "800",
-                        color: "#64748b",
-                        textTransform: "uppercase",
-                        borderLeft: "1px solid #e2e8f0",
-                      }}
-                    >
-                      Diagnosis & Remedy
-                    </div>
+          {/* Detail panel */}
+          {selectedItem && (() => {
+            const c = getTileColors(selectedItem);
+            return (
+              <div style={{ border: `1.5px solid ${c.border}`, borderRadius: "10px", overflow: "hidden", backgroundColor: c.bg }}>
+                <div style={{ padding: "12px 20px", backgroundColor: "#0d0d1a", borderBottom: `1px solid ${c.border}44`, display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center" }}>
+                  <span style={{ color: c.titleColor, fontWeight: "800", fontSize: "0.9rem" }}>{selectedItem.parameter}</span>
+                  <span style={{ color: c.subColor, fontSize: "0.7rem", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.85, textAlign: "center" }}>
+                    {selectedItem.comparedAgainst ? `vs ${selectedItem.comparedAgainst}` : ""}
+                  </span>
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button onClick={() => setSelectedIdx(null)} style={{ background: "none", border: "none", color: c.subColor, cursor: "pointer", fontSize: "1rem", lineHeight: 1 }}>✕</button>
                   </div>
-
-                  {/* DATA */}
-                  <div
-                    style={{
-                      padding: "16px",
-                      fontSize: "0.9rem",
-                      fontWeight: "700",
-                      color: "#1e293b",
-                      lineHeight: "1.4",
-                    }}
-                  >
-                    {item.finding}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr" }}>
+                  <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr", backgroundColor: "#0d0d1a", borderBottom: `1px solid ${c.border}44` }}>
+                    {["Observation", "Possible Causes", "Diagnosis & Remedy"].map((h, i) => (
+                      <div key={h} style={{ padding: "8px 16px", fontSize: "0.65rem", fontWeight: "800", color: c.subColor, textTransform: "uppercase", letterSpacing: "0.08em", borderLeft: i > 0 ? `1px solid ${c.border}44` : "none" }}>{h}</div>
+                    ))}
                   </div>
-                  <div
-                    style={{ padding: "16px", borderLeft: "1px solid #e2e8f0" }}
-                  >
-                    <ul
-                      style={{
-                        margin: 0,
-                        paddingLeft: "14px",
-                        color: "#475569",
-                        fontSize: "0.85rem",
-                        fontWeight: "500",
-                      }}
-                    >
-                      {item.causes.map((c, i) => (
-                        <li key={i} style={{ marginBottom: "2px" }}>
-                          {c}
-                        </li>
-                      ))}
+                  <div style={{ padding: "16px", fontSize: "0.85rem", fontWeight: "600", color: c.titleColor, lineHeight: "1.5" }}>{selectedItem.finding}</div>
+                  <div style={{ padding: "16px", borderLeft: `1px solid ${c.border}44` }}>
+                    <ul style={{ margin: 0, paddingLeft: "14px", color: c.subColor, fontSize: "0.82rem", fontWeight: "500", lineHeight: "1.7" }}>
+                      {selectedItem.causes.map((cause, i) => <li key={i}>{cause}</li>)}
                     </ul>
                   </div>
-                  <div
-                    style={{
-                      padding: "16px",
-                      borderLeft: "1px solid #e2e8f0",
-                      backgroundColor: "#f0f9ff",
-                    }}
-                  >
-                    <div
-                      style={{
-                        color: "#0369a1",
-                        fontSize: "0.85rem",
-                        fontWeight: "600",
-                        lineHeight: "1.5",
-                      }}
-                    >
-                      {item.remedy}
-                    </div>
-                  </div>
+                  <div style={{ padding: "16px", borderLeft: `1px solid ${c.border}44`, backgroundColor: "#0f1e2a" }}>
+  <ul style={{ margin: 0, paddingLeft: "14px", color: "#a8d8f0", fontSize: "0.82rem", fontWeight: "600", lineHeight: "1.7" }}>
+    {selectedItem.remedy
+      .split('.')
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+      .map((point, i) => (
+        <li key={i}>{point}.</li>
+      ))
+    }
+  </ul>
+</div>
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </div>
       )}
     </div>
   );
 };
+
+const groupIntoVerdicts = (findings) => {
+  const used = new Set();
+  const verdicts =[];
+
+  // Helper: find first unused finding whose parameter contains keyword
+  const get = (keyword) => findings.find(f =>
+    !used.has(f) && f.parameter?.toLowerCase().includes(keyword.toLowerCase())
+  );
+
+  // Helper: collect ALL unused findings whose parameter contains keyword
+  const getAll = (keyword) => findings.filter(f =>
+    !used.has(f) && f.parameter?.toLowerCase().includes(keyword.toLowerCase())
+  );
+
+  // ── PATTERN 1: TURBOCHARGER FOULING ──────────────────────────────────────
+  // Triggers: TC RPM low + Scav Air low (Trend or Single Report)
+  const tcFindings   = getAll("turbocharger speed").concat(getAll("turbo speed"));
+  const scavFindings = getAll("scavenge air");
+  const exhTCFindings = getAll("exh. t/c");
+
+  if (tcFindings.length > 0 && scavFindings.length > 0) {
+    const sfocFindings = getAll("sfoc"); // Grab SFOC if it exists as a symptom
+    const grouped = [...tcFindings, ...scavFindings, ...exhTCFindings, ...sfocFindings];
+    grouped.forEach(f => used.add(f));
+    
+    verdicts.push({
+      pattern: "TC_FOULING",
+      parameter: "Turbocharger Fouling",
+      severity: grouped.some(f => f.severity === "critical") ? "critical" : "warning",
+      comparedAgainst: "Shop Trial & Trend",
+      finding: "TC Speed and Scavenge Air are both below baseline. TC fouling reduces compressor efficiency → less air delivered → scav air drops. This leads to air starvation and increased SFOC.",
+      causes:[
+        "TC compressor / turbine blade fouling",
+        "Clogged or damaged nozzle ring",
+        "Air filter blockage reducing airflow"
+      ],
+      remedy: "Perform TC water washing (air and exhaust sides). Inspect nozzle ring for fouling or damage. Check TC bearings and air filter condition.",
+      evidence: grouped.map(f => f.parameter),
+    });
+  }
+
+  // ── PATTERN 2: COMPRESSION LOSS — Pcomp low + Pmax low ───────────────────
+  const pcompFindings = getAll("pcomp");
+  const pmaxFindings  = getAll("pmax");
+
+  // Pcomp only triggers when LOW now. Check if Pmax is also LOW ('below' for single, '-' for trend)
+  const pmaxIsLow = pmaxFindings.some(f => 
+    f.finding?.toLowerCase().includes("below") || 
+    f.finding?.includes("-") ||
+    f.finding?.toLowerCase().includes("retarded")
+  );
+
+  if (pcompFindings.length > 0 && pmaxIsLow) {
+    const sfocFindings = getAll("sfoc");
+    const grouped = [...pcompFindings, ...pmaxFindings, ...sfocFindings];
+    grouped.forEach(f => used.add(f));
+
+    verdicts.push({
+      pattern: "COMPRESSION_LOSS",
+      parameter: "Mechanical Compression Loss",
+      severity: grouped.some(f => f.severity === "critical") ? "critical" : "warning",
+      comparedAgainst: "Shop Trial & Trend",
+      finding: "Both Pmax and Pcomp are below baseline. Compression boundary is failing mechanically — gas escapes during compression, reducing peak pressure and increasing fuel consumption.",
+      causes:[
+        "Piston ring blow-by",
+        "Leaking exhaust valve",
+        "Burnt or eroded piston crown"
+      ],
+      remedy: "Scavenge port inspection. Exhaust valve dropout test. Piston crown check with template. Liner wear measurement.",
+      evidence: grouped.map(f => f.parameter),
+    });
+  }
+
+  // ── PATTERN 3: EARLY INJECTION — Pmax high + Pcomp normal ────────────────
+  const pmaxHigh = getAll("pmax").filter(f => 
+    f.finding?.toLowerCase().includes("above") || 
+    f.finding?.includes("+") || 
+    f.finding?.toLowerCase().includes("early")
+  );
+
+  if (pmaxHigh.length > 0) {
+    const grouped = [...pmaxHigh, ...getAll("pmax balance")]; // catch related cylinder balance
+    grouped.forEach(f => used.add(f));
+
+    verdicts.push({
+      pattern: "EARLY_INJECTION",
+      parameter: "Early Injection Timing",
+      severity: grouped.some(f => f.severity === "critical") ? "critical" : "warning",
+      comparedAgainst: "Shop Trial & Trend",
+      finding: "Pmax is above baseline while Pcomp is normal. This diagnostic fingerprint indicates fuel is firing too early in the cycle.",
+      causes:[
+        "Early fuel injection timing / VIT index error",
+        "HCU timing fault (ME engines)",
+        "Incorrect fuel cam position"
+      ],
+      remedy: "Check VIT index calibration. Verify HCU timing. Reduce fuel pump lead.",
+      evidence: grouped.map(f => f.parameter),
+    });
+  }
+
+  // ── PATTERN 4: RETARDED INJECTION — Pmax low + Pcomp normal ──────────────
+  const pmaxLow = getAll("pmax").filter(f => 
+    f.finding?.toLowerCase().includes("below") || 
+    f.finding?.includes("-") || 
+    f.finding?.toLowerCase().includes("retarded")
+  );
+
+  if (pmaxLow.length > 0) {
+    const grouped = [...pmaxLow, ...getAll("pmax balance")];
+    grouped.forEach(f => used.add(f));
+
+    verdicts.push({
+      pattern: "RETARDED_INJECTION",
+      parameter: "Retarded Injection / Poor Fuel Quality",
+      severity: grouped.some(f => f.severity === "critical") ? "critical" : "warning",
+      comparedAgainst: "Shop Trial & Trend",
+      finding: "Pmax is below baseline while Pcomp is normal. Fuel is igniting late or burning slowly, reducing combustion energy release.",
+      causes:[
+        "Retarded fuel injection timing",
+        "Poor fuel ignition quality (low CCAI)",
+        "Worn or leaking injector nozzles"
+      ],
+      remedy: "Check fuel CCAI value. Verify fuel pressure after filter. Pressure test fuel valves. Check VIT index for retardation.",
+      evidence: grouped.map(f => f.parameter),
+    });
+  }
+
+  // ── PATTERN 5: FUEL SYSTEM WEAR — FIPI high ──────────────────────────────
+  const fipiFindings = getAll("fuel pump index").concat(getAll("fipi")).concat(getAll("fuel index"));
+  const fipiHigh = fipiFindings.filter(f => 
+    f.finding?.toLowerCase().includes("above") || 
+    f.finding?.includes("+")
+  );
+
+  if (fipiHigh.length > 0) {
+    const sfocFindings = getAll("sfoc");
+    const balance = getAll("fuel index balance").concat(getAll("fuel index vs shop trial"));
+    const grouped =[...fipiHigh, ...sfocFindings, ...balance];
+    grouped.forEach(f => used.add(f));
+
+    verdicts.push({
+      pattern: "FUEL_SYSTEM_WEAR",
+      parameter: "Fuel System Wear",
+      severity: grouped.some(f => f.severity === "critical") ? "critical" : "warning",
+      comparedAgainst: "Shop Trial & Trend",
+      finding: "Fuel pump index is above baseline. More fuel is required to maintain power, indicating delivery efficiency loss.",
+      causes:[
+        "Worn fuel pump plunger and barrel",
+        "Leaking fuel injector nozzles",
+        "Increased fuel viscosity"
+      ],
+      remedy: "Pressure test all fuel valves. Overhaul fuel pump plunger and barrel on affected cylinders. Check fuel viscosity.",
+      evidence: grouped.map(f => f.parameter),
+    });
+  }
+
+  // ── PATTERN 6: EXHAUST CYLINDER IMBALANCE ────────────────────────────────
+  const exhCylFindings = getAll("exh. cyl");
+
+  if (exhCylFindings.length > 0) {
+    exhCylFindings.forEach(f => used.add(f));
+    
+    verdicts.push({
+      pattern: "EXH_CYL_IMBALANCE",
+      parameter: "Exhaust Cylinder Imbalance",
+      severity: exhCylFindings.some(f => f.severity === "critical") ? "critical" : "warning",
+      comparedAgainst: "Shop Trial & ISO Average",
+      finding: "Exhaust cylinder outlet temperatures are significantly imbalanced across cylinders. Combustion is uneven.",
+      causes:[
+        "Worn or stuck fuel injector on affected cylinders",
+        "Incorrect fuel injection timing on affected units",
+        "Exhaust valve leakage on affected cylinders"
+      ],
+      remedy: "Pressure test and overhaul fuel injectors on affected cylinders. Check exhaust valve condition. Inspect scavenge ports.",
+      evidence: exhCylFindings.map(f => f.parameter),
+    });
+  }
+
+  // ── PATTERN 7: HULL / PROPELLER FOULING ──────────────────────────────────
+  const propFindings = getAll("power margin").concat(getAll("propeller"));
+  const sfocOnly = getAll("sfoc");
+
+  if (propFindings.length > 0 || sfocOnly.length > 0) {
+    const grouped = [...propFindings, ...sfocOnly];
+    grouped.forEach(f => used.add(f));
+
+    verdicts.push({
+      pattern: "HULL_FOULING",
+      parameter: "Hull / Propeller Fouling",
+      severity: "warning",
+      comparedAgainst: "Service Propeller Curve",
+      finding: "Engine is running above the service propeller curve or SFOC is elevated while internal parameters are normal. Excess fuel is consumed overcoming external resistance.",
+      causes:[
+        "Hull fouling increasing resistance",
+        "Propeller fouling or damage",
+        "Heavy sea conditions or adverse weather"
+      ],
+      remedy: "Review load diagram for heavy running. Plan hull cleaning and propeller inspection at next dry-dock. Expected savings after cleaning: 5–15%.",
+      evidence: grouped.map(f => f.parameter),
+    });
+  }
+
+  // ── REMAINING: Any unmatched findings shown individually (including T1/T3 trends) ──
+  findings.forEach(f => {
+    if (!used.has(f)) {
+      verdicts.push({ ...f, evidence: [f.parameter] });
+    }
+  });
+
+  return verdicts;
+};
+
+const UnifiedDiagnosisCard = ({ findings, report }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [selectedIdx, setSelectedIdx] = useState(null);
+
+  const verdicts = groupIntoVerdicts(findings);
+  const selectedItem = selectedIdx !== null ? verdicts[selectedIdx] : null;
+
+  const getTileColors = (item) => {
+    const isCross = item.pattern?.startsWith("X");
+    const isCritical = item.severity === "critical";
+    if (isCross) return {
+      bg: "#1e1a3a", border: "#4c3f9f", titleColor: "#d4cefb",
+      subColor: "#a89cf5", badgeBg: "#4c3f9f", badgeText: "#d4cefb",
+      badgeLabel: "CROSS-CORR",
+    };
+    if (isCritical) return {
+      bg: "#3d1a1a", border: "#7f2a2a", titleColor: "#f8d7d7",
+      subColor: "#f09898", badgeBg: "#7f2a2a", badgeText: "#ffd0d0",
+      badgeLabel: "CRITICAL",
+    };
+    return {
+      bg: "#3a3210", border: "#6b5a14", titleColor: "#f5e9c0",
+      subColor: "#d4b84a", badgeBg: "#6b5a14", badgeText: "#f5e0a0",
+      badgeLabel: "WARNING",
+    };
+  };
+
+  return (
+    <div style={{
+      marginBottom: "32px", borderRadius: "14px", overflow: "hidden",
+      border: "1.5px solid #2a2a3a", backgroundColor: "#12121c",
+      boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+    }}>
+      {/* HEADER */}
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
+        style={{
+          backgroundColor: "#1a1a2e",
+          borderBottom: isExpanded ? "1.5px solid #2e2e50" : "none",
+          padding: "14px 24px", display: "flex",
+          justifyContent: "space-between", alignItems: "center",
+          cursor: "pointer", userSelect: "none",
+        }}
+      >
+        <h3 style={{
+          margin: 0, color: "#e8e8f8", fontWeight: "800",
+          fontSize: "1rem", display: "flex", alignItems: "center", gap: "10px",
+        }}>
+          Troubleshooting & Diagnosis Insights
+          <span style={{
+            backgroundColor: "#2e2e50", color: "#a0a0e0", fontSize: "0.7rem",
+            fontWeight: "700", padding: "2px 10px", borderRadius: "20px",
+            border: "1px solid #4040a0",
+          }}>
+            {verdicts.length} Finding{verdicts.length !== 1 ? "s" : ""}
+          </span>
+        </h3>
+        <span style={{
+          fontSize: "1.1rem", color: "#a0a0c0",
+          transition: "transform 0.3s ease",
+          transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+          display: "inline-block",
+        }}>▼</span>
+      </div>
+
+      {isExpanded && (
+        <div style={{ padding: "20px 24px" }}>
+          {/* TILE GRID — 7 per row */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+            gap: "10px",
+            marginBottom: selectedItem ? "16px" : "0",
+          }}>
+            {verdicts.map((item, idx) => {
+              const c = getTileColors(item);
+              const isSelected = selectedIdx === idx;
+              const causesSummary = Array.isArray(item.causes)
+                ? item.causes.slice(0, 2).join(" / ") : "";
+              return (
+                <div
+                  key={idx}
+                  onClick={() => setSelectedIdx(isSelected ? null : idx)}
+                  style={{
+                    backgroundColor: c.bg,
+                    border: `1.5px solid ${isSelected ? "#ffffff55" : c.border}`,
+                    borderRadius: "10px", padding: "12px", cursor: "pointer",
+                    userSelect: "none", position: "relative",
+                    height: "160px", boxSizing: "border-box",
+                    display: "flex", flexDirection: "column",
+                    justifyContent: "space-between",
+                    outline: isSelected ? `2px solid ${c.border}` : "none",
+                    outlineOffset: "2px", transition: "all 0.15s ease",
+                    boxShadow: isSelected ? `0 0 0 2px ${c.border}` : "none",
+                  }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.filter = "brightness(1.15)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.filter = "brightness(1)"; }}
+                >
+                  {/* Badge */}
+                  <div style={{
+                    position: "absolute", top: "8px", right: "8px",
+                    backgroundColor: c.badgeBg, color: c.badgeText,
+                    fontSize: "0.5rem", fontWeight: "700",
+                    padding: "2px 6px", borderRadius: "4px",
+                    textTransform: "uppercase", whiteSpace: "nowrap",
+                  }}>{c.badgeLabel}</div>
+
+                  {/* Title */}
+                  <div style={{
+                    color: c.titleColor, fontWeight: "800",
+                    fontSize: "0.82rem", lineHeight: "1.3",
+                    paddingRight: "60px", marginTop: "4px",
+                  }}>{item.parameter}</div>
+
+                  {/* Evidence pills */}
+                  {item.evidence && item.evidence.length > 1 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginTop: "4px" }}>
+                      {item.evidence.slice(0, 3).map((ev, i) => (
+                        <span key={i} style={{
+                          fontSize: "0.5rem", fontWeight: "700",
+                          backgroundColor: `${c.border}55`,
+                          color: c.subColor, padding: "1px 5px",
+                          borderRadius: "3px",
+                        }}>{ev.replace(" (Average)", "").replace("Exh. ", "")}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Causes summary */}
+                  <div style={{
+                    color: c.subColor, fontSize: "0.7rem",
+                    fontWeight: "500", lineHeight: "1.4",
+                    overflow: "hidden", display: "-webkit-box",
+                    WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                    flex: 1, marginTop: "6px",
+                  }}>{causesSummary}</div>
+
+                  {/* View details */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: "4px",
+                    color: c.subColor, fontSize: "0.65rem",
+                    fontWeight: "700", marginTop: "8px",
+                  }}>
+                    <span style={{
+                      transition: "transform 0.2s",
+                      transform: isSelected ? "rotate(90deg)" : "rotate(0deg)",
+                      display: "inline-block",
+                    }}>▶</span>
+                    {isSelected ? "Hide details" : "View details"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* DETAIL PANEL */}
+          {selectedItem && (() => {
+            const c = getTileColors(selectedItem);
+            return (
+              <div style={{
+                border: `1.5px solid ${c.border}`,
+                borderRadius: "10px", overflow: "hidden",
+                backgroundColor: c.bg,
+              }}>
+                {/* Detail header */}
+                <div style={{
+                  padding: "12px 20px", backgroundColor: "#0d0d1a",
+                  borderBottom: `1px solid ${c.border}44`,
+                  display: "grid", gridTemplateColumns: "1fr auto 1fr",
+                  alignItems: "center",
+                }}>
+                  <span style={{ color: c.titleColor, fontWeight: "800", fontSize: "0.9rem" }}>
+                    {selectedItem.parameter}
+                  </span>
+                  <span style={{
+                    color: c.subColor, fontSize: "0.7rem", fontWeight: "700",
+                    textTransform: "uppercase", letterSpacing: "0.05em",
+                    opacity: 0.85, textAlign: "center",
+                  }}>
+                    {selectedItem.comparedAgainst ? `vs ${selectedItem.comparedAgainst}` : ""}
+                  </span>
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button
+                      onClick={() => setSelectedIdx(null)}
+                      style={{
+                        background: "none", border: "none",
+                        color: c.subColor, cursor: "pointer",
+                        fontSize: "1rem", lineHeight: 1,
+                      }}
+                    >✕</button>
+                  </div>
+                </div>
+
+                {/* 3-column grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr" }}>
+                  {/* Column headers */}
+                  <div style={{
+                    gridColumn: "1 / -1", display: "grid",
+                    gridTemplateColumns: "1.2fr 1fr 1fr",
+                    backgroundColor: "#0d0d1a",
+                    borderBottom: `1px solid ${c.border}44`,
+                  }}>
+                    {["Observation", "Possible Causes", "Diagnosis & Remedy"].map((h, i) => (
+                      <div key={h} style={{
+                        padding: "8px 16px", fontSize: "0.65rem",
+                        fontWeight: "800", color: c.subColor,
+                        textTransform: "uppercase", letterSpacing: "0.08em",
+                        borderLeft: i > 0 ? `1px solid ${c.border}44` : "none",
+                      }}>{h}</div>
+                    ))}
+                  </div>
+
+                  {/* Observation */}
+                  <div style={{
+                    padding: "16px", fontSize: "0.85rem",
+                    fontWeight: "600", color: c.titleColor, lineHeight: "1.5",
+                  }}>
+                    {selectedItem.finding}
+                  </div>
+
+                  {/* Causes */}
+                  <div style={{ padding: "16px", borderLeft: `1px solid ${c.border}44` }}>
+                    <ul style={{
+                      margin: 0, paddingLeft: "14px",
+                      color: c.subColor, fontSize: "0.82rem",
+                      fontWeight: "500", lineHeight: "1.7",
+                    }}>
+                      {selectedItem.causes.map((cause, i) => (
+                        <li key={i}>{cause}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Remedy */}
+                  <div style={{
+                    padding: "16px",
+                    borderLeft: `1px solid ${c.border}44`,
+                    backgroundColor: "#0f1e2a",
+                  }}>
+                    <ul style={{
+                      margin: 0, paddingLeft: "14px",
+                      color: "#a8d8f0", fontSize: "0.82rem",
+                      fontWeight: "600", lineHeight: "1.7",
+                    }}>
+                      {selectedItem.remedy
+                        .split('.')
+                        .map(s => s.trim())
+                        .filter(s => s.length > 0)
+                        .map((point, i) => (
+                          <li key={i}>{point}.</li>
+                        ))
+                      }
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+    </div>
+  );
+};
+const DiagnosisPanel = ({ report, baseline, analysisMode, availableReports }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [selectedIdx, setSelectedIdx] = useState(null);
+
+  const rawConcerns = getDetectedConcerns(report, baseline, analysisMode);
+  const trendFindings = availableReports && availableReports.length >= 2
+    ? getTrendDiagnosisFindings(availableReports, baseline, analysisMode)
+    : [];
+
+  const allRaw = [...rawConcerns, ...trendFindings];
+
+  const isSFOCRelated = (item) =>
+    item.parameter === "SFOC" ||
+    item.parameter?.toLowerCase().includes("sfoc") ||
+    (item.pattern && ["X1","X2","X3","X4","X12"].includes(item.pattern));
+
+  const sfocFindings = allRaw.filter(isSFOCRelated);
+  const allFindings  = allRaw.filter(f => !isSFOCRelated(f));
+
+  if (allFindings.length === 0 && sfocFindings.length === 0) 
+    return (
+      <div className="enhanced-card" style={{ marginBottom: "32px", borderLeft: "8px solid #16a34a", backgroundColor: "#f0fdf4", padding: "20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <span style={{ fontSize: "1.5rem" }}>✅</span>
+          <span style={{ fontWeight: "700", color: "#166534" }}>
+            No critical deviations detected. Engine parameters are within operational limits.
+          </span>
+        </div>
+      </div>
+    );
+
+// When there ARE findings, render both cards separately
+return (
+  <>
+    {sfocFindings.length > 0 && (
+      <SFOCDiagnosisCard findings={sfocFindings} />
+    )}
+    {allFindings.length > 0 && (
+      <UnifiedDiagnosisCard findings={allFindings} report={report} />
+    )}
+  </>
+);
+
+  const selectedItem = selectedIdx !== null ? allFindings[selectedIdx] : null;
+
+  const getTileColors = (item) => {
+    const isCritical = item.severity === "critical";
+    const isCross = item.pattern?.startsWith("X");
+    if (isCross) return {
+      bg: "#1e1a3a", border: "#4c3f9f", titleColor: "#d4cefb",
+      subColor: "#a89cf5", badgeBg: "#4c3f9f", badgeText: "#d4cefb", badgeLabel: "🔗 Cross-Corr"
+    };
+    if (isCritical) return {
+      bg: "#3d1a1a", border: "#7f2a2a", titleColor: "#f8d7d7",
+      subColor: "#f09898", badgeBg: "#7f2a2a", badgeText: "#ffd0d0", badgeLabel: "🔴 Critical"
+    };
+    return {
+      bg: "#3a3210", border: "#6b5a14", titleColor: "#f5e9c0",
+      subColor: "#d4b84a", badgeBg: "#6b5a14", badgeText: "#f5e0a0", badgeLabel: "🟡 Warning"
+    };
+  };
+
+  return (
+    <div style={{ marginBottom: "32px", borderRadius: "14px", overflow: "hidden", border: "1.5px solid #2a2a3a", backgroundColor: "#12121c", boxShadow: "0 4px 24px rgba(0,0,0,0.25)" }}>
+
+      {/* HEADER */}
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
+        style={{ backgroundColor: "#1a1a2e", borderBottom: isExpanded ? "1.5px solid #2e2e50" : "none", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }}
+      >
+        <h3 style={{ margin: 0, color: "#e8e8f8", fontWeight: "800", fontSize: "1rem", display: "flex", alignItems: "center", gap: "10px" }}>
+          <span style={{ fontSize: "1.2rem" }}>🔍</span>
+          Troubleshooting & Diagnosis Insights
+          <span style={{ backgroundColor: "#2e2e50", color: "#a0a0e0", fontSize: "0.7rem", fontWeight: "700", padding: "2px 10px", borderRadius: "20px", border: "1px solid #4040a0" }}>
+            {allFindings.length} Finding{allFindings.length !== 1 ? "s" : ""}
+          </span>
+        </h3>
+        <span style={{ fontSize: "1.1rem", color: "#a0a0c0", transition: "transform 0.3s ease", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", display: "inline-block" }}>▼</span>
+      </div>
+
+      {isExpanded && (
+        <div style={{ padding: "20px 24px" }}>
+
+          {/* UNIFORM TILE GRID */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+            gap: "12px",
+            marginBottom: selectedItem ? "16px" : "0"
+          }}>
+            {allFindings.map((item, idx) => {
+              const c = getTileColors(item);
+              const isSelected = selectedIdx === idx;
+              const causesSummary = Array.isArray(item.causes)
+                ? item.causes.slice(0, 2).join(" / ")
+                : "";
+
+              return (
+                <div
+                  key={idx}
+                  onClick={() => setSelectedIdx(isSelected ? null : idx)}
+                  style={{
+                    backgroundColor: c.bg,
+                    border: `1.5px solid ${isSelected ? "#ffffff55" : c.border}`,
+                    borderRadius: "10px",
+                    padding: "16px",
+                    cursor: "pointer",
+                    userSelect: "none",
+                    position: "relative",
+                    height: "160px",           // ← FIXED HEIGHT for all tiles
+                    boxSizing: "border-box",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    outline: isSelected ? `2px solid ${c.border}` : "none",
+                    outlineOffset: "2px",
+                    transition: "all 0.15s ease",
+                    boxShadow: isSelected ? `0 0 0 2px ${c.border}` : "none",
+                  }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.filter = "brightness(1.15)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.filter = "brightness(1)"; }}
+                >
+                  {/* Badge top-right */}
+                  <div style={{
+                    position: "absolute", top: "10px", right: "10px",
+                    backgroundColor: c.badgeBg, color: c.badgeText,
+                    fontSize: "0.55rem", fontWeight: "700",
+                    padding: "2px 7px", borderRadius: "4px", textTransform: "uppercase",
+                    whiteSpace: "nowrap"
+                  }}>
+                    {c.badgeLabel}
+                  </div>
+
+                  {/* Title */}
+                  <div style={{
+                    color: c.titleColor, fontWeight: "800",
+                    fontSize: "0.88rem", lineHeight: "1.3",
+                    paddingRight: "70px",
+                    marginTop: "4px"
+                  }}>
+                    {item.parameter}
+                  </div>
+
+                  {/* Causes summary */}
+                  <div style={{
+                    color: c.subColor, fontSize: "0.75rem",
+                    fontWeight: "500", lineHeight: "1.4",
+                    overflow: "hidden",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: "vertical",
+                    flex: 1,
+                    marginTop: "8px"
+                  }}>
+                    {causesSummary}
+                  </div>
+
+                  {/* View/Hide details */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: "5px",
+                    color: c.subColor, fontSize: "0.7rem", fontWeight: "700",
+                    marginTop: "10px"
+                  }}>
+                    <span style={{ transition: "transform 0.2s", transform: isSelected ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block" }}>▶</span>
+                    {isSelected ? "Hide details" : "View details"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* DETAIL PANEL — shown below grid when a tile is selected */}
+          {selectedItem && (() => {
+            const c = getTileColors(selectedItem);
+            return (
+              <div style={{
+                border: `1.5px solid ${c.border}`,
+                borderRadius: "10px",
+                overflow: "hidden",
+                backgroundColor: c.bg,
+                marginTop: "4px"
+              }}>
+                {/* Detail header */}
+<div style={{
+  padding: "12px 20px",
+  backgroundColor: "#0d0d1a",
+  borderBottom: `1px solid ${c.border}44`,
+  display: "grid",
+  gridTemplateColumns: "1fr auto 1fr",
+  alignItems: "center"
+}}>
+  {/* LEFT — parameter name */}
+  <span style={{ color: c.titleColor, fontWeight: "800", fontSize: "0.9rem" }}>
+    {selectedItem.parameter}
+  </span>
+
+  {/* CENTER — vs compared against (always centered) */}
+  <span style={{
+    color: c.subColor,
+    fontSize: "0.7rem",
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    opacity: 0.85,
+    textAlign: "center"
+  }}>
+    {selectedItem.comparedAgainst ? `vs ${selectedItem.comparedAgainst}` : ""}
+  </span>
+
+  {/* RIGHT — close button */}
+  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+    <button
+      onClick={() => setSelectedIdx(null)}
+      style={{ background: "none", border: "none", color: c.subColor, cursor: "pointer", fontSize: "1rem", lineHeight: 1 }}
+    >✕</button>
+  </div>
+</div>
+
+                {/* 3-column grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr" }}>
+                  {/* Column headers */}
+                  <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr", backgroundColor: "#0d0d1a", borderBottom: `1px solid ${c.border}44` }}>
+                    {["Observation", "Possible Causes", "Diagnosis & Remedy"].map((h, i) => (
+                      <div key={h} style={{
+                        padding: "8px 16px", fontSize: "0.65rem", fontWeight: "800",
+                        color: c.subColor, textTransform: "uppercase", letterSpacing: "0.08em",
+                        borderLeft: i > 0 ? `1px solid ${c.border}44` : "none"
+                      }}>{h}</div>
+                    ))}
+                  </div>
+
+                  {/* Observation */}
+                  <div style={{ padding: "16px", fontSize: "0.85rem", fontWeight: "600", color: c.titleColor, lineHeight: "1.5" }}>
+                    {selectedItem.finding}
+                  </div>
+
+                  {/* Causes */}
+                  <div style={{ padding: "16px", borderLeft: `1px solid ${c.border}44` }}>
+                    <ul style={{ margin: 0, paddingLeft: "14px", color: c.subColor, fontSize: "0.82rem", fontWeight: "500", lineHeight: "1.7" }}>
+                      {selectedItem.causes.map((cause, i) => (
+                        <li key={i}>{cause}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Remedy */}
+                  <div style={{ padding: "16px", borderLeft: `1px solid ${c.border}44`, backgroundColor: "#0f1e2a" }}>
+                    <ul style={{ margin: 0, paddingLeft: "14px", color: "#a8d8f0", fontSize: "0.82rem", fontWeight: "600", lineHeight: "1.7" }}>
+                      {selectedItem.remedy
+                        .split('.')
+                        .map(s => s.trim())
+                        .filter(s => s.length > 0)
+                        .map((point, i) => (
+                          <li key={i}>{point}.</li>
+                        ))
+                      }
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+        </div>
+      )}
+    </div>
+  );
+};
+
+const TrendDiagnosisPanel = ({ availableReports, baseline, analysisMode }) => null;
+
 // --- NEW COMPONENT: Raw Report Download Dropdown (Click to Download) ---
 // --- UPDATED COMPONENT: Raw Report Download Dropdown (Centered Modal) ---
 // --- UPDATED COMPONENT: Raw Report Download Dropdown (Flyout Style) ---
@@ -3303,6 +4108,7 @@ export default function Performance({
         style={{
           marginTop: "16px",
           padding: "16px",
+          marginBottom: "24px",
           borderRadius: "8px",
           backgroundColor: "#fef2f2",
           border: "2px solid #dc2626",
@@ -3645,18 +4451,15 @@ export default function Performance({
             const lastDate =
               genData?.monthly_performance_list?.[0]?.report_date || null;
 
-            // Use designation (e.g., 'AE-1') as key
-            const label =
-              gen.designation ||
-              gen.generator_designation ||
-              `Gen ${gen.generator_id}`;
-            aeDates[label] = lastDate;
+            // Consistently save the date using the generator_id
+            aeDates[gen.generator_id] = lastDate; 
           } catch (err) {
             console.warn(
               `Could not fetch history for generator ${gen.generator_id}`,
               err,
             );
-            aeDates[gen.designation] = null;
+            // Consistently save the fallback using the generator_id
+            aeDates[gen.generator_id] = null;
           }
         }),
       );
@@ -8439,13 +9242,31 @@ export default function Performance({
 
         if (allMonthlyReports.length === 1) {
           const diagReport = allMonthlyReports[0];
-          const concerns = getDetectedConcerns(
-            diagReport,
-            baseline,
-            analysisMode,
-          );
+          
+          // 1. Get ALL raw findings (matching UI logic)
+          const rawConcerns = getDetectedConcerns(diagReport, baseline, analysisMode);
+          const trendFindings = availableReports && availableReports.length >= 2
+            ? getTrendDiagnosisFindings(availableReports, baseline, analysisMode)
+            :[];
+          const allRaw = [...rawConcerns, ...trendFindings];
+
+          // 2. Separate SFOC findings from the rest (matching UI logic)
+          const isSFOCRelated = (item) =>
+            item.parameter === "SFOC" ||
+            item.parameter?.toLowerCase().includes("sfoc") ||
+            (item.pattern && ["X1","X2","X3","X4","X12"].includes(item.pattern));
+
+          const sfocFindings = allRaw.filter(isSFOCRelated);
+          const allFindings  = allRaw.filter(f => !isSFOCRelated(f));
+
+          // 3. APPLY THE GROUPING LOGIC (This fixes the 5 vs 3 mismatch!)
+          const verdicts = groupIntoVerdicts(allFindings);
+
+          // 4. Combine them for the PDF output
+          const concerns = [...sfocFindings, ...verdicts];
 
           if (concerns.length > 0) {
+
             // ── Force new page ──────────────────────────────────────────────────
             pdf.addPage();
             currentY = drawHeader(pdf, margin);
@@ -9166,392 +9987,446 @@ export default function Performance({
         // Layout: [Title Bar] + [Chart Box] + [Legend Strip] — 2 per page
         // ======================================================================
         {
-          const isAuxMode = analysisMode === "auxiliaryEngine";
+  const isAuxMode = analysisMode === "auxiliaryEngine";
 
-          const MAIN_TREND_PARAMS = [
-            { key: "Turbospeed", label: "Turbo Speed", group: "ABS_TURBO" },
-            { key: "FIPI", label: "Fuel Index", group: "B" },
-            { key: "Pmax", label: "Pmax", group: "A" },
-            { key: "Pcomp", label: "Pcomp", group: "A" },
-            { key: "ScavAir", label: "Scav Air", group: "B" },
-            {
-              key: "Exh_Cylinder_outlet",
-              label: "Exh Cyl Outlet",
-              group: "ABS_EXHAUST",
-            },
-            { key: "SFOC", label: "SFOC", group: "B" },
-          ];
-          const AUX_TREND_PARAMS = [
-            { key: "Pmax", label: "Pmax", group: "A" },
-            { key: "FIPI", label: "Fuel Index", group: "B" },
-            { key: "ScavAirPressure", label: "Scav Air", group: "B" },
-            {
-              key: "Exh_Cylinder_outlet",
-              label: "Exh Cyl Outlet",
-              group: "ABS_EXHAUST",
-            },
-          ];
+  const MAIN_TREND_PARAMS = [
+    { key: "Turbospeed", label: "Turbo Speed", group: "ABS_TURBO" },
+    { key: "FIPI", label: "Fuel Index", group: "B" },
+    { key: "Pmax", label: "Pmax", group: "A" },
+    { key: "Pcomp", label: "Pcomp", group: "A" },
+    { key: "ScavAir", label: "Scav Air", group: "B" },
+    {
+      key: "Exh_Cylinder_outlet",
+      label: "Exh Cyl Outlet",
+      group: "ABS_EXHAUST",
+    },
+    { key: "SFOC", label: "SFOC", group: "B" },
+  ];
+  const AUX_TREND_PARAMS = [
+    { key: "Pmax", label: "Pmax", group: "A" },
+    { key: "FIPI", label: "Fuel Index", group: "B" },
+    { key: "ScavAirPressure", label: "Scav Air", group: "B" },
+    {
+      key: "Exh_Cylinder_outlet",
+      label: "Exh Cyl Outlet",
+      group: "ABS_EXHAUST",
+    },
+  ];
 
-          const trendParams = (
-            isAuxMode ? AUX_TREND_PARAMS : MAIN_TREND_PARAMS
-          ).filter((p) => baseline[p.key]);
+  const trendParams = (
+    isAuxMode ? AUX_TREND_PARAMS : MAIN_TREND_PARAMS
+  ).filter((p) => baseline[p.key]);
 
-          const sourceReports =
-            availableReports.length > 0 ? availableReports : allMonthlyReports;
-          const sortedReports = [...sourceReports].sort(
-            (a, b) => new Date(a.report_date) - new Date(b.report_date),
+  // ── One-year filter (matches UI) ──────────────────────────────────────────
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  const sourceReports = (
+    availableReports.length > 0 ? availableReports : allMonthlyReports
+  ).filter(
+    (r) => !r.report_date || new Date(r.report_date) >= oneYearAgo,
+  );
+
+  const sortedReports = [...sourceReports].sort(
+    (a, b) => new Date(a.report_date) - new Date(b.report_date),
+  );
+
+  if (trendParams.length > 0 && sortedReports.length >= 2) {
+    const xAxisStr = isAuxMode ? "load_percentage" : "load";
+
+    const getThresholds = (group) => {
+      if (group === "A")           return { amber: 3,   red: 5    };
+      if (group === "B")           return { amber: 5,   red: 10   };
+      if (group === "ABS_TURBO")   return { amber: 500, red: 1000 };
+      if (group === "ABS_EXHAUST") return { amber: 40,  red: 60   };
+      return                              { amber: 5,   red: 10   };
+    };
+
+    // ── NEW: unit helper (matches UI) ──────────────────────────────────────
+    const getUnit = (group) => {
+      if (group === "ABS_TURBO")   return "RPM";
+      if (group === "ABS_EXHAUST") return "°C";
+      return "%";
+    };
+
+    // ── UPDATED: absolute delta for Turbo & Exhaust, % for all others ──────
+    const buildSeries = (paramKey, group) =>
+      sortedReports.map((report) => {
+        const load = isAuxMode ? report.load_percentage : report.load;
+        const base = interpolateBaseline(
+          baseline,
+          load,
+          paramKey,
+          xAxisStr,
+        );
+        const actual = report[paramKey];
+        if (base == null || actual == null || base === 0)
+          return { label: report.displayName, val: null };
+        const val =
+          group === "ABS_TURBO" || group === "ABS_EXHAUST"
+            ? actual - base
+            : ((actual - base) / base) * 100;
+        return { label: report.displayName, val };
+      });
+
+    // ── Slot layout ────────────────────────────────────────────────────
+    const usableW = pageWidth - margin * 2;
+    const titleH = 10;
+    const chartBoxH = 85;
+    const legStripH = 10;
+    const slotGap = 5;
+
+    const plotPadL = 12;
+    const plotPadR = 6;
+    const plotPadT = 10;
+    const plotPadB = 16;
+    const plotW = usableW - plotPadL - plotPadR;
+    const plotH = chartBoxH - plotPadT - plotPadB;
+
+    const BAND_COLORS = {
+      green: [220, 252, 231],
+      amber: [254, 243, 199],
+      red:   [254, 226, 226],
+    };
+
+    const LINE_COLOR = [8, 145, 178];
+
+    const drawDashedSeg = (
+      x1, y1, x2, y2,
+      dashLen, gapLen,
+      r, g, b, lw,
+    ) => {
+      const dx = x2 - x1, dy = y2 - y1;
+      const total = Math.sqrt(dx * dx + dy * dy);
+      if (total < 0.1) return;
+      const ux = dx / total, uy = dy / total;
+      let d = 0, on = true;
+      while (d < total) {
+        const seg = Math.min(on ? dashLen : gapLen, total - d);
+        if (on) {
+          pdf.setDrawColor(r, g, b);
+          pdf.setLineWidth(lw);
+          pdf.line(
+            x1 + ux * d,       y1 + uy * d,
+            x1 + ux * (d + seg), y1 + uy * (d + seg),
           );
+        }
+        d += seg;
+        on = !on;
+      }
+    };
 
-          if (trendParams.length > 0 && sortedReports.length >= 2) {
-            const xAxisStr = isAuxMode ? "load_percentage" : "load";
+    // ── Section header ─────────────────────────────────────────────────
+    pdf.addPage();
+    currentY = drawHeader(pdf, margin);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(11);
+    pdf.setTextColor(0, 0, 0);
+    pdf.text(
+      `SECTION ${sectionIndex}: DEVIATION TREND OVER TIME`,
+      margin,
+      currentY,
+    );
+    currentY += 8;
+    sectionIndex++;
 
-            const getThresholds = (group) => {
-              if (group === "A") return { amber: 3, red: 5 };
-              if (group === "B") return { amber: 5, red: 10 };
-              if (group === "ABS_TURBO") return { amber: 500, red: 1000 };
-              if (group === "ABS_EXHAUST") return { amber: 40, red: 60 };
-              return { amber: 5, red: 10 };
-            };
+    let chartIndexOnPage = 0;
 
-            const getUnit = (group) => {
-              if (group === "ABS_TURBO") return "RPM";
-              if (group === "ABS_EXHAUST") return "°C";
-              return "%";
-            };
+    for (let pi = 0; pi < trendParams.length; pi++) {
+      const param = trendParams[pi];
+      const unit = getUnit(param.group);
+      const { amber, red } = getThresholds(param.group);
+      const series = buildSeries(param.key, param.group);
+      const validVals = series
+        .map((s) => s.val)
+        .filter((v) => v != null);
+      if (validVals.length < 2) continue;
 
-            const buildSeries = (paramKey, group) =>
-              sortedReports.map((report) => {
-                const load = isAuxMode ? report.load_percentage : report.load;
-                const base = interpolateBaseline(
-                  baseline,
-                  load,
-                  paramKey,
-                  xAxisStr,
-                );
-                const actual = report[paramKey];
-                if (base == null || actual == null || base === 0)
-                  return { label: report.displayName, val: null };
-                const val =
-                  group === "ABS_TURBO" || group === "ABS_EXHAUST"
-                    ? actual - base
-                    : ((actual - base) / base) * 100;
-                return { label: report.displayName, val };
-              });
+      if (chartIndexOnPage >= 2) {
+        pdf.addPage();
+        currentY = drawHeader(pdf, margin);
+        chartIndexOnPage = 0;
+      }
 
-            // ── Slot layout ────────────────────────────────────────────────────
-            const usableW = pageWidth - margin * 2;
-            const titleH = 10;
-            const chartBoxH = 85;
-            const legStripH = 10; // reduced
-            const slotGap = 5;
+      // ── UPDATED: minimum extent per group (matches UI) ─────────────────
+      const maxAbs = Math.max(...validVals.map(Math.abs), red * 1.1);
+      const minExtent =
+        param.group === "ABS_TURBO"   ? 1200 :
+        param.group === "ABS_EXHAUST" ? 70   : 15;
+      const yExtent = Math.max(maxAbs * 1.2, minExtent);
 
-            const plotPadL = 12;
-            const plotPadR = 6;
-            const plotPadT = 10;
-            const plotPadB = 16;
-            const plotW = usableW - plotPadL - plotPadR;
-            const plotH = chartBoxH - plotPadT - plotPadB;
+      const titleBarY = currentY;
+      const chartBoxY = titleBarY + titleH;
+      const legStripY = chartBoxY + chartBoxH;
 
-            const BAND_COLORS = {
-              green: [220, 252, 231],
-              amber: [254, 243, 199],
-              red: [254, 226, 226],
-            };
+      const plotX   = margin + plotPadL;
+      const plotTop = chartBoxY + plotPadT;
+      const zeroY   = plotTop + plotH / 2;
+      const pxPerU  = plotH / 2 / yExtent;
 
-            const LINE_COLOR = [8, 145, 178];
+      const n    = series.length;
+      const step = plotW / Math.max(n - 1, 1);
+      const toX  = (idx) => plotX + idx * step;
+      const toY  = (val) =>
+        Math.max(plotTop, Math.min(plotTop + plotH, zeroY - val * pxPerU));
 
-            const drawDashedSeg = (
-              x1,
-              y1,
-              x2,
-              y2,
-              dashLen,
-              gapLen,
-              r,
-              g,
-              b,
-              lw,
-            ) => {
-              const dx = x2 - x1,
-                dy = y2 - y1;
-              const total = Math.sqrt(dx * dx + dy * dy);
-              if (total < 0.1) return;
-              const ux = dx / total,
-                uy = dy / total;
-              let d = 0,
-                on = true;
-              while (d < total) {
-                const seg = Math.min(on ? dashLen : gapLen, total - d);
-                if (on) {
-                  pdf.setDrawColor(r, g, b);
-                  pdf.setLineWidth(lw);
-                  pdf.line(
-                    x1 + ux * d,
-                    y1 + uy * d,
-                    x1 + ux * (d + seg),
-                    y1 + uy * (d + seg),
-                  );
-                }
-                d += seg;
-                on = !on;
-              }
-            };
+      // ── 1. TITLE BAR ───────────────────────────────────────────────
+      pdf.setFillColor(241, 245, 249);
+      pdf.setDrawColor(226, 232, 240);
+      pdf.setLineWidth(0.4);
+      pdf.rect(margin, titleBarY, usableW, titleH, "FD");
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(
+        `${param.label}  (${unit} deviation)`,
+        margin + usableW / 2,
+        titleBarY + 6.5,
+        { align: "center" },
+      );
 
-            // ── Section header ─────────────────────────────────────────────────
-            pdf.addPage();
-            currentY = drawHeader(pdf, margin);
-            pdf.setFont("helvetica", "bold");
-            pdf.setFontSize(11);
-            pdf.setTextColor(0, 0, 0);
-            pdf.text(
-              `SECTION ${sectionIndex}: DEVIATION TREND OVER TIME`,
-              margin,
-              currentY,
-            );
-            currentY += 8;
-            sectionIndex++;
+      // ── 2. CHART BOX ───────────────────────────────────────────────
+      pdf.setFillColor(255, 255, 255);
+      pdf.setDrawColor(226, 232, 240);
+      pdf.setLineWidth(0.4);
+      pdf.rect(margin, chartBoxY, usableW, chartBoxH, "FD");
 
-            let chartIndexOnPage = 0;
+      // Inner plot bg
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(plotX, plotTop, plotW, plotH, "F");
 
-            for (let pi = 0; pi < trendParams.length; pi++) {
-              const param = trendParams[pi];
-              const unit = getUnit(param.group);
-              const { amber, red } = getThresholds(param.group);
-              const series = buildSeries(param.key, param.group);
-              const validVals = series
-                .map((s) => s.val)
-                .filter((v) => v != null);
-              if (validVals.length < 2) continue;
+      // ── Threshold bands (red bg → amber overlay → green center) ────
+      const clamp = (v) =>
+        Math.max(plotTop, Math.min(plotTop + plotH, v));
 
-              if (chartIndexOnPage >= 2) {
-                pdf.addPage();
-                currentY = drawHeader(pdf, margin);
-                chartIndexOnPage = 0;
-              }
+      pdf.setFillColor(...BAND_COLORS.red);
+      pdf.rect(plotX, plotTop, plotW, plotH, "F");
 
-              const maxAbs = Math.max(...validVals.map(Math.abs), red * 1.1);
-              const yExtent = maxAbs * 1.2;
+      pdf.setFillColor(...BAND_COLORS.amber);
+      const aTop1 = clamp(zeroY - red   * pxPerU);
+      const aBot1 = clamp(zeroY - amber * pxPerU);
+      if (aBot1 > aTop1) pdf.rect(plotX, aTop1, plotW, aBot1 - aTop1, "F");
+      const aTop2 = clamp(zeroY + amber * pxPerU);
+      const aBot2 = clamp(zeroY + red   * pxPerU);
+      if (aBot2 > aTop2) pdf.rect(plotX, aTop2, plotW, aBot2 - aTop2, "F");
 
-              const titleBarY = currentY;
-              const chartBoxY = titleBarY + titleH;
-              const legStripY = chartBoxY + chartBoxH;
+      pdf.setFillColor(...BAND_COLORS.green);
+      const gTop = clamp(zeroY - amber * pxPerU);
+      const gBot = clamp(zeroY + amber * pxPerU);
+      if (gBot > gTop) pdf.rect(plotX, gTop, plotW, gBot - gTop, "F");
 
-              const plotX = margin + plotPadL;
-              const plotTop = chartBoxY + plotPadT;
-              const zeroY = plotTop + plotH / 2;
-              const pxPerU = plotH / 2 / yExtent;
+      // ── Threshold dashed lines ─────────────────────────────────────
+      [
+        { v:  amber, r: 245, g: 158, b: 11 },
+        { v: -amber, r: 245, g: 158, b: 11 },
+        { v:  red,   r: 239, g: 68,  b: 68 },
+        { v: -red,   r: 239, g: 68,  b: 68 },
+      ].forEach(({ v, r, g, b }) => {
+        const ty = zeroY - v * pxPerU;
+        if (ty < plotTop || ty > plotTop + plotH) return;
+        drawDashedSeg(plotX, ty, plotX + plotW, ty, 2.5, 2, r, g, b, 0.5);
+      });
 
-              const n = series.length;
-              const step = plotW / Math.max(n - 1, 1);
-              const toX = (idx) => plotX + idx * step;
-              const toY = (val) =>
-                Math.max(
-                  plotTop,
-                  Math.min(plotTop + plotH, zeroY - val * pxPerU),
-                );
+      // Zero dashed green line
+      drawDashedSeg(plotX, zeroY, plotX + plotW, zeroY, 3, 2, 22, 163, 74, 0.7);
 
-              // ── 1. TITLE BAR ───────────────────────────────────────────────
-              pdf.setFillColor(241, 245, 249);
-              pdf.setDrawColor(226, 232, 240);
-              pdf.setLineWidth(0.4);
-              pdf.rect(margin, titleBarY, usableW, titleH, "FD");
-              pdf.setFont("helvetica", "bold");
-              pdf.setFontSize(9);
-              pdf.setTextColor(15, 23, 42);
-              pdf.text(
-                `${param.label}  (${unit} deviation)`,
-                margin + usableW / 2,
-                titleBarY + 6.5,
-                { align: "center" },
-              );
+      // ── Y-axis labels (UPDATED: group-aware ticks & units) ─────────
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(5);
+      pdf.setTextColor(100, 116, 139);
 
-              // ── 2. CHART BOX ───────────────────────────────────────────────
-              pdf.setFillColor(255, 255, 255);
-              pdf.setDrawColor(226, 232, 240);
-              pdf.setLineWidth(0.4);
-              pdf.rect(margin, chartBoxY, usableW, chartBoxH, "FD");
+      // ── UPDATED: smart tick set per group (matches UI) ────────────
+      const yTicks = (() => {
+        if (param.group === "ABS_TURBO") {
+          const tickStep = yExtent <= 1500 ? 500 : 1000;
+          const raw = [];
+          for (
+            let t = Math.ceil(-yExtent / tickStep) * tickStep;
+            t <= yExtent;
+            t += tickStep
+          ) raw.push(t);
+          return [...new Set([...raw, -1000, -500, 0, 500, 1000])].sort(
+            (a, b) => a - b,
+          );
+        }
+        if (param.group === "ABS_EXHAUST") {
+          const tickStep = yExtent <= 80 ? 20 : 30;
+          const raw = [];
+          for (
+            let t = Math.ceil(-yExtent / tickStep) * tickStep;
+            t <= yExtent;
+            t += tickStep
+          ) raw.push(t);
+          return [...new Set([...raw, -60, -40, 0, 40, 60])].sort(
+            (a, b) => a - b,
+          );
+        }
+        // Percentage ticks — original logic preserved exactly
+        return [yExtent, red, amber, 0, -amber, -red, -yExtent];
+      })();
 
-              // Inner plot bg
-              pdf.setFillColor(248, 250, 252);
-              pdf.rect(plotX, plotTop, plotW, plotH, "F");
+      yTicks.forEach((v) => {
+        const ty = zeroY - v * pxPerU;
+        if (ty < plotTop + 1 || ty > plotTop + plotH - 1) return;
+        // ── UPDATED: label format uses correct unit suffix ─────────
+        const lbl =
+          v === 0
+            ? "0"
+            : `${v > 0 ? "+" : ""}${
+                Number.isInteger(v) ? v : v.toFixed(0)
+              }${unit === "%" ? "%" : ""}`;
+        pdf.text(lbl, plotX - 1, ty + 1.5, { align: "right" });
+      });
 
-              // ── Threshold bands (red bg → amber overlay → green center) ────
-              const clamp = (v) =>
-                Math.max(plotTop, Math.min(plotTop + plotH, v));
+      // Y unit rotated
+      pdf.setFontSize(5);
+      pdf.text(unit, margin + 3, plotTop + plotH / 2, {
+        angle: 90,
+        align: "center",
+      });
 
-              pdf.setFillColor(...BAND_COLORS.red);
-              pdf.rect(plotX, plotTop, plotW, plotH, "F");
+      // ── X-axis — ALL months always shown ──────────────────────────
+      const availPerLabel = plotW / n;
+      const xFontSize =
+        availPerLabel < 12 ? 4 : availPerLabel < 18 ? 4.5 : 5;
+      pdf.setFontSize(xFontSize);
+      pdf.setTextColor(100, 116, 139);
+      series.forEach((pt, idx) => {
+        pdf.text(pt.label, toX(idx), plotTop + plotH + 5, {
+          align: "center",
+          maxWidth: availPerLabel * 0.95,
+        });
+      });
 
-              pdf.setFillColor(...BAND_COLORS.amber);
-              const aTop1 = clamp(zeroY - red * pxPerU);
-              const aBot1 = clamp(zeroY - amber * pxPerU);
-              if (aBot1 > aTop1)
-                pdf.rect(plotX, aTop1, plotW, aBot1 - aTop1, "F");
-              const aTop2 = clamp(zeroY + amber * pxPerU);
-              const aBot2 = clamp(zeroY + red * pxPerU);
-              if (aBot2 > aTop2)
-                pdf.rect(plotX, aTop2, plotW, aBot2 - aTop2, "F");
+      // ── NEW: Polynomial regression curve (quadratic, matches UI) ──
+      const validPts = series
+        .map((pt, i) => ({ i, v: pt.val }))
+        .filter((p) => p.v != null);
 
-              pdf.setFillColor(...BAND_COLORS.green);
-              const gTop = clamp(zeroY - amber * pxPerU);
-              const gBot = clamp(zeroY + amber * pxPerU);
-              if (gBot > gTop) pdf.rect(plotX, gTop, plotW, gBot - gTop, "F");
-
-              // ── Threshold dashed lines ─────────────────────────────────────
-              [
-                { v: amber, r: 245, g: 158, b: 11 },
-                { v: -amber, r: 245, g: 158, b: 11 },
-                { v: red, r: 239, g: 68, b: 68 },
-                { v: -red, r: 239, g: 68, b: 68 },
-              ].forEach(({ v, r, g, b }) => {
-                const ty = zeroY - v * pxPerU;
-                if (ty < plotTop || ty > plotTop + plotH) return;
-                drawDashedSeg(
-                  plotX,
-                  ty,
-                  plotX + plotW,
-                  ty,
-                  2.5,
-                  2,
-                  r,
-                  g,
-                  b,
-                  0.5,
-                );
-              });
-
-              // Zero dashed green line
-              drawDashedSeg(
-                plotX,
-                zeroY,
-                plotX + plotW,
-                zeroY,
-                3,
-                2,
-                22,
-                163,
-                74,
-                0.7,
-              );
-
-              // ── Y-axis labels ──────────────────────────────────────────────
-              pdf.setFont("helvetica", "normal");
-              pdf.setFontSize(5);
-              pdf.setTextColor(100, 116, 139);
-
-              const yTicks = [yExtent, red, amber, 0, -amber, -red, -yExtent];
-              yTicks.forEach((v) => {
-                const ty = zeroY - v * pxPerU;
-                if (ty < plotTop + 1 || ty > plotTop + plotH - 1) return;
-                const lbl =
-                  v === 0
-                    ? "0"
-                    : `${v > 0 ? "+" : ""}${Number.isInteger(v) ? v : v.toFixed(0)}${unit === "%" ? "%" : ""}`;
-                pdf.text(lbl, plotX - 1, ty + 1.5, { align: "right" });
-              });
-
-              // Y unit rotated
-              pdf.setFontSize(5);
-              pdf.text(unit, margin + 3, plotTop + plotH / 2, {
-                angle: 90,
-                align: "center",
-              });
-
-              // ── X-axis — ALL months always shown ──────────────────────────
-              // Calculate available width per label and pick font size accordingly
-              const availPerLabel = plotW / n;
-              const xFontSize =
-                availPerLabel < 12 ? 4 : availPerLabel < 18 ? 4.5 : 5;
-              pdf.setFontSize(xFontSize);
-              pdf.setTextColor(100, 116, 139);
-              series.forEach((pt, idx) => {
-                pdf.text(pt.label, toX(idx), plotTop + plotH + 5, {
-                  align: "center",
-                  maxWidth: availPerLabel * 0.95,
-                });
-              });
-
-              // ── Data line + dots + VALUE LABELS (clamped inside plot) ──────
-              let prevX = null,
-                prevY = null;
-              series.forEach((pt, idx) => {
-                if (pt.val == null) {
-                  prevX = null;
-                  prevY = null;
-                  return;
-                }
-                const cx = toX(idx);
-                const cy = toY(pt.val); // already clamped to plotTop..plotTop+plotH
-
-                // Line
-                if (prevX !== null) {
-                  pdf.setDrawColor(...LINE_COLOR);
-                  pdf.setLineWidth(1.3);
-                  pdf.line(prevX, prevY, cx, cy);
-                }
-
-                // Dot
-                pdf.setFillColor(...LINE_COLOR);
-                pdf.circle(cx, cy, 1.3, "F");
-
-                // Value label — clamp so it never exits the chart box
-                const valLbl = `${pt.val > 0 ? "+" : ""}${pt.val.toFixed(1)}${unit === "%" ? "%" : ""}`;
-                pdf.setFontSize(4);
-                pdf.setTextColor(...LINE_COLOR);
-
-                // Preferred: above dot if positive, below if negative
-                let labelY = pt.val >= 0 ? cy - 2.5 : cy + 5;
-                // Clamp label inside plot area vertically
-                labelY = Math.max(
-                  plotTop + 4,
-                  Math.min(plotTop + plotH - 2, labelY),
-                );
-                pdf.text(valLbl, cx, labelY, { align: "center" });
-
-                prevX = cx;
-                prevY = cy;
-              });
-
-              // ── 3. LEGEND STRIP (compact) ──────────────────────────────────
-              pdf.setFillColor(252, 252, 253);
-              pdf.setDrawColor(226, 232, 240);
-              pdf.setLineWidth(0.4);
-              pdf.rect(margin, legStripY, usableW, legStripH, "FD");
-
-              const legendItems = [
-                { label: `±${amber}${unit} Amber`, color: [245, 158, 11] },
-                { label: `±${red}${unit} Red`, color: [239, 68, 68] },
-                { label: "Zero Baseline", color: [22, 163, 74] },
-                { label: param.label, color: LINE_COLOR },
-              ];
-
-              pdf.setFont("helvetica", "normal");
-              pdf.setFontSize(4.5); // reduced font
-              const ICON_R = 1.5; // reduced icon
-              const GAP = 5;
-              const itemWidths = legendItems.map(
-                (item) => ICON_R * 2 + 3 + pdf.getTextWidth(item.label) + GAP,
-              );
-              const totalW = itemWidths.reduce((a, b) => a + b, 0);
-              let legX = margin + (usableW - totalW) / 2;
-              const legY = legStripY + 6;
-
-              legendItems.forEach((item, i) => {
-                const [r, g, b] = item.color;
-                pdf.setFillColor(r, g, b);
-                pdf.circle(legX + ICON_R, legY - 1.5, ICON_R, "F");
-                pdf.setTextColor(71, 85, 105);
-                pdf.text(item.label, legX + ICON_R * 2 + 3, legY);
-                legX += itemWidths[i];
-              });
-
-              currentY = legStripY + legStripH + slotGap;
-              chartIndexOnPage++;
-            }
-
-            currentY += 4;
+      let coeffs = null;
+      if (validPts.length >= 3) {
+        const nn = validPts.length;
+        const xs = validPts.map((p) => p.i);
+        const ys = validPts.map((p) => p.v);
+        let sumX=0, sumX2=0, sumX3=0, sumX4=0,
+            sumY=0, sumXY=0, sumX2Y=0;
+        for (let i = 0; i < nn; i++) {
+          sumX   += xs[i];       sumX2  += xs[i] ** 2;
+          sumX3  += xs[i] ** 3;  sumX4  += xs[i] ** 4;
+          sumY   += ys[i];       sumXY  += xs[i] * ys[i];
+          sumX2Y += xs[i] ** 2 * ys[i];
+        }
+        const A = [
+          [nn,    sumX,  sumX2],
+          [sumX,  sumX2, sumX3],
+          [sumX2, sumX3, sumX4],
+        ];
+        const B = [sumY, sumXY, sumX2Y];
+        for (let i = 0; i < 3; i++) {
+          for (let j = i + 1; j < 3; j++) {
+            const ratio = A[j][i] / A[i][i];
+            for (let k = i; k < 3; k++) A[j][k] -= ratio * A[i][k];
+            B[j] -= ratio * B[i];
           }
         }
+        const c = [0, 0, 0];
+        for (let i = 2; i >= 0; i--) {
+          c[i] = B[i];
+          for (let j = i + 1; j < 3; j++) c[i] -= A[i][j] * c[j];
+          c[i] /= A[i][i];
+        }
+        coeffs = c;
+      }
+
+      // Draw smooth polynomial curve (line only, no dots — matches UI)
+      if (coeffs) {
+        const curvePoints = series.map((_, idx) => {
+          const curveVal = coeffs[0] + coeffs[1] * idx + coeffs[2] * idx ** 2;
+          return {
+            x: toX(idx),
+            y: Math.max(
+              plotTop,
+              Math.min(plotTop + plotH, zeroY - curveVal * pxPerU),
+            ),
+          };
+        });
+        pdf.setDrawColor(...LINE_COLOR);
+        pdf.setLineWidth(0.8);
+        for (let i = 0; i < curvePoints.length - 1; i++) {
+          pdf.line(
+            curvePoints[i].x,     curvePoints[i].y,
+            curvePoints[i + 1].x, curvePoints[i + 1].y,
+          );
+        }
+      }
+
+      // ── Raw data dots + value labels (replaces old connected line) ─
+      // Dots only — the polynomial curve above is the connecting line,
+      // matching the UI where raw points are dots and curve is the line.
+      series.forEach((pt, idx) => {
+        if (pt.val == null) return;
+        const cx = toX(idx);
+        const cy = toY(pt.val);
+
+        // Dot
+        pdf.setFillColor(...LINE_COLOR);
+        pdf.circle(cx, cy, 1.3, "F");
+
+        // ── UPDATED: value label uses correct unit suffix & precision ─
+        const valLbl =
+          `${pt.val > 0 ? "+" : ""}${
+            param.group === "ABS_TURBO"
+              ? pt.val.toFixed(0)
+              : pt.val.toFixed(1)
+          }${unit === "%" ? "%" : ""}`;
+        pdf.setFontSize(4);
+        pdf.setTextColor(...LINE_COLOR);
+
+        // Above dot if positive, below if negative; clamped inside plot
+        let labelY = pt.val >= 0 ? cy - 2.5 : cy + 5;
+        labelY = Math.max(plotTop + 4, Math.min(plotTop + plotH - 2, labelY));
+        pdf.text(valLbl, cx, labelY, { align: "center" });
+      });
+
+      // ── 3. LEGEND STRIP (compact) ──────────────────────────────────
+      pdf.setFillColor(252, 252, 253);
+      pdf.setDrawColor(226, 232, 240);
+      pdf.setLineWidth(0.4);
+      pdf.rect(margin, legStripY, usableW, legStripH, "FD");
+
+      const legendItems = [
+        { label: `±${amber}${unit} Amber`, color: [245, 158, 11] },
+        { label: `±${red}${unit} Red`,     color: [239, 68,  68]  },
+        { label: "Zero Baseline",           color: [22,  163, 74]  },
+        { label: param.label,               color: LINE_COLOR       },
+      ];
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(4.5);
+      const ICON_R = 1.5;
+      const GAP    = 5;
+      const itemWidths = legendItems.map(
+        (item) => ICON_R * 2 + 3 + pdf.getTextWidth(item.label) + GAP,
+      );
+      const totalW = itemWidths.reduce((a, b) => a + b, 0);
+      let legX = margin + (usableW - totalW) / 2;
+      const legY = legStripY + 6;
+
+      legendItems.forEach((item, i) => {
+        const [r, g, b] = item.color;
+        pdf.setFillColor(r, g, b);
+        pdf.circle(legX + ICON_R, legY - 1.5, ICON_R, "F");
+        pdf.setTextColor(71, 85, 105);
+        pdf.text(item.label, legX + ICON_R * 2 + 3, legY);
+        legX += itemWidths[i];
+      });
+
+      currentY = legStripY + legStripH + slotGap;
+      chartIndexOnPage++;
+    }
+
+    currentY += 4;
+  }
+}
 
         // ======================================================================
         // SECTION 7 — TREND OVER LOAD BASED
@@ -10563,7 +11438,7 @@ export default function Performance({
     try {
       // 1. Call the new specific endpoint
       // analysisMode is already 'mainEngine' or 'auxiliaryEngine' in your state
-      const response = await axiosAepms.getRawReportUrl(reportId, analysisMode);
+      const response = await apiService.getRawReportUrl(reportId, analysisMode);
 
       // 2. Extract the signed URL from backend response
       const finalUrl = response.data?.download_url || response.download_url;
@@ -10980,12 +11855,11 @@ export default function Performance({
               Select Reports to Analyze
             </label>
             <MultiSelectDropdown
-              label={
-                availableReports.length > 0 ? "Select Reports" : "Loading..."
-              }
+              label="Select Reports"
               options={availableReports}
               selectedIds={selectedReportIds}
               onChange={(ids) => setSelectedReportIds(ids)}
+              isLoading={loading && availableReports.length === 0}
             />
           </div>
 
@@ -11076,15 +11950,8 @@ export default function Performance({
                       (g) => g.generator_id === selectedGeneratorId,
                     );
                     if (activeGen) {
-                      const label =
-                        activeGen.designation ||
-                        activeGen.generator_designation ||
-                        `Gen ${activeGen.generator_id}`;
-                      return (
-                        formatReportDate(
-                          lastReportDates.auxiliaryEngine[label],
-                        ) || "No record found"
-                      );
+                      // Fetch the date using the generator_id instead of the text label
+                      return formatReportDate(lastReportDates.auxiliaryEngine[activeGen.generator_id]);
                     }
                     return "Select Unit Above"; // Fixed Logic Point 3: Restored original string
                   })()}
@@ -11113,13 +11980,21 @@ export default function Performance({
         <>
           <div ref={analysisResultsRef} style={{ scrollMarginTop: "100px" }}>
             {renderMissingAlert()}
-            {allMonthlyReports.length === 1 && (
+            {allMonthlyReports.length === 1 && baseline && Object.keys(baseline).length > 0 && (
               <DiagnosisPanel
                 report={allMonthlyReports[0]}
                 baseline={baseline}
                 analysisMode={analysisMode}
+                availableReports={availableReports}
               />
             )}
+
+            {/* <TrendDiagnosisPanel
+              availableReports={availableReports}
+              baseline={baseline}
+              analysisMode={analysisMode}
+            /> */}
+
             {allMonthlyReports.length === 1 &&
               allMonthlyReports[0].cylinder_readings &&
               (() => {
@@ -12038,46 +12913,34 @@ export default function Performance({
                     const x = valid.map((p) => p.i);
                     const y = valid.map((p) => p.v);
 
-                    let sumX = 0,
-                      sumX2 = 0,
-                      sumX3 = 0,
-                      sumX4 = 0,
-                      sumX5 = 0,
-                      sumX6 = 0;
-                    let sumY = 0,
-                      sumXY = 0,
-                      sumX2Y = 0,
-                      sumX3Y = 0;
+                    let sumX = 0, sumX2 = 0, sumX3 = 0, sumX4 = 0;
+                    let sumY = 0, sumXY = 0, sumX2Y = 0;
                     for (let i = 0; i < n; i++) {
-                      sumX += x[i];
+                      sumX  += x[i];
                       sumX2 += x[i] ** 2;
                       sumX3 += x[i] ** 3;
                       sumX4 += x[i] ** 4;
-                      sumX5 += x[i] ** 5;
-                      sumX6 += x[i] ** 6;
-                      sumY += y[i];
-                      sumXY += x[i] * y[i];
+                      sumY   += y[i];
+                      sumXY  += x[i] * y[i];
                       sumX2Y += x[i] ** 2 * y[i];
-                      sumX3Y += x[i] ** 3 * y[i];
                     }
                     const A = [
-                      [n, sumX, sumX2, sumX3],
-                      [sumX, sumX2, sumX3, sumX4],
-                      [sumX2, sumX3, sumX4, sumX5],
-                      [sumX3, sumX4, sumX5, sumX6],
+                      [n,     sumX,  sumX2],
+                      [sumX,  sumX2, sumX3],
+                      [sumX2, sumX3, sumX4],
                     ];
-                    const B = [sumY, sumXY, sumX2Y, sumX3Y];
-                    for (let i = 0; i < 4; i++) {
-                      for (let j = i + 1; j < 4; j++) {
+                    const B = [sumY, sumXY, sumX2Y];
+                    for (let i = 0; i < 3; i++) {
+                      for (let j = i + 1; j < 3; j++) {
                         const r = A[j][i] / A[i][i];
-                        for (let k = i; k < 4; k++) A[j][k] -= r * A[i][k];
+                        for (let k = i; k < 3; k++) A[j][k] -= r * A[i][k];
                         B[j] -= r * B[i];
                       }
                     }
-                    const c = [0, 0, 0, 0];
-                    for (let i = 3; i >= 0; i--) {
+                    const c = [0, 0, 0];
+                    for (let i = 2; i >= 0; i--) {
                       c[i] = B[i];
-                      for (let j = i + 1; j < 4; j++) c[i] -= A[i][j] * c[j];
+                      for (let j = i + 1; j < 3; j++) c[i] -= A[i][j] * c[j];
                       c[i] /= A[i][i];
                     }
                     coeffs[key] = c;
@@ -12089,7 +12952,8 @@ export default function Performance({
                       const c = coeffs[key];
                       if (!c) return;
                       newRow[`${key}__curve`] =
-                        c[0] + c[1] * idx + c[2] * idx ** 2 + c[3] * idx ** 3;
+                        // c[0] + c[1] * idx + c[2] * idx ** 2 + c[3] * idx ** 3;
+                         c[0] + c[1] * idx + c[2] * idx ** 2;
                     });
                     return newRow;
                   });
@@ -12379,7 +13243,7 @@ export default function Performance({
                           </div>
                         ) : (
                           <>
-                            <ResponsiveContainer width="100%" height={400}>
+                            <ResponsiveContainer width="100%" height={400} minHeight={400}>
                               <LineChart
                                 data={mergedTrendData}
                                 margin={{

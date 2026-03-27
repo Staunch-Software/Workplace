@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 import bcrypt
 import logging
 from app.utils.auth_utils import (
-    verify_application_jwt
+    verify_application_jwt,
+    create_application_jwt,   # ← add this line
+    validate_microsoft_token, # ← add if you use SSO
 )
 
 router = APIRouter()

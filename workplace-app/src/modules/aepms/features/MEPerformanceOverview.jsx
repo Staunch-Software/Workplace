@@ -22,6 +22,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import AppHeader from '../components/AppHeader';
 import "../styles/MEPerformanceOverview.css";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -114,17 +115,17 @@ const PropellerTrendChart = ({ history }) => {
     return buckets;
   }, []);
 
-  const getY = (val) => {
+  const getY = React.useCallback((val) => {
     const clampedVal = Math.max(Y_MIN, Math.min(val, Y_MAX));
     const pct = (clampedVal - Y_MIN) / Y_RANGE;
     const drawingHeight = height - padding.bottom - padding.top;
     return height - padding.bottom - pct * drawingHeight;
-  };
+  },[Y_MIN, Y_MAX, Y_RANGE]);
 
-  const getX = (index) => {
+  const getX = React.useCallback((index) => {
     const step = (width - padding.left - padding.right) / 11;
     return padding.left + index * step;
-  };
+  },[]);
 
   // --- UPDATED COLOR LOGIC ---
   // > 5     : Critical (Red)
@@ -155,13 +156,80 @@ const PropellerTrendChart = ({ history }) => {
           x: getX(bucketIndex),
           y: getY(val),
           value: val,
+          index: bucketIndex, // Included to calculate the curve formula
           dateObj: dateObj,
           bucketLabel: monthBuckets[bucketIndex].label,
         };
       })
       .filter(Boolean)
       .sort((a, b) => a.x - b.x);
-  }, [history, monthBuckets, Y_MIN, Y_MAX, Y_RANGE]);
+  },[history, monthBuckets, Y_MIN, Y_MAX, Y_RANGE, getX, getY]);
+
+  // --- NEW: Quadratic Polynomial Regression (y = ax^2 + bx + c) ---
+  const curveCoeffs = useMemo(() => {
+    if (chartPoints.length < 3) return null;
+
+    const n = chartPoints.length;
+    const x = chartPoints.map((p) => p.index);
+    const y = chartPoints.map((p) => p.value);
+
+    let sumX = 0, sumX2 = 0, sumX3 = 0, sumX4 = 0;
+    let sumY = 0, sumXY = 0, sumX2Y = 0;
+
+    for (let i = 0; i < n; i++) {
+      sumX += x[i];
+      sumX2 += x[i] ** 2;
+      sumX3 += x[i] ** 3;
+      sumX4 += x[i] ** 4;
+      sumY += y[i];
+      sumXY += x[i] * y[i];
+      sumX2Y += x[i] ** 2 * y[i];
+    }
+
+    const A = [
+      [n, sumX, sumX2],[sumX, sumX2, sumX3],
+      [sumX2, sumX3, sumX4],
+    ];
+    const B = [sumY, sumXY, sumX2Y];
+
+    // Gaussian elimination
+    for (let i = 0; i < 3; i++) {
+      for (let j = i + 1; j < 3; j++) {
+        const ratio = A[j][i] / A[i][i];
+        for (let k = i; k < 3; k++) A[j][k] -= ratio * A[i][k];
+        B[j] -= ratio * B[i];
+      }
+    }
+
+    const c = [0, 0, 0];
+    for (let i = 2; i >= 0; i--) {
+      c[i] = B[i];
+      for (let j = i + 1; j < 3; j++) c[i] -= A[i][j] * c[j];
+      c[i] /= A[i][i];
+    }
+    return c;
+  }, [chartPoints]);
+
+  // --- NEW: Generate smooth curve SVG points ---
+  const smoothCurvePoints = useMemo(() => {
+    if (!curveCoeffs || chartPoints.length < 3) return null;
+
+    const minIdx = Math.min(...chartPoints.map((p) => p.index));
+    const maxIdx = Math.max(...chartPoints.map((p) => p.index));
+
+    let pointsStr = "";
+    // Step by 0.25 on the X-axis to create a smooth curve
+    for (let idx = minIdx; idx <= maxIdx; idx += 0.25) {
+      const curveVal = curveCoeffs[0] + curveCoeffs[1] * idx + curveCoeffs[2] * (idx ** 2);
+      pointsStr += `${getX(idx)},${getY(curveVal)} `;
+    }
+    
+    // Cap exactly at the final point
+    const lastVal = curveCoeffs[0] + curveCoeffs[1] * maxIdx + curveCoeffs[2] * (maxIdx ** 2);
+    pointsStr += `${getX(maxIdx)},${getY(lastVal)}`;
+
+    return pointsStr.trim();
+  },[curveCoeffs, chartPoints, getX, getY]);
 
   const polylinePoints = chartPoints.map((p) => `${p.x},${p.y}`).join(" ");
   const showEmptyMessage = chartPoints.length === 0;
@@ -355,9 +423,23 @@ const PropellerTrendChart = ({ history }) => {
           strokeWidth="1"
         />
 
-        {chartPoints.length > 1 && (
+        {/* Draw a basic straight line if we only have 2 points */}
+        {chartPoints.length === 2 && !smoothCurvePoints && (
           <polyline
             points={polylinePoints}
+            fill="none"
+            stroke="#64748b"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ filter: "drop-shadow(0px 1px 1px rgba(0,0,0,0.1))" }}
+          />
+        )}
+
+        {/* Draw the smooth quadratic curve if we have >= 3 points */}
+        {smoothCurvePoints && (
+          <polyline
+            points={smoothCurvePoints}
             fill="none"
             stroke="#64748b"
             strokeWidth="2.5"
@@ -471,10 +553,8 @@ const PropellerTrendChart = ({ history }) => {
               width: 0,
               height: 0,
               borderLeft: "6px solid transparent",
-              borderRight: "6px solid transparent",
-              [tooltipStyle.arrowClass === "arrow-up" ? "bottom" : "top"]:
-                "100%",
-              [tooltipStyle.arrowClass === "arrow-up"
+              borderRight: "6px solid transparent",[tooltipStyle.arrowClass === "arrow-up" ? "bottom" : "top"]:
+                "100%",[tooltipStyle.arrowClass === "arrow-up"
                 ? "borderBottom"
                 : "borderTop"]: "6px solid #1e293b",
             }}
@@ -794,7 +874,7 @@ export default function MEPerformanceOverview() {
 
       const logoWidth = 35;
       const logoHeight = 14;
-      // try {
+    // try {
       //   pdf.addImage(
       //     ozellarLogo,
       //     "PNG",
@@ -1536,10 +1616,10 @@ export default function MEPerformanceOverview() {
   return (
     <div
       className="me-performance-container"
-      style={{ width: "100%", padding: "20px" }}
+      style={{ width: "100%", padding: "50px" }}
     >
       {/* <PerformanceNav /> */}
-
+      <AppHeader />
       <div className="performance-cards-grid">
         {/* CARD 1: Propeller Margin */}
         <div

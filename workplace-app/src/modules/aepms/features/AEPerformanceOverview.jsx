@@ -1479,6 +1479,10 @@ useEffect(() => {
               borderBottom: isSectionOpen ? "1px solid #f1f5f9" : "none",
               gap: "16px",
             }}
+            onClick={(e) => {
+                e.stopPropagation();
+                setIsSectionOpen(!isSectionOpen); // Open/Close action moved to this specific element
+              }}
             // onClick removed from here
           >
             {/* 1. Icon Badge - The signature dark ME style */}

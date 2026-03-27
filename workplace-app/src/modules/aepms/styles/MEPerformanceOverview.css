@@ -3,7 +3,10 @@
 /* Main Container */
 .me-performance-container {
     min-height: 100vh;
-    padding: 24px 40px;
+    padding-top: 80px;   /* accounts for fixed header height */
+    padding-right: 40px;
+    padding-bottom: 24px;
+    padding-left: 40px;
     background: linear-gradient(135deg, #fbf6f6 0%, #f8fafc 50%, #f1f5f9 100%);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, 
                   Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", 

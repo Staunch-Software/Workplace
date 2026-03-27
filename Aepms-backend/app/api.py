@@ -36,7 +36,8 @@ import re
 from datetime import datetime, timedelta, date, timezone
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import func, distinct, text, desc, and_
-
+# add this at the top of api.py (or replace the existing definition)
+from app.core.permissions import get_allowed_vessel_imos
 import numpy as np
 from decimal import Decimal
 
@@ -89,6 +90,57 @@ VESSEL_ORDER_CONFIG = {
     9481661: 7,  # GCL SABARMATI
     9481219: 8,  # GCL YAMUNA
 }
+import logging
+logger = logging.getLogger(__name__)
+
+# In app/api.py (Update the get_allowed_vessel_imos definition near line 83)
+
+def get_allowed_vessel_imos(current_user):
+    from app.model.control.vessel import Vessel as ControlVessel
+    from app.core.database_control import SessionControl
+    from sqlalchemy import text
+
+    # Extract user ID from either 'id' or 'sub'
+    user_id_raw = current_user.get("id") or current_user.get("sub")
+    role = str(current_user.get("role") or "").upper()
+
+    # Create session directly — don't use next() on a generator
+    control_db = SessionControl()
+    try:
+        if not user_id_raw:
+            logger.warning("get_allowed_vessel_imos: no user_id in token")
+            return[], role
+
+        # Query assigned vessels for this user
+        query = text("""
+            SELECT vessel_imo 
+            FROM user_vessel_link 
+            WHERE user_id = CAST(:uid AS UUID)
+        """)
+        result = control_db.execute(query, {"uid": str(user_id_raw)}).fetchall()
+        clean_imos = [int(row[0]) for row in result if str(row[0]).isdigit()]
+
+        logger.info(f"User {user_id_raw} (role={role}) assigned IMOs: {clean_imos}")
+
+        if clean_imos:
+            return clean_imos, role
+
+        # Elevated roles get all vessels
+        if role in ("ADMIN", "SUPERUSER", "SHORE", "SUPERINTENDENT"):
+            all_vessels = control_db.query(ControlVessel).all()
+            all_imos =[int(v.imo) for v in all_vessels if str(v.imo).isdigit()]
+            logger.info(f"Elevated role {role} granted all IMOs: {all_imos}")
+            return all_imos, role
+
+        logger.warning(f"User {user_id_raw} has no assigned vessels and role {role} is not elevated")
+        return[], role
+
+    except Exception as e:
+        logger.error(f"get_allowed_vessel_imos error: {e}", exc_info=True)
+        return[], role
+    finally:
+        control_db.close()
+
 
 def format_vessel_name(name: str) -> str:
     """
@@ -968,11 +1020,18 @@ async def upload_generated_report(
 # ðŸ”¥ NEW: AUXILIARY GENERATOR LIST ENDPOINT (Fixes 404 error)
 # ============================================
 @app.get("/aux/generators/{imo_number}", tags=["Auxiliary Engine"])
-async def get_generators_list(imo_number: int, db: Session = Depends(get_db)):
+async def get_generators_list(
+    imo_number: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)  # ADD
+):
     """
     Retrieves the list of Auxiliary Engines (VesselGenerator) for a given IMO number.
     ðŸ”¥ FIXED: Returns engine_maker and engine_model (actual database column names)
     """
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)  # ADD
+    if str(imo_number) not in [str(x) for x in allowed_imos]:  # ADD
+        raise HTTPException(status_code=403, detail="Access Denied")  # ADD
     try:
         generators = db.query(VesselGenerator).filter(
             VesselGenerator.imo_number == imo_number
@@ -997,10 +1056,24 @@ async def get_generators_list(imo_number: int, db: Session = Depends(get_db)):
 # ðŸ”¥ NEW: AE GRAPH DATA ENDPOINT (CRITICAL FIX)
 # ============================================
 @app.get("/api/aux-engine/{report_id}/graph-data")
-async def get_ae_graph_data(report_id: int, db: Session = Depends(get_db)):
+async def get_ae_graph_data(
+    report_id: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)  # ADD
+):
     """
     Get AE performance graph data for a specific report ID.
     """
+    report = db.query(GeneratorMonthlyReportHeader).filter_by(report_id=report_id).first()
+    if report:
+        generator = db.query(VesselGenerator).filter(
+            VesselGenerator.generator_id == report.generator_id
+        ).first()
+        if generator:
+            allowed_imos, _ = get_allowed_vessel_imos(current_user)
+            if str(generator.imo_number) not in [str(x) for x in allowed_imos]:
+                raise HTTPException(status_code=403, detail="Access Denied")
+
     try:
         graph_generator = AuxPerformanceGraphGenerator(db)
         graph_data = graph_generator.generate_graph_data(report_id)
@@ -1021,8 +1094,17 @@ async def get_ae_graph_data(report_id: int, db: Session = Depends(get_db)):
 # ME GRAPH DATA ENDPOINT
 # ============================================
 @app.get("/reports/{report_id}/graph-data")
-async def get_graph_data(report_id: int, db: Session = Depends(get_db)):
+async def get_graph_data(
+    report_id: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)  # ADD
+):
     """Get ME performance graph data for a specific report ID."""
+    report = db.query(MonthlyReportHeader).filter_by(report_id=report_id).first()
+    if report:
+        allowed_imos, _ = get_allowed_vessel_imos(current_user)
+        if str(report.imo_number) not in [str(x) for x in allowed_imos]:
+            raise HTTPException(status_code=403, detail="Access Denied")
     try:
         graph_generator = PerformanceGraphGenerator(db)
         graph_data = graph_generator.generate_graph_data(report_id)
@@ -1047,9 +1129,14 @@ async def get_performance_history(
     imo_number: int,
     limit: Optional[int] = 6,
     ref_month: str = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user) 
 ):
     """Get historical monthly performance data for the specified vessel."""
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    if str(imo_number) not in [str(x) for x in allowed_imos]:
+        raise HTTPException(status_code=403, detail="Access Denied: Not assigned to this vessel.")
+    
     try:
         logger.info(f"Historical data request: IMO={imo_number}, limit={limit}, ref_month={ref_month}")
        
@@ -1193,7 +1280,8 @@ async def get_ae_performance_history(
     limit: Optional[int] = 6,
     ref_month: str = None,
     imo_number: Optional[int] = None, # 🔥 CHANGE 2: Added to handle frontend query param
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
 ):
     """
     Get historical AE performance data for a specific generator.
@@ -1210,6 +1298,10 @@ async def get_ae_performance_history(
         generator = db.query(VesselGenerator).filter(
             VesselGenerator.generator_id == generator_id
         ).first()
+
+        allowed_imos, _ = get_allowed_vessel_imos(current_user)
+        if str(generator.imo_number) not in [str(x) for x in allowed_imos]:
+            raise HTTPException(status_code=403, detail="Access Denied")
        
         if not generator:
             raise HTTPException(status_code=404, detail=f"Generator {generator_id} not found")
@@ -1305,8 +1397,15 @@ async def get_ae_performance_history(
 # ME BASELINE PERFORMANCE ENDPOINT
 # ============================================
 @app.get("/api/performance/{imo_number}/baseline")
-async def get_baseline_performance(imo_number: int, db: Session = Depends(get_db)):
+async def get_baseline_performance(
+    imo_number: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)  # ADD
+):
     """Get baseline (shop trial) performance data for a vessel."""
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    if str(imo_number) not in [str(x) for x in allowed_imos]:
+        raise HTTPException(status_code=403, detail="Access Denied")
     try:
         logger.info(f"Fetching baseline data for IMO: {imo_number}")
        
@@ -1394,53 +1493,62 @@ async def get_baseline_performance(imo_number: int, db: Session = Depends(get_db
 # REMAINING ENDPOINTS (Fleet, Alerts, Dashboard, etc.)
 # ============================================
 @app.get("/api/fleet/config-summary-live")
-async def get_fleet_configuration_summary_live(db: Session = Depends(get_db)):
+async def get_fleet_configuration_summary_live(db: Session = Depends(get_db), control_db: Session = Depends(get_control_db), current_user: Any = Depends(auth.get_current_user)):
     """Executes live SQL queries to get configuration counts and unconfigured lists."""
     logger.info("Executing live fleet configuration summary queries.")
-   
-    total_ships_query = db.query(func.count(VesselInfo.imo_number)).scalar()
+    allowed_imos, role = get_allowed_vessel_imos(current_user)
+    allowed_imos_str =[str(x) for x in allowed_imos]
+    # Total ships from WORKPLACE vessel table (control DB)
+    total_ships_query = control_db.query(func.count(Vessel.imo)).filter(Vessel.imo.in_(allowed_imos_str)).scalar()
     total_ships = total_ships_query if total_ships_query is not None else 0
 
+    # ME configured count (from vessel_info joined with shop_trial_session)
     me_configured_imo_count = db.query(func.count(distinct(VesselInfo.imo_number))).join(
         ShopTrialSession, VesselInfo.engine_no == ShopTrialSession.engine_no
-    ).scalar()
+    ).filter(VesselInfo.imo_number.in_(allowed_imos)).scalar()
     me_configured_ships = me_configured_imo_count if me_configured_imo_count is not None else 0
 
+    # AE configured count
     ae_configured_imo_count = db.query(func.count(distinct(VesselInfo.imo_number))).join(
         GeneratorBaselineData, VesselInfo.imo_number == GeneratorBaselineData.imo_number
-    ).scalar()
+    ).filter(VesselInfo.imo_number.in_(allowed_imos)).scalar()
     ae_configured_ships = ae_configured_imo_count if ae_configured_imo_count is not None else 0
-   
-    me_configured_imos = db.query(distinct(VesselInfo.imo_number)).join(
-        ShopTrialSession, VesselInfo.engine_no == ShopTrialSession.engine_no
-    ).subquery()
 
-    me_unconfigured_list_query = db.query(
-        VesselInfo.imo_number.label("imo"),
-        VesselInfo.vessel_name.label("name"),
-        VesselInfo.vessel_id.label("id")
-    ).filter(
-        VesselInfo.imo_number.notin_(me_configured_imos)
+    # Get all vessels from control DB
+    all_control_vessels = control_db.query(Vessel).filter(
+        Vessel.imo.in_(allowed_imos_str)
     ).all()
-   
-    me_unconfigured_list = [
-        {"id": str(r.id), "imo": str(r.imo), "name": format_vessel_name(r.name)} 
-        for r in me_unconfigured_list_query
+
+    # Get ME configured IMOs as strings for comparison
+    me_configured_imos = set(
+        str(r[0]) for r in db.query(distinct(VesselInfo.imo_number)).join(
+            ShopTrialSession, VesselInfo.engine_no == ShopTrialSession.engine_no
+        ).all()
+    )
+
+    # Get AE configured IMOs as strings for comparison
+    ae_configured_imos = set(
+        str(r[0]) for r in db.query(distinct(GeneratorBaselineData.imo_number)).all()
+    )
+
+    # Full fleet from control DB (for the configured table in frontend)
+    full_fleet = [
+        {"imo": str(v.imo), "name": v.name}
+        for v in all_control_vessels
     ]
 
-    ae_configured_imos = db.query(distinct(GeneratorBaselineData.imo_number)).subquery()
+    # ME unconfigured = vessels in control DB but NOT in me_configured_imos
+    me_unconfigured_list = [
+        {"imo": str(v.imo), "name": v.name}
+        for v in all_control_vessels
+        if str(v.imo) not in me_configured_imos
+    ]
 
-    ae_unconfigured_list_query = db.query(
-        VesselInfo.imo_number.label("imo"),
-        VesselInfo.vessel_name.label("name"),
-        VesselInfo.vessel_id.label("id")
-    ).filter(
-        VesselInfo.imo_number.notin_(ae_configured_imos)
-    ).all()
-   
+    # AE unconfigured = vessels in control DB but NOT in ae_configured_imos
     ae_unconfigured_list = [
-        {"id": str(r.id), "imo": str(r.imo), "name": format_vessel_name(r.name)} 
-        for r in ae_unconfigured_list_query
+        {"imo": str(v.imo), "name": v.name}
+        for v in all_control_vessels
+        if str(v.imo) not in ae_configured_imos
     ]
 
     return {
@@ -1448,13 +1556,18 @@ async def get_fleet_configuration_summary_live(db: Session = Depends(get_db)):
         "me_configured_ships": me_configured_ships,
         "ae_configured_ships": ae_configured_ships,
         "me_unconfigured_list": me_unconfigured_list,
-        "ae_unconfigured_list": ae_unconfigured_list
+        "ae_unconfigured_list": ae_unconfigured_list,
+        "fleet": full_fleet
     }
 
 
 @app.get("/performance/alerts/{report_id}")
-async def get_me_alerts(report_id: int, db: Session = Depends(get_db)):
+async def get_me_alerts(report_id: int, db: Session = Depends(get_db),current_user: Any = Depends(auth.get_current_user)):
     """Get categorized ME performance alerts for a specific report."""
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    report = db.query(MEAlertSummary).filter_by(report_id=report_id).first()
+    if report and str(report.imo_number) not in [str(x) for x in allowed_imos]:
+        raise HTTPException(status_code=403, detail="Access Denied")
     try:
         normal_alerts = db.query(MENormalStatus).filter_by(report_id=report_id).all()
         warning_alerts = db.query(MEWarningAlert).filter_by(report_id=report_id).all()
@@ -1485,8 +1598,13 @@ async def get_me_alerts(report_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/performance/alerts/summary/{report_id}")
-async def get_me_alert_summary(report_id: int, db: Session = Depends(get_db)):
+async def get_me_alert_summary(report_id: int, db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)):
     """Get precomputed ME alert summary for a specific report."""
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    report = db.query(MEAlertSummary).filter_by(report_id=report_id).first()
+    if report and str(report.imo_number) not in [str(x) for x in allowed_imos]:
+        raise HTTPException(status_code=403, detail="Access Denied")
     try:
         summary = db.query(MEAlertSummary).filter(
             MEAlertSummary.report_id == report_id
@@ -1527,9 +1645,14 @@ async def get_fleet_alert_summary(
     year: Optional[int] = None,
     month: Optional[int] = None,
     status_filter: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
 ):
     """Get ME alert summaries for entire fleet with optional filters."""
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    query = db.query(MEAlertSummary).filter(
+        MEAlertSummary.imo_number.in_(allowed_imos)
+    )
     from sqlalchemy import extract, and_
    
     try:
@@ -1596,9 +1719,15 @@ async def get_me_dashboard_summary(
     year: int,
     month: Optional[int] = None,
     imo_number: Optional[int] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)  # ADD
 ):
     """Returns ME performance status summaries for vessels."""
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)  # ADD
+    # ADD at top of try block - filter by allowed IMOs:
+    # if imo_number passed, verify it's allowed:
+    if imo_number and str(imo_number) not in [str(x) for x in allowed_imos]:
+        raise HTTPException(status_code=403, detail="Access Denied")
     from sqlalchemy import extract, and_, func, desc
    
     try:
@@ -1613,9 +1742,11 @@ async def get_me_dashboard_summary(
         ).filter(
             extract('year', MonthlyReportHeader.report_date) == year
         )
+
+        base_query = base_query.filter(MonthlyReportHeader.imo_number.in_(allowed_imos))
        
         if imo_number:
-            base_query = base_query.filter(MonthlyReportHeader.imo_number == imo_number)
+            base_query = base_query.filter(MonthlyReportHeader.imo_number.in_(allowed_imos))
 
         if month is None:
             latest_dates_subquery = db.query(
@@ -1625,6 +1756,10 @@ async def get_me_dashboard_summary(
             ).filter(
                 extract('year', MonthlyReportHeader.report_date) == year
             )
+            # ALWAYS filter the subquery by allowed IMOs first
+            latest_dates_subquery = latest_dates_subquery.filter(MonthlyReportHeader.imo_number.in_(allowed_imos))
+            
+            # If a specific vessel is clicked, filter down further
             if imo_number:
                 latest_dates_subquery = latest_dates_subquery.filter(MonthlyReportHeader.imo_number == imo_number)
 
@@ -1727,8 +1862,10 @@ async def get_me_dashboard_summary(
 
 
 @app.get("/api/v1/fleet/propeller-margin-overview", tags=["Fleet Overview"])
-async def get_propeller_margin_overview(db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def get_propeller_margin_overview(db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)) -> Dict[str, Any]:
     """Retrieves the latest propeller margin percentage for every vessel."""
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
     from sqlalchemy import func, desc
    
     logger.info("Executing fleet propeller margin overview query.")
@@ -1759,7 +1896,8 @@ async def get_propeller_margin_overview(db: Session = Depends(get_db)) -> Dict[s
             VesselInfo,
             latest_report_rank_subquery.c.imo == VesselInfo.imo_number
         ).filter(
-            latest_report_rank_subquery.c.rn == 1
+            latest_report_rank_subquery.c.rn == 1,
+            MonthlyISOPerformanceData.imo_number.in_(allowed_imos)
         ).all()
        
         overview_data = []
@@ -1784,7 +1922,10 @@ async def get_propeller_margin_overview(db: Session = Depends(get_db)) -> Dict[s
 # ... (inside app/api.py)
 
 @app.get("/api/v1/fleet/propeller-margin-trend", tags=["Fleet Overview"])
-async def get_propeller_margin_trend(db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def get_propeller_margin_trend(
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)   # ← ADD THIS
+) -> Dict[str, Any]:
     """
     Retrieves the latest margin AND a history of the last 12 reports 
     for every vessel to generate sparkline charts.
@@ -1792,6 +1933,7 @@ async def get_propeller_margin_trend(db: Session = Depends(get_db)) -> Dict[str,
     UPDATED: Returns the raw Propeller Margin % directly from the database
     (No longer calculates deviation from 100).
     """
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)  
     from sqlalchemy import func, desc
     
     # 1. Subquery: Get last 12 reports for every vessel where margin is not null
@@ -1807,7 +1949,8 @@ async def get_propeller_margin_trend(db: Session = Depends(get_db)) -> Dict[str,
         MonthlyISOPerformanceData,
         MonthlyReportHeader.report_id == MonthlyISOPerformanceData.report_id
     ).filter(
-        MonthlyISOPerformanceData.propeller_margin_percent.isnot(None)
+        MonthlyISOPerformanceData.propeller_margin_percent.isnot(None),
+        MonthlyReportHeader.imo_number.in_(allowed_imos) 
     ).subquery()
 
     # 2. Query: Fetch the Top 12 records per vessel
@@ -1866,9 +2009,15 @@ async def get_ae_fleet_alert_summary(
     month: Optional[int] = None,
     imo_number: Optional[int] = None,
     status_filter: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
 ):
     """Get AE alert summaries for entire fleet with optional filters."""
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    report = db.query(MEAlertSummary).filter_by(report_id=report_id).first()
+    query = db.query(AEAlertSummary).filter(
+        AEAlertSummary.imo_number.in_(allowed_imos)
+    )
     from sqlalchemy import extract, and_, desc
    
     try:
@@ -1931,8 +2080,16 @@ async def get_ae_fleet_alert_summary(
 
 
 @app.get("/performance/ae-alerts/summary/{report_id}")
-async def get_ae_alert_summary_endpoint(report_id: int, db: Session = Depends(get_db)):
+async def get_ae_alert_summary_endpoint(
+    report_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: Any = Depends(auth.get_current_user)
+):
     """Get precomputed AE alert summary"""
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    report = db.query(MEAlertSummary).filter_by(report_id=report_id).first()
+    if report and str(report.imo_number) not in [str(x) for x in allowed_imos]:
+        raise HTTPException(status_code=403, detail="Access Denied")
     from app.ae_alert_processor import get_ae_alert_summary
     try:
         return get_ae_alert_summary(db, report_id)
@@ -1944,8 +2101,12 @@ async def get_ae_alert_summary_endpoint(report_id: int, db: Session = Depends(ge
 
 
 @app.get("/performance/ae-alerts/{report_id}")
-async def get_ae_alerts(report_id: int, db: Session = Depends(get_db)):
+async def get_ae_alerts(report_id: int, db: Session = Depends(get_db), current_user: Any = Depends(auth.get_current_user)):
     """Get all AE alerts for a specific report"""
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    report = db.query(MEAlertSummary).filter_by(report_id=report_id).first()
+    if report and str(report.imo_number) not in [str(x) for x in allowed_imos]:
+        raise HTTPException(status_code=403, detail="Access Denied")
     from app.ae_alert_processor import get_ae_alerts_by_report
     try:
         return get_ae_alerts_by_report(db, report_id)
@@ -1976,9 +2137,13 @@ async def get_ae_dashboard_summary(
     year: int,
     month: Optional[int] = None,
     imo_number: Optional[int] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)  # ADD
 ):
     """AE Dashboard Summary - mirrors ME dashboard structure"""
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)  # ADD
+    if imo_number and str(imo_number) not in [str(x) for x in allowed_imos]:
+        raise HTTPException(status_code=403, detail="Access Denied")
     from sqlalchemy import extract, and_, func, desc
     from app.generator_models import AECriticalAlert, AEWarningAlert, AENormalStatus
 
@@ -1998,9 +2163,9 @@ async def get_ae_dashboard_summary(
         ).filter(
             extract('year', GeneratorMonthlyReportHeader.report_date) == year
         )
-       
+        base_query = base_query.filter(VesselGenerator.imo_number.in_(allowed_imos))
         if imo_number:
-            base_query = base_query.filter(VesselGenerator.imo_number == imo_number)
+            base_query = base_query.filter(VesselGenerator.imo_number.in_(allowed_imos))
 
         if month is None:
             latest_dates_subquery = db.query(
@@ -2030,7 +2195,9 @@ async def get_ae_dashboard_summary(
                     GeneratorMonthlyReportHeader.report_date == latest_dates_subquery.c.latest_date
                 )
             )
-           
+            # ALWAYS filter by allowed IMOs
+            reports_query = reports_query.filter(VesselGenerator.imo_number.in_(allowed_imos))
+            
             if imo_number:
                 reports_query = reports_query.filter(VesselGenerator.imo_number == imo_number)
                
@@ -2117,8 +2284,11 @@ async def get_ae_dashboard_summary(
 
 
 @app.get("/api/v1/fleet/days-elapsed-overview", tags=["Fleet Overview"])
-async def get_days_elapsed_overview(db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def get_days_elapsed_overview(db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
+) -> Dict[str, Any]:
     """Calculates days elapsed since the latest report date for each vessel."""
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
     from sqlalchemy import extract
     from datetime import timedelta, date
    
@@ -2142,6 +2312,8 @@ async def get_days_elapsed_overview(db: Session = Depends(get_db)) -> Dict[str, 
             VesselInfo.imo_number == latest_date_subquery.c.imo
         ).order_by(
             VesselInfo.display_order.asc() # <--- CHANGE 2: Add sorting
+        ).filter(
+            VesselInfo.imo_number.in_(allowed_imos)
         ).all()
 
         today = date.today()
@@ -2436,14 +2608,22 @@ async def get_days_elapsed_overview(db: Session = Depends(get_db)) -> Dict[str, 
 async def get_ae_deviation_history_table(
     generator_id: int,
     limit: int = 6,
-    ref_date: Optional[str] = None, 
-    db: Session = Depends(get_db)
+    ref_date: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)  # ADD
 ):
     """
     Fetches specific AE deviation parameters joined with Report Date for the last N reports.
     Now joins with GeneratorMonthlyPerformanceData to ensure 'Actual' values represent
     the report AVERAGES (matching the Summary table) rather than Peak/Worst values.
     """
+    generator = db.query(VesselGenerator).filter(
+        VesselGenerator.generator_id == generator_id
+    ).first()
+    if generator:
+        allowed_imos, _ = get_allowed_vessel_imos(current_user)
+        if str(generator.imo_number) not in [str(x) for x in allowed_imos]:
+            raise HTTPException(status_code=403, detail="Access Denied")
     try:
         target_date = None
 
@@ -2554,13 +2734,24 @@ async def get_ae_deviation_history_table(
 
 
 @app.get("/api/me-engine/alert-details/{report_id}")
-async def get_me_alert_details_api(report_id: int, db: Session = Depends(get_db)):
+async def get_me_alert_details_api(
+    report_id: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)  # ADD
+):
     """
     Get detailed ME parameters for a specific report.
     UPDATED MAPPING:
     - 'pmax' & 'pcomp': ACTUAL values (ISO Corrected or Observed).
     - 'pmax_dev' & 'pcomp_dev': DEVIATION values from 'me_deviation_history' table.
     """
+    raw_report = db.query(MonthlyReportHeader).filter(
+        MonthlyReportHeader.report_id == report_id
+    ).first()
+    if raw_report:
+        allowed_imos, _ = get_allowed_vessel_imos(current_user)
+        if str(raw_report.imo_number) not in [str(x) for x in allowed_imos]:
+            raise HTTPException(status_code=403, detail="Access Denied")
     try:
         # 1. Fetch Data
         raw_report = db.query(MonthlyReportHeader).filter(MonthlyReportHeader.report_id == report_id).first()
@@ -2710,13 +2901,18 @@ async def get_me_deviation_history_table(
     imo_number: int,
     limit: int = 6,
     ref_date: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
 ):
     """
     Returns ME deviation table history.
     Joins with MonthlyISOPerformanceData to ensure 'Actual' values are ISO corrected,
     exactly matching the Summary Table values.
     """
+
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    if str(imo_number) not in [str(x) for x in allowed_imos]:
+        raise HTTPException(status_code=403, detail="Access Denied")
     try:
         target_date = None
 
@@ -2864,11 +3060,17 @@ async def get_me_deviation_history_table(
 
 
 @app.get("/api/me-engine/baseline/reference/{imo_number}")
-async def get_me_baseline_reference(imo_number: int, db: Session = Depends(get_db)):
+async def get_me_baseline_reference(
+    imo_number: int, 
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)):
     """
     Baseline interpolation API for Main Engine.
     Fetches Shop Trial data to allow the frontend to calculate deviation at any load.
     """
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    if str(imo_number) not in [str(x) for x in allowed_imos]:
+        raise HTTPException(status_code=403, detail="Access Denied")
     try:
         # 1. Get Vessel
         vessel = db.query(VesselInfo).filter(VesselInfo.imo_number == imo_number).first()
@@ -3082,7 +3284,11 @@ from collections import defaultdict
 # app/api.py
 
 @app.get("/api/v1/fleet/ae-report-details/{report_id}")
-async def get_ae_report_details(report_id: int, db: Session = Depends(get_db)):
+async def get_ae_report_details(
+    report_id: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)  # ADD
+):
     """
     Fetches raw AE report data, baseline curves, and SECURE DUAL SAS URLs.
     """
@@ -3110,7 +3316,9 @@ async def get_ae_report_details(report_id: int, db: Session = Depends(get_db)):
             raise HTTPException(status_code=404, detail="AE Report not found")
 
         header, data, gen, vessel = result
-        
+        allowed_imos, _ = get_allowed_vessel_imos(current_user)
+        if str(gen.imo_number) not in [str(x) for x in allowed_imos]:
+            raise HTTPException(status_code=403, detail="Access Denied")
         # 2. Fetch Baseline Data
         baseline_records = db.query(GeneratorBaselineData).filter(
             GeneratorBaselineData.generator_id == header.generator_id
@@ -3197,7 +3405,8 @@ async def get_ae_report_details(report_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/v1/fleet/ae-performance-overview", tags=["Fleet Overview"])
 async def get_ae_performance_overview(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
 ) -> Dict[str, Any]:
     """
     Retrieves:
@@ -3205,6 +3414,9 @@ async def get_ae_performance_overview(
     2. Last 3 load percentages for history.
     3. Alert Status History for the last 12 months per generator (The Dots).
     """
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    if not allowed_imos:
+        return {"running_hours_data": [], "load_history_data":[], "status_history_data":[]}
     from sqlalchemy import func, desc, and_
     from datetime import date, datetime, timedelta
     from dateutil.relativedelta import relativedelta
@@ -3239,7 +3451,8 @@ async def get_ae_performance_overview(
             VesselInfo,
             VesselGenerator.imo_number == VesselInfo.imo_number
         ).filter(
-            latest_report_rank_subquery.c.rn == 1
+            latest_report_rank_subquery.c.rn == 1,
+            VesselInfo.imo_number.in_(allowed_imos) # <--- Fixed Model Name
         ).order_by(
             VesselInfo.display_order.asc(),      # <--- [NEW] Sort by Display Order
             VesselInfo.vessel_name.asc(),        # Fallback
@@ -3281,7 +3494,8 @@ async def get_ae_performance_overview(
             GeneratorMonthlyPerformanceData,
             GeneratorMonthlyReportHeader.report_id == GeneratorMonthlyPerformanceData.report_id
         ).filter(
-             GeneratorMonthlyPerformanceData.load_percentage.isnot(None)
+             GeneratorMonthlyPerformanceData.load_percentage.isnot(None),
+             VesselGenerator.imo_number.in_(allowed_imos)
         ).subquery()
 
         historical_loads = db.query(
@@ -3321,7 +3535,7 @@ async def get_ae_performance_overview(
         # ==============================================================================
         # 3. STATUS HISTORY (THE DOTS)
         # ==============================================================================
-        cutoff_date = datetime.now() - timedelta(days=400)
+        cutoff_date = datetime.now() - timedelta(days=1850)
         raw_status = []
 
         # Check if AEAlertSummary exists (Optimized Query)
@@ -3336,7 +3550,8 @@ async def get_ae_performance_overview(
             ).join(
                 VesselInfo, AEAlertSummary.imo_number == VesselInfo.imo_number # <--- [NEW] Join VesselInfo
             ).filter(
-                AEAlertSummary.report_date >= cutoff_date
+                AEAlertSummary.report_date >= cutoff_date,
+                VesselGenerator.imo_number.in_(allowed_imos)
             ).order_by(
                 VesselInfo.display_order.asc(), # <--- [NEW] Sort by Display Order
                 AEAlertSummary.generator_designation.asc(),
@@ -3356,27 +3571,52 @@ async def get_ae_performance_overview(
             ).join(
                 VesselInfo, VesselGenerator.imo_number == VesselInfo.imo_number
             ).filter(
-                GeneratorMonthlyReportHeader.report_date >= cutoff_date
+                GeneratorMonthlyReportHeader.report_date >= cutoff_date,
+                AEAlertSummary.imo_number.in_(allowed_imos)
             ).order_by(
                 VesselInfo.display_order.asc(), # <--- [NEW] Sort by Display Order
                 VesselGenerator.designation.asc(),
                 desc(GeneratorMonthlyReportHeader.report_date)
             ).all()
 
-        status_history_list = []
+        # ==========================================================
+        # DE-DUPLICATE: ONLY ONE DOT (WORST STATUS) PER MONTH
+        # ==========================================================
+        dedup_map = {}
+        priority = {"Critical": 3, "Warning": 2, "Normal": 1}
+
         for row in raw_status:
-            # Handle potential None status
             current_status = row.status if row.status else "Normal"
             
-            # Note: SQLAlchemy Row objects allow access by name, so row.display_order works
-            status_history_list.append({
-                "vessel_name": format_vessel_name(row.vessel_name),
-                "generator_designation": row.generator_designation,
-                "report_date": row.report_date,
-                "status": current_status,
-                "report_id": row.report_id,
-                "display_order": row.display_order # <--- Sending to frontend
-            })
+            # Safely extract Year-Month (e.g., '2025-12')
+            if hasattr(row.report_date, 'strftime'):
+                month_key = row.report_date.strftime("%Y-%m")
+            else:
+                month_key = str(row.report_date)[:7]
+                
+            # Create a unique tracking key for Vessel + Generator + Month
+            unique_key = f"{row.vessel_name}_{row.generator_designation}_{month_key}"
+            
+            if unique_key not in dedup_map:
+                dedup_map[unique_key] = {
+                    "vessel_name": format_vessel_name(row.vessel_name),
+                    "generator_designation": row.generator_designation,
+                    "report_date": row.report_date,
+                    "status": current_status,
+                    "report_id": row.report_id,
+                    "display_order": row.display_order
+                }
+            else:
+                # If we find another report for the SAME month, keep the WORST status
+                existing_status = dedup_map[unique_key]["status"]
+                if priority.get(current_status, 0) > priority.get(existing_status, 0):
+                    dedup_map[unique_key]["status"] = current_status
+                    # Update report_id so clicking the dot opens the worst report
+                    dedup_map[unique_key]["report_id"] = row.report_id
+                    dedup_map[unique_key]["report_date"] = row.report_date
+
+        # Convert dictionary values back to a flat list for the frontend
+        status_history_list = list(dedup_map.values())
 
         return {
             "running_hours_data": running_hours_data,
@@ -3475,10 +3715,13 @@ async def upload_shop_trial_report(
 
 # Add this endpoint near the bottom or with other Shop Trial endpoints
 @app.get("/api/shop-trial-url/{imo_number}", summary="Get secure link for Shop Trial PDF")
-async def get_shop_trial_url(imo_number: int, db: Session = Depends(get_db)):
+async def get_shop_trial_url(imo_number: int, db: Session = Depends(get_db), current_user: Any = Depends(auth.get_current_user)):
     """
     Retrieves the SAS (Secure) URL for the Shop Trial PDF associated with a vessel.
     """
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    if str(imo_number) not in [str(x) for x in allowed_imos]:
+        raise HTTPException(status_code=403, detail="Access Denied")
     try:
         # 1. Get Vessel
         vessel = db.query(VesselInfo).filter(VesselInfo.imo_number == imo_number).first()
@@ -3514,11 +3757,14 @@ async def get_shop_trial_url(imo_number: int, db: Session = Depends(get_db)):
 # Open app/api.py and add this near the other Shop Trial endpoints
 
 @app.get("/api/shop-trial-details/{imo_number}", summary="Get Shop Trial Performance Data Values")
-async def get_shop_trial_details(imo_number: int, db: Session = Depends(get_db)):
+async def get_shop_trial_details(imo_number: int, db: Session = Depends(get_db), current_user: Any = Depends(auth.get_current_user)):
     """
     Fetches the raw Shop Trial performance data points for the latest session.
     Maps database columns exactly to frontend keys.
     """
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    if str(imo_number) not in [str(x) for x in allowed_imos]:
+        raise HTTPException(status_code=403, detail="Access Denied")
     try:
         # 1. Get Vessel
         vessel = db.query(VesselInfo).filter(VesselInfo.imo_number == imo_number).first()
@@ -3604,11 +3850,15 @@ async def get_shop_trial_details(imo_number: int, db: Session = Depends(get_db))
 def admin_data_sync(
     file: UploadFile = File(...),
     engine_type: str = Form(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
 ):
     """
     Admin endpoint to sync Excel data.
     """
+    _, role = get_allowed_vessel_imos(current_user)
+    if role not in ("ADMIN", "SUPERUSER"):
+        raise HTTPException(status_code=403, detail="Admin access required")
     logger.info(f"Admin Data Sync initiated for {engine_type} with file: {file.filename}")
     
     if not file.filename.lower().endswith(('.xlsx', '.xls')):
@@ -3675,13 +3925,17 @@ async def upload_baseline_data(
     file: UploadFile = File(...),
     engine_type: str = Form(...),
     imo_number: str = Form(...),  # <--- NEW: Require IMO Number
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
 ):
     """
     Handles Baseline Data Uploads.
     - ME: Expects Excel (.xlsx) -> Database
     - AE: Expects PDF (.pdf) -> Extracts -> Appends to 'data/ae_shop_trial.xlsx'
     """
+    _, role = get_allowed_vessel_imos(current_user)
+    if role not in ("ADMIN", "SUPERUSER"):
+        raise HTTPException(status_code=403, detail="Admin access required")
     logger.info(f"Baseline Upload: Type={engine_type}, IMO={imo_number}, File={file.filename}")
 
     # Read file content into memory
@@ -3809,11 +4063,15 @@ async def upload_ae_shop_trial(
 # Corrected to map your GeneratorBaselineData columns
 # ============================================
 @app.get("/api/aux/shop-trial-details/{generator_id}", summary="Get AE Shop Trial Data Values")
-async def get_ae_shop_trial_details(generator_id: int, db: Session = Depends(get_db)):
+async def get_ae_shop_trial_details(generator_id: int, db: Session = Depends(get_db), current_user: Any = Depends(auth.get_current_user)):
     """
     Fetches the raw Shop Trial performance data points for a specific Generator.
     Maps database columns to frontend keys.
     """
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    generator = db.query(VesselGenerator).filter_by(generator_id=generator_id).first()
+    if generator and str(generator.imo_number) not in [str(x) for x in allowed_imos]:
+        raise HTTPException(status_code=403, detail="Access Denied")
     try:
         # 1. Get Generator & Vessel Info
         generator = db.query(VesselGenerator).filter(VesselGenerator.generator_id == generator_id).first()
@@ -3884,10 +4142,14 @@ async def get_ae_shop_trial_details(generator_id: int, db: Session = Depends(get
 # Corrected for: shop_trial_report_url
 # ============================================
 @app.get("/api/aux/shop-trial-url/{generator_id}", summary="Get secure link for AE Shop Trial PDF")
-async def get_ae_shop_trial_url(generator_id: int, db: Session = Depends(get_db)):
+async def get_ae_shop_trial_url(generator_id: int, db: Session = Depends(get_db), current_user: Any = Depends(auth.get_current_user)):
     """
     Retrieves the SAS (Secure) URL for the AE Shop Trial PDF.
     """
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
+    generator = db.query(VesselGenerator).filter_by(generator_id=generator_id).first()
+    if generator and str(generator.imo_number) not in [str(x) for x in allowed_imos]:
+        raise HTTPException(status_code=403, detail="Access Denied")
     try:
         # 1. Get Generator
         generator = db.query(VesselGenerator).filter(VesselGenerator.generator_id == generator_id).first()
@@ -3926,12 +4188,14 @@ async def get_ae_shop_trial_url(generator_id: int, db: Session = Depends(get_db)
 async def get_raw_report_download_link(
     report_id: int, 
     engine_type: str, # 'mainEngine' or 'auxiliaryEngine'
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
 ):
     """
     Fetches the SECURE SAS URL for the ORIGINAL uploaded PDF 
     from the raw_report_url database column.
     """
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
     try:
         url_in_db = None
         vessel_name = "Ship"
@@ -3973,9 +4237,11 @@ class BatchDownloadRequest(BaseModel):
 @app.post("/api/performance/batch-raw-download-links")
 async def get_batch_raw_download_links(
     request: BatchDownloadRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
 ):
     """Fetches multiple secure SAS URLs at once."""
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
     results = []
     model = MonthlyReportHeader if request.engine_type == 'mainEngine' else GeneratorMonthlyReportHeader
     
@@ -3999,9 +4265,11 @@ async def get_batch_raw_download_links(
 @app.post("/api/performance/batch-download-zip")
 async def download_reports_zip(
     request: BatchDownloadRequest, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
 ):
     # 1. Determine the Model (Expanded to support all 3 types)
+    allowed_imos, _ = get_allowed_vessel_imos(current_user)
     if request.engine_type == 'mainEngine':
         model = MonthlyReportHeader
     elif request.engine_type == 'auxiliaryEngine':
@@ -4064,5 +4332,24 @@ async def download_reports_zip(
         headers={"Content-Disposition": f"attachment; filename={zip_name}"}
     )
 
+@app.get("/api/v1/user/vessels", tags=["User"])
+async def get_user_assigned_vessels(
+    current_user: Any = Depends(auth.get_current_user)
+):
+    from app.model.control.vessel import Vessel as ControlVessel
+    from app.core.database_control import get_control_db
 
+    allowed_imos, role = get_allowed_vessel_imos(current_user)
+
+    control_db = next(get_control_db())
+    try:
+        vessels = control_db.query(ControlVessel).filter(
+            ControlVessel.imo.in_(allowed_imos)
+        ).all()
+        return [
+            {"imo": v.imo, "name": v.name}
+            for v in vessels
+        ]
+    finally:
+        control_db.close()
 
