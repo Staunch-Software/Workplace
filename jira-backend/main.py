@@ -63,3 +63,7 @@ def root():
         "status": "running",
         "mode": settings.STORAGE_MODE,
     }
+    
+@app.get("/api/jira/health")
+async def health():
+    return {"status": "ok"}

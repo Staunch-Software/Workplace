@@ -22,7 +22,7 @@ async def login(
 ):
     result = await db.execute(
         select(User)
-        .where(User.email == form_data.username)
+        .where(User.email.ilike(form_data.username))
         .options(selectinload(User.vessels))
     )
     user = result.scalar_one_or_none()

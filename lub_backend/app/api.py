@@ -188,7 +188,7 @@ app.add_middleware(
 # app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 # app.include_router(admin.router, tags=["Admin"])  
 from app.routes.sync import router as sync_router
-app.include_router(sync_router, prefix="/sync", tags=["Sync"])
+app.include_router(sync_router, prefix="/api/sync", tags=["Sync"])
 
 # Database Initialization
 @app.on_event("startup")
@@ -1228,7 +1228,7 @@ async def get_luboil_fleet_overview(
                         
                         res = await db.execute(
                             sa_select(LuboilEvent)
-                            .where(LuboilEvent.imo == int(v.imo))
+                            .where(LuboilEvent.imo == str(v.imo))
                             .where(LuboilEvent.equipment_code == code)
                             .where(LuboilEvent.event_type == "SCHEDULE_ALERT")
                             .where(LuboilEvent.created_at >= cooldown_overdue)
@@ -1262,7 +1262,7 @@ async def get_luboil_fleet_overview(
                         
                         res = await db.execute(
                             sa_select(LuboilEvent)
-                            .where(LuboilEvent.imo == int(v.imo))
+                            .where(LuboilEvent.imo == str(v.imo))
                             .where(LuboilEvent.equipment_code == code)
                             .where(LuboilEvent.event_type == "RESAMPLE_REMINDER")
                             .where(LuboilEvent.created_at >= cooldown_resample)
@@ -1941,7 +1941,7 @@ async def get_luboil_live_feed(
                 LuboilEventReadState.user_id == user_id
             )
         )
-        .where(LuboilEvent.imo.in_(allowed_imos))
+        .where(LuboilEvent.imo.in_([str(i) for i in allowed_imos]))
     )
 
     if feed_mode == "MY_FEED":

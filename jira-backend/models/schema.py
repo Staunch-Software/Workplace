@@ -11,28 +11,6 @@ def _uuid():
     return str(uuid.uuid4())
 
 
-# class User(Base):
-#     __tablename__ = "users"
-#     id         = Column(String, primary_key=True, default=_uuid)
-#     name       = Column(String, nullable=False)
-#     email      = Column(String, unique=True, nullable=False, index=True)
-#     password   = Column(String, nullable=False)
-#     role       = Column(String, nullable=False)
-#     vesselName = Column(String, nullable=True)
-#     createdAt  = Column(DateTime, default=datetime.utcnow)
-#     updatedAt  = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
-# class Vessel(Base):
-#     __tablename__ = "vessels"
-#     id        = Column(String, primary_key=True, default=_uuid)
-#     name      = Column(String, unique=True, nullable=False)
-#     code      = Column(String, unique=True, nullable=False)
-#     isActive  = Column(Boolean, default=True, nullable=False)
-#     createdAt = Column(DateTime, default=datetime.utcnow)
-#     updatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
 class Ticket(Base):
     __tablename__ = "tickets"
     id                   = Column(String, primary_key=True, default=_uuid)
@@ -59,6 +37,13 @@ class Ticket(Base):
     detailFetchedAt      = Column(DateTime, nullable=True)
     attachments          = Column(JSONB, default=list)
     sharedWith           = Column(JSONB, default=list)
+
+    # ── NEW: Sync columns ─────────────────────────────────────────────
+    version              = Column(Integer, nullable=False, default=1)
+    origin               = Column(String(20), nullable=False, default="SHORE")
+    is_deleted           = Column(Boolean, default=False)
+    # ──────────────────────────────────────────────────────────────────
+
     comments             = relationship(
         "Comment",
         back_populates="ticket",
@@ -80,4 +65,12 @@ class Comment(Base):
     source    = Column(String, default="jira")
     createdAt = Column(DateTime, default=datetime.utcnow)
     images    = Column(JSONB, default=list)
+
+    # ── NEW: Sync columns ─────────────────────────────────────────────
+    version   = Column(Integer, nullable=False, default=1)
+    origin    = Column(String(20), nullable=False, default="SHORE")
+    is_deleted = Column(Boolean, default=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # ──────────────────────────────────────────────────────────────────
+
     ticket    = relationship("Ticket", back_populates="comments")

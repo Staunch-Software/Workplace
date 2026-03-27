@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Search, Filter, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Activity } from "lucide-react";
-import { getUsers, updateUser, assignVessels, getVessels } from "./lib/adminApi";
+import { Search, Filter, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Activity, Mail } from "lucide-react";
+import { getUsers, updateUser, assignVessels, getVessels, resendWelcomeEmail } from "./lib/adminApi";
 
 const SearchIcon = () => <Search size={16} />;
 const FilterIcon = () => <Filter size={16} />;
@@ -208,6 +208,16 @@ export default function AllUsers() {
         }
     };
 
+    const handleResendEmail = async (user) => {
+        if (!window.confirm(`Reset password to "Ozellar@123" and resend welcome email to ${user.email}?`)) return;
+        try {
+            await resendWelcomeEmail(user.id);
+            alert(`✅ Password reset and email sent to ${user.email}`);
+        } catch (err) {
+            alert(err.response?.data?.detail || "Failed to resend email");
+        }
+    };
+
     const filtered = users.filter(u => {
         const q = search.toLowerCase();
         return (
@@ -292,6 +302,7 @@ export default function AllUsers() {
                                     <td>
                                         <div className="ap-row-actions">
                                             <button className="ap-action-btn" title="Edit" onClick={() => setEditingUser(user)}><EditIcon /></button>
+                                            <button className="ap-action-btn" title="Resend Welcome Email" onClick={() => handleResendEmail(user)}><Mail size={16} /></button>
                                             <button className={"ap-action-btn " + (user.is_active ? "danger" : "success")}
                                                 onClick={() => toggleStatus(user)}><BanIcon /></button>
                                         </div>

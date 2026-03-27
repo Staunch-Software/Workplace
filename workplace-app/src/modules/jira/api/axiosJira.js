@@ -1,4 +1,5 @@
 import axios from 'axios';
+import toast from 'react-hot-toast';
 
 const axiosJira = axios.create({
   // baseURL: 'http://localhost:8004',
@@ -20,6 +21,7 @@ axiosJira.interceptors.response.use(
       localStorage.removeItem('platform_user');
       sessionStorage.removeItem('platform_token');
       sessionStorage.removeItem('platform_user');
+      toast.error('Session expired. Please login again.'); // ← only this line added
       window.location.href = '/login';
     }
     return Promise.reject(err);

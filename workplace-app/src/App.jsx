@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import { Toaster } from 'react-hot-toast';
 
 import Login from './pages/Login/Login';
 import Home from './pages/Dashboard/Home';
@@ -16,6 +17,7 @@ const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
 function App() {
   return (
     <AuthProvider>
+      <Toaster position="top-right" />
       <BrowserRouter>
         <Routes>
           {/* ── PUBLIC ─────────────────────────────────── */}
