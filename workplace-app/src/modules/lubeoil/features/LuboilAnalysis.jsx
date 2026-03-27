@@ -594,7 +594,7 @@ const LuboilAnalysis = () => {
       const data = (
         await axiosLub.get(`/api/luboil/live-feed?feed_mode=${feedMode}`)
       ).data;
-      setFeedData(data || []);
+      setFeedData(Array.isArray(data) ? data : data?.items || data?.feed || data?.results || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -909,7 +909,7 @@ const LuboilAnalysis = () => {
   // Filtering logic for the feed
   const groupedFeed = useMemo(() => {
     // 1. Apply your existing filters + Updated Tab Filtering
-    const filtered = feedData.filter((item) => {
+    const filtered = (feedData || []).filter((item) => {
       // --- NEW: TAB MODE FILTERING (RECIPIENT_ID BASED) ---
       // MY_FEED: Show items where recipient_id is NOT null (these are mentions/private)
       // FLEET: Show items where recipient_id IS null (these are general fleet actions)
@@ -1482,7 +1482,7 @@ const LuboilAnalysis = () => {
             `/api/luboil/mentions/${selectedCell.data.imo}?chat_mode=${chatMode}`,
           )
         ).data;
-        setMentionList(users);
+        setMentionList(Array.isArray(users) ? users : []);
         setShowMentionDropdown(true);
       } catch (err) {
         console.error("Mention fetch failed", err);
@@ -2231,7 +2231,7 @@ const LuboilAnalysis = () => {
       let vesselIsOverdue60 = false;
       let vesselHasActiveIssue = false; // Flag to see if vessel has pending actions
 
-      Object.values(vessel.machineries).forEach((m) => {
+      Object.values(vessel.machineries || {}).forEach((m) => {
         if (!m.is_configured) return;
 
         // --- UPDATED ACTION-BASED LOGIC ---
@@ -2555,7 +2555,7 @@ const LuboilAnalysis = () => {
           name: vesselName,
           imo: vesselData.imo || "N/A",
           reportUrl: vesselData.vessel_report_url,
-          overdueItems: Object.values(vesselData.machineries)
+          overdueItems: Object.values(vesselData.machineries || {})
             .filter((m) => m.is_configured)
             .map((m) => ({
               fullName: m.description || m.code,
@@ -2567,7 +2567,7 @@ const LuboilAnalysis = () => {
 
       // --- CASE 2: Pending / Unresolved ---
       if (statusType === "PendingUnresolved") {
-        const items = Object.values(vesselData.machineries)
+        const items = Object.values(vesselData.machineries || {})
           .filter((m) => {
             const hasReport = m.has_report === true;
             const isNotResolved = !m.is_resolved;
@@ -2612,7 +2612,7 @@ const LuboilAnalysis = () => {
       let vesselIsOverdue60 = false;
       let vesselIsOverdue30 = false;
 
-      Object.values(vesselData.machineries).forEach((m) => {
+      Object.values(vesselData.machineries || {}).forEach((m) => {
         if (!m.is_configured || !m.has_report || !m.last_sample) return;
         hasReport = true;
 
@@ -2887,7 +2887,7 @@ const LuboilAnalysis = () => {
     const today = new Date();
 
     Object.values(data.data).forEach((vessel) => {
-      const dates = Object.values(vessel.machineries)
+      const dates = Object.values(vessel.machineries || {})
         .map((m) => m.last_sample)
         .filter((d) => d && d !== "-" && d !== "N/A")
         .map((d) => new Date(d.replace(/-/g, "/")));
@@ -7937,7 +7937,7 @@ const LuboilAnalysis = () => {
                               `/api/luboil/mentions/${selectedCell.data.imo}?chat_mode=${chatMode}`,
                             )
                           ).data;
-                          setMentionList(users);
+                          setMentionList(Array.isArray(users) ? users : []);
                           setShowMentionDropdown(true);
                         } catch (err) {
                           console.error("Failed to fetch mentions", err);
@@ -8524,7 +8524,7 @@ const LuboilAnalysis = () => {
                                     >
                                       ASSIGNED TO THIS VESSEL
                                     </div>
-                                    {mentionList
+                                    {(mentionList || [])
                                       .filter((u) =>
                                         u.full_name
                                           ?.toLowerCase()
@@ -8612,7 +8612,7 @@ const LuboilAnalysis = () => {
                                         showMentionDropdown &&
                                         mentionList.length > 0
                                       ) {
-                                        const filtered = mentionList.filter(
+                                        const filtered = (mentionList || []).filter(
                                           (u) =>
                                             u.full_name
                                               .toLowerCase()
