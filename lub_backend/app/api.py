@@ -474,7 +474,7 @@ async def upload_luboil_report(
 
             new_event = LuboilEvent(
                 vessel_name=vessel_name,
-                imo=imo_val,
+                imo=str(imo_val),
                 machinery_name="Multiple", 
                 event_type="NEW_REPORT",
                 priority=event_priority,
@@ -1244,7 +1244,7 @@ async def get_luboil_fleet_overview(
                             
                             db.add(LuboilEvent(
                                 vessel_name=v.name,
-                                imo=int(v.imo),
+                                imo=str(v.imo),
                                 machinery_name=eq.ui_label,
                                 equipment_code=code,
                                 event_type="SCHEDULE_ALERT",
@@ -1277,7 +1277,7 @@ async def get_luboil_fleet_overview(
                             
                             db.add(LuboilEvent(
                                 vessel_name=v.name,
-                                imo=int(v.imo),
+                                imo=str(v.imo),
                                 machinery_name=eq.ui_label,
                                 equipment_code=code,
                                 event_type="RESAMPLE_REMINDER",
@@ -1676,7 +1676,7 @@ async def upload_luboil_attachment(
 
                 db.add(LuboilEvent(
                     vessel_name=vessel_name,
-                    imo=imo,
+                    imo=str(imo),
                     machinery_name=sample.machinery_name or equipment_code,
                     equipment_code=equipment_code,
                     event_type="EVIDENCE_UPLOAD",
