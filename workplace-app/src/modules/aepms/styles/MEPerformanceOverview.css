@@ -3,7 +3,7 @@
 /* Main Container */
 .me-performance-container {
     min-height: 100vh;
-    padding-top: 80px;   /* accounts for fixed header height */
+    padding-top: 24px;   /* accounts for fixed header height */
     padding-right: 40px;
     padding-bottom: 24px;
     padding-left: 40px;
@@ -333,7 +333,7 @@
 }
 
 /* CHANGE TO */
-.performance-data-card {
+.aepms-engine-console .performance-data-card {
     background: white;
     border-radius: 20px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
@@ -396,7 +396,7 @@
 }
 
 /* Card Header */
-.card-header-enhanced {
+.aepms-engine-console .card-header-enhanced {
     display: flex;
     align-items: flex-start;
     gap: 16px;
@@ -458,7 +458,7 @@
 
 /* Card Body */
 /* Find this in your CSS and UPDATE it */
-.card-body-enhanced {
+.aepms-engine-console .card-body-enhanced {
     padding: 0;
     position: relative;
     /* CHANGE: Lower the z-index significantly */

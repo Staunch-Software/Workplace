@@ -3485,16 +3485,6 @@ const styles = `
     }
   `;
 
-// Inject styles
-if (
-  typeof document !== "undefined" &&
-  !document.getElementById("performance-enhanced-styles")
-) {
-  const styleSheet = document.createElement("style");
-  styleSheet.id = "performance-enhanced-styles";
-  styleSheet.textContent = styles;
-  document.head.appendChild(styleSheet);
-}
 
 // Metric mappings
 const MAIN_METRIC_MAPPING = {
@@ -11624,11 +11614,12 @@ export default function Performance({
     : "Load (%)";
 
   return (
-    <div
-      className={
-        embeddedMode ? "unified-performance-embed" : "performance-container"
-      }
-    >
+      <div
+        className={
+          embeddedMode ? "unified-performance-embed" : "performance-container"
+        }
+      >
+      <style>{styles}</style>
       {!embeddedMode && (
         <div className="performance-header">
           <h1 className="performance-title">Performance Analysis</h1>

@@ -669,7 +669,7 @@ const getParamStatus = (paramName, deviationPct, absoluteDiff, value) => {
   return "Normal";
 };
 
-export default function MEPerformanceOverview() {
+export default function MEPerformanceOverview({ embeddedMode = false }) {
   const [loading, setLoading] = useState(true);
   const [viewOffset, setViewOffset] = useState(0);
   const maxOffset = useMemo(() => {
@@ -1615,8 +1615,8 @@ export default function MEPerformanceOverview() {
 
   return (
     <div
-      className="me-performance-container"
-      style={{ width: "100%", padding: "50px" }}
+      className="me-performance-container aepms-engine-console"
+      style={{ width: "100%", padding: embeddedMode ? "0" : "50px" }}
     >
       {/* <PerformanceNav /> */}
       <AppHeader />
