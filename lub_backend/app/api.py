@@ -925,7 +925,8 @@ async def update_luboil_remarks(
                 ))
             except Exception as feed_err:
                 logger.error(f"Live feed commit failed (non-fatal): {feed_err}", exc_info=True)
-
+        sample.version = (sample.version or 1) + 1
+        sample.updated_at = datetime.utcnow()
         await db.commit()
 
         # 4. REBUILD HISTORY
@@ -1688,7 +1689,8 @@ async def upload_luboil_attachment(
                 logger.info(f"ðŸ“¡ Live Feed triggered for evidence upload by {sender_name}")
             except Exception as feed_err:
                 logger.error(f"âš ï¸ Failed to add evidence event to Live Feed: {feed_err}")
-            
+            sample.version = (sample.version or 1) + 1
+            sample.updated_at = datetime.utcnow()
             await db.commit()
             
             # 4. Generate a signed SAS URL for the file just uploaded

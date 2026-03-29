@@ -44,7 +44,7 @@ class SyncService:
 
         existing_version = getattr(existing, "version", 0) or 0
 
-        if incoming_version <= existing_version:
+        if incoming_version < existing_version:
             logger.info(
                 f"SyncService: SKIP {model_class.__tablename__} id={entity_id} "
                 f"(incoming v{incoming_version} <= existing v{existing_version})"
