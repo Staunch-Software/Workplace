@@ -3,14 +3,15 @@
 /* Main Container */
 .me-performance-container {
     min-height: 100vh;
-    padding-top: 24px;   /* accounts for fixed header height */
+    height: auto; 
+    padding-top: 80px;   /* was 24px — needs to clear the fixed header */
     padding-right: 40px;
     padding-bottom: 24px;
     padding-left: 40px;
     background: linear-gradient(135deg, #fbf6f6 0%, #f8fafc 50%, #f1f5f9 100%);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, 
                   Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", 
-                  sans-serif, system-ui, Avenir, Helvetica, Arial, sans-serif;
+                  sans-serif;
     color: #1e293b;
 }
 
@@ -1064,4 +1065,8 @@
 
 .performance-grid-wrapper::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
+}
+
+body {
+    background: #fbf6f6;  /* matches container gradient start color */
 }

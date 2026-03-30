@@ -463,8 +463,12 @@
 .all-configured-cell {
     padding: 48px 28px !important;
     text-align: center;
+    display: table-cell; /* ensure td behavior */
 }
-
+.all-configured-cell .success-message {
+    margin: 0 auto;  /* ADD THIS LINE */
+    display: inline-flex;
+}
 .success-message {
     display: inline-flex;
     align-items: center;
@@ -3238,5 +3242,13 @@ select.enhanced-select:disabled {
 }
 .dashboard-page-wrapper {
     min-height: 100vh;
-    padding-top: 30px; /* same header height */
+    padding-top: 56px; /* match actual header height — was 30px, too small */
+}
+
+/* FIX: AE card icon should NOT stay dark when card is in active/focus state */
+.dashboard-kpi-card-enhanced:focus .kpi-icon-circle,
+.dashboard-kpi-card-enhanced:active .kpi-icon-circle {
+    transform: none;
+    background: #f1f5f9;
+    color: #1e293b;
 }
