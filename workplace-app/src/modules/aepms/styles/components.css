@@ -211,10 +211,12 @@
 
 /* Header Styles */
 .app-header {
-  position: sticky;
+  position: fixed;          /* change from sticky to fixed */
   top: 0;
-  z-index: 999999 !important;
+  left: 0;
+  right: 0;
   width: 100%;
+  z-index: 50 !important;   /* remove the 999999, let header.css win */
   border-bottom: 1px solid var(--border);
   background-color: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(8px);
@@ -226,12 +228,14 @@
 
 .header-container {
   margin: 0 auto;
-  max-width: 1280px;
+  max-width: 100%;           /* changed from 1280px */
   display: flex;
   align-items: center;
-  justify-content: space-around;
-  gap: 16px;
+  justify-content: flex-start;  /* changed from space-around */
+  gap: 8px;
   padding: 12px 16px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .header-actions {
@@ -274,15 +278,14 @@
 }
 
 .nav-link:hover {
-  background-color: var(--accent);
-  color: var(--accent-foreground);
+  background-color: #334155;  /* was var(--accent) — match header.css */
+  color: #ffffff !important;  /* was var(--accent-foreground) — force white */
 }
 
 .nav-link.active {
-  background-color: var(--primary);
-  color: var(--primary-foreground);
+  background-color: #1e293b;  /* was var(--primary) */
+  color: #ffffff !important;  /* was var(--primary-foreground) */
 }
-
 .nav-divider {
   margin: 0 8px;
   height: 20px;

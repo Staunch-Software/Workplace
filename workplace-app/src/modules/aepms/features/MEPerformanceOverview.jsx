@@ -1614,12 +1614,19 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
     );
 
   return (
-    <div
-      className="me-performance-container aepms-engine-console"
-      style={{ width: "100%", padding: embeddedMode ? "0" : "50px" }}
-    >
+     <>
       {/* <PerformanceNav /> */}
       <AppHeader />
+      <div
+    className="me-performance-container aepms-engine-console"
+    style={{ 
+        width: "100%", 
+        paddingTop: embeddedMode ? "0" : "80px",   /* clears fixed header */
+        paddingLeft: embeddedMode ? "0" : "50px",
+        paddingRight: embeddedMode ? "0" : "50px",
+        paddingBottom: embeddedMode ? "0" : "50px",
+    }}
+>
       <div className="performance-cards-grid">
         {/* CARD 1: Propeller Margin */}
         <div
@@ -3859,5 +3866,6 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
           );
         })()}
     </div>
+    </>
   );
 }
