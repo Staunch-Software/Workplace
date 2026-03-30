@@ -90,7 +90,7 @@ const uploadToAzure = async (blob, blobPath) => {
   console.log('   URL ends with:', signedUrl.substring(signedUrl.length - 50));
 
   // STEP 2: Validate the signed URL format
-  if (!signedUrl.startsWith('https://')) {
+  if (!signedUrl.startsWith('http://') && !signedUrl.startsWith('https://')) {
     const error = `❌ [BLOB] Invalid signed URL format - must start with https://. Got: ${signedUrl.substring(0, 20)}...`;
     console.error(error);
     throw new Error(error);
