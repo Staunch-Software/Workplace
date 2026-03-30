@@ -27,7 +27,7 @@ const VesselStatusModal = ({ onClose, assignedVessels = [], userPermissions = {}
         // [{ imo, name, online, last_sync, modules: [{ key: 'drs', available: true }, ...] }]
         const fetchStatuses = async () => {
             try {
-                const res = await api.get('/vessels/status');
+                const res = await api.get('/vessel-status');
                 const filtered = res.data.map(v => ({
                     ...v,
                     modules: (v.modules || []).filter(m => allowedKeys.includes(m.key)),

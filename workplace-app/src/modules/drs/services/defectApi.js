@@ -658,6 +658,8 @@ export const defectApi = {
       "owner",
       "chat",
       "pr_details",
+      "dd",
+      "flag"
     ];
 
     // Check if all columns are valid
