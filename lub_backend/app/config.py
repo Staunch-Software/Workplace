@@ -50,7 +50,8 @@ class SSOSettings(BaseSettings):
     CONTROL_DATABASE_URL: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080
-
+    LUBOIL_DATABASE_URL: str = ""
+     
     class Config:
         env_file = ".env"
         case_sensitive = True
