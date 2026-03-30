@@ -56,7 +56,11 @@ export const COLUMN_DEFINITIONS = [
   { id: 'status', label: 'Status Icon', description: 'Current status (Open/Closed)' },
   { id: 'deadline_icon', label: 'Deadline Status Icon', description: 'Visual indicator for deadline urgency' },
   { id: 'chat', label: 'Discussion Icon', description: 'Open discussion thread' },
-  { id: 'pr_details', label: 'PR Details', description: 'Purchase requisition information' }
+  { id: 'pr_details', label: 'PR Details', description: 'Purchase requisition information' },
+    // In your constants file, add to SHORE_COLUMN_DEFINITIONS:
+  { id: 'flag', label: 'Flag', description: 'Flag defect to show at top'  },
+  { id: 'dd', label: 'Dry Dock' }
+  
 ];
 
 // ✅ SHORE-ONLY COLUMNS (extends base)
@@ -66,7 +70,8 @@ export const SHORE_COLUMN_DEFINITIONS = [
     id: 'owner',
     label: 'Owner',
     description: 'Indicates whether this defect is owned by shore'
-  }
+  },
+
 ];
 
 

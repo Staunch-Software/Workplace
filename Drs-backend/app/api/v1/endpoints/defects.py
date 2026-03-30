@@ -164,6 +164,8 @@ COLUMN_MAP = {
         lambda d, idx: d.status.value if hasattr(d.status, "value") else str(d.status),
     ),
     "owner": ("Owner", lambda d, idx: "Owner" if d.is_owner else "Not Owner"),
+    "flag": ("Flagged", lambda d, idx: "Yes" if d.is_flagged else "No"), # ✅ Added
+    "dd": ("Dry Dock", lambda d, idx: "Yes" if d.is_dd else "No"),      # ✅ Added
     "pr_details": (
         "PR Number",
         lambda d, idx: ", ".join([p.pr_number for p in d.pr_entries if not p.is_deleted]),
@@ -993,6 +995,8 @@ async def import_defects(
 
                 new_id = uuid.uuid4()
                 is_owner_val = str(row_data.get("Owner", "")).strip().lower() == "owner"
+                is_flagged_val = str(row_data.get("Flagged", "")).strip().lower() in ["yes", "true", "1"]
+                is_dd_val = str(row_data.get("Dry Dock", "")).strip().lower() in ["yes", "true", "1"]
 
                 # ✅ FIX 2: Create real ORM Objects (guarantees ID generation & defaults)
                 # In the Defect() constructor inside the loop, add version:
@@ -1018,6 +1022,8 @@ async def import_defects(
                     origin="VESSEL" if _should_sync() else "SHORE",  # ← ADD THIS
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow(),
+                    is_flagged=is_flagged_val,
+                    is_dd=is_dd_val,
                 )   
                 
                 defects_to_insert.append(new_defect)

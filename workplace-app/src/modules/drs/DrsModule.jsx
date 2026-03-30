@@ -25,6 +25,7 @@ import ShoreHistory from './features/shore/ShoreHistory';
 import ShoreVesselData from './features/shore/ShoreVesselData';
 import ShoreReports from './features/shore/ShoreReports';
 import AdminUserPanel from './features/shore/AdminUserPanel';
+import AnalyticsDashboard from './features/shore/AnalyticsDashboard';
 
 function DrsModule() {
   return (
@@ -66,6 +67,7 @@ function DrsModule() {
         <Route path="tasks" element={<ShoreTasks />} />
         <Route path="history" element={<ShoreHistory />} />
         <Route path="reports" element={<ShoreReports />} />
+        <Route path="analytics-dashboard" element={<AnalyticsDashboard />} />
         <Route
           path="admin/users"
           element={

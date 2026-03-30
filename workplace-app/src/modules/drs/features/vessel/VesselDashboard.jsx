@@ -1124,7 +1124,7 @@ const VesselDashboard = () => {
   const [showCreateRow, setShowCreateRow] = useState(false);
   const rowRefs = useRef({});
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(50);
   const [activeDescDefect, setActiveDescDefect] = useState(null);
   const [descDraft, setDescDraft] = useState('');
 

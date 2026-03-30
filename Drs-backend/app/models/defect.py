@@ -72,6 +72,8 @@ class Defect(Base):
     json_backup_path = Column(String, nullable=True)
     is_deleted = Column(Boolean, default=False, nullable=False)
     is_owner = Column(Boolean, default=False, nullable=False)
+    is_flagged = Column(Boolean, default=False, nullable=False)
+    is_dd = Column(Boolean, default=False, nullable=False)
     # Relationships
     # vessel = relationship("Vessel", back_populates="defects")
     # reporter = relationship(

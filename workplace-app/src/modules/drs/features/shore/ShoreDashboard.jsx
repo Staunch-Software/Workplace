@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle, Clock, ClipboardList, MessageSquare,
   ChevronDown, ChevronUp, CheckCircle, ShieldAlert, Send, Paperclip,
-  X, Check, Edit2, Save, Edit3, Filter, Edit, Flower, Ship, AlertOctagon, MessageCircle, MoreHorizontal, Trash2, ArrowRightLeft, UserCircle, Download
+  X, Check, Edit2, Save, Edit3, Filter, Edit, Flower, Ship, AlertOctagon, MessageCircle, MoreHorizontal, Trash2, ArrowRightLeft, UserCircle, Download, Flag
 } from 'lucide-react';
 import { Image as ImageIcon, Eye, Upload } from 'lucide-react';
 import ColumnCustomizationModal from '@drs/components/modals/ColumnCustomizationModal';
@@ -1295,7 +1295,7 @@ const ShoreDashboard = () => {
   const { user } = useAuth();
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(50);
   const rowRefs = useRef({});
   const [expandedDescId, setExpandedDescId] = useState(null);
   const [activeDescDefect, setActiveDescDefect] = useState(null);
@@ -1322,7 +1322,9 @@ const ShoreDashboard = () => {
     priority: 'LOW',
     status: 'OPEN',
     is_owner: false, // <--- ADD THIS
-    pr_number: ''
+    pr_number: '',
+    is_flagged: false,  // ✅ NEW
+    is_dd: false,
   };
 
   const { data: allVessels = [] } = useQuery({
@@ -1343,18 +1345,85 @@ const ShoreDashboard = () => {
     target_close_date_sort: '',
     equipment: [],
     vessel: [],
+    description: '',           // stays text search
+    priority: [],              // CHANGED: was string, now array
+    status: [],                // CHANGED: was string, now array
+    pr_number: '',             // stays text
+    pr_status: '',
+    defect_source: [],
+    deadline_status: [],       // CHANGED: was string, now array
+    is_owner: [],              // CHANGED: was string, now array
+    pending_closure: '',
+    text_sort: { field: null, dir: 'asc' },
+    is_flagged: [],  // ✅ NEW
+    is_dd: [],       // ✅ NEW
+  });
+
+  const EMPTY_FILTERS = {
+    date_identified_from: '',
+    date_identified_to: '',
+    date_identified_sort: '',
+    target_close_date: '',
+    target_close_date_sort: '',
+    equipment: [],
+    vessel: [],
     description: '',
-    priority: '',
-    status: '',
+    priority: [],
+    status: [],
     pr_number: '',
     pr_status: '',
     defect_source: [],
-    deadline_status: '',
-    is_owner: '',
+    deadline_status: [],
+    is_owner: [],
     pending_closure: '',
-    text_sort: { field: null, dir: 'asc' }
-  });
+    text_sort: { field: null, dir: 'asc' },
+    is_flagged: [],  // ✅ NEW
+    is_dd: [],
+  };
 
+  const hasActiveFilters = useMemo(() => {
+    return (
+      filters.date_identified_from ||
+      filters.date_identified_to ||
+      filters.target_close_date ||
+      filters.equipment.length > 0 ||
+      filters.vessel.length > 0 ||
+      filters.description ||
+      filters.priority.length > 0 ||
+      filters.status.length > 0 ||
+      filters.pr_number ||
+      filters.defect_source.length > 0 ||
+      filters.deadline_status.length > 0 ||
+      filters.is_owner.length > 0 ||
+      filters.pending_closure ||
+      filters.is_flagged.length > 0 ||  // ✅ NEW
+      filters.is_dd.length > 0          // ✅ NEW
+    );
+  }, [filters]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.date_identified_from || filters.date_identified_to) count++;
+    if (filters.target_close_date) count++;
+    if (filters.equipment.length > 0) count++;
+    if (filters.vessel.length > 0) count++;
+    if (filters.description) count++;
+    if (filters.priority.length > 0) count++;
+    if (filters.status.length > 0) count++;
+    if (filters.pr_number) count++;
+    if (filters.defect_source.length > 0) count++;
+    if (filters.deadline_status.length > 0) count++;
+    if (filters.is_owner.length > 0) count++;
+    if (filters.pending_closure) count++;
+    if (filters.is_flagged.length > 0) count++;  // ✅ NEW
+    if (filters.is_dd.length > 0) count++;
+    return count;
+  }, [filters]);
+
+  const clearAllFilters = () => {
+    setFilters(EMPTY_FILTERS);
+    setCurrentPage(1);
+  };
   const [visibleColumns, setVisibleColumns] = useState([
     'date',
     'deadline',
@@ -1366,6 +1435,8 @@ const ShoreDashboard = () => {
     'status',
     'deadline_icon',
     'chat',
+    'flag',  // ✅ NEW
+    'dd',    // ✅ NEW
     'pr_details'
   ]);
 
@@ -1485,15 +1556,15 @@ const ShoreDashboard = () => {
       target_close_date: '',
       target_close_date_sort: '',
       equipment: [],
-      vessel: [],          // ⭐ MISSING
+      vessel: [],
       description: '',
-      priority: '',
-      status: '',
+      priority: [],
+      status: [],
       pr_number: '',
       pr_status: '',
       defect_source: [],
-      deadline_status: '',
-      is_owner: '',    // ⭐ MISSING
+      deadline_status: [],
+      is_owner: [],
       pending_closure: '',
       text_sort: { field: null, dir: 'asc' }
     });
@@ -1605,15 +1676,15 @@ const ShoreDashboard = () => {
     const config = {
       NORMAL: {
         color: '#00a115',
-        title: 'Deadline OK'
+        title: 'Due Date OK'
       },
       WARNING: {
         color: '#f59e0b',
-        title: 'Deadline within 15 days'
+        title: 'Due Date within 15 days'
       },
       OVERDUE: {
         color: '#dc2626',
-        title: 'Deadline crossed'
+        title: 'Due Date crossed'
       }
     };
 
@@ -1666,6 +1737,13 @@ const ShoreDashboard = () => {
       const toDate = filters.date_identified_to
         ? new Date(filters.date_identified_to)
         : null;
+      const matchFlagged =
+        filters.is_flagged.length === 0 ||
+        filters.is_flagged.includes(String(d.is_flagged));
+
+      const matchDD =
+        filters.is_dd.length === 0 ||
+        filters.is_dd.includes(String(d.is_dd));
 
       const matchReportDate =
         (!fromDate || (reportDate && reportDate >= fromDate)) &&
@@ -1696,12 +1774,13 @@ const ShoreDashboard = () => {
         d.description.toLowerCase().includes(filters.description.toLowerCase());
 
       const matchPrior =
-        !filters.priority || d.priority === filters.priority;
+        filters.priority.length === 0 ||
+        filters.priority.includes(d.priority);
 
       const matchStatus =
         isEditMode
           ? d.status === 'OPEN'
-          : !filters.status || d.status === filters.status;
+          : filters.status.length === 0 || filters.status.includes(d.status);
 
       const matchPrNo =
         !filters.pr_number ||
@@ -1711,12 +1790,12 @@ const ShoreDashboard = () => {
         !filters.pr_status || d.pr_status === filters.pr_status;
 
       const matchDeadlineStatus =
-        !filters.deadline_status ||
-        getDeadlineStatus(d.target_close_date) === filters.deadline_status;
+        filters.deadline_status.length === 0 ||
+        filters.deadline_status.includes(getDeadlineStatus(d.target_close_date));
 
       const matchOwner =
-        filters.is_owner === '' ||
-        String(d.is_owner) === filters.is_owner;
+        filters.is_owner.length === 0 ||
+        filters.is_owner.includes(String(d.is_owner));
 
       const matchPendingClosure =
         !filters.pending_closure ||
@@ -1740,7 +1819,9 @@ const ShoreDashboard = () => {
         matchDeadlineStatus &&
         matchOwner &&
         matchPendingClosure &&
-        matchVessel
+        matchVessel &&
+        matchFlagged &&  // ✅ NEW
+        matchDD
       );
     });
 
@@ -1781,7 +1862,9 @@ const ShoreDashboard = () => {
         priority: 'priority',
         status: 'status',
         deadline_icon: 'target_close_date',
-        owner: 'is_owner'
+        owner: 'is_owner',
+        flag: 'is_flagged',
+        dd: 'is_dd',
       };
 
       const key = fieldMap[field];
@@ -1815,6 +1898,12 @@ const ShoreDashboard = () => {
             return dir === 'asc' ? bA - bB : bB - bA;
           }
 
+          if (field === 'flag' || field === 'dd') {
+            const bA = valA ? 1 : 0;
+            const bB = valB ? 1 : 0;
+            return dir === 'asc' ? bA - bB : bB - bA;
+          }
+
           // 4. Dates (Report Date, Deadline, Deadline Icon)
           if (['date_identified', 'target_close_date', 'deadline_icon'].includes(field)) {
             const dA = valA ? new Date(valA).getTime() : 0;
@@ -1828,6 +1917,10 @@ const ShoreDashboard = () => {
           return dir === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
         });
       }
+    }
+    // ✅ Always float flagged defects to top (unless user is actively sorting by something else)
+    if (!filters.text_sort?.field && !filters.date_identified_sort && !filters.target_close_date_sort) {
+      data.sort((a, b) => (b.is_flagged ? 1 : 0) - (a.is_flagged ? 1 : 0));
     }
     return data;
   }, [defects, filters, isEditMode]);
@@ -1918,51 +2011,37 @@ const ShoreDashboard = () => {
   };
   const handleKpiFilter = (type) => {
     setCurrentPage(1);
-
     setFilters(prev => {
       switch (type) {
         case 'OPEN':
-          return prev.status === 'OPEN'
-            ? { ...prev, status: '' }
-            : { ...prev, status: 'OPEN', priority: '', deadline_status: '', pending_closure: '' };
+          return prev.status.includes('OPEN') && prev.status.length === 1
+            ? { ...prev, status: [] }
+            : { ...prev, status: ['OPEN'], priority: [], deadline_status: [], pending_closure: '' };
 
         case 'HIGH':
-          return prev.priority === 'HIGH'
-            ? { ...prev, priority: '' }
-            : { ...prev, priority: 'HIGH', status: '', deadline_status: '', pending_closure: '' };
+          return prev.priority.includes('HIGH') && prev.priority.length === 1
+            ? { ...prev, priority: [] }
+            : { ...prev, priority: ['HIGH'], status: [], deadline_status: [], pending_closure: '' };
 
         case 'CRITICAL':
-          return prev.priority === 'CRITICAL'
-            ? { ...prev, priority: '' }
-            : { ...prev, priority: 'CRITICAL', status: '', deadline_status: '', pending_closure: '' };
+          return prev.priority.includes('CRITICAL') && prev.priority.length === 1
+            ? { ...prev, priority: [] }
+            : { ...prev, priority: ['CRITICAL'], status: [], deadline_status: [], pending_closure: '' };
 
         case 'OVERDUE':
-          return prev.deadline_status === 'OVERDUE'
-            ? { ...prev, deadline_status: '', status: '' }
-            : {
-              ...prev,
-              deadline_status: 'OVERDUE',
-              status: 'OPEN',   // ← add this
-              priority: '',
-              pending_closure: ''
-            };
+          return prev.deadline_status.includes('OVERDUE') && prev.deadline_status.length === 1
+            ? { ...prev, deadline_status: [], status: [] }
+            : { ...prev, deadline_status: ['OVERDUE'], status: ['OPEN'], priority: [], pending_closure: '' };
 
         case 'PENDING_CLOSURE':
           return prev.pending_closure
-            ? { ...prev, pending_closure: '', status: '' }
-            : {
-              ...prev,
-              pending_closure: 'YES',
-              status: 'PENDING_CLOSURE',   // ⭐ add this
-              priority: '',
-              deadline_status: ''
-            };
-
+            ? { ...prev, pending_closure: '', status: [] }
+            : { ...prev, pending_closure: 'YES', status: ['PENDING_CLOSURE'], priority: [], deadline_status: [] };
 
         case 'CLOSED':
-          return prev.status === 'CLOSED'
-            ? { ...prev, status: '' }
-            : { ...prev, status: 'CLOSED', priority: '', deadline_status: '', pending_closure: '' };
+          return prev.status.includes('CLOSED') && prev.status.length === 1
+            ? { ...prev, status: [] }
+            : { ...prev, status: ['CLOSED'], priority: [], deadline_status: [], pending_closure: '' };
 
         default:
           return prev;
@@ -1991,7 +2070,8 @@ const ShoreDashboard = () => {
 
     // Shore only column
     if (isColumnVisible('owner')) count++;
-
+    if (isColumnVisible('flag')) count++;   // ✅ ADD
+    if (isColumnVisible('dd')) count++;     // ✅ ADD
     // Edit mode "Delete" column
     if (isEditMode) count++;
 
@@ -2179,7 +2259,9 @@ const ShoreDashboard = () => {
         is_owner: newDefect.is_owner === true || newDefect.is_owner === 'true',
         responsibility: 'Engine Dept',
         defect_source: newDefect.defect_source,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        is_flagged: newDefect.is_flagged === true,  // ✅ NEW
+        is_dd: newDefect.is_dd === true,
       };
 
       console.log('📦 Uploading JSON metadata backup...');
@@ -2209,7 +2291,39 @@ const ShoreDashboard = () => {
       alert(`Failed to create defect: ${err.message}`);
     }
   };
+  const getFlagIcon = (value) => (
+    <Flag
+      size={18}
+      color={value ? '#e8290b' : '#8e8d8d'}
+      fill={value ? '#e8290b' : 'none'}
+      strokeWidth={value ? 2 : 1.5}
+      style={{ transition: 'all 0.15s ease' }}
+      title={value ? 'Click to unflag' : 'Click to flag'}
+    />
+  );
 
+  const getDDIcon = (value) => (
+    <div
+      style={{
+        width: '20px',
+        height: '20px',
+        borderRadius: '50%', // Squared off looks more "Industrial/Doc"
+        border: `${value ? '1.5px solid #0ea5e9' : '2px solid #9ca3af'}`,
+        background: value ? '#e0f2fe' : 'transparent',
+        color: value ? '#0ea5e9' : '#9ca3af',
+        fontSize: '9px',
+        fontWeight: 'bold',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        userSelect: 'none',
+        transition: 'all 0.2s'
+      }}
+      title={value ? 'Dry Dock — Active' : 'Not Dry Dock'}
+    >
+      DD
+    </div>
+  );
 
   if (isLoading)
     return <div className="dashboard-container">Loading Fleet Overview...</div>;
@@ -2246,7 +2360,7 @@ const ShoreDashboard = () => {
 
 
         <div
-          className={`kpi-card blue ${filters.status === 'OPEN' ? 'active' : ''}`}
+          className={`kpi-card blue ${filters.status.includes('OPEN') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('OPEN')}
 
@@ -2260,8 +2374,7 @@ const ShoreDashboard = () => {
         </div>
 
         <div
-          className={`kpi-card orange ${filters.priority === 'HIGH' ? 'active' : ''
-            }`}
+          className={`kpi-card orange ${filters.priority.includes('HIGH') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('HIGH')}
         >
@@ -2275,7 +2388,7 @@ const ShoreDashboard = () => {
         </div>
 
         <div
-          className={`kpi-card red ${filters.priority === 'CRITICAL' ? 'active' : ''}`}
+          className={`kpi-card red ${filters.priority.includes('CRITICAL') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('CRITICAL')}
         >
@@ -2291,8 +2404,7 @@ const ShoreDashboard = () => {
 
         {/* ✅ NEW OVERDUE CARD */}
         <div
-          className={`kpi-card red ${filters.deadline_status === 'OVERDUE' ? 'active' : ''
-            }`}
+          className={`kpi-card red ${filters.deadline_status.includes('OVERDUE') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('OVERDUE')}
         >
@@ -2322,8 +2434,7 @@ const ShoreDashboard = () => {
         </div>
 
         <div
-          className={`kpi-card green ${filters.status === 'CLOSED' ? 'active' : ''
-            }`}
+          className={`kpi-card green ${filters.status.includes('CLOSED') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('CLOSED')}
         >
@@ -2405,14 +2516,68 @@ const ShoreDashboard = () => {
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <strong>Deadline:</strong>
+              <strong>Due Date:</strong>
               <span style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <Clock size={14} color="#16a34a" /> Normal
                 <Clock size={14} color="#f59e0b" /> ≤15 Days
                 <Clock size={14} color="#dc2626" /> Overdue
               </span>
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <strong>Other:</strong>
+              <span style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <Flag size={14} color="#e8290b" fill="#e8290b" /> Flagged
+                <div style={{
+                  width: '17px', height: '17px', borderRadius: '50%',
+                  border: '2px solid #0ea5e9', background: '#e0f2fe',
+                  color: '#0ea5e9', fontSize: '9px', fontWeight: '900',
+                  display: 'inline-flex', alignItems: 'center',
+                  justifyContent: 'center', fontFamily: 'monospace'
+                }}>DD</div> Dry Dock
+              </span>
+            </div>
           </div>
+          {/* ✅ ADD THIS: Clear All Filters Button */}
+          {/* {hasActiveFilters && (
+            <button
+              onClick={clearAllFilters}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'white',
+                color: '#ea580c',
+                border: '1px solid #ea580c',
+                padding: '4px 6px',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                margin: "2px"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#fff7ed';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'white';
+              }}
+            >
+              <X size={14} />
+              Clear Filters
+              <span style={{
+                background: '#ea580c',
+                color: 'white',
+                borderRadius: '10px',
+                padding: '1px 7px',
+                fontSize: '11px',
+                fontWeight: '700',
+                lineHeight: '1.6'
+              }}>
+                {activeFilterCount}
+              </span>
+            </button>
+          )} */}
         </div>
         <div className='table-scroll-wrapper'>
           <DndContext
@@ -2500,7 +2665,7 @@ const ShoreDashboard = () => {
                           return (
                             <DraggableTh key="deadline" id="deadline" disabled={!isEditMode} style={{ width: columnWidths.target_close_date }}>
                               <FilterHeader
-                                label="Deadline"
+                                label="Due Date"
                                 field="target_close_date"
                                 currentFilter={filters.target_close_date}
                                 // currentFilterSort={filters.target_close_date_sort} // REMOVED
@@ -2576,22 +2741,40 @@ const ShoreDashboard = () => {
 
                         case 'priority':
                           return (
-                            <DraggableTh key="priority" id="priority" disabled={!isEditMode} style={{ width: 20, textAlign: 'center' }}>
+                            <DraggableTh key="priority" id="priority" disabled={!isEditMode}
+                              style={{ width: 20, textAlign: 'center' }}
+                            >
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                                 <span
                                   onClick={() => handleTextSort('priority')}
                                   style={{ cursor: 'pointer', display: 'inline-flex' }}
                                   title="Sort by Priority"
                                 >
-                                  <AlertTriangle size={16} color={filters.text_sort.field === 'priority' ? '#ea580c' : '#64748b'} />
+                                  <AlertTriangle
+                                    size={16}
+                                    color={
+                                      filters.text_sort.field === 'priority' && filters.priority.length > 0 ? '#7c3aed'  // both: purple
+                                        : filters.text_sort.field === 'priority' ? '#2563eb'                                 // sorted: blue
+                                          : filters.priority.length > 0 ? '#ea580c' : '#64748b'
+                                    }
+                                  />
                                 </span>
                                 <FilterHeader
                                   label=""
                                   field="priority"
                                   currentFilter={filters.priority}
                                   onFilterChange={handleFilterChange}
-                                  type="select"
-                                  options={PRIORITY_OPTIONS}
+                                  type="multi-select"
+                                  options={[
+                                    { label: 'Low', value: 'LOW' },
+                                    { label: 'Medium', value: 'MEDIUM' },
+                                    { label: 'High', value: 'HIGH' },
+                                    { label: 'Critical', value: 'CRITICAL' },
+                                  ]}
+                                  iconRenderer={(val) => {
+                                    const colorMap = { CRITICAL: '#dc2626', HIGH: '#f97316', MEDIUM: '#2563eb', LOW: '#16a34a' };
+                                    return <AlertTriangle size={13} color={colorMap[val]} />;
+                                  }}
                                 />
                               </div>
                             </DraggableTh>
@@ -2605,15 +2788,27 @@ const ShoreDashboard = () => {
                                   style={{ cursor: 'pointer', display: 'inline-flex' }}
                                   title="Sort by Status"
                                 >
-                                  <Flower size={16} color={filters.text_sort.field === 'status' ? '#ea580c' : '#64748b'} />
+                                  <Flower size={16} color={
+                                    filters.text_sort.field === 'status' && filters.status.length > 0 ? '#7c3aed'
+                                      : filters.text_sort.field === 'status' ? '#2563eb'
+                                        : filters.status.length > 0 ? '#ea580c' : '#64748b'
+                                  } />
                                 </span>
                                 <FilterHeader
                                   label=""
                                   field="status"
                                   currentFilter={filters.status}
                                   onFilterChange={handleFilterChange}
-                                  type="select"
-                                  options={FILTER_STATUS_OPTIONS}
+                                  type="multi-select"
+                                  options={[
+                                    { label: 'Open', value: 'OPEN' },
+                                    { label: 'Pending Closure', value: 'PENDING_CLOSURE' },
+                                    { label: 'Closed', value: 'CLOSED' },
+                                  ]}
+                                  iconRenderer={(val) => {
+                                    const colorMap = { OPEN: '#3b82f6', PENDING_CLOSURE: '#f59e0b', CLOSED: '#22c55e' };
+                                    return <Flower size={13} color={colorMap[val]} />;
+                                  }}
                                 />
                               </div>
                             </DraggableTh>
@@ -2627,18 +2822,25 @@ const ShoreDashboard = () => {
                                   style={{ cursor: 'pointer', display: 'inline-flex' }}
                                   title="Sort by Owner"
                                 >
-                                  <UserCircle size={16} color={filters.text_sort.field === 'owner' ? '#ea580c' : '#64748b'} />
+                                  <UserCircle size={16} color={
+                                    filters.text_sort.field === 'owner' && filters.is_owner.length > 0 ? '#7c3aed'
+                                      : filters.text_sort.field === 'owner' ? '#2563eb'
+                                        : filters.is_owner.length > 0 ? '#ea580c' : '#64748b'
+                                  } />
                                 </span>
                                 <FilterHeader
                                   label=""
                                   field="is_owner"
-                                  currentFilter={filters.is_owner}
+                                  currentFilter={filters.is_owner}   // now array
                                   onFilterChange={handleFilterChange}
-                                  type="select"
+                                  type="multi-select"                 // CHANGED
                                   options={[
                                     { label: "Owner", value: "true" },
                                     { label: "Others", value: "false" }
                                   ]}
+                                  iconRenderer={(val) => (
+                                    <UserCircle size={13} color={val === 'true' ? '#22c55e' : '#9ca3af'} />
+                                  )}
                                 />
                               </div>
                             </DraggableTh>
@@ -2652,15 +2854,27 @@ const ShoreDashboard = () => {
                                   style={{ cursor: 'pointer', display: 'inline-flex' }}
                                   title="Sort by Deadline"
                                 >
-                                  <Clock size={16} color={filters.text_sort.field === 'deadline_icon' ? '#ea580c' : '#64748b'} />
+                                  <Clock size={16} color={
+                                    filters.text_sort.field === 'deadline_icon' && filters.deadline_status.length > 0 ? '#7c3aed'
+                                      : filters.text_sort.field === 'deadline_icon' ? '#2563eb'
+                                        : filters.deadline_status.length > 0 ? '#ea580c' : '#64748b'
+                                  } />
                                 </span>
                                 <FilterHeader
                                   label=""
                                   field="deadline_status"
                                   currentFilter={filters.deadline_status}
                                   onFilterChange={handleFilterChange}
-                                  type="select"
-                                  options={DEADLINE_STATUS_OPTIONS}
+                                  type="multi-select"
+                                  options={[
+                                    { label: 'Normal', value: 'NORMAL' },
+                                    { label: 'Warning (≤15 days)', value: 'WARNING' },
+                                    { label: 'Overdue', value: 'OVERDUE' },
+                                  ]}
+                                  iconRenderer={(val) => {
+                                    const colorMap = { NORMAL: '#16a34a', WARNING: '#f59e0b', OVERDUE: '#dc2626' };
+                                    return <Clock size={13} color={colorMap[val]} />;
+                                  }}
                                 />
                               </div>
                             </DraggableTh>
@@ -2686,6 +2900,118 @@ const ShoreDashboard = () => {
                                 width={columnWidths.pr_number}
                                 onResize={onMouseDown}
                               />
+                            </DraggableTh>
+                          );
+
+                        case 'flag':
+                          return (
+                            <DraggableTh key="flag" id="flag" disabled={!isEditMode}
+                              style={{ width: 24, textAlign: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0px' }}>
+                                <span
+                                  onClick={() => handleTextSort('flag')}
+                                  style={{ cursor: 'pointer', display: 'inline-flex' }}
+                                  title="Sort by Flag"
+                                >
+                                  <Flag
+                                    size={16}
+                                    color={
+                                      filters.text_sort.field === 'flag' && filters.is_flagged.length > 0 ? '#7c3aed' // Both: Purple
+                                        : filters.text_sort.field === 'flag' ? '#2563eb'                             // Sorted: Blue
+                                          : filters.is_flagged.length > 0 ? '#ea580c'                                 // Filtered: Orange
+                                            : '#64748b'                                                                  // Default: Grey
+                                    }
+                                    fill={filters.text_sort.field === 'flag' ? '#ef4444' : 'none'}
+                                  />
+                                </span>
+                                <FilterHeader
+                                  label=""
+                                  field="is_flagged"
+                                  currentFilter={filters.is_flagged}
+                                  onFilterChange={handleFilterChange}
+                                  type="multi-select"
+                                  options={[
+                                    { label: 'Flagged', value: 'true' },
+                                    { label: 'Not Flagged', value: 'false' },
+                                  ]}
+                                  iconRenderer={(val) => (
+                                    <Flag
+                                      size={13}
+                                      color={val === 'true' ? '#e8290b' : '#64748b'}
+                                      fill={val === 'true' ? '#e8290b' : 'none'}
+                                    />
+                                  )}
+                                />
+                              </div>
+                            </DraggableTh>
+                          );
+
+                        case 'dd':
+                          return (
+                            <DraggableTh key="dd" id="dd" disabled={!isEditMode} style={{ width: 24, textAlign: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0px' }}>
+                                <div
+                                  onClick={() => handleTextSort('dd')}
+                                  style={{
+                                    width: '18px',
+                                    height: '18px',
+                                    borderRadius: '50%',
+                                    border: `1.5px solid ${filters.text_sort.field === 'dd' && filters.is_dd.length > 0 ? '#7c3aed'
+                                      : filters.text_sort.field === 'dd' ? '#2563eb'
+                                        : filters.is_dd.length > 0 ? '#ea580c'
+                                          : '#64748b'
+                                      }`,
+                                    background:
+                                      filters.text_sort.field === 'dd' && filters.is_dd.length > 0 ? '#f5f3ff' // Light Purple
+                                        : filters.text_sort.field === 'dd' ? '#e0f2fe'                       // Light Blue
+                                          : filters.is_dd.length > 0 ? '#fff7ed'                               // Light Orange
+                                            : 'transparent',
+                                    color:
+                                      filters.text_sort.field === 'dd' && filters.is_dd.length > 0 ? '#7c3aed'
+                                        : filters.text_sort.field === 'dd' ? '#2563eb'
+                                          : filters.is_dd.length > 0 ? '#ea580c'
+                                            : '#64748b',
+                                    fontSize: '9px',
+                                    fontWeight: '900',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontFamily: 'monospace',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  title="Sort by Dry Dock"
+                                >
+                                  DD
+                                </div>
+                                <FilterHeader
+                                  label=""
+                                  field="is_dd"
+                                  currentFilter={filters.is_dd}
+                                  onFilterChange={handleFilterChange}
+                                  type="multi-select"
+                                  options={[
+                                    { label: 'Dry Dock', value: 'true' },
+                                    { label: 'Not Dry Dock', value: 'false' },
+                                  ]}
+                                  iconRenderer={(val) => (
+                                    <div style={{
+                                      width: '13px',
+                                      height: '13px',
+                                      borderRadius: '50%',
+                                      border: `1px solid ${val === 'true' ? '#0ea5e9' : '#a0aec0'}`,
+                                      background: val === 'true' ? '#e0f2fe' : 'transparent',
+                                      color: val === 'true' ? '#0ea5e9' : '#94a3b8',
+                                      fontSize: '6px',
+                                      fontWeight: '900',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontFamily: 'monospace'
+                                    }}>DD</div>
+                                  )}
+                                />
+                              </div>
                             </DraggableTh>
                           );
 
@@ -3093,7 +3419,7 @@ const ShoreDashboard = () => {
                             case "deadline_icon":
                               return (
                                 <td key="deadline_icon" style={{ width: 20 }}>
-                                  <span title={"Deadline:" + getDeadlineStatus(defect.target_close_date)}>
+                                  <span title={"Due Date:" + getDeadlineStatus(defect.target_close_date)}>
                                     <DeadlineIcon date={defect.target_close_date} />
                                   </span>
                                 </td>
@@ -3140,6 +3466,59 @@ const ShoreDashboard = () => {
                                   )}
                                 </td>
                               )
+                            case 'flag':
+                              return (
+                                <td key="flag" style={{ width: 24 }}>
+                                  {isEditMode && !isClosed ? (
+                                    <div
+                                      onClick={() => handleInlineUpdate(defect.id, 'is_flagged', !defect.is_flagged)}
+                                      style={{
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                        transition: 'background 0.2s'
+                                      }}
+                                      onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                      title={defect.is_flagged ? 'Click to unflag' : 'Click to flag (will sort to top)'}
+                                    >
+                                      {getFlagIcon(defect.is_flagged)}
+                                    </div>
+                                  ) : (
+                                    <span title={defect.is_flagged ? 'Flagged' : 'Not Flagged'}>
+                                      {getFlagIcon(defect.is_flagged)}
+                                    </span>
+                                  )}
+                                </td>
+                              );
+
+                            case 'dd':
+                              return (
+                                <td key="dd" style={{ width: 24, }}>
+                                  {isEditMode && !isClosed ? (
+                                    <div
+                                      onClick={() => handleInlineUpdate(defect.id, 'is_dd', !defect.is_dd)}
+                                      style={{
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                        transition: 'background 0.2s'
+                                      }}
+                                      onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                      title={defect.is_dd ? 'Click to remove Dry Dock' : 'Click to mark as Dry Dock'}
+                                    >
+                                      {getDDIcon(defect.is_dd)}
+                                    </div>
+                                  ) : (
+                                    <span title={defect.is_dd ? 'Dry Dock' : 'Not Dry Dock'}>
+                                      {getDDIcon(defect.is_dd)}
+                                    </span>
+                                  )}
+                                </td>
+                              );
                             default:
                               return null;
                           }
@@ -3332,13 +3711,39 @@ const ShoreDashboard = () => {
                         case 'deadline_icon':
                           return (
                             <td key="deadline_icon" style={{ width: 20, textAlign: 'center' }}>
-                              <Clock size={20} color="#94a3b8" title="Set deadline first" />
+                              <Clock size={20} color="#94a3b8" title="Set due date first" />
                             </td>
                           );
                         case 'chat':
                           return (
                             <td key="chat" style={{ width: 20, textAlign: 'center' }}>
                               <MessageCircle size={20} color="#94a3b8" />
+                            </td>
+                          );
+
+                        case 'flag':
+                          return (
+                            <td key="flag" style={{ width: 24, textAlign: 'center' }}>
+                              <div
+                                onClick={() => setNewDefect(prev => ({ ...prev, is_flagged: !prev.is_flagged }))}
+                                style={{ cursor: 'pointer', display: 'inline-flex', padding: '4px', borderRadius: '4px' }}
+                                title="Toggle flag"
+                              >
+                                {getFlagIcon(newDefect.is_flagged)}
+                              </div>
+                            </td>
+                          );
+
+                        case 'dd':
+                          return (
+                            <td key="dd" style={{ width: 24, textAlign: 'center' }}>
+                              <div
+                                onClick={() => setNewDefect(prev => ({ ...prev, is_dd: !prev.is_dd }))}
+                                style={{ cursor: 'pointer', display: 'inline-flex', padding: '4px', borderRadius: '4px' }}
+                                title="Toggle Dry Dock"
+                              >
+                                {getDDIcon(newDefect.is_dd)}
+                              </div>
                             </td>
                           );
                         default:

@@ -135,6 +135,8 @@ class DefectService:
             before_image_path=defect_in.before_image_path,
             after_image_path=defect_in.after_image_path,
             is_owner=False,
+            is_flagged=defect_in.is_flagged or False, # ✅ Added
+            is_dd=defect_in.is_dd or False,           # ✅ Added
             origin="VESSEL" if _should_sync() else "SHORE",
             updated_at=datetime.utcnow(),
         )
@@ -151,6 +153,8 @@ class DefectService:
             sync_payload["equipment_name"] = defect_in.equipment
             sync_payload["date_identified"] = date_identified.isoformat() if date_identified else None
             sync_payload["target_close_date"] = target_close_date.isoformat() if target_close_date else None
+            sync_payload["is_flagged"] = defect_in.is_flagged
+            sync_payload["is_dd"] = defect_in.is_dd
 
             db.add(SyncQueue(
                 entity_id=new_defect.id,           

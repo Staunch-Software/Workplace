@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Search, Filter, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Activity, Mail } from "lucide-react";
 import { getUsers, updateUser, assignVessels, getVessels, resendWelcomeEmail } from "./lib/adminApi";
 
@@ -21,6 +21,180 @@ function roleBadgeClass(role) {
     if (role === "SHORE") return "ap-badge ap-badge-shore";
     if (role === "VESSEL") return "ap-badge ap-badge-vessel";
     return "ap-badge";
+}
+
+function VesselPopover({ vessels, isOpen, onClose, triggerRef }) {
+    const popoverRef = useRef(null);
+    const [position, setPosition] = useState({ top: 0, left: 0 });
+
+    useEffect(() => {
+        if (isOpen && triggerRef?.current) {
+            setTimeout(() => {
+                if (popoverRef?.current) {
+                    const triggerRect = triggerRef.current.getBoundingClientRect();
+                    const popoverRect = popoverRef.current.getBoundingClientRect();
+
+                    // Position to the left of the trigger with gap for the arrow
+                    let left = triggerRect.left - popoverRect.width - 16;
+
+                    // If no space on left, flip to right
+                    if (left < 8) {
+                        left = triggerRect.right + 16;
+                    }
+
+                    // Vertically centered alongside the trigger row
+                    let top = triggerRect.top + triggerRect.height / 2 - popoverRect.height / 2;
+
+                    // Clamp vertically so it stays within viewport
+                    top = Math.max(8, Math.min(top, window.innerHeight - popoverRect.height - 8));
+
+                    setPosition({ top, left });
+                }
+            }, 0);
+        }
+    }, [isOpen, triggerRef]);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            if (isOpen) onClose();
+        };
+        if (isOpen) {
+            window.addEventListener("scroll", handleScroll);
+            return () => window.removeEventListener("scroll", handleScroll);
+        }
+    }, [isOpen, onClose]);
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (
+                popoverRef.current && !popoverRef.current.contains(e.target) &&
+                triggerRef?.current && !triggerRef.current.contains(e.target)
+            ) {
+                onClose();
+            }
+        };
+        if (isOpen) {
+            document.addEventListener("mousedown", handleClickOutside);
+            return () => document.removeEventListener("mousedown", handleClickOutside);
+        }
+    }, [isOpen, onClose, triggerRef]);
+
+    if (!isOpen || vessels.length === 0) return null;
+
+    // Dynamically compute arrow position relative to the popover's clamped top
+    // so it always points exactly at the clicked trigger badge
+    const triggerCenterY = triggerRef?.current
+        ? triggerRef.current.getBoundingClientRect().top +
+          triggerRef.current.getBoundingClientRect().height / 2
+        : 0;
+
+    const arrowTop = Math.max(
+        16,
+        Math.min(
+            triggerCenterY - position.top,
+            (popoverRef.current?.offsetHeight ?? 300) - 16
+        )
+    );
+
+    return (
+        <div
+            ref={popoverRef}
+            style={{
+                position: "fixed",
+                top: `${position.top}px`,
+                left: `${position.left}px`,
+                zIndex: 1000,
+                background: "var(--ap-bg)",
+                border: "1px solid var(--ap-border)",
+                borderRadius: "8px",
+                boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
+                minWidth: "300px",
+                maxWidth: "420px",
+            }}
+            className="ap-popover"
+        >
+            {/* Arrow border layer — dynamically points at the trigger */}
+            <div
+                style={{
+                    position: "absolute",
+                    right: "-8px",
+                    top: `${arrowTop}px`,
+                    transform: "translateY(-50%)",
+                    width: 0,
+                    height: 0,
+                    borderTop: "8px solid transparent",
+                    borderBottom: "8px solid transparent",
+                    borderLeft: "8px solid var(--ap-border)",
+                }}
+            />
+            {/* Arrow fill layer — masks border for clean outlined look */}
+            <div
+                style={{
+                    position: "absolute",
+                    right: "-6px",
+                    top: `${arrowTop}px`,
+                    transform: "translateY(-50%)",
+                    width: 0,
+                    height: 0,
+                    borderTop: "7px solid transparent",
+                    borderBottom: "7px solid transparent",
+                    borderLeft: "7px solid var(--ap-bg)",
+                }}
+            />
+
+            <div style={{ padding: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                    <Ship size={16} style={{ color: "var(--ap-primary)" }} />
+                    <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--ap-text)", margin: 0 }}>
+                        Assigned Vessels ({vessels.length})
+                    </p>
+                </div>
+                <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                    maxHeight: "420px",
+                    overflowY: "auto",
+                    paddingRight: "6px",
+                }}>
+                    {vessels.map(vessel => (
+                        <div
+                            key={vessel.imo}
+                            style={{
+                                padding: "12px 14px",
+                                borderRadius: 7,
+                                background: "linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.02) 100%)",
+                                border: "1px solid rgba(59, 130, 246, 0.2)",
+                                borderLeft: "3px solid var(--ap-primary)",
+                                flexShrink: 0,
+                                transition: "all 0.2s ease",
+                            }}
+                        >
+                            <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--ap-text)", marginBottom: 4 }}>
+                                {vessel.name}
+                            </div>
+                            <div style={{ fontSize: "0.75rem", color: "var(--ap-text-muted)", fontFamily: "monospace", letterSpacing: "0.5px" }}>
+                                IMO {vessel.imo}
+                            </div>
+                            {vessel.vessel_type && (
+                                <div style={{
+                                    fontSize: "0.7rem",
+                                    color: "var(--ap-text-muted)",
+                                    marginTop: 4,
+                                    display: "inline-block",
+                                    padding: "2px 8px",
+                                    borderRadius: 3,
+                                    background: "rgba(59, 130, 246, 0.1)",
+                                }}>
+                                    {vessel.vessel_type.replace(/_/g, " ")}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function EditSlideOver({ user, vessels, onClose, onSave }) {
@@ -176,6 +350,31 @@ function EditSlideOver({ user, vessels, onClose, onSave }) {
     );
 }
 
+// AFTER
+function VesselCountCell({ assignedVessels, isOpen, onToggle, onClose }) {
+    const triggerRef = useRef(null);
+
+    return (
+        <>
+            <div
+                ref={triggerRef}
+                className="ap-vessel-count"
+                onClick={onToggle}
+                style={{ cursor: "pointer" }}
+                title={assignedVessels.length > 0 ? "Click to see details" : "No vessels assigned"}
+            >
+                {assignedVessels.length}
+            </div>
+            <VesselPopover
+                vessels={assignedVessels}
+                isOpen={isOpen}
+                onClose={onClose}
+                triggerRef={triggerRef}
+            />
+        </>
+    );
+}
+
 export default function AllUsers() {
     const [users, setUsers] = useState([]);
     const [vessels, setVessels] = useState([]);
@@ -184,6 +383,7 @@ export default function AllUsers() {
     const [roleFilter, setRoleFilter] = useState("ALL");
     const [statusFilter, setStatusFilter] = useState("ALL");
     const [editingUser, setEditingUser] = useState(null);
+    const [openVesselPopoverUserId, setOpenVesselPopoverUserId] = useState(null);
 
     const fetchData = async () => {
         try {
@@ -271,7 +471,7 @@ export default function AllUsers() {
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
-                                <tr><td colSpan={7} className="ap-empty-row">No users found.</td></tr>
+                                <tr><td colSpan={8} className="ap-empty-row">No users found.</td></tr>
                             ) : filtered.map(user => (
                                 <tr key={user.id}>
                                     <td>
@@ -292,7 +492,16 @@ export default function AllUsers() {
                                             ))}
                                         </div>
                                     </td>
-                                    <td><div className="ap-vessel-count">{user.assigned_vessels?.length ?? 0}</div></td>
+                                    <td>
+                                        <VesselCountCell
+                                            assignedVessels={user.assigned_vessels ?? []}
+                                            isOpen={openVesselPopoverUserId === user.id}
+                                            onToggle={() => setOpenVesselPopoverUserId(
+                                                openVesselPopoverUserId === user.id ? null : user.id
+                                            )}
+                                            onClose={() => setOpenVesselPopoverUserId(null)}
+                                        />
+                                    </td>
                                     <td>
                                         {user.last_login
                                             ? new Date(user.last_login).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
