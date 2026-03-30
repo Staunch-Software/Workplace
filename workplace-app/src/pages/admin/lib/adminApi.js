@@ -21,3 +21,6 @@ export const getVessels = () => api.get('/vessels');
 export const createVessel = (payload) => api.post('/vessels', payload);
 
 export const updateVessel = (imo, payload) => api.patch(`/vessels/${imo}`, payload);
+
+export const updateVesselModuleStatus = (imo, status) =>
+  api.patch(`/vessels/${imo}/module-status`, status);

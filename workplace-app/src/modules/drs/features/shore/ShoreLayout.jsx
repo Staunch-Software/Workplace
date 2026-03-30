@@ -120,7 +120,7 @@ const ShoreLayout = () => {
       setTimeout(() => setShowNotifications(false), 100);
     } else if (notification.type === 'MENTION') {
       console.log('💬 Mention notification without link, routing to tasks');
-      navigate('/drs/shore/tasks',{state: {highlightDefectId: defectId,isInternal}});
+      navigate('/drs/shore/tasks', { state: { highlightDefectId: defectId, isInternal } });
       setTimeout(() => setShowNotifications(false), 100);
     } else {
       console.log('⚠️ No link in notification, routing to dashboard');
@@ -213,6 +213,13 @@ const ShoreLayout = () => {
           </div>
           <div className="nav-divider-v"></div>
           <div className="nav-pill-group">
+            <button
+              className={`nav-pill ${isActive('/drs/shore/analytics-dashboard') ? 'active' : ''}`}
+              onClick={() => navigate('/drs/shore/analytics-dashboard')}
+            >
+              <LayoutGrid size={16} />
+              <span>Dashboard</span>
+            </button>
             <button className={`nav-pill ${isActive('/drs/shore/dashboard') ? 'active' : ''}`} onClick={() => navigate('/drs/shore/dashboard')}>
               {/* <LayoutGrid size={16} /> */}
               <span>Defect List</span>
@@ -409,7 +416,7 @@ const ShoreLayout = () => {
                                   day: 'numeric',
                                   hour: 'numeric',
                                   minute: '2-digit',
-                                  hour12:false
+                                  hour12: false
                                 })}
                               </span>
 

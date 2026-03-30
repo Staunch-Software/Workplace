@@ -69,7 +69,8 @@ class DefectCreate(BaseModel):
     json_backup_path: Optional[str] = None
     target_close_date: Optional[str] = None
     is_owner: bool = False 
-    
+    is_flagged: bool = False  # ✅ Added
+    is_dd: bool = False       # ✅ Added
     # ✅ Defect Source
     defect_source: str
     pr_status: Optional[str] = 'Not Set' 
@@ -108,7 +109,8 @@ class DefectResponse(BaseModel):
     
      # ✅ OWNER FLAG
     is_owner: bool = False
-    
+    is_flagged: bool = False
+    is_dd: bool = False
     # Other fields
     responsibility: Optional[str] = None
     pr_status: Optional[str] = 'Not Set'
@@ -146,7 +148,9 @@ class DefectUpdate(BaseModel):
     after_image_required: Optional[bool] = None
     before_image_path: Optional[str] = None
     after_image_path: Optional[str] = None
-    is_owner: Optional[bool] = None    
+    is_owner: Optional[bool] = None 
+    is_flagged: Optional[bool] = None  # ✅ Added
+    is_dd: Optional[bool] = None    
     # ✅ Closure remarks (minimum 50 characters required when closing)
     closure_remarks: Optional[str] = None
 

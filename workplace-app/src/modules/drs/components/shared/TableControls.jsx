@@ -29,7 +29,9 @@ export const FilterHeader = ({
   width,
   onResize,
   onSort,
-  sortState
+  sortState,
+  isFiltered,
+  iconRenderer,
 }) => {
 
 
@@ -37,12 +39,12 @@ export const FilterHeader = ({
   const [tempRange, setTempRange] = useState(currentFilter || { from: '', to: '' });
   const [tempDate, setTempDate] = useState(currentFilter || '');
   const filterRef = useRef(null);
-  const isActive =
-    type === 'date-range'
-      ? !!currentFilter?.from || !!currentFilter?.to
-      : Array.isArray(currentFilter)
-        ? currentFilter.length > 0
-        : !!currentFilter;
+  // const isActive =
+  //   type === 'date-range'
+  //     ? !!currentFilter?.from || !!currentFilter?.to
+  //     : Array.isArray(currentFilter)
+  //       ? currentFilter.length > 0
+  //       : !!currentFilter;
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -68,7 +70,32 @@ export const FilterHeader = ({
     };
   }, [isOpen, currentFilter, type]);
 
+  const isActive = isFiltered !== undefined
+    ? isFiltered
+    : type === 'date-range'
+      ? !!(currentFilter?.from || currentFilter?.to)
+      : Array.isArray(currentFilter)
+        ? currentFilter.length > 0
+        : !!currentFilter;
 
+  // Color logic: purple if both filtered+sorted, blue if sorted only, orange if filtered only
+  // ✅ Correct unified color logic
+
+  const labelColor = (isActive && sortState)
+    ? '#7c3aed'   // both → purple
+    : sortState
+      ? '#2563eb' // sort → blue
+      : isActive
+        ? '#ea580c' // filter → orange
+        : undefined; // default dark
+
+  const filterIconColor = (isActive && sortState)
+    ? '#7c3aed'   // both → purple
+    : sortState
+      ? '#2563eb' // sort → blue
+      : isActive
+        ? '#ea580c' // filter → orange
+        : undefined; // default gray
 
   return (
     <div
@@ -88,9 +115,12 @@ export const FilterHeader = ({
           }
           style={{
             cursor: onSort ? 'pointer' : 'default',
+            color: labelColor,
+            fontWeight: isActive || sortState ? 600 : undefined,
             textDecorationLine: sortState ? 'underline' : 'none',
             textDecorationStyle: sortState ? 'dotted' : 'none',
-            textUnderlineOffset: '2px'
+            textUnderlineOffset: '2px',
+            transition: 'color 0.2s',
           }}
         >
           {label}
@@ -99,6 +129,7 @@ export const FilterHeader = ({
           <Filter
             size={18}
             className={`filter-icon ${isActive ? 'active' : ''}`}
+            style={{ color: filterIconColor }}   // ← ADD THIS LINE
             onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
           />
           {isOpen && (
@@ -107,14 +138,167 @@ export const FilterHeader = ({
               onClick={(e) => e.stopPropagation()}
             >
               {type === 'text' && (
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder={`Filter ${label}...`}
-                  value={currentFilter || ''}
-                  onChange={(e) => onFilterChange(field, e.target.value)}
-                />
+                <>
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder={`Filter ${label}...`}
+                    value={currentFilter || ''}
+                    onChange={(e) =>
+                      onFilterChange(field, e.target.value)
+                    }
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      fontSize: '12px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '4px'
+                    }}
+                  />
+
+                  {currentFilter && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        textAlign: 'right',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: '#ea580c',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => {
+                        onFilterChange(field, '');
+                        setIsOpen(false);
+                      }}
+                    >
+                      Clear
+                    </div>
+                  )}
+                </>
               )}
+              {/* // Inside FilterHeader component, under type === 'multi-select' */}
+              {type === 'multi-select' && (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '6px',
+                    minWidth: '180px',
+                    maxWidth: '240px',
+
+                    maxHeight: '260px',
+
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+
+                    boxSizing: 'border-box',
+
+                    gap: '2px'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {options.map(opt => {
+                    const val = typeof opt === 'object' ? opt.value : opt;
+                    const lbl = typeof opt === 'object' ? opt.label : opt;
+
+                    const checked =
+                      Array.isArray(currentFilter) &&
+                      currentFilter.includes(val);
+
+                    return (
+                      <div
+                        key={val}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '6px 8px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#f1f5f9';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                        onClick={() => {
+                          const current = Array.isArray(currentFilter)
+                            ? currentFilter
+                            : [];
+
+                          const next = checked
+                            ? current.filter(v => v !== val)
+                            : [...current, val];
+
+                          onFilterChange(field, next);
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          readOnly
+                          style={{
+                            margin: 0,
+                            width: '14px',
+                            height: '14px',
+                            flexShrink: 0
+                          }}
+                        />
+                        {iconRenderer && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+                            {iconRenderer(val)}
+                          </span>
+                        )}
+                        <span
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            color: "#000"
+                          }}
+                        >
+                          {lbl}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {Array.isArray(currentFilter) &&
+                    currentFilter.length > 0 && (
+                      <div
+                        style={{
+                          marginTop: '8px',
+
+                          paddingTop: '6px',
+
+                          borderTop: '1px solid #f1f5f9',
+
+                          textAlign: 'right',
+
+                          fontSize: '11px',
+
+                          fontWeight: '600',
+
+                          color: '#ea580c',
+
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => {
+                          onFilterChange(field, []);
+                          setIsOpen(false);
+                        }}
+                      >
+                        Clear
+                      </div>
+                    )}
+                </div>
+              )}
+
               {/* {type === 'select' && (
                 <select
                   value={currentFilter || ''}
@@ -353,13 +537,10 @@ export const FilterHeader = ({
               )}
 
 
-              {type !== 'date-range' && type !== 'date' && (
+              {type !== 'date-range' && type !== 'date' && type !== 'multi-select' && type !== 'text' && (
                 <div
                   style={{ textAlign: 'right', fontSize: '11px', color: '#ea580c', cursor: 'pointer' }}
-                  onClick={() => {
-                    onFilterChange(field, '');
-                    setIsOpen(false);
-                  }}
+                  onClick={() => { onFilterChange(field, ''); setIsOpen(false); }}
                 >
                   Clear
                 </div>
@@ -625,15 +806,35 @@ export function EquipmentFilter({
           }
           style={{
             cursor: onSort ? 'pointer' : 'default',
+            color: (selectedValues.length > 0 && sortState) ? '#7c3aed'
+              : sortState ? '#2563eb'
+                : selectedValues.length > 0 ? '#ea580c'
+                  : 'inherit',
+            fontWeight: selectedValues.length > 0 || sortState ? 600 : undefined,
             textDecorationLine: sortState ? 'underline' : 'none',
             textDecorationStyle: sortState ? 'dotted' : 'none',
-            textUnderlineOffset: '2px'
+            textUnderlineOffset: '2px',
+            transition: 'color 0.2s',
           }}
         >
           {label}
-          {selectedValues.length > 0 && (
-            <span style={{ marginLeft: 4, color: '#ea580c', fontWeight: 600 }}>
-              ({selectedValues.length})
+          {/* {selectedValues.length > 0 && (
+            <span style={{
+              marginLeft: 4,
+              fontSize: '10px',
+              background: sortState ? '#ede9fe' : '#fff7ed',
+              color: sortState ? '#7c3aed' : '#ea580c',
+              border: `1px solid ${sortState ? '#c4b5fd' : '#fdba74'}`,
+              padding: '0 5px',
+              borderRadius: '8px',
+              fontWeight: 700,
+            }}>
+              {selectedValues.length}
+            </span>
+          )} */}
+          {sortState && (
+            <span style={{ marginLeft: 3, fontSize: '10px' }}>
+              {sortState === 'asc' ? '↑' : '↓'}
             </span>
           )}
         </span>
@@ -642,10 +843,13 @@ export function EquipmentFilter({
           <Filter
             size={18}
             className={`filter-icon ${selectedValues.length ? 'active' : ''}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(!open);
+            style={{
+              color: (selectedValues.length > 0 && sortState) ? '#7c3aed'
+                : selectedValues.length > 0 ? '#ea580c'
+                  : sortState ? '#2563eb'
+                    : undefined
             }}
+            onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
           />
 
           {open && (
@@ -706,8 +910,6 @@ export function EquipmentFilter({
           )}
         </div>
       </div>
-
-
     </div>
   );
 }
@@ -756,15 +958,35 @@ export function DefectSourceFilter({
           }
           style={{
             cursor: onSort ? 'pointer' : 'default',
+            color: (selectedValues.length > 0 && sortState) ? '#7c3aed'
+              : sortState ? '#2563eb'
+                : selectedValues.length > 0 ? '#ea580c'
+                  : 'inherit',
+            fontWeight: selectedValues.length > 0 || sortState ? 600 : undefined,
             textDecorationLine: sortState ? 'underline' : 'none',
             textDecorationStyle: sortState ? 'dotted' : 'none',
-            textUnderlineOffset: '2px'
+            textUnderlineOffset: '2px',
+            transition: 'color 0.2s',
           }}
         >
           {label}
-          {selectedValues.length > 0 && (
-            <span style={{ marginLeft: 4, color: '#ea580c', fontWeight: 600 }}>
-              ({selectedValues.length})
+          {/* {selectedValues.length > 0 && (
+            <span style={{
+              marginLeft: 4,
+              fontSize: '10px',
+              background: sortState ? '#ede9fe' : '#fff7ed',
+              color: sortState ? '#7c3aed' : '#ea580c',
+              border: `1px solid ${sortState ? '#c4b5fd' : '#fdba74'}`,
+              padding: '0 5px',
+              borderRadius: '8px',
+              fontWeight: 700,
+            }}>
+              {selectedValues.length}
+            </span>
+          )} */}
+          {sortState && (
+            <span style={{ marginLeft: 3, fontSize: '10px' }}>
+              {sortState === 'asc' ? '↑' : '↓'}
             </span>
           )}
         </span>
@@ -773,10 +995,13 @@ export function DefectSourceFilter({
           <Filter
             size={18}
             className={`filter-icon ${selectedValues.length ? 'active' : ''}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(!open);
+            style={{
+              color: (selectedValues.length > 0 && sortState) ? '#7c3aed'
+                : selectedValues.length > 0 ? '#ea580c'
+                  : sortState ? '#2563eb'
+                    : undefined
             }}
+            onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
           />
 
           {open && (
@@ -1203,15 +1428,35 @@ export function VesselFilter({
           }
           style={{
             cursor: onSort ? 'pointer' : 'default',
+            color: (selectedValues.length > 0 && sortState) ? '#7c3aed'
+              : sortState ? '#2563eb'
+                : selectedValues.length > 0 ? '#ea580c'
+                  : 'inherit',
+            fontWeight: selectedValues.length > 0 || sortState ? 600 : undefined,
             textDecorationLine: sortState ? 'underline' : 'none',
             textDecorationStyle: sortState ? 'dotted' : 'none',
-            textUnderlineOffset: '2px'
+            textUnderlineOffset: '2px',
+            transition: 'color 0.2s',
           }}
         >
           {label}
           {selectedValues.length > 0 && (
-            <span style={{ marginLeft: 4, color: '#ea580c', fontWeight: 600 }}>
-              ({selectedValues.length})
+            <span style={{
+              marginLeft: 4,
+              fontSize: '10px',
+              background: sortState ? '#ede9fe' : '#fff7ed',
+              color: sortState ? '#7c3aed' : '#ea580c',
+              border: `1px solid ${sortState ? '#c4b5fd' : '#fdba74'}`,
+              padding: '0 5px',
+              borderRadius: '8px',
+              fontWeight: 700,
+            }}>
+              {selectedValues.length}
+            </span>
+          )}
+          {sortState && (
+            <span style={{ marginLeft: 3, fontSize: '10px' }}>
+              {sortState === 'asc' ? '↑' : '↓'}
             </span>
           )}
         </span>
@@ -1220,10 +1465,13 @@ export function VesselFilter({
           <Filter
             size={18}
             className={`filter-icon ${selectedValues.length ? 'active' : ''}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(!open);
+            style={{
+              color: (selectedValues.length > 0 && sortState) ? '#7c3aed'
+                : selectedValues.length > 0 ? '#ea580c'
+                  : sortState ? '#2563eb'
+                    : undefined
             }}
+            onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
           />
 
           {open && (
