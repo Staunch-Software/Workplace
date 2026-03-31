@@ -35,7 +35,7 @@ async def list_vessels(
         for v in vessels
     ]
 
-@router.get("/vessels/status")
+@router.get("/vessel-status")
 async def get_vessel_status(
     db: AsyncSession = Depends(get_control_db),
     current_user: User = Depends(get_current_user),

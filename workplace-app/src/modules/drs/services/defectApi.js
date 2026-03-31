@@ -526,6 +526,9 @@ export const defectApi = {
     }
   },
 
+  getEmailRecipients: (defectId) =>
+    api.get(`/defects/${defectId}/email-recipients`).then(r => r.data),
+
   // ============================================
   // TASKS & NOTIFICATIONS
   // ============================================
@@ -658,6 +661,8 @@ export const defectApi = {
       "owner",
       "chat",
       "pr_details",
+      "dd",
+      "flag"
     ];
 
     // Check if all columns are valid
