@@ -932,11 +932,14 @@ async def update_luboil_remarks(
         try:
             from app.models.sync import SyncQueue
             from sqlalchemy import inspect as sa_inspect
+            from decimal import Decimal
             payload = {}
             for col in sa_inspect(sample.__class__).columns:
                 val = getattr(sample, col.key, None)
                 if hasattr(val, 'isoformat'):
                     val = val.isoformat()
+                elif isinstance(val, Decimal):
+                    val = str(val)  # Use str() to preserve exact precision for lab values
                 payload[col.key] = val
             db.add(SyncQueue(
                 entity_type="luboil_sample",
