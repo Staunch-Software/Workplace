@@ -928,34 +928,6 @@ async def update_luboil_remarks(
         sample.version = (sample.version or 1) + 1
         sample.updated_at = datetime.utcnow()
 
-        # ✅ Queue vessel changes to push to cloud
-        try:
-            from app.models.sync import SyncQueue
-            from sqlalchemy import inspect as sa_inspect
-            from decimal import Decimal
-            payload = {}
-            for col in sa_inspect(sample.__class__).columns:
-                val = getattr(sample, col.key, None)
-                if hasattr(val, 'isoformat'):
-                    val = val.isoformat()
-                elif isinstance(val, Decimal):
-                    val = str(val)  # Use str() to preserve exact precision for lab values
-                payload[col.key] = val
-            db.add(SyncQueue(
-                entity_type="luboil_sample",
-                entity_id=str(sample.sample_id),
-                operation="UPDATE",
-                payload=payload,
-                version=sample.version,
-                origin="VESSEL",
-                sync_scope="LUBOIL",
-                status="PENDING",
-                created_at=datetime.utcnow()
-            ))
-            logger.info(f"✅ Queued luboil_sample id={sample.sample_id} v{sample.version} for cloud push")
-        except Exception as sync_err:
-            logger.error(f"Failed to queue sample sync (non-fatal): {sync_err}", exc_info=True)
-
         await db.commit()
 
         # 4. REBUILD HISTORY
