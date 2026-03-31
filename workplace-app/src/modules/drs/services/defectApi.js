@@ -526,6 +526,9 @@ export const defectApi = {
     }
   },
 
+  getEmailRecipients: (defectId) =>
+    api.get(`/defects/${defectId}/email-recipients`).then(r => r.data),
+
   // ============================================
   // TASKS & NOTIFICATIONS
   // ============================================

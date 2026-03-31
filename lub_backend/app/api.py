@@ -391,7 +391,7 @@ async def upload_luboil_report(
 
         # 2. Process Data (Extract values to DB)
         logger.info(" Parsing PDF Data...")
-        result = save_luboil_report(
+        result = await save_luboil_report(
             pdf_file_stream=pdf_stream,
             filename=file.filename,
             session=db
@@ -928,31 +928,6 @@ async def update_luboil_remarks(
         sample.version = (sample.version or 1) + 1
         sample.updated_at = datetime.utcnow()
 
-        # ✅ Queue vessel changes to push to cloud
-        try:
-            from app.models.sync import SyncQueue
-            from sqlalchemy import inspect as sa_inspect
-            payload = {}
-            for col in sa_inspect(sample.__class__).columns:
-                val = getattr(sample, col.key, None)
-                if hasattr(val, 'isoformat'):
-                    val = val.isoformat()
-                payload[col.key] = val
-            db.add(SyncQueue(
-                entity_type="luboil_sample",
-                entity_id=str(sample.sample_id),
-                operation="UPDATE",
-                payload=payload,
-                version=sample.version,
-                origin="VESSEL",
-                sync_scope="LUBOIL",
-                status="PENDING",
-                created_at=datetime.utcnow()
-            ))
-            logger.info(f"✅ Queued luboil_sample id={sample.sample_id} v{sample.version} for cloud push")
-        except Exception as sync_err:
-            logger.error(f"Failed to queue sample sync (non-fatal): {sync_err}", exc_info=True)
-
         await db.commit()
 
         # 4. REBUILD HISTORY
@@ -1095,6 +1070,7 @@ async def get_luboil_fleet_overview(
                 LuboilReport.imo_number,
                 LuboilReport.report_url,
                 LuboilSample.equipment_code,
+                LuboilReport.oil_source,
                 LuboilSample.machinery_name,
                 LuboilSample.status,
                 LuboilSample.sample_date,
@@ -1117,7 +1093,9 @@ async def get_luboil_fleet_overview(
                 LuboilSample.pdf_page_index,
                 LuboilSample.viscosity_40c,
                 LuboilSample.tan,
-                LuboilSample.tbn
+                LuboilSample.tbn,
+                LuboilReport.overdue_remarks,
+                LuboilReport.is_overdue_accepted
             )
             .join(LuboilReport, LuboilSample.report_id == LuboilReport.report_id)
             .where(LuboilReport.imo_number.in_(allowed_imos))
@@ -1236,8 +1214,8 @@ async def get_luboil_fleet_overview(
                     # =========================================================
                     interval_months = eq.default_interval_months or 3
                     limit_days = interval_months * 30
-                    warning_threshold = limit_days + 30  
-                    critical_threshold = limit_days + 60 
+                    warning_threshold = limit_days    
+                    critical_threshold = limit_days + 30
 
                     days_elapsed = (datetime.now().date() - latest_sample.sample_date).days
                     excess_days = days_elapsed - limit_days
@@ -1265,7 +1243,7 @@ async def get_luboil_fleet_overview(
                         if not existing_alert:
                             clean_v_name = format_vessel_name(v.name)
                             line_1 = f"SCHEDULE ALERT ({target_priority}) - {clean_v_name.upper()}" 
-                            status_text = "CRITICAL OVERDUE (>60 days)" if target_priority == "CRITICAL" else "OVERDUE (>30 days)"
+                            status_text = "CRITICAL OVERDUE (>30 days)" if target_priority == "CRITICAL" else "OVERDUE"
                             line_2 = f"{eq.ui_label} is now {status_text} (Overdue by {excess_days} days)."
                             line_3 = f"Report Date: {latest_sample.sample_date} | Status: {latest_sample.status}"
                             
@@ -1346,12 +1324,15 @@ async def get_luboil_fleet_overview(
                     cell_data.update({
                         "sample_id": latest_sample.sample_id,
                         "status": latest_sample.status,
+                        "oil_source": latest_sample.oil_source,
                         "diagnosis": latest_sample.lab_diagnosis,
                         "summary_error": latest_sample.summary_error, 
                         "last_sample": latest_sample.sample_date.strftime("%Y-%m-%d"),
                         "report_date": latest_sample.report_date.strftime("%Y-%m-%d") if latest_sample.report_date else None,
                         "has_report": True,
                         "report_url": secure_report_url,
+                        "report_overdue_remarks": latest_sample.overdue_remarks,
+                        "report_is_overdue_accepted": latest_sample.is_overdue_accepted,
                         "officer_remarks": latest_sample.officer_remarks,
                         "office_remarks": latest_sample.office_remarks,
                         "internal_remarks": latest_sample.internal_remarks,
@@ -2088,6 +2069,109 @@ async def upload_vessel_config_report(
         control_db.close()
     
     return {"url": blob_url}
+
+class VesselOverdueActionRequest(BaseModel):
+    imo: int
+    action: str  # 'SUBMIT', 'ACCEPT', 'DECLINE'
+    remarks: Optional[str] = None
+
+@app.post("/api/luboil/vessel/overdue-workflow", tags=["Lube Oil"])
+async def vessel_overdue_workflow(
+    request: VesselOverdueActionRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
+):
+    from sqlalchemy import select as sa_select
+    from datetime import datetime
+    from app.core.database_control import SessionControl
+    from app.models.control.vessel import Vessel as ControlVessel
+    from app.models.control.user import User as ControlUser
+    from app.models.control.associations import user_vessel_link
+    
+    # 1. Extract User Info & Role
+    user_data = current_user.get('user') if isinstance(current_user, dict) and 'user' in current_user else current_user
+    user_name = getattr(user_data, 'full_name', 'User') if not isinstance(user_data, dict) else user_data.get('full_name', 'User')
+    u_role = str(getattr(user_data, 'role', "") if not isinstance(user_data, dict) else user_data.get('role', "")).upper()
+    is_shore = u_role in["SHORE", "ADMIN", "SUPERUSER", "SUPERINTENDENT"]
+
+    # 2. Get Vessel Name for Notifications
+    control_db = SessionControl()
+    try:
+        vessel = control_db.query(ControlVessel).filter(ControlVessel.imo == str(request.imo)).first()
+        vessel_name = vessel.name if vessel else f"IMO {request.imo}"
+    finally:
+        control_db.close()
+
+    # 3. Find the Active Reports tied to this Vessel
+    stmt = (
+        sa_select(LuboilSample.report_id)
+        .join(LuboilReport, LuboilSample.report_id == LuboilReport.report_id)
+        .where(LuboilReport.imo_number == str(request.imo))
+        .order_by(LuboilSample.sample_date.desc())
+        .limit(20)
+    )
+    res = await db.execute(stmt)
+    report_ids = list(set(res.scalars().all()))
+
+    if not report_ids:
+        raise HTTPException(status_code=404, detail="No active reports found for this vessel.")
+
+    # 4. Update the 2 Columns on those Reports
+    res_reports = await db.execute(sa_select(LuboilReport).where(LuboilReport.report_id.in_(report_ids)))
+    reports_to_update = res_reports.scalars().all()
+
+    justification_text = request.remarks
+    for r in reports_to_update:
+        if request.action == "SUBMIT":
+            r.overdue_remarks = request.remarks
+            r.is_overdue_accepted = None  # NULL means Pending
+            r.updated_at = datetime.utcnow()
+        elif request.action == "ACCEPT":
+            r.is_overdue_accepted = True  # True means Accepted
+            justification_text = r.overdue_remarks
+            r.updated_at = datetime.utcnow()
+        elif request.action == "DECLINE":
+            r.is_overdue_accepted = False # False means Declined
+            justification_text = r.overdue_remarks
+            r.updated_at = datetime.utcnow()
+
+    # 5. Trigger the "MY FEED" Private Notifications
+    control_db = SessionControl()
+    try:
+        if request.action == "SUBMIT":
+            # Send to SHORE users
+            target_users = control_db.query(ControlUser).filter(ControlUser.role.in_(["SHORE", "ADMIN", "SUPERINTENDENT"])).all()
+            priority = "WARNING"
+            event_type = "APPROVAL_REQUEST"
+            msg = f"⏳ PENDING APPROVAL - {vessel_name}\n{user_name} submitted a vessel-wide overdue justification.\nRemarks: '{justification_text}'"
+        else:
+            # Send back to VESSEL users assigned to this ship
+            target_users = control_db.query(ControlUser).join(
+                user_vessel_link, ControlUser.id == user_vessel_link.c.user_id
+            ).filter(user_vessel_link.c.vessel_imo == str(request.imo), ControlUser.role == "VESSEL").all()
+            
+            status_text = "✅ ACCEPTED" if request.action == "ACCEPT" else "❌ DECLINED"
+            priority = "SUCCESS" if request.action == "ACCEPT" else "CRITICAL"
+            event_type = "STATUS_CHANGE"
+            msg = f"{status_text} - {vessel_name}\nShore ({user_name}) has {request.action.lower()} the overdue justification.\nOriginal Remark: '{justification_text}'"
+
+        # Route directly into MY FEED via recipient_id
+        for t_user in target_users:
+            db.add(LuboilEvent(
+                vessel_name=vessel_name,
+                imo=str(request.imo),
+                machinery_name="Vessel-Wide",
+                event_type=event_type,
+                priority=priority,
+                message=msg,
+                recipient_id=t_user.id, # 🔥 Routes strictly to MY FEED
+                created_at=datetime.utcnow()
+            ))
+    finally:
+        control_db.close()
+
+    await db.commit()
+    return {"message": "Vessel overdue workflow updated successfully."}
 
 if __name__ == "__main__":
     import uvicorn
