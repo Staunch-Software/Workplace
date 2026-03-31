@@ -27,12 +27,35 @@ class SyncService:
         mapper = inspect(model_class)
         pk_col = mapper.primary_key[0].name
 
+        # Cast entity_id to match the primary key column type
         pk_type = type(mapper.primary_key[0].type).__name__
         if pk_type in ('Integer', 'BigInteger', 'SmallInteger'):
             try:
                 entity_id = int(entity_id)
             except (ValueError, TypeError):
                 pass
+
+        # Coerce string date/datetime values to proper Python types
+        from datetime import date as _date, datetime as _datetime
+        valid_cols_map = {c.key: c for c in mapper.columns}
+        coerced = {}
+        for k, v in data.items():
+            if k not in valid_cols_map:
+                continue
+            col_type = type(valid_cols_map[k].type).__name__
+            if v is not None and isinstance(v, str):
+                if col_type.upper() in ("DATE",):
+                    try:
+                        v = _date.fromisoformat(v)
+                    except ValueError:
+                        pass
+                elif col_type.upper() in ("DATETIME", "TIMESTAMP", "DATETIME_"):
+                    try:
+                        v = _datetime.fromisoformat(v)
+                    except ValueError:
+                        pass
+            coerced[k] = v
+        data = coerced
 
         stmt = select(model_class).where(
             getattr(model_class, pk_col) == entity_id
