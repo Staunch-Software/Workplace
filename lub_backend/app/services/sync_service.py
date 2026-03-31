@@ -27,6 +27,13 @@ class SyncService:
         mapper = inspect(model_class)
         pk_col = mapper.primary_key[0].name
 
+        pk_type = type(mapper.primary_key[0].type).__name__
+        if pk_type in ('Integer', 'BigInteger', 'SmallInteger'):
+            try:
+                entity_id = int(entity_id)
+            except (ValueError, TypeError):
+                pass
+
         stmt = select(model_class).where(
             getattr(model_class, pk_col) == entity_id
         )
