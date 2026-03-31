@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Building2, Search, Shield, LogOut, ChevronDown, Ship, X, Check, KeyRound, Activity, ChevronRight, Database, Clock, Wifi, WifiOff, FileText, Trello, Droplet, Zap } from "lucide-react";
+import { Building2, Search, Shield, LogOut, ChevronDown, Ship, X, Check, KeyRound, Activity, ChevronRight, Database, Clock, Wifi, WifiOff, FileText, Trello, Droplet, Zap, AlertCircle } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import api from '../api/axios';
+import { getVesselStatus } from '../pages/admin/lib/adminApi';
 import './Navbar.css';
 
 // ── Module metadata keyed by backend permission key ───────────────────────────
@@ -14,37 +14,37 @@ const MODULE_META = {
     engine_performance: { label: 'Engine Performance', icon: <Zap size={13} />, color: '#22c55e' },
 };
 
-// ── Vessel Status Modal ────────────────────────────────────────────────────────
 const VesselStatusModal = ({ onClose, assignedVessels = [], userPermissions = {} }) => {
     const [vessels, setVessels] = useState([]);
     const [loading, setLoading] = useState(true);
     const [expandedImo, setExpandedImo] = useState(null);
+    const [filter, setFilter] = useState('all');
     const rowRefs = useRef({});
     const allowedKeys = Object.keys(userPermissions).filter(k => userPermissions[k] === true);
 
     useEffect(() => {
-        // Backend should return:
-        // [{ imo, name, online, last_sync, modules: [{ key: 'drs', available: true }, ...] }]
         const fetchStatuses = async () => {
             try {
-                const res = await api.get('/vessel-status');
+                const res = await getVesselStatus();
                 const filtered = res.data.map(v => ({
                     ...v,
                     modules: (v.modules || []).filter(m => allowedKeys.includes(m.key)),
                 }));
                 setVessels(filtered);
             } catch {
-                // Mock fallback — uses permission keys matching MODULE_META
                 setVessels(
                     assignedVessels.map((imo, idx) => ({
                         imo,
                         name: `Vessel ${idx + 1}`,
                         online: idx % 2 === 0,
-                        last_sync: idx % 2 === 0 ? new Date(Date.now() - 1000 * 60 * 15).toISOString() : new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-                        modules: allowedKeys.map((key, i) => ({
-                            key,
-                            available: i % 2 === 0,
-                        })),
+                        last_sync_success: idx % 3 !== 0,
+                        last_pull_at: new Date(Date.now() - 1000 * 60 * (idx * 30 + 15)).toISOString(),
+                        last_push_at: new Date(Date.now() - 1000 * 60 * (idx * 15 + 5)).toISOString(),
+                        sync_errors: idx % 3 === 0 ? [
+                            { id: 1, error_type: 'shore_error', error_msg: 'HTTP 500: Defect sync failed', created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString() },
+                            { id: 2, error_type: 'vessel_error', error_msg: 'Blob upload failed: timeout', created_at: new Date(Date.now() - 1000 * 60 * 90).toISOString() },
+                        ] : [],
+                        modules: allowedKeys.map((key, i) => ({ key, available: i % 2 === 0 })),
                     }))
                 );
             } finally {
@@ -52,8 +52,7 @@ const VesselStatusModal = ({ onClose, assignedVessels = [], userPermissions = {}
             }
         };
         fetchStatuses();
-    }, [userPermissions]);
-
+    }, []);
 
     const formatSync = (iso) => {
         if (!iso) return 'Never';
@@ -64,220 +63,419 @@ const VesselStatusModal = ({ onClose, assignedVessels = [], userPermissions = {}
         return `${Math.floor(diff / 86400)}d ago`;
     };
 
-    const handleToggle = (imo) => {                      // 👈 add this handler
+    const liveCount = vessels.filter(v => v.online).length;
+    const errorCount = vessels.filter(v => (v.sync_errors || []).length > 0).length;
+
+    const filteredVessels = vessels.filter(v => {
+        if (filter === 'live') return v.online;
+        if (filter === 'errors') return (v.sync_errors || []).length > 0;
+        return true;
+    });
+
+    const handleToggle = (imo) => {
         const next = expandedImo === imo ? null : imo;
         setExpandedImo(next);
-        if (next) {
-            setTimeout(() => {
-                rowRefs.current[next]?.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'nearest',                    // scrolls minimally — only if needed
-                });
-            }, 50); // small delay lets the DOM expand first
-        }
+        if (next) setTimeout(() => rowRefs.current[next]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+    };
+
+    const handleStatCard = (type) => {
+        setFilter(prev => prev === type ? 'all' : type);
+        setExpandedImo(null);
+    };
+
+    const ageStyle = (iso) => {
+        if (!iso) return { bg: '#f8fafc', border: '#e2e8f0', color: '#94a3b8' };
+        const h = (Date.now() - new Date(iso).getTime()) / 3_600_000;
+        if (h < 1) return { bg: '#f0fdf4', border: '#86efac', color: '#15803d' };
+        if (h < 6) return { bg: '#fefce8', border: '#fde68a', color: '#854d0e' };
+        return { bg: '#fff1f2', border: '#fecdd3', color: '#be123c' };
     };
 
     return (
         <div style={{
             position: 'fixed', inset: 0, zIndex: 1000,
-            background: 'rgba(0,0,0,0.45)',
+            background: 'rgba(15,23,42,0.5)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
+            backdropFilter: 'blur(2px)',
         }}>
             <div style={{
-                background: 'var(--white)', borderRadius: 18,
-                width: 520, maxHeight: '82vh',
+                background: '#fff', borderRadius: 20,
+                width: 540, maxHeight: '86vh',
                 display: 'flex', flexDirection: 'column',
-                boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
+                boxShadow: '0 32px 80px rgba(0,0,0,0.28)',
                 overflow: 'hidden',
+                border: '1px solid #e2e8f0',
             }}>
-                {/* Header */}
+
+                {/* ── Header ── */}
                 <div style={{
-                    padding: '20px 24px 16px',
-                    borderBottom: '1px solid var(--gray-200)',
+                    padding: '18px 22px',
+                    borderBottom: '1px solid #f1f5f9',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    background: 'linear-gradient(135deg, var(--primary-light) 0%, var(--white) 100%)',
+                    background: '#fff',
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{
-                            width: 36, height: 36, borderRadius: 10,
-                            background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            width: 38, height: 38, borderRadius: 11,
+                            background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
                         }}>
                             <Activity size={18} color="white" />
                         </div>
                         <div>
-                            <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--gray-900)' }}>Vessel Status</div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: 1 }}>
-                                {vessels.length} assigned vessel{vessels.length !== 1 ? 's' : ''}
+                            <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em' }}>Fleet Status</div>
+                            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
+                                {vessels.length} vessel{vessels.length !== 1 ? 's' : ''} assigned
                             </div>
                         </div>
                     </div>
-                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-400)', padding: 4, borderRadius: 6 }}>
-                        <X size={20} />
+                    <button onClick={onClose} style={{
+                        background: '#f8fafc', border: '1px solid #e2e8f0',
+                        cursor: 'pointer', color: '#64748b', padding: '6px 8px',
+                        borderRadius: 8, display: 'flex', alignItems: 'center',
+                        transition: 'background 0.15s',
+                    }}>
+                        <X size={16} />
                     </button>
                 </div>
 
-                {/* Body */}
-                <div style={{ overflowY: 'auto', padding: '14px 20px', flex: 1 }}>
-                    {loading ? (
-                        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--gray-400)', fontSize: '0.875rem' }}>
-                            Loading vessel status…
+                {/* ── Stat cards ── */}
+                {!loading && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '14px 18px 0' }}>
+                        {/* Live */}
+                        <div onClick={() => handleStatCard('live')} style={{
+                            borderRadius: 12, padding: '13px 15px', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 11,
+                            background: filter === 'live' ? '#dcfce7' : '#f0fdf4',
+                            border: `1.5px solid ${filter === 'live' ? '#22c55e' : '#bbf7d0'}`,
+                            transition: 'all 0.15s',
+                        }}>
+                            <div style={{
+                                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                                background: filter === 'live' ? '#bbf7d0' : '#dcfce7',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                                <Wifi size={18} color="#16a34a" />
+                            </div>
+                            <div>
+                                <div style={{ fontSize: 24, fontWeight: 800, color: '#15803d', lineHeight: 1, letterSpacing: '-0.02em' }}>{liveCount}</div>
+                                <div style={{ fontSize: 11, color: '#4ade80', fontWeight: 600, marginTop: 3 }}>
+                                    {filter === 'live' ? '← tap to clear' : 'Live now'}
+                                </div>
+                            </div>
                         </div>
-                    ) : vessels.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--gray-400)', fontSize: '0.875rem' }}>
-                            No vessels assigned.
+
+                        {/* Errors */}
+                        <div onClick={() => handleStatCard('errors')} style={{
+                            borderRadius: 12, padding: '13px 15px', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 11,
+                            background: filter === 'errors' ? '#fee2e2' : (errorCount > 0 ? '#fff1f2' : '#f8fafc'),
+                            border: `1.5px solid ${filter === 'errors' ? '#ef4444' : (errorCount > 0 ? '#fecdd3' : '#e2e8f0')}`,
+                            transition: 'all 0.15s',
+                            opacity: errorCount === 0 ? 0.55 : 1,
+                        }}>
+                            <div style={{
+                                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                                background: filter === 'errors' ? '#fecaca' : (errorCount > 0 ? '#fee2e2' : '#f1f5f9'),
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                                <AlertCircle size={18} color={errorCount > 0 ? '#dc2626' : '#94a3b8'} />
+                            </div>
+                            <div>
+                                <div style={{ fontSize: 24, fontWeight: 800, color: errorCount > 0 ? '#b91c1c' : '#94a3b8', lineHeight: 1, letterSpacing: '-0.02em' }}>{errorCount}</div>
+                                <div style={{ fontSize: 11, color: errorCount > 0 ? '#f87171' : '#cbd5e1', fontWeight: 600, marginTop: 3 }}>
+                                    {filter === 'errors' ? '← tap to clear' : 'With errors'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Filter tabs ── */}
+                {!loading && (
+                    <div style={{ display: 'flex', gap: 5, padding: '10px 18px 0' }}>
+                        {[
+                            { key: 'all', label: `All`, count: vessels.length },
+                            { key: 'live', label: `Online`, count: liveCount },
+                            { key: 'errors', label: `Errors`, count: errorCount },
+                        ].map(tab => (
+                            <button key={tab.key}
+                                onClick={() => { setFilter(tab.key); setExpandedImo(null); }}
+                                style={{
+                                    fontSize: 12, padding: '5px 12px', borderRadius: 20,
+                                    cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5,
+                                    background: filter === tab.key ? '#0f172a' : '#f8fafc',
+                                    border: `1px solid ${filter === tab.key ? '#0f172a' : '#e2e8f0'}`,
+                                    color: filter === tab.key ? '#fff' : '#64748b',
+                                    transition: 'all 0.15s',
+                                }}
+                            >
+                                {tab.label}
+                                <span style={{
+                                    fontSize: 10, fontWeight: 700,
+                                    background: filter === tab.key ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+                                    color: filter === tab.key ? '#fff' : '#64748b',
+                                    padding: '1px 6px', borderRadius: 10,
+                                }}>
+                                    {tab.count}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {/* ── Vessel list ── */}
+                <div style={{ overflowY: 'auto', padding: '10px 18px 14px', flex: 1 }}>
+                    {loading ? (
+                        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                            <div style={{ width: 32, height: 32, border: '3px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', margin: '0 auto 12px', animation: 'spin 0.8s linear infinite' }} />
+                            <div style={{ fontSize: 13, color: '#94a3b8' }}>Loading vessel status…</div>
+                        </div>
+                    ) : filteredVessels.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '48px 0', color: '#94a3b8', fontSize: 13 }}>
+                            No vessels match this filter.
                         </div>
                     ) : (
-                        vessels.map((v) => {
+                        filteredVessels.map((v) => {
                             const isExpanded = expandedImo === v.imo;
-                            const availableCount = (v.modules || []).filter(m => m.available).length;
+                            const errors = v.sync_errors || [];
+                            const hasErrors = errors.length > 0;
+                            const ps = ageStyle(v.last_push_at);
+                            const pl = ageStyle(v.last_pull_at);
 
                             return (
-                                <div key={v.imo}
-                                    ref={el => rowRefs.current[v.imo] = el}
+                                <div key={v.imo} ref={el => rowRefs.current[v.imo] = el}
                                     style={{
-                                        border: `1px solid ${isExpanded ? 'var(--primary)' : 'var(--gray-200)'}`,
-                                        borderRadius: 12, marginBottom: 10,
-                                        overflow: 'hidden',
-                                        transition: 'border-color 0.2s',
-                                        boxShadow: isExpanded ? '0 0 0 3px var(--primary-light)' : 'none',
+                                        borderRadius: 13, marginBottom: 8, overflow: 'hidden',
+                                        border: `1px solid ${hasErrors ? '#fecdd3' : isExpanded ? '#c7d2fe' : '#e2e8f0'}`,
+                                        boxShadow: isExpanded ? '0 0 0 3px rgba(99,102,241,0.1)' : 'none',
+                                        transition: 'all 0.2s',
+                                    }}
+                                >
+                                    {/* ── Row summary (always visible) ── */}
+                                    <div onClick={() => handleToggle(v.imo)} style={{
+                                        padding: '12px 14px',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                        cursor: 'pointer',
+                                        background: hasErrors ? '#fff5f5' : isExpanded ? '#f5f3ff' : '#fff',
+                                        transition: 'background 0.15s',
                                     }}>
-                                    {/* Vessel Row */}
-                                    <div
-                                        onClick={() => handleToggle(v.imo)}
-                                        style={{
-                                            padding: '14px 16px',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                            cursor: 'pointer',
-                                            background: isExpanded ? 'var(--primary-light)' : 'var(--white)',
-                                            transition: 'background 0.15s',
-                                        }}
-                                    >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                            {/* Ship icon box instead of status dot */}
-                                            <div style={{
-                                                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                                                background: isExpanded ? 'var(--primary)' : 'var(--gray-100)',
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                transition: 'background 0.15s',
-                                            }}>
-                                                <Ship size={16} color={isExpanded ? 'white' : 'var(--gray-500)'} />
+                                        {/* Left: status dot + name */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            <div style={{ position: 'relative', flexShrink: 0 }}>
+                                                <div style={{
+                                                    width: 34, height: 34, borderRadius: 9,
+                                                    background: v.online ? '#f0fdf4' : '#f8fafc',
+                                                    border: `1px solid ${v.online ? '#86efac' : '#e2e8f0'}`,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                }}>
+                                                    <Ship size={15} color={v.online ? '#16a34a' : '#94a3b8'} />
+                                                </div>
+                                                {/* Online indicator dot */}
+                                                <div style={{
+                                                    position: 'absolute', bottom: -2, right: -2,
+                                                    width: 9, height: 9, borderRadius: '50%',
+                                                    background: v.online ? '#22c55e' : '#d1d5db',
+                                                    border: '2px solid #fff',
+                                                }} />
                                             </div>
                                             <div>
-                                                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--gray-900)' }}>
+                                                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em' }}>
                                                     {v.name}
                                                 </div>
-                                                <div style={{ fontSize: '0.72rem', color: 'var(--gray-500)', marginTop: 2 }}>
-                                                    IMO: {v.imo}
+                                                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
+                                                    IMO {v.imo}
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                            <div style={{
-                                                fontSize: '0.72rem', padding: '3px 8px', borderRadius: 20,
-                                                background: 'var(--gray-100)', color: 'var(--gray-600)',
-                                                display: 'flex', alignItems: 'center', gap: 4,
-                                            }}>
-                                                <Database size={11} />
-                                                {availableCount}/{(v.modules || []).length} modules
-                                            </div>
-                                            <ChevronRight size={15} color="var(--gray-400)"
-                                                style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+                                        {/* Right: badges + chevron */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+
+                                            {/* Error badge */}
+                                            {hasErrors && (
+                                                <div style={{
+                                                    display: 'flex', alignItems: 'center', gap: 4,
+                                                    fontSize: 11, padding: '3px 8px', borderRadius: 20,
+                                                    background: '#fee2e2', color: '#b91c1c',
+                                                    fontWeight: 700, border: '1px solid #fecaca',
+                                                }}>
+                                                    <AlertCircle size={10} />
+                                                    {errors.length}
+                                                </div>
+                                            )}
+
+                                            {/* ── Offline app install badge ── */}
+                                            {(() => {
+                                                const anyInstalled = (v.modules || []).some(m => m.available === true);
+                                                return (
+                                                    <div style={{
+                                                        display: 'flex', alignItems: 'center', gap: 5,
+                                                        fontSize: 11, padding: '4px 9px', borderRadius: 20,
+                                                        fontWeight: 600,
+                                                        background: anyInstalled ? '#f0fdf4' : '#f8fafc',
+                                                        border: `1px solid ${anyInstalled ? '#86efac' : '#e2e8f0'}`,
+                                                        color: anyInstalled ? '#15803d' : '#94a3b8',
+                                                    }}>
+                                                        <div style={{
+                                                            width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                                                            background: anyInstalled ? '#22c55e' : '#d1d5db',
+                                                        }} />
+                                                        {anyInstalled ? 'App installed' : 'Not installed'}
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            <ChevronRight size={14} color="#cbd5e1"
+                                                style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
                                         </div>
                                     </div>
 
-                                    {/* Expanded Panel */}
+                                    {/* ── Expanded panel ── */}
                                     {isExpanded && (
                                         <div style={{
-                                            borderTop: '1px solid var(--gray-200)',
-                                            padding: '16px',
-                                            background: '#fafafa',
+                                            borderTop: '1px solid #f1f5f9',
+                                            background: '#fafbfc',
                                             animation: 'fadeSlideIn 0.18s ease',
                                         }}>
-                                            {/* Last Sync */}
-                                            {/* Connection & Sync Info */}
-                                            <div style={{
-                                                display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
-                                                gap: 8, marginBottom: 14,
-                                            }}>
+                                            {/* Sync timestamps (Shore Perspective) */}
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '12px 14px' }}>
                                                 {[
-                                                    // {
-                                                    //     label: 'Last Sync',
-                                                    //     value: v.last_sync,
-                                                    //     icon: <Wifi size={13} color={v.online ? '#16a34a' : 'var(--gray-400)'} />,
-                                                    //     bg: v.online ? 'rgba(34,197,94,0.08)' : 'var(--gray-100)',
-                                                    // },
                                                     {
-                                                        label: 'Last Push',
-                                                        value: v.last_push_at,
-                                                        icon: <Clock size={13} color="#16a34a" />,
-                                                        bg: 'rgba(34,197,94,0.08)',
-                                                    },
-                                                    {
-                                                        label: 'Last Pull',
+                                                        label: 'Shore Pull (Vessel → Shore)',
                                                         value: v.last_pull_at,
-                                                        icon: <Clock size={13} color="#16a34a" />,
-                                                        bg: 'rgba(34,197,94,0.08)',
+                                                        s: ageStyle(v.last_pull_at)
                                                     },
-                                                ].map(({ label, value, icon, bg }) => (
+                                                    {
+                                                        label: 'Shore Push (Shore → Vessel)',
+                                                        value: v.last_push_at,
+                                                        s: ageStyle(v.last_push_at)
+                                                    },
+                                                ].map(({ label, value, s }) => (
                                                     <div key={label} style={{
                                                         padding: '10px 12px', borderRadius: 9,
-                                                        background: bg,
-                                                        border: '1px solid var(--gray-200)',
+                                                        background: s.bg, border: `1px solid ${s.border}`,
                                                     }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-                                                            {icon}
-                                                            <span style={{ fontSize: '0.7rem', color: 'var(--gray-500)', fontWeight: 600 }}>
-                                                                {label}
-                                                            </span>
+                                                        <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, marginBottom: 4, lineHeight: 1.3, textTransform: 'uppercase' }}>
+                                                            {label}
                                                         </div>
-                                                        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--gray-800)' }}>
+                                                        <div style={{ fontSize: 14, fontWeight: 800, color: s.color, letterSpacing: '-0.01em' }}>
                                                             {formatSync(value)}
                                                         </div>
                                                         {value && (
-                                                            <div style={{ fontSize: '0.67rem', color: 'var(--gray-400)', marginTop: 2 }}>
-                                                                {new Date(value).toLocaleString()}
+                                                            <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>
+                                                                {new Date(value).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                                                             </div>
                                                         )}
                                                     </div>
                                                 ))}
                                             </div>
 
-                                            {/* Modules */}
-                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-                                                Available Modules
-                                            </div>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
-                                                {(v.modules || []).map((mod) => {
-                                                    const meta = MODULE_META[mod.key] ?? { label: mod.key, icon: <Database size={13} />, color: '#6b7280' };
-                                                    return (
-                                                        <div key={mod.key} style={{
-                                                            display: 'flex', alignItems: 'center', gap: 8,
-                                                            padding: '8px 10px', borderRadius: 8,
-                                                            background: mod.available ? `${meta.color}12` : 'var(--gray-100)',
-                                                            border: `1px solid ${mod.available ? `${meta.color}33` : 'var(--gray-200)'}`,
-                                                            cursor: mod.available ? 'default' : 'not-allowed',   // 👈 shows not-allowed cursor
-                                                        }}
-                                                            title={mod.available ? `${meta.label} is available` : `${meta.label} is not available on this vessel`}  // 👈 native tooltip
-                                                        >
-                                                            <div style={{
-                                                                width: 26, height: 26, borderRadius: 7, flexShrink: 0,
-                                                                background: mod.available ? `${meta.color}20` : 'var(--gray-200)',
-                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                                color: mod.available ? meta.color : 'var(--gray-400)',
-                                                            }}>
-                                                                {meta.icon}
-                                                            </div>
-                                                            <span style={{
-                                                                fontSize: '0.75rem', fontWeight: 500,
-                                                                color: mod.available ? 'var(--gray-800)' : 'var(--gray-400)',
-                                                                lineHeight: 1.2,
-                                                            }}>
-                                                                {meta.label}
+                                            {/* ── Error log — only shown when expanded ── */}
+                                            {hasErrors && (
+                                                <div style={{ padding: '0 14px 12px' }}>
+                                                    <div style={{
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                        marginBottom: 8,
+                                                    }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                            <AlertCircle size={12} color="#ef4444" />
+                                                            <span style={{ fontSize: 11, fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                                Sync errors
                                                             </span>
                                                         </div>
-                                                    );
-                                                })}
+                                                        <span style={{
+                                                            fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
+                                                            background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca',
+                                                        }}>
+                                                            {errors.length} event{errors.length !== 1 ? 's' : ''}
+                                                        </span>
+                                                    </div>
+
+                                                    <div style={{
+                                                        maxHeight: 220, overflowY: 'auto',
+                                                        display: 'flex', flexDirection: 'column', gap: 6,
+                                                        paddingRight: 2,
+                                                    }}>
+                                                        {errors.map((err, i) => (
+                                                            <div key={err.id ?? i} style={{
+                                                                display: 'flex', gap: 9, alignItems: 'flex-start',
+                                                                padding: '9px 10px', borderRadius: 9,
+                                                                background: '#fff',
+                                                                border: `1px solid ${err.error_type === 'shore_error' ? '#fecaca' : '#fed7aa'}`,
+                                                            }}>
+                                                                {/* Type badge */}
+                                                                <div style={{
+                                                                    fontSize: 9, fontWeight: 800, padding: '3px 6px',
+                                                                    borderRadius: 5, flexShrink: 0, letterSpacing: '0.04em',
+                                                                    background: err.error_type === 'shore_error' ? '#fef2f2' : '#fff7ed',
+                                                                    color: err.error_type === 'shore_error' ? '#b91c1c' : '#c2410c',
+                                                                    border: `1px solid ${err.error_type === 'shore_error' ? '#fecaca' : '#fed7aa'}`,
+                                                                    marginTop: 1,
+                                                                }}>
+                                                                    {err.error_type === 'shore_error' ? 'SHORE' : 'SHIP'}
+                                                                </div>
+
+                                                                {/* Message + time */}
+                                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                                    <div style={{
+                                                                        fontSize: 12, fontWeight: 600, color: '#1e293b',
+                                                                        wordBreak: 'break-word', lineHeight: 1.4,
+                                                                    }}>
+                                                                        {err.error_msg}
+                                                                    </div>
+                                                                    {err.created_at && (
+                                                                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>
+                                                                            {new Date(err.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* ── Modules ── */}
+                                            <div style={{ padding: '0 14px 14px' }}>
+                                                <div style={{
+                                                    fontSize: 11, fontWeight: 700, color: '#94a3b8',
+                                                    textTransform: 'uppercase', letterSpacing: '0.05em',
+                                                    marginBottom: 8,
+                                                }}>
+                                                    Modules
+                                                </div>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                                                    {(v.modules || []).map((mod) => {
+                                                        const meta = MODULE_META[mod.key] ?? { label: mod.key, icon: <Database size={13} />, color: '#6b7280' };
+                                                        return (
+                                                            <div key={mod.key} style={{
+                                                                display: 'flex', alignItems: 'center', gap: 8,
+                                                                padding: '8px 10px', borderRadius: 8,
+                                                                background: mod.available ? `${meta.color}0d` : '#f8fafc',
+                                                                border: `1px solid ${mod.available ? `${meta.color}25` : '#e2e8f0'}`,
+                                                            }}>
+                                                                <div style={{
+                                                                    width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                                                                    background: mod.available ? `${meta.color}18` : '#f1f5f9',
+                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                    color: mod.available ? meta.color : '#cbd5e1',
+                                                                }}>
+                                                                    {React.cloneElement(meta.icon, { size: 13 })}
+                                                                </div>
+                                                                <div>
+                                                                    <div style={{ fontSize: 12, fontWeight: 600, color: mod.available ? '#1e293b' : '#94a3b8' }}>
+                                                                        {meta.label}
+                                                                    </div>
+                                                                    <div style={{ fontSize: 10, color: mod.available ? '#22c55e' : '#cbd5e1', fontWeight: 600 }}>
+                                                                        {mod.available ? 'Active' : 'Inactive'}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -287,16 +485,19 @@ const VesselStatusModal = ({ onClose, assignedVessels = [], userPermissions = {}
                     )}
                 </div>
 
-                {/* Footer */}
+                {/* ── Footer ── */}
                 <div style={{
-                    padding: '14px 24px', borderTop: '1px solid var(--gray-200)',
-                    display: 'flex', justifyContent: 'flex-end',
+                    padding: '12px 18px', borderTop: '1px solid #f1f5f9',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    background: '#fafbfc',
                 }}>
+                    <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                        {liveCount} online · {errorCount} with errors
+                    </div>
                     <button onClick={onClose} style={{
-                        padding: '8px 20px', borderRadius: 8,
-                        border: '1px solid var(--gray-200)', background: 'var(--white)',
-                        cursor: 'pointer', fontSize: '0.875rem', color: 'var(--gray-700)',
-                        fontWeight: 500,
+                        padding: '7px 18px', borderRadius: 8,
+                        border: '1px solid #e2e8f0', background: '#fff',
+                        cursor: 'pointer', fontSize: 13, color: '#475569', fontWeight: 600,
                     }}>
                         Close
                     </button>
@@ -305,8 +506,11 @@ const VesselStatusModal = ({ onClose, assignedVessels = [], userPermissions = {}
 
             <style>{`
                 @keyframes fadeSlideIn {
-                    from { opacity: 0; transform: translateY(-6px); }
+                    from { opacity: 0; transform: translateY(-5px); }
                     to   { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
                 }
             `}</style>
         </div>

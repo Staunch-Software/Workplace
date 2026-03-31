@@ -1,6 +1,7 @@
+import json
 import traceback
 from typing import Any, Dict, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Security
 from fastapi.security import APIKeyHeader
@@ -8,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy import update
-
+from dateutil import parser
 from app.core.database_control import get_control_db  # ✅ control DB session
 from app.core.database import get_db                  # ✅ vessel/main DB session
 from app.core.config import settings
@@ -39,6 +40,7 @@ async def verify_sync_key(api_key: str = Security(sync_api_key_header)):
 # Helper: record sync timestamp + telemetry on the control Vessel row
 # ---------------------------------------------------------------------------
 
+
 async def record_vessel_sync_time(
     control_db: AsyncSession,
     imo: str,
@@ -46,57 +48,81 @@ async def record_vessel_sync_time(
     error_msg: str = None,
     telemetry: dict = None,
 ):
-    """
-    is_vessel_pushing=True  → vessel sent data to shore → update last_pull_at
-    is_vessel_pushing=False → vessel fetched data from shore → update last_push_at
-    """
-    if not imo:
-        return
+    if not imo: return
 
-    imo_clean = imo.strip()
+    # 1. Fetch current vessel
+    res = await control_db.execute(select(Vessel).where(Vessel.imo == imo))
+    vessel = res.scalar_one_or_none()
+    if not vessel: return
+
     now = datetime.now(timezone.utc)
-    update_data = {}
-
+    update_data = {"updated_at": now}
+    
+    # --- SHORE PERSPECTIVE MAPPING ---
+    # is_vessel_pushing = True  -> Vessel to Shore -> Shore is Pulling
+    # is_vessel_pushing = False -> Shore to Vessel -> Shore is Pushing
+    
     if is_vessel_pushing:
-        update_data[Vessel.last_pull_at] = now
+        # Check if telemetry has a more accurate "reported at" time
+        vessel_time_str = telemetry.get("vessel_reported_push") if telemetry else None
+        if vessel_time_str:
+            try:
+                update_data["last_pull_at"] = parser.isoparse(vessel_time_str)
+            except:
+                update_data["last_pull_at"] = now
+        else:
+            update_data["last_pull_at"] = now
     else:
-        update_data[Vessel.last_push_at] = now
+        # For Shore to Vessel (GET /changes), we use the server's 'now' 
+        # as the last time we successfully distributed data.
+        update_data["last_push_at"] = now
 
-    # Vessel-reported timestamps override the server-side ones
-    if telemetry:
-        if telemetry.get("vessel_reported_push"):
-            update_data["last_pull_at"] = telemetry["vessel_reported_push"]
-        if telemetry.get("vessel_reported_pull"):
-            update_data["last_push_at"] = telemetry["vessel_reported_pull"]
+    # 2. Manage the Error History (Stored as a JSON list in last_sync_error)
+    try:
+        current_errors = json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
+        if not isinstance(current_errors, list): current_errors = []
+    except:
+        current_errors = []
 
-        update_data["vessel_telemetry"] = telemetry
-
-        failed_count = telemetry.get("failed_items_count", 0)
-        update_data["last_sync_success"] = failed_count == 0
-        update_data["last_sync_error"] = (
-            f"Vessel Error: {telemetry.get('last_local_error')}" if failed_count > 0 else None
-        )
+    new_err_content = None
+    err_type = None
 
     if error_msg:
+        new_err_content = error_msg
+        err_type = "shore_error"
+    elif telemetry and telemetry.get("failed_items_count", 0) > 0:
+        new_err_content = telemetry.get("last_local_error")
+        err_type = "vessel_error"
+
+    # 3. Append New Error (Duplicate check)
+    if new_err_content:
+        is_duplicate = len(current_errors) > 0 and current_errors[0]['msg'] == new_err_content
+        if not is_duplicate:
+            current_errors.insert(0, {
+                "id": int(now.timestamp()),
+                "type": err_type,
+                "msg": new_err_content,
+                "ts": now.isoformat()
+            })
         update_data["last_sync_success"] = False
-        update_data["last_sync_error"] = f"Shore Error: {error_msg}"
-
-    stmt = (
-        update(Vessel)
-        .where(Vessel.imo == imo_clean)
-        .values(update_data)
-        .execution_options(synchronize_session=False)
-    )
-
-    result = await control_db.execute(stmt)
-    await control_db.commit()
-
-    if result.rowcount > 0:
-        print(f"--- SYNC: Updated IMO '{imo_clean}' (vessel_pushing={is_vessel_pushing}) ---")
     else:
-        print(f"--- SYNC WARNING: IMO '{imo_clean}' not found in Control DB ---")
+        # Clear success state ONLY if telemetry specifically reports 0 failures
+        if telemetry and telemetry.get("failed_items_count") == 0:
+            update_data["last_sync_success"] = True
 
+    # 4. Prune: Only keep errors from the last 7 days
+    one_week_ago = now - timedelta(days=7)
+    pruned_errors = [
+        e for e in current_errors 
+        if datetime.fromisoformat(e['ts']) > one_week_ago
+    ]
 
+    update_data["last_sync_error"] = json.dumps(pruned_errors[:50])
+
+    # 5. Save
+    await control_db.execute(update(Vessel).where(Vessel.imo == imo).values(update_data))
+    await control_db.commit()
+           
 # ---------------------------------------------------------------------------
 # Heartbeat
 # ---------------------------------------------------------------------------
