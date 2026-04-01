@@ -5528,22 +5528,26 @@ export default function Performance({
 
           setMonthlyReports([newReport]);
 
-          const ship = fleet.find((s) => s.id === shipId);
-          const imoNumber = ship ? parseInt(ship.imo || ship.imo_number) : null;
-
-          if (imoNumber) {
-            axiosAepms
-              .getMainEngineDeviationHistory(imoNumber, currentMonth)
-              .then((data) => setMeDeviationHistory(data.history || []))
-              .catch(console.error);
-
-            fetchLastReportDates(imoNumber);
-          }
-
           alert(response.message || "✅ Upload successful!");
           isUploadInProgressRef.current = true;
           setRefreshReportsTrigger((prev) => prev + 1);
           setShowReport(true);
+
+          const ship = fleet.find((s) => s.id === shipId);
+          const imoNumber = ship ? parseInt(ship.imo || ship.imo_number) : null;
+
+          if (imoNumber) {
+            try {
+              // AWAIT the history fetch so it populates before PDF runs
+              const historyData = await axiosAepms.getMainEngineDeviationHistory(imoNumber, currentMonth);
+              setMeDeviationHistory(historyData.history || []);
+              await fetchLastReportDates(imoNumber);
+            } catch (err) {
+              console.error("History fetch error during upload:", err);
+            }
+          }
+          
+          // Trigger download AFTER history is ready
           setTriggerAutoDownload(true);
         }
       } else if (uploadMode === "auxiliaryEngine") {
@@ -5660,33 +5664,34 @@ export default function Performance({
 
           setMonthlyReports([newReport]);
 
-          if (uploadedGeneratorId || selectedGeneratorId) {
-            const genIdToFetch = uploadedGeneratorId
-              ? Number(uploadedGeneratorId)
-              : selectedGeneratorId;
-
-            axiosAepms
-              .getAEDeviationHistoryTable(genIdToFetch, reportMonth)
-              .then((data) => setAeDeviationHistory(data.history || []))
-              .catch(console.error);
-          }
-
           alert(result.message || "✅ Upload successful!");
-
-          if (shipId && fleet.length > 0) {
-            const ship = fleet.find((s) => s.id === shipId);
-            const imoNumber = ship
-              ? parseInt(ship.imo || ship.imo_number)
-              : null;
-
-            if (imoNumber) {
-              fetchLastReportDates(imoNumber);
-            }
-          }
-
           isUploadInProgressRef.current = true;
           setRefreshReportsTrigger((prev) => prev + 1);
           setShowReport(true);
+
+          try {
+            if (uploadedGeneratorId || selectedGeneratorId) {
+              const genIdToFetch = uploadedGeneratorId
+                ? Number(uploadedGeneratorId)
+                : selectedGeneratorId;
+                
+              // AWAIT the history fetch
+              const historyData = await axiosAepms.getAEDeviationHistoryTable(genIdToFetch, reportMonth);
+              setAeDeviationHistory(historyData.history || []);
+            }
+
+            if (shipId && fleet.length > 0) {
+              const ship = fleet.find((s) => s.id === shipId);
+              const imoNumber = ship ? parseInt(ship.imo || ship.imo_number) : null;
+              if (imoNumber) {
+                await fetchLastReportDates(imoNumber);
+              }
+            }
+          } catch (err) {
+            console.error("AE History fetch error during upload:", err);
+          }
+
+          // Trigger download AFTER history is ready
           setTriggerAutoDownload(true);
         }
       }
@@ -11633,7 +11638,7 @@ export default function Performance({
     boxSizing: "border-box",
     flexWrap: "nowrap",
     overflow: "visible",
-    zIndex: 400,
+    // zIndex: 100,
   }}
 >
           {/* 1. VESSEL SELECTOR */}
