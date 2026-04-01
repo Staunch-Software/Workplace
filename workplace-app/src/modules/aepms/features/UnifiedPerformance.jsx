@@ -7798,15 +7798,15 @@ export default function Performance({
     const chartOrder = (isAux ? AUX_ORDER : MAIN_ORDER).filter((key) =>
       metricMapping.hasOwnProperty(key),
     );
-    {
-      allMonthlyReports.length === 1 && (
-        <DiagnosisPanel
-          report={allMonthlyReports[0]}
-          baseline={baseline}
-          analysisMode={analysisMode}
-        />
-      );
-    }
+    // {
+    //   allMonthlyReports.length === 1 && (
+    //     <DiagnosisPanel
+    //       report={allMonthlyReports[0]}
+    //       baseline={baseline}
+    //       analysisMode={analysisMode}
+    //     />
+    //   );
+    // }
     return (
       <>
         {renderSummaryTable()}
@@ -9230,275 +9230,246 @@ export default function Performance({
         // 3-column grid: Observation | Possible Causes | Diagnosis & Remedy
         // ======================================================================
 
-        if (allMonthlyReports.length === 1) {
-          const diagReport = allMonthlyReports[0];
+        // if (allMonthlyReports.length === 1) {
+        //   const diagReport = allMonthlyReports[0];
           
-          // 1. Get ALL raw findings (matching UI logic)
-          const rawConcerns = getDetectedConcerns(diagReport, baseline, analysisMode);
-          const trendFindings = availableReports && availableReports.length >= 2
-            ? getTrendDiagnosisFindings(availableReports, baseline, analysisMode)
-            :[];
-          const allRaw = [...rawConcerns, ...trendFindings];
+          
+        //   const rawConcerns = getDetectedConcerns(diagReport, baseline, analysisMode);
+        //   const trendFindings = availableReports && availableReports.length >= 2
+        //     ? getTrendDiagnosisFindings(availableReports, baseline, analysisMode)
+        //     :[];
+        //   const allRaw = [...rawConcerns, ...trendFindings];
 
-          // 2. Separate SFOC findings from the rest (matching UI logic)
-          const isSFOCRelated = (item) =>
-            item.parameter === "SFOC" ||
-            item.parameter?.toLowerCase().includes("sfoc") ||
-            (item.pattern && ["X1","X2","X3","X4","X12"].includes(item.pattern));
+        //   const isSFOCRelated = (item) =>
+        //     item.parameter === "SFOC" ||
+        //     item.parameter?.toLowerCase().includes("sfoc") ||
+        //     (item.pattern && ["X1","X2","X3","X4","X12"].includes(item.pattern));
 
-          const sfocFindings = allRaw.filter(isSFOCRelated);
-          const allFindings  = allRaw.filter(f => !isSFOCRelated(f));
+        //   const sfocFindings = allRaw.filter(isSFOCRelated);
+        //   const allFindings  = allRaw.filter(f => !isSFOCRelated(f));
 
-          // 3. APPLY THE GROUPING LOGIC (This fixes the 5 vs 3 mismatch!)
-          const verdicts = groupIntoVerdicts(allFindings);
+        //   const verdicts = groupIntoVerdicts(allFindings);
 
-          // 4. Combine them for the PDF output
-          const concerns = [...sfocFindings, ...verdicts];
+        //   const concerns = [...sfocFindings, ...verdicts];
 
-          if (concerns.length > 0) {
+        //   if (concerns.length > 0) {
 
-            // ── Force new page ──────────────────────────────────────────────────
-            pdf.addPage();
-            currentY = drawHeader(pdf, margin);
+        //     pdf.addPage();
+        //     currentY = drawHeader(pdf, margin);
 
-            // ── Section banner ──────────────────────────────────────────────────
-            pdf.setFillColor(255, 247, 237); // #fff7ed
-            pdf.rect(margin, currentY, pageWidth - margin * 2, 10, "F");
-            pdf.setFont("helvetica", "bold");
-            pdf.setFontSize(11);
-            pdf.setTextColor(154, 52, 18); // #9a3412
-            pdf.text(
-              `SECTION ${sectionIndex}: TROUBLESHOOTING & DIAGNOSIS INSIGHTS  (${concerns.length} Findings)`,
-              margin + 3,
-              currentY + 7,
-            );
-            currentY += 14;
-            sectionIndex++;
+        //     pdf.setFillColor(255, 247, 237); // #fff7ed
+        //     pdf.rect(margin, currentY, pageWidth - margin * 2, 10, "F");
+        //     pdf.setFont("helvetica", "bold");
+        //     pdf.setFontSize(11);
+        //     pdf.setTextColor(154, 52, 18); // #9a3412
+        //     pdf.text(
+        //       `SECTION ${sectionIndex}: TROUBLESHOOTING & DIAGNOSIS INSIGHTS  (${concerns.length} Findings)`,
+        //       margin + 3,
+        //       currentY + 7,
+        //     );
+        //     currentY += 14;
+        //     sectionIndex++;
 
-            // ── Column geometry ─────────────────────────────────────────────────
-            // Layout: [Severity header spans full width]
-            //         [Observation 38% | Causes 32% | Remedy 30%]
-            const usableW = pageWidth - margin * 2;
-            const colWidths = [usableW * 0.38, usableW * 0.32, usableW * 0.3];
-            const colX = [
-              margin,
-              margin + colWidths[0],
-              margin + colWidths[0] + colWidths[1],
-            ];
-            const colHeaders = [
-              "OBSERVATION",
-              "POSSIBLE CAUSES",
-              "DIAGNOSIS & REMEDY",
-            ];
+        //     const usableW = pageWidth - margin * 2;
+        //     const colWidths = [usableW * 0.38, usableW * 0.32, usableW * 0.3];
+        //     const colX = [
+        //       margin,
+        //       margin + colWidths[0],
+        //       margin + colWidths[0] + colWidths[1],
+        //     ];
+        //     const colHeaders = [
+        //       "OBSERVATION",
+        //       "POSSIBLE CAUSES",
+        //       "DIAGNOSIS & REMEDY",
+        //     ];
 
-            // ── Text wrapping helper ─────────────────────────────────────────────
-            const wrapText = (doc, text, maxWidth, fontSize) => {
-              doc.setFontSize(fontSize);
-              return doc.splitTextToSize(String(text || ""), maxWidth - 4);
-            };
+        //     const wrapText = (doc, text, maxWidth, fontSize) => {
+        //       doc.setFontSize(fontSize);
+        //       return doc.splitTextToSize(String(text || ""), maxWidth - 4);
+        //     };
 
-            // ── Height estimator (dry-run) ───────────────────────────────────────
-            const estimateRowHeight = (concern) => {
-              const LINE_H = 4.2; // mm per line at 8pt
-              const CELL_PAD = 4; // top + bottom padding
+        //     const estimateRowHeight = (concern) => {
+        //       const LINE_H = 4.2; 
+        //       const CELL_PAD = 4; 
 
-              const obsLines = wrapText(
-                pdf,
-                concern.finding,
-                colWidths[0],
-                8,
-              ).length;
-              const causesLines = concern.causes.reduce((acc, c) => {
-                return acc + wrapText(pdf, `• ${c}`, colWidths[1], 8).length;
-              }, 0);
-              const remedyLines = wrapText(
-                pdf,
-                concern.remedy,
-                colWidths[2],
-                8,
-              ).length;
+        //       const obsLines = wrapText(
+        //         pdf,
+        //         concern.finding,
+        //         colWidths[0],
+        //         8,
+        //       ).length;
+        //       const causesLines = concern.causes.reduce((acc, c) => {
+        //         return acc + wrapText(pdf, `• ${c}`, colWidths[1], 8).length;
+        //       }, 0);
+        //       const remedyLines = wrapText(
+        //         pdf,
+        //         concern.remedy,
+        //         colWidths[2],
+        //         8,
+        //       ).length;
 
-              const maxLines = Math.max(obsLines, causesLines, remedyLines);
-              return Math.max(maxLines * LINE_H + CELL_PAD * 2, 14);
-            };
+        //       const maxLines = Math.max(obsLines, causesLines, remedyLines);
+        //       return Math.max(maxLines * LINE_H + CELL_PAD * 2, 14);
+        //     };
 
-            // ── Draw one concern card ────────────────────────────────────────────
-            const drawConcernCard = (concern, startY) => {
-              const isCritical = concern.severity === "critical";
+        //     const drawConcernCard = (concern, startY) => {
+        //       const isCritical = concern.severity === "critical";
 
-              // Colours matching UI exactly
-              const headerBg = isCritical ? [255, 225, 230] : [254, 243, 199]; // #ffe1e6 / #fef3c7
-              const borderColor = isCritical
-                ? [254, 205, 211]
-                : [253, 230, 138]; // #fecdd3 / #fde68a
-              const cardBg = isCritical ? [255, 241, 242] : [255, 251, 235]; // #fff1f2 / #fffbeb
-              const headerText = isCritical ? [159, 18, 57] : [146, 64, 14]; // #9f1239 / #92400e
-              const remedyBg = [240, 249, 255]; // #f0f9ff
-              const remedyText = [3, 105, 161]; // #0369a1
-              const colHeaderC = [100, 116, 139]; // #64748b
+        //       const headerBg = isCritical ? [255, 225, 230] : [254, 243, 199];
+        //       const borderColor = isCritical
+        //         ? [254, 205, 211]
+        //         : [253, 230, 138]; 
+        //       const cardBg = isCritical ? [255, 241, 242] : [255, 251, 235]; 
+        //       const headerText = isCritical ? [159, 18, 57] : [146, 64, 14]; 
+        //       const remedyBg = [240, 249, 255]; 
+        //       const remedyText = [3, 105, 161]; 
+        //       const colHeaderC = [100, 116, 139]; 
 
-              // ── Severity header bar ──────────────────────────────────────────
-              const HEADER_H = 8;
-              pdf.setFillColor(...headerBg);
-              pdf.rect(margin, startY, usableW, HEADER_H, "F");
+ 
+        //       const HEADER_H = 8;
+        //       pdf.setFillColor(...headerBg);
+        //       pdf.rect(margin, startY, usableW, HEADER_H, "F");
 
-              // Thin border outline
-              pdf.setDrawColor(...borderColor);
-              pdf.setLineWidth(0.3);
-              pdf.rect(margin, startY, usableW, HEADER_H, "S");
+        //       pdf.setDrawColor(...borderColor);
+        //       pdf.setLineWidth(0.3);
+        //       pdf.rect(margin, startY, usableW, HEADER_H, "S");
 
-              // Severity + parameter label  (left)
-              pdf.setFont("helvetica", "bold");
-              pdf.setFontSize(8);
-              pdf.setTextColor(...headerText);
-              const severityLabel = `[${isCritical ? "CRITICAL" : "WARNING"}]  ${concern.parameter}`;
-              pdf.text(severityLabel, margin + 3, startY + 5.5);
+        //       pdf.setFont("helvetica", "bold");
+        //       pdf.setFontSize(8);
+        //       pdf.setTextColor(...headerText);
+        //       const severityLabel = `[${isCritical ? "CRITICAL" : "WARNING"}]  ${concern.parameter}`;
+        //       pdf.text(severityLabel, margin + 3, startY + 5.5);
 
-              // comparedAgainst badge  (right)
-              if (concern.comparedAgainst) {
-                pdf.setFont("helvetica", "normal");
-                pdf.setFontSize(6.5);
-                pdf.setTextColor(...colHeaderC);
-                pdf.text(
-                  `vs ${concern.comparedAgainst.toUpperCase()}`,
-                  pageWidth - margin - 3,
-                  startY + 5.5,
-                  { align: "right" },
-                );
-              }
+        //       if (concern.comparedAgainst) {
+        //         pdf.setFont("helvetica", "normal");
+        //         pdf.setFontSize(6.5);
+        //         pdf.setTextColor(...colHeaderC);
+        //         pdf.text(
+        //           `vs ${concern.comparedAgainst.toUpperCase()}`,
+        //           pageWidth - margin - 3,
+        //           startY + 5.5,
+        //           { align: "right" },
+        //         );
+        //       }
 
-              let y = startY + HEADER_H;
+        //       let y = startY + HEADER_H;
 
-              // ── Column header sub-row ────────────────────────────────────────
-              const SUB_H = 6;
-              pdf.setFillColor(248, 250, 252); // #f8fafc
-              pdf.rect(margin, y, usableW, SUB_H, "F");
-              pdf.setDrawColor(226, 232, 240);
-              pdf.setLineWidth(0.2);
-              pdf.line(margin, y + SUB_H, margin + usableW, y + SUB_H);
+        //       const SUB_H = 6;
+        //       pdf.setFillColor(248, 250, 252); 
+        //       pdf.rect(margin, y, usableW, SUB_H, "F");
+        //       pdf.setDrawColor(226, 232, 240);
+        //       pdf.setLineWidth(0.2);
+        //       pdf.line(margin, y + SUB_H, margin + usableW, y + SUB_H);
 
-              pdf.setFont("helvetica", "bold");
-              pdf.setFontSize(6.5);
-              pdf.setTextColor(...colHeaderC);
-              colHeaders.forEach((hdr, ci) => {
-                if (ci > 0) {
-                  pdf.setDrawColor(226, 232, 240);
-                  pdf.line(colX[ci], y, colX[ci], y + SUB_H);
-                }
-                pdf.text(hdr, colX[ci] + 3, y + 4.2);
-              });
-              y += SUB_H;
+        //       pdf.setFont("helvetica", "bold");
+        //       pdf.setFontSize(6.5);
+        //       pdf.setTextColor(...colHeaderC);
+        //       colHeaders.forEach((hdr, ci) => {
+        //         if (ci > 0) {
+        //           pdf.setDrawColor(226, 232, 240);
+        //           pdf.line(colX[ci], y, colX[ci], y + SUB_H);
+        //         }
+        //         pdf.text(hdr, colX[ci] + 3, y + 4.2);
+        //       });
+        //       y += SUB_H;
 
-              // ── Estimate data row height ─────────────────────────────────────
-              const LINE_H = 4.2;
-              const CELL_PAD = 4;
+        //       const LINE_H = 4.2;
+        //       const CELL_PAD = 4;
 
-              const obsLines = wrapText(pdf, concern.finding, colWidths[0], 8);
-              const remedyLines = wrapText(
-                pdf,
-                concern.remedy,
-                colWidths[2],
-                8,
-              );
-              const causeLines = concern.causes.flatMap((c) =>
-                wrapText(pdf, `• ${c}`, colWidths[1], 8),
-              );
+        //       const obsLines = wrapText(pdf, concern.finding, colWidths[0], 8);
+        //       const remedyLines = wrapText(
+        //         pdf,
+        //         concern.remedy,
+        //         colWidths[2],
+        //         8,
+        //       );
+        //       const causeLines = concern.causes.flatMap((c) =>
+        //         wrapText(pdf, `• ${c}`, colWidths[1], 8),
+        //       );
 
-              const rowH = Math.max(
-                obsLines.length * LINE_H + CELL_PAD * 2,
-                causeLines.length * LINE_H + CELL_PAD * 2,
-                remedyLines.length * LINE_H + CELL_PAD * 2,
-                14,
-              );
+        //       const rowH = Math.max(
+        //         obsLines.length * LINE_H + CELL_PAD * 2,
+        //         causeLines.length * LINE_H + CELL_PAD * 2,
+        //         remedyLines.length * LINE_H + CELL_PAD * 2,
+        //         14,
+        //       );
 
-              // ── Fill cell backgrounds ────────────────────────────────────────
-              // Col 0 — Observation (card bg)
-              pdf.setFillColor(...cardBg);
-              pdf.rect(colX[0], y, colWidths[0], rowH, "F");
+        //       pdf.setFillColor(...cardBg);
+        //       pdf.rect(colX[0], y, colWidths[0], rowH, "F");
 
-              // Col 1 — Causes (white)
-              pdf.setFillColor(255, 255, 255);
-              pdf.rect(colX[1], y, colWidths[1], rowH, "F");
+        //       pdf.setFillColor(255, 255, 255);
+        //       pdf.rect(colX[1], y, colWidths[1], rowH, "F");
 
-              // Col 2 — Remedy (light blue)
-              pdf.setFillColor(...remedyBg);
-              pdf.rect(colX[2], y, colWidths[2], rowH, "F");
+        //       pdf.setFillColor(...remedyBg);
+        //       pdf.rect(colX[2], y, colWidths[2], rowH, "F");
 
-              // Vertical dividers
-              pdf.setDrawColor(226, 232, 240);
-              pdf.setLineWidth(0.2);
-              pdf.line(colX[1], y, colX[1], y + rowH);
-              pdf.line(colX[2], y, colX[2], y + rowH);
+        //       pdf.setDrawColor(226, 232, 240);
+        //       pdf.setLineWidth(0.2);
+        //       pdf.line(colX[1], y, colX[1], y + rowH);
+        //       pdf.line(colX[2], y, colX[2], y + rowH);
 
-              // Bottom border
-              pdf.line(margin, y + rowH, margin + usableW, y + rowH);
+        //       pdf.line(margin, y + rowH, margin + usableW, y + rowH);
 
-              // Left + right borders
-              pdf.setDrawColor(...borderColor);
-              pdf.setLineWidth(0.3);
-              pdf.line(margin, startY, margin, y + rowH);
-              pdf.line(margin + usableW, startY, margin + usableW, y + rowH);
-              pdf.line(margin, y + rowH, margin + usableW, y + rowH);
+        //       pdf.setDrawColor(...borderColor);
+        //       pdf.setLineWidth(0.3);
+        //       pdf.line(margin, startY, margin, y + rowH);
+        //       pdf.line(margin + usableW, startY, margin + usableW, y + rowH);
+        //       pdf.line(margin, y + rowH, margin + usableW, y + rowH);
 
-              // ── Col 0: Observation text ──────────────────────────────────────
-              pdf.setFont("helvetica", "bold");
-              pdf.setFontSize(8);
-              pdf.setTextColor(30, 41, 59); // #1e293b
-              let textY = y + CELL_PAD;
-              obsLines.forEach((line) => {
-                pdf.text(line, colX[0] + 3, textY);
-                textY += LINE_H;
-              });
+        //       pdf.setFont("helvetica", "bold");
+        //       pdf.setFontSize(8);
+        //       pdf.setTextColor(30, 41, 59); 
+        //       let textY = y + CELL_PAD;
+        //       obsLines.forEach((line) => {
+        //         pdf.text(line, colX[0] + 3, textY);
+        //         textY += LINE_H;
+        //       });
 
-              // ── Col 1: Causes bullet list ────────────────────────────────────
-              pdf.setFont("helvetica", "normal");
-              pdf.setFontSize(8);
-              pdf.setTextColor(71, 85, 105); // #475569
-              textY = y + CELL_PAD;
-              concern.causes.forEach((cause) => {
-                const lines = wrapText(pdf, `• ${cause}`, colWidths[1], 8);
-                lines.forEach((line) => {
-                  pdf.text(line, colX[1] + 3, textY);
-                  textY += LINE_H;
-                });
-              });
+        //       pdf.setFont("helvetica", "normal");
+        //       pdf.setFontSize(8);
+        //       pdf.setTextColor(71, 85, 105);
+        //       textY = y + CELL_PAD;
+        //       concern.causes.forEach((cause) => {
+        //         const lines = wrapText(pdf, `• ${cause}`, colWidths[1], 8);
+        //         lines.forEach((line) => {
+        //           pdf.text(line, colX[1] + 3, textY);
+        //           textY += LINE_H;
+        //         });
+        //       });
 
-              // ── Col 2: Remedy text ───────────────────────────────────────────
-              pdf.setFont("helvetica", "bold");
-              pdf.setFontSize(8);
-              pdf.setTextColor(...remedyText);
-              textY = y + CELL_PAD;
-              remedyLines.forEach((line) => {
-                pdf.text(line, colX[2] + 3, textY);
-                textY += LINE_H;
-              });
+        //       pdf.setFont("helvetica", "bold");
+        //       pdf.setFontSize(8);
+        //       pdf.setTextColor(...remedyText);
+        //       textY = y + CELL_PAD;
+        //       remedyLines.forEach((line) => {
+        //         pdf.text(line, colX[2] + 3, textY);
+        //         textY += LINE_H;
+        //       });
 
-              return HEADER_H + SUB_H + rowH + 4; // total height consumed + gap
-            };
+        //       return HEADER_H + SUB_H + rowH + 4; 
+        //     };
 
-            // ── Render all concerns with page-break logic ────────────────────────
-            for (const concern of concerns) {
-              // Estimate total height needed
-              const neededH =
-                8 + // severity header
-                6 + // col headers
-                estimateRowHeight(concern) +
-                4; // gap
+        //     for (const concern of concerns) {
+     
+        //       const neededH =
+        //         8 + 
+        //         6 + 
+        //         estimateRowHeight(concern) +
+        //         4; 
 
-              // Page break if not enough room
-              if (currentY + neededH > pageHeight - margin - 5) {
-                pdf.addPage();
-                currentY = drawHeader(pdf, margin);
-              }
+        //       if (currentY + neededH > pageHeight - margin - 5) {
+        //         pdf.addPage();
+        //         currentY = drawHeader(pdf, margin);
+        //       }
 
-              const consumed = drawConcernCard(concern, currentY);
-              currentY += consumed;
-            }
+        //       const consumed = drawConcernCard(concern, currentY);
+        //       currentY += consumed;
+        //     }
 
-            currentY += 6; // breathing room after section
-          }
-        }
-        // ── end SECTION 3 ────────────────────────────────────────────────────────
+        //     currentY += 6; 
+        //   }
+        // }
+       
 
         // ======================================================================
         // SECTION 4 — ENGINE LOAD DIAGRAM → REMOVED per requirements
@@ -11971,14 +11942,14 @@ export default function Performance({
         <>
           <div ref={analysisResultsRef} style={{ scrollMarginTop: "100px" }}>
             {renderMissingAlert()}
-            {allMonthlyReports.length === 1 && baseline && Object.keys(baseline).length > 0 && (
+            {/* {allMonthlyReports.length === 1 && baseline && Object.keys(baseline).length > 0 && (
               <DiagnosisPanel
                 report={allMonthlyReports[0]}
                 baseline={baseline}
                 analysisMode={analysisMode}
                 availableReports={availableReports}
               />
-            )}
+            )} */}
 
             {/* <TrendDiagnosisPanel
               availableReports={availableReports}
