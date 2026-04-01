@@ -762,7 +762,7 @@
     border-bottom: 2px solid #e2e8f0 !important;
     position: relative;
     flex-wrap: wrap;
-    z-index: 999 !important; 
+    /* z-index: 999 !important;  */
     overflow: visible !important;
     border-radius: 20px 20px 0 0;
 }
