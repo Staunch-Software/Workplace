@@ -1566,7 +1566,9 @@ const ShoreDashboard = () => {
       deadline_status: [],
       is_owner: [],
       pending_closure: '',
-      text_sort: { field: null, dir: 'asc' }
+      text_sort: { field: null, dir: 'asc' },
+      is_flagged: [],  // ✅ ADD THIS
+      is_dd: [],
     });
 
 
@@ -1723,6 +1725,23 @@ const ShoreDashboard = () => {
     return <Flower size={20} color="#3b82f6" title="Open" />;
   };
   const filteredData = useMemo(() => {
+    if (!Array.isArray(defects) || defects.length === 0) return [];
+
+    const safeFilters = {
+      ...EMPTY_FILTERS,
+      ...filters,
+      is_flagged: filters.is_flagged ?? [],
+      is_dd: filters.is_dd ?? [],
+      deadline_status: filters.deadline_status ?? [],
+      is_owner: filters.is_owner ?? [],
+      priority: filters.priority ?? [],
+      status: filters.status ?? [],
+      equipment: filters.equipment ?? [],
+      vessel: filters.vessel ?? [],
+      defect_source: filters.defect_source ?? [],
+      text_sort: filters.text_sort ?? { field: null, dir: 'asc' },
+    };
+
     let data = defects.filter(d => {
       const prString = d.pr_entries?.map(p => p.pr_number).join(', ') || '';
 
@@ -1738,12 +1757,12 @@ const ShoreDashboard = () => {
         ? new Date(filters.date_identified_to)
         : null;
       const matchFlagged =
-        filters.is_flagged.length === 0 ||
-        filters.is_flagged.includes(String(d.is_flagged));
+        safeFilters.is_flagged.length === 0 ||
+        safeFilters.is_flagged.includes(String(d.is_flagged));
 
       const matchDD =
-        filters.is_dd.length === 0 ||
-        filters.is_dd.includes(String(d.is_dd));
+        safeFilters.is_dd.length === 0 ||
+        safeFilters.is_dd.includes(String(d.is_dd));
 
       const matchReportDate =
         (!fromDate || (reportDate && reportDate >= fromDate)) &&
@@ -1761,26 +1780,26 @@ const ShoreDashboard = () => {
 
 
       const matchSource =
-        filters.defect_source.length === 0 ||
-        filters.defect_source.includes(d.defect_source);
+        safeFilters.defect_source.length === 0 ||
+        safeFilters.defect_source.includes(d.defect_source);
 
 
       const matchEquip =
-        filters.equipment.length === 0 ||
-        filters.equipment.includes(d.equipment_name);
+        safeFilters.equipment.length === 0 ||
+        safeFilters.equipment.includes(d.equipment_name);
 
       const matchDesc =
         !filters.description ||
         d.description.toLowerCase().includes(filters.description.toLowerCase());
 
       const matchPrior =
-        filters.priority.length === 0 ||
-        filters.priority.includes(d.priority);
+        safeFilters.priority.length === 0 ||
+        safeFilters.priority.includes(d.priority);
 
       const matchStatus =
         isEditMode
           ? d.status === 'OPEN'
-          : filters.status.length === 0 || filters.status.includes(d.status);
+          : safeFilters.status.length === 0 || safeFilters.status.includes(d.status);
 
       const matchPrNo =
         !filters.pr_number ||
@@ -1790,19 +1809,20 @@ const ShoreDashboard = () => {
         !filters.pr_status || d.pr_status === filters.pr_status;
 
       const matchDeadlineStatus =
-        filters.deadline_status.length === 0 ||
-        filters.deadline_status.includes(getDeadlineStatus(d.target_close_date));
+        safeFilters.deadline_status.length === 0 ||
+        safeFilters.deadline_status.includes(getDeadlineStatus(d.target_close_date));
 
       const matchOwner =
-        filters.is_owner.length === 0 ||
-        filters.is_owner.includes(String(d.is_owner));
+        safeFilters.is_owner.length === 0 ||
+        safeFilters.is_owner.includes(String(d.is_owner));
 
       const matchPendingClosure =
         !filters.pending_closure ||
         d.status === 'PENDING_CLOSURE';
+
       const matchVessel =
-        filters.vessel.length === 0 ||
-        filters.vessel.includes(d.vessel_name);
+        safeFilters.vessel.length === 0 ||
+        safeFilters.vessel.includes(d.vessel_name);
 
 
 
