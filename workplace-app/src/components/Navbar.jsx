@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getVesselStatus } from '../pages/admin/lib/adminApi';
 import './Navbar.css';
+import api from '../api/axios';
 
 // ── Module metadata keyed by backend permission key ───────────────────────────
 const MODULE_META = {
@@ -26,27 +27,20 @@ const VesselStatusModal = ({ onClose, assignedVessels = [], userPermissions = {}
         const fetchStatuses = async () => {
             try {
                 const res = await getVesselStatus();
+                console.log('[DEBUG] res.data type:', typeof res.data, '| value:', JSON.stringify(res.data).slice(0, 300));
                 const filtered = res.data.map(v => ({
                     ...v,
                     modules: (v.modules || []).filter(m => allowedKeys.includes(m.key)),
                 }));
                 setVessels(filtered);
-            } catch {
-                setVessels(
-                    assignedVessels.map((imo, idx) => ({
-                        imo,
-                        name: `Vessel ${idx + 1}`,
-                        online: idx % 2 === 0,
-                        last_sync_success: idx % 3 !== 0,
-                        last_pull_at: new Date(Date.now() - 1000 * 60 * (idx * 30 + 15)).toISOString(),
-                        last_push_at: new Date(Date.now() - 1000 * 60 * (idx * 15 + 5)).toISOString(),
-                        sync_errors: idx % 3 === 0 ? [
-                            { id: 1, error_type: 'shore_error', error_msg: 'HTTP 500: Defect sync failed', created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString() },
-                            { id: 2, error_type: 'vessel_error', error_msg: 'Blob upload failed: timeout', created_at: new Date(Date.now() - 1000 * 60 * 90).toISOString() },
-                        ] : [],
-                        modules: allowedKeys.map((key, i) => ({ key, available: i % 2 === 0 })),
-                    }))
-                );
+            } catch (err) {
+                // ← Log the REAL error so you can see what's failing
+                console.error('[VesselStatusModal] Failed to fetch vessel status:', err);
+                console.error('[VesselStatusModal] Status code:', err?.response?.status);
+                console.error('[VesselStatusModal] Detail:', err?.response?.data?.detail);
+
+                // ← Show empty state instead of fake data
+                setVessels([]);
             } finally {
                 setLoading(false);
             }
