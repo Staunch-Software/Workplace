@@ -150,13 +150,13 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, initialChatMode
 
   // ✅ UPDATED: Robust filtering in ThreadSection
   const threads = useMemo(() => {
-    if (chatMode === 'internal') {
-      // STRICT: Only show messages where is_internal is explicitly TRUE
-      return allThreads.filter(t => t.is_internal === true);
-    }
+    // Ensure allThreads is treated as an array
+    const safeThreads = Array.isArray(allThreads) ? allThreads : [];
 
-    // EXTERNAL: Show messages where is_internal is explicitly FALSE, null, or undefined
-    return allThreads.filter(t => t.is_internal !== true);
+    if (chatMode === 'internal') {
+      return safeThreads.filter(t => t.is_internal === true);
+    }
+    return safeThreads.filter(t => t.is_internal !== true);
   }, [allThreads, chatMode]);
 
   const { data: vesselUsers = [] } = useQuery({
@@ -205,15 +205,16 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, initialChatMode
       const searchTerm = textBeforeCursor.slice(lastAtIndex + 1).toLowerCase();
 
       let usersToShow = [];
+      const safeVesselUsers = Array.isArray(vesselUsers) ? vesselUsers : [];
       if (chatMode === 'internal') {
-        usersToShow = vesselUsers.filter(u => {
+        usersToShow = safeVesselUsers.filter(u => {
           if (u.id === user?.id) return false;
           const role = String(u.role || u.user_role || '').toUpperCase();
           const job = String(u.jobTitle || u.job_title || '').toUpperCase();
           return role === 'SHORE' || role === 'ADMIN' || job.includes('SUPERINTENDENT');
         });
       } else {
-        usersToShow = vesselUsers.filter(u => u.id !== user?.id);
+        usersToShow = safeVesselUsers.filter(u => u.id !== user?.id);
       }
 
       const filtered = usersToShow.filter(u => {
@@ -1333,8 +1334,10 @@ const ShoreDashboard = () => {
   });
 
   const vessels = (user?.role === 'ADMIN' || user?.role === 'SUPERADMIN')
-    ? allVessels
-    : allVessels.filter(v => user?.assigned_vessels?.includes(v.imo_number));
+    ? (allVessels || []) // Ensure allVessels is an array
+    : (allVessels || []).filter(v =>
+      Array.isArray(user?.assigned_vessels) && user.assigned_vessels.includes(v.imo_number)
+    );
 
 
   const [filters, setFilters] = useState({
@@ -1381,23 +1384,40 @@ const ShoreDashboard = () => {
     is_dd: [],
   };
 
+  // Add this right after your filters useState declaration:
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const sf = {  // "safe filters" shorthand for use outside filteredData
+    ...EMPTY_FILTERS,
+    ...filters,
+    equipment: filters.equipment ?? [],
+    vessel: filters.vessel ?? [],
+    priority: filters.priority ?? [],
+    status: filters.status ?? [],
+    defect_source: filters.defect_source ?? [],
+    deadline_status: filters.deadline_status ?? [],
+    is_owner: filters.is_owner ?? [],
+    is_flagged: filters.is_flagged ?? [],
+    is_dd: filters.is_dd ?? [],
+    text_sort: filters.text_sort ?? { field: null, dir: 'asc' },
+  };
+
   const hasActiveFilters = useMemo(() => {
     return (
-      filters.date_identified_from ||
-      filters.date_identified_to ||
-      filters.target_close_date ||
-      filters.equipment.length > 0 ||
-      filters.vessel.length > 0 ||
-      filters.description ||
-      filters.priority.length > 0 ||
-      filters.status.length > 0 ||
-      filters.pr_number ||
-      filters.defect_source.length > 0 ||
-      filters.deadline_status.length > 0 ||
-      filters.is_owner.length > 0 ||
-      filters.pending_closure ||
-      filters.is_flagged.length > 0 ||  // ✅ NEW
-      filters.is_dd.length > 0          // ✅ NEW
+      sf.date_identified_from ||
+      sf.date_identified_to ||
+      sf.target_close_date ||
+      sf.equipment.length > 0 ||
+      sf.vessel.length > 0 ||
+      sf.description ||
+      sf.priority.length > 0 ||
+      sf.status.length > 0 ||
+      sf.pr_number ||
+      sf.defect_source.length > 0 ||
+      sf.deadline_status.length > 0 ||
+      sf.is_owner.length > 0 ||
+      sf.pending_closure ||
+      sf.is_flagged.length > 0 ||
+      sf.is_dd.length > 0
     );
   }, [filters]);
 
@@ -1405,18 +1425,18 @@ const ShoreDashboard = () => {
     let count = 0;
     if (filters.date_identified_from || filters.date_identified_to) count++;
     if (filters.target_close_date) count++;
-    if (filters.equipment.length > 0) count++;
-    if (filters.vessel.length > 0) count++;
-    if (filters.description) count++;
-    if (filters.priority.length > 0) count++;
-    if (filters.status.length > 0) count++;
+    if (sf.equipment.length > 0) count++;
+    if (sf.vessel.length > 0) count++;
+    if (sf.description?.trim()) count++;
+    if (sf.priority.length > 0) count++;
+    if (sf.status.length > 0) count++;
     if (filters.pr_number) count++;
-    if (filters.defect_source.length > 0) count++;
-    if (filters.deadline_status.length > 0) count++;
-    if (filters.is_owner.length > 0) count++;
+    if (sf.defect_source.length > 0) count++;
+    if (sf.deadline_status.length > 0) count++;
+    if (sf.is_owner.length > 0) count++;
     if (filters.pending_closure) count++;
-    if (filters.is_flagged.length > 0) count++;  // ✅ NEW
-    if (filters.is_dd.length > 0) count++;
+    if (sf.is_flagged.length > 0) count++;  // ✅ NEW
+    if (sf.is_dd.length > 0) count++;
     return count;
   }, [filters]);
 
@@ -1566,7 +1586,9 @@ const ShoreDashboard = () => {
       deadline_status: [],
       is_owner: [],
       pending_closure: '',
-      text_sort: { field: null, dir: 'asc' }
+      text_sort: { field: null, dir: 'asc' },
+      is_flagged: [],  // ✅ ADD THIS
+      is_dd: [],
     });
 
 
@@ -1723,6 +1745,23 @@ const ShoreDashboard = () => {
     return <Flower size={20} color="#3b82f6" title="Open" />;
   };
   const filteredData = useMemo(() => {
+    if (!Array.isArray(defects) || defects.length === 0) return [];
+
+    const safeFilters = {
+      ...EMPTY_FILTERS,
+      ...filters,
+      is_flagged: filters.is_flagged ?? [],
+      is_dd: filters.is_dd ?? [],
+      deadline_status: filters.deadline_status ?? [],
+      is_owner: filters.is_owner ?? [],
+      priority: filters.priority ?? [],
+      status: filters.status ?? [],
+      equipment: filters.equipment ?? [],
+      vessel: filters.vessel ?? [],
+      defect_source: filters.defect_source ?? [],
+      text_sort: filters.text_sort ?? { field: null, dir: 'asc' },
+    };
+
     let data = defects.filter(d => {
       const prString = d.pr_entries?.map(p => p.pr_number).join(', ') || '';
 
@@ -1738,12 +1777,12 @@ const ShoreDashboard = () => {
         ? new Date(filters.date_identified_to)
         : null;
       const matchFlagged =
-        filters.is_flagged.length === 0 ||
-        filters.is_flagged.includes(String(d.is_flagged));
+        safeFilters.is_flagged.length === 0 ||
+        safeFilters.is_flagged.includes(String(d.is_flagged));
 
       const matchDD =
-        filters.is_dd.length === 0 ||
-        filters.is_dd.includes(String(d.is_dd));
+        safeFilters.is_dd.length === 0 ||
+        safeFilters.is_dd.includes(String(d.is_dd));
 
       const matchReportDate =
         (!fromDate || (reportDate && reportDate >= fromDate)) &&
@@ -1761,26 +1800,26 @@ const ShoreDashboard = () => {
 
 
       const matchSource =
-        filters.defect_source.length === 0 ||
-        filters.defect_source.includes(d.defect_source);
+        (safeFilters.defect_source?.length || 0) === 0 ||
+        safeFilters.defect_source.includes(d.defect_source);
 
 
       const matchEquip =
-        filters.equipment.length === 0 ||
-        filters.equipment.includes(d.equipment_name);
+        (safeFilters.equipment?.length || 0) === 0 ||
+        safeFilters.equipment.includes(d.equipment_name);
 
       const matchDesc =
         !filters.description ||
         d.description.toLowerCase().includes(filters.description.toLowerCase());
 
       const matchPrior =
-        filters.priority.length === 0 ||
-        filters.priority.includes(d.priority);
+        safeFilters.priority.length === 0 ||
+        safeFilters.priority.includes(d.priority);
 
       const matchStatus =
         isEditMode
           ? d.status === 'OPEN'
-          : filters.status.length === 0 || filters.status.includes(d.status);
+          : safeFilters.status.length === 0 || safeFilters.status.includes(d.status);
 
       const matchPrNo =
         !filters.pr_number ||
@@ -1790,19 +1829,20 @@ const ShoreDashboard = () => {
         !filters.pr_status || d.pr_status === filters.pr_status;
 
       const matchDeadlineStatus =
-        filters.deadline_status.length === 0 ||
-        filters.deadline_status.includes(getDeadlineStatus(d.target_close_date));
+        safeFilters.deadline_status.length === 0 ||
+        safeFilters.deadline_status.includes(getDeadlineStatus(d.target_close_date));
 
       const matchOwner =
-        filters.is_owner.length === 0 ||
-        filters.is_owner.includes(String(d.is_owner));
+        safeFilters.is_owner.length === 0 ||
+        safeFilters.is_owner.includes(String(d.is_owner));
 
       const matchPendingClosure =
         !filters.pending_closure ||
         d.status === 'PENDING_CLOSURE';
+
       const matchVessel =
-        filters.vessel.length === 0 ||
-        filters.vessel.includes(d.vessel_name);
+        (safeFilters.vessel?.length || 0) === 0 ||
+        safeFilters.vessel.includes(d.vessel_name);
 
 
 
@@ -2009,27 +2049,32 @@ const ShoreDashboard = () => {
       block: 'start'
     });
   };
+
   const handleKpiFilter = (type) => {
     setCurrentPage(1);
     setFilters(prev => {
+      const currentStatus = Array.isArray(prev.status) ? prev.status : [];
+      const currentPriority = Array.isArray(prev.priority) ? prev.priority : [];
+      const currentDeadline = Array.isArray(prev.deadline_status) ? prev.deadline_status : [];
+
       switch (type) {
         case 'OPEN':
-          return prev.status.includes('OPEN') && prev.status.length === 1
+          return currentStatus.includes('OPEN') && currentStatus.length === 1
             ? { ...prev, status: [] }
             : { ...prev, status: ['OPEN'], priority: [], deadline_status: [], pending_closure: '' };
 
         case 'HIGH':
-          return prev.priority.includes('HIGH') && prev.priority.length === 1
+          return currentPriority.includes('HIGH') && currentPriority.length === 1
             ? { ...prev, priority: [] }
             : { ...prev, priority: ['HIGH'], status: [], deadline_status: [], pending_closure: '' };
 
         case 'CRITICAL':
-          return prev.priority.includes('CRITICAL') && prev.priority.length === 1
+          return currentPriority.includes('CRITICAL') && currentPriority.length === 1
             ? { ...prev, priority: [] }
             : { ...prev, priority: ['CRITICAL'], status: [], deadline_status: [], pending_closure: '' };
 
         case 'OVERDUE':
-          return prev.deadline_status.includes('OVERDUE') && prev.deadline_status.length === 1
+          return currentDeadline.includes('OVERDUE') && currentDeadline.length === 1
             ? { ...prev, deadline_status: [], status: [] }
             : { ...prev, deadline_status: ['OVERDUE'], status: ['OPEN'], priority: [], pending_closure: '' };
 
@@ -2039,7 +2084,7 @@ const ShoreDashboard = () => {
             : { ...prev, pending_closure: 'YES', status: ['PENDING_CLOSURE'], priority: [], deadline_status: [] };
 
         case 'CLOSED':
-          return prev.status.includes('CLOSED') && prev.status.length === 1
+          return currentStatus.includes('CLOSED') && currentStatus.length === 1
             ? { ...prev, status: [] }
             : { ...prev, status: ['CLOSED'], priority: [], deadline_status: [], pending_closure: '' };
 
@@ -2360,7 +2405,7 @@ const ShoreDashboard = () => {
 
 
         <div
-          className={`kpi-card blue ${filters.status.includes('OPEN') ? 'active' : ''}`}
+          className={`kpi-card blue ${sf.status.includes('OPEN') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('OPEN')}
 
@@ -2374,7 +2419,7 @@ const ShoreDashboard = () => {
         </div>
 
         <div
-          className={`kpi-card orange ${filters.priority.includes('HIGH') ? 'active' : ''}`}
+          className={`kpi-card orange ${sf.priority.includes('HIGH') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('HIGH')}
         >
@@ -2388,7 +2433,7 @@ const ShoreDashboard = () => {
         </div>
 
         <div
-          className={`kpi-card red ${filters.priority.includes('CRITICAL') ? 'active' : ''}`}
+          className={`kpi-card red ${sf.priority.includes('CRITICAL') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('CRITICAL')}
         >
@@ -2404,7 +2449,7 @@ const ShoreDashboard = () => {
 
         {/* ✅ NEW OVERDUE CARD */}
         <div
-          className={`kpi-card red ${filters.deadline_status.includes('OVERDUE') ? 'active' : ''}`}
+          className={`kpi-card red ${sf.deadline_status.includes('OVERDUE') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('OVERDUE')}
         >
@@ -2434,7 +2479,7 @@ const ShoreDashboard = () => {
         </div>
 
         <div
-          className={`kpi-card green ${filters.status.includes('CLOSED') ? 'active' : ''}`}
+          className={`kpi-card green ${sf.status.includes('CLOSED') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('CLOSED')}
         >
@@ -2753,9 +2798,9 @@ const ShoreDashboard = () => {
                                   <AlertTriangle
                                     size={16}
                                     color={
-                                      filters.text_sort.field === 'priority' && filters.priority.length > 0 ? '#7c3aed'  // both: purple
+                                      filters.text_sort.field === 'priority' && sf.priority.length > 0 ? '#7c3aed'  // both: purple
                                         : filters.text_sort.field === 'priority' ? '#2563eb'                                 // sorted: blue
-                                          : filters.priority.length > 0 ? '#ea580c' : '#64748b'
+                                          : sf.priority.length > 0 ? '#ea580c' : '#64748b'
                                     }
                                   />
                                 </span>
@@ -2789,9 +2834,9 @@ const ShoreDashboard = () => {
                                   title="Sort by Status"
                                 >
                                   <Flower size={16} color={
-                                    filters.text_sort.field === 'status' && filters.status.length > 0 ? '#7c3aed'
+                                    filters.text_sort.field === 'status' && sf.status.length > 0 ? '#7c3aed'
                                       : filters.text_sort.field === 'status' ? '#2563eb'
-                                        : filters.status.length > 0 ? '#ea580c' : '#64748b'
+                                        : sf.status.length > 0 ? '#ea580c' : '#64748b'
                                   } />
                                 </span>
                                 <FilterHeader
@@ -2823,9 +2868,9 @@ const ShoreDashboard = () => {
                                   title="Sort by Owner"
                                 >
                                   <UserCircle size={16} color={
-                                    filters.text_sort.field === 'owner' && filters.is_owner.length > 0 ? '#7c3aed'
+                                    filters.text_sort.field === 'owner' && sf.is_owner.length > 0 ? '#7c3aed'
                                       : filters.text_sort.field === 'owner' ? '#2563eb'
-                                        : filters.is_owner.length > 0 ? '#ea580c' : '#64748b'
+                                        : sf.is_owner.length > 0 ? '#ea580c' : '#64748b'
                                   } />
                                 </span>
                                 <FilterHeader
@@ -2855,9 +2900,9 @@ const ShoreDashboard = () => {
                                   title="Sort by Deadline"
                                 >
                                   <Clock size={16} color={
-                                    filters.text_sort.field === 'deadline_icon' && filters.deadline_status.length > 0 ? '#7c3aed'
+                                    filters.text_sort.field === 'deadline_icon' && sf.deadline_status.length > 0 ? '#7c3aed'
                                       : filters.text_sort.field === 'deadline_icon' ? '#2563eb'
-                                        : filters.deadline_status.length > 0 ? '#ea580c' : '#64748b'
+                                        : sf.deadline_status.length > 0 ? '#ea580c' : '#64748b'
                                   } />
                                 </span>
                                 <FilterHeader
@@ -2916,10 +2961,10 @@ const ShoreDashboard = () => {
                                   <Flag
                                     size={16}
                                     color={
-                                      filters.text_sort.field === 'flag' && filters.is_flagged.length > 0 ? '#7c3aed' // Both: Purple
+                                      filters.text_sort.field === 'flag' && sf.is_flagged.length > 0 ? '#7c3aed' // Both: Purple
                                         : filters.text_sort.field === 'flag' ? '#2563eb'                             // Sorted: Blue
-                                          : filters.is_flagged.length > 0 ? '#ea580c'                                 // Filtered: Orange
-                                            : '#64748b'                                                                  // Default: Grey
+                                          : sf.is_flagged.length > 0 ? '#ea580c'
+                                            : '#64748b'
                                     }
                                     fill={filters.text_sort.field === 'flag' ? '#ef4444' : 'none'}
                                   />
@@ -2956,20 +3001,20 @@ const ShoreDashboard = () => {
                                     width: '18px',
                                     height: '18px',
                                     borderRadius: '50%',
-                                    border: `1.5px solid ${filters.text_sort.field === 'dd' && filters.is_dd.length > 0 ? '#7c3aed'
+                                    border: `1.5px solid ${filters.text_sort.field === 'dd' && sf.is_dd.length > 0 ? '#7c3aed'
                                       : filters.text_sort.field === 'dd' ? '#2563eb'
-                                        : filters.is_dd.length > 0 ? '#ea580c'
+                                        : sf.is_dd.length > 0 ? '#ea580c'
                                           : '#64748b'
                                       }`,
                                     background:
-                                      filters.text_sort.field === 'dd' && filters.is_dd.length > 0 ? '#f5f3ff' // Light Purple
+                                      filters.text_sort.field === 'dd' && sf.is_dd.length > 0 ? '#f5f3ff' // Light Purple
                                         : filters.text_sort.field === 'dd' ? '#e0f2fe'                       // Light Blue
-                                          : filters.is_dd.length > 0 ? '#fff7ed'                               // Light Orange
+                                          : sf.is_dd.length > 0 ? '#fff7ed'                               // Light Orange
                                             : 'transparent',
                                     color:
-                                      filters.text_sort.field === 'dd' && filters.is_dd.length > 0 ? '#7c3aed'
+                                      filters.text_sort.field === 'dd' && sf.is_dd.length > 0 ? '#7c3aed'
                                         : filters.text_sort.field === 'dd' ? '#2563eb'
-                                          : filters.is_dd.length > 0 ? '#ea580c'
+                                          : sf.is_dd.length > 0 ? '#ea580c'
                                             : '#64748b',
                                     fontSize: '9px',
                                     fontWeight: '900',

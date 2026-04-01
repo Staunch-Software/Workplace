@@ -1,4 +1,5 @@
 import json
+from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,14 +8,14 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import get_control_db, get_current_admin, get_current_user
 from app.models.control.user import User
 from app.models.control.vessel import Vessel
-from app.schemas.vessel import VesselCreate, VesselUpdate, VesselOut
+from app.schemas.vessel import ModuleStatusUpdate, VesselCreate, VesselStatusOut, VesselUpdate, VesselOut
 import re
 from datetime import datetime, timezone, timedelta
 
 router = APIRouter()
 
 
-@router.get("/vessels/status")
+@router.get("/vessels/status",response_model=list[VesselStatusOut])
 async def get_vessel_status(
     db: AsyncSession = Depends(get_control_db),
     current_user: User = Depends(get_current_user),
@@ -160,10 +161,10 @@ async def create_vessel(
     )
 
 
-@router.patch("/vessels/{imo}/module-status")
+@router.patch("/vessels/{imo}/module-status",response_model=Dict[str, bool])
 async def update_module_status(
     imo: str,
-    payload: dict,  # e.g. {"drs": true, "voyage": false}
+    payload: ModuleStatusUpdate,  # e.g. {"drs": true, "voyage": false}
     db: AsyncSession = Depends(get_control_db),
     admin: User = Depends(get_current_admin),
 ):
@@ -174,7 +175,7 @@ async def update_module_status(
 
     # Merge with existing — don't wipe keys not in payload
     existing = vessel.module_status or {}
-    vessel.module_status = {**existing, **payload}
+    vessel.module_status = {**existing, **payload.model_dump(exclude_none=True)}
     vessel.updated_at = datetime.utcnow()
     await db.commit()
     await db.refresh(vessel)

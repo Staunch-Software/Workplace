@@ -673,14 +673,14 @@ const FeedRow = ({ item, onView, onMarkDone, isPending }) => {
         <div style={{ display: 'flex', gap: '6px' }}>
           {item.defect_id && (
             <Tooltip text="View Defect">
-              <button onClick={() => onView(item.defect_id)} style={{ border: '1px solid #e2e8f0', borderRadius: '7px', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569' }}>
+              <button onClick={() => onView(item.defect_id)} style={{ border: '1px solid #e2e8f0', borderRadius: '7px', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569',width:"35px",height:"24px" }}>
                 <Eye size={14} />
               </button>
             </Tooltip>
           )}
           {!item.is_read && (
             <Tooltip text="Mark as Done">
-              <button onClick={() => onMarkDone(item.id)} disabled={isPending} style={{ border: `1px solid ${accentBorder}`, borderRadius: '7px', background: accentBg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: accentColor }}>
+              <button onClick={() => onMarkDone(item.id)} disabled={isPending} style={{ border: `1px solid ${accentBorder}`, borderRadius: '7px', background: accentBg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: accentColor,width:"35px",height:"24px" }}>
                 <CheckCircle size={14} />
               </button>
             </Tooltip>
@@ -780,14 +780,14 @@ const MentionRow = ({ item, onView, onMarkDone, isPending }) => {
         <div style={{ display: 'flex', gap: '6px' }}>
           {item.defect_id && (
             <Tooltip text="View Defect">
-              <button onClick={() => onView(item.defect_id, item.meta?.is_internal)} style={{ border: '1px solid #e2e8f0', borderRadius: '7px', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569' }}>
+              <button onClick={() => onView(item.defect_id, item.meta?.is_internal)} style={{ border: '1px solid #e2e8f0', borderRadius: '7px', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569',width:"35px",height:"24px" }}>
                 <Eye size={14} />
               </button>
             </Tooltip>
           )}
           {!item.is_read && (
             <Tooltip text="Mark as Done">
-              <button onClick={() => onMarkDone(item.id)} disabled={isPending} style={{ border: `1px solid ${accentBorder}`, borderRadius: '7px', background: accentBg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: accentColor }}>
+              <button onClick={() => onMarkDone(item.id)} disabled={isPending} style={{ border: `1px solid ${accentBorder}`, borderRadius: '7px', background: accentBg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: accentColor,width:"35px",height:"24px" }}>
                 <CheckCircle size={14} />
               </button>
             </Tooltip>
