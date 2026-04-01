@@ -14,6 +14,90 @@ from datetime import datetime, timezone, timedelta
 router = APIRouter()
 
 
+@router.get("/vessels/status")
+async def get_vessel_status(
+    db: AsyncSession = Depends(get_control_db),
+    current_user: User = Depends(get_current_user),
+):
+    # 1. Fetch user with assigned vessels
+    result = await db.execute(
+        select(User)
+        .where(User.id == current_user.id)
+        .options(selectinload(User.vessels))
+    )
+    user = result.scalar_one_or_none()
+    now = datetime.now(timezone.utc)
+
+    ONLINE_THRESHOLD = timedelta(minutes=10)
+    allowed_keys = [k for k, v in (current_user.permissions or {}).items() if v]
+
+    def to_utc(dt):
+        """Safely make any datetime UTC-aware."""
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)  # naive → assume UTC
+        return dt.astimezone(timezone.utc)  # aware → convert to UTC
+
+    # --- UPDATED HELPER FOR JSON HISTORY ---
+    def parse_errors(last_sync_error_json: str) -> list:
+        if not last_sync_error_json:
+            return []
+        
+        try:
+            history = json.loads(last_sync_error_json)
+        except (json.JSONDecodeError, TypeError):
+            # Not valid JSON at all — treat as no errors, not as an error
+            return []
+
+        # Must be a non-empty list to count as errors
+        if not isinstance(history, list) or len(history) == 0:
+            return []
+
+        result = []
+        for e in history:
+            # Each item must be a dict with expected keys — skip malformed entries
+            if not isinstance(e, dict):
+                continue
+            result.append({
+                "id":         e.get("id", 0),
+                "error_type": e.get("type", "vessel_error"),
+                "error_msg":  e.get("msg", "Unknown error"),
+                "created_at": e.get("ts"),
+            })
+        
+        return result
+    # Change this in your GET /vessel-status
+
+    return [
+        {
+            "imo": vessel.imo,
+            "name": vessel.name,
+            "online": (
+                (now - to_utc(vessel.last_pull_at)) < ONLINE_THRESHOLD
+                if vessel.last_pull_at
+                else False
+            ),
+            "last_pull_at": (
+                to_utc(vessel.last_pull_at).isoformat() if vessel.last_pull_at else None
+            ),
+            "last_push_at": (
+                to_utc(vessel.last_push_at).isoformat() if vessel.last_push_at else None
+            ),
+            "last_sync_success": vessel.last_sync_success,
+            "failed_items_count": (vessel.vessel_telemetry or {}).get(
+                "failed_items_count", 0
+            ),
+            "sync_errors": parse_errors(vessel.last_sync_error),
+            "modules": [
+                {"key": k, "available": (vessel.module_status or {}).get(k, False)}
+                for k in allowed_keys
+            ],
+        }
+        for vessel in user.vessels
+    ]
+
+
 @router.get("/vessels", response_model=list[VesselOut])
 async def list_vessels(
     db: AsyncSession = Depends(get_control_db),
@@ -37,86 +121,6 @@ async def list_vessels(
             ],
         )
         for v in vessels
-    ]
-
-
-@router.get("/vessels/status")
-async def get_vessel_status(
-    db: AsyncSession = Depends(get_control_db),
-    current_user: User = Depends(get_current_user),
-):
-    # 1. Fetch user with assigned vessels
-    result = await db.execute(
-        select(User)
-        .where(User.id == current_user.id)
-        .options(selectinload(User.vessels))
-    )
-    user = result.scalar_one_or_none()
-    now = datetime.now(timezone.utc)
-
-    ONLINE_THRESHOLD = timedelta(minutes=10)
-    allowed_keys = [k for k, v in (current_user.permissions or {}).items() if v]
-
-    # --- UPDATED HELPER FOR JSON HISTORY ---
-    def parse_errors(last_sync_error_json: str) -> list:
-        if not last_sync_error_json:
-            return []
-        try:
-            # Parse the stored JSON list
-            history = json.loads(last_sync_error_json)
-            # Map to the format the React UI expects
-            return [
-                {
-                    "id": e["id"],
-                    "error_type": e["type"],
-                    "error_msg": e["msg"],
-                    "created_at": e["ts"],
-                }
-                for e in history
-            ]
-        except:
-            # Fallback for old string-based data if any remains
-            return [
-                {
-                    "id": 0,
-                    "error_type": "vessel_error",
-                    "error_msg": last_sync_error_json,
-                    "created_at": None,
-                }
-            ]
-
-    # Change this in your GET /vessel-status
-
-
-    return [
-        {
-            "imo": vessel.imo,
-            "name": vessel.name,
-            "online": (
-                (now - vessel.last_pull_at.replace(tzinfo=timezone.utc)) < ONLINE_THRESHOLD
-                if vessel.last_pull_at
-                else False
-            ),
-            # SHORE PERSPECTIVE:
-            # last_pull_at = When Shore last received data FROM the ship
-            "last_pull_at": (
-                vessel.last_pull_at.isoformat() if vessel.last_pull_at else None
-            ),
-            # last_push_at = When Shore last sent data TO the ship
-            "last_push_at": (
-                vessel.last_push_at.isoformat() if vessel.last_push_at else None
-            ),
-            "last_sync_success": vessel.last_sync_success,
-            "failed_items_count": (vessel.vessel_telemetry or {}).get(
-                "failed_items_count", 0
-            ),
-            "sync_errors": parse_errors(vessel.last_sync_error),
-            "modules": [
-                {"key": k, "available": (vessel.module_status or {}).get(k, False)}
-                for k in allowed_keys
-            ],
-        }
-        for vessel in user.vessels
     ]
 
 
