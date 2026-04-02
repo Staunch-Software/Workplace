@@ -2952,6 +2952,7 @@ const LuboilAnalysis = () => {
     onSampleClick,
     hasReport,
     dueText,
+    daysOverdue,
     openUpward,
   }) => {
     // --- STATE FOR DROPDOWN ---
@@ -3236,16 +3237,17 @@ const LuboilAnalysis = () => {
         {/* --- LINE 2: DUE DATE BADGE (ISOLATED BOTTOM) --- */}
         <span
           style={{
-            backgroundColor: "#ffffff",
-            color: "#334155",
+            backgroundColor: daysOverdue > 0 ? "#fee2e2" : "#ffffff",
+            color: daysOverdue > 0 ? "#991b1b" : "#334155",
             fontSize: "0.65rem",
             padding: "2px 10px",
             borderRadius: "4px",
             fontWeight: "700",
             whiteSpace: "nowrap",
-            border: "1px solid #cbd5e1",
+            border: `1px solid ${daysOverdue > 0 ? "#fca5a5" : "#cbd5e1"}`,
           }}
         >
+          {/* {daysOverdue > 0 ? `Overdue by ${daysOverdue}d` : `Due: ${dueText}`} */}
           Due: {dueText}
         </span>
       </div>
@@ -4629,7 +4631,7 @@ const LuboilAnalysis = () => {
                                     });
                                   const limitDays = interval * 30;
                                   const daysElapsed = Math.ceil(
-                                      (today - sampleDate) / (1000 * 60 * 60 * 24)
+                                    (today - sampleDate) / (1000 * 60 * 60 * 24)
                                   );
                                   const daysOverdue = daysElapsed - limitDays;
                                   const hasRemarks =
@@ -4714,6 +4716,7 @@ const LuboilAnalysis = () => {
                                           previousStatus={cell.previous_status}
                                           hasReport={cell.has_report}
                                           dueText={formattedDue}
+                                          daysOverdue={daysOverdue}
                                           openUpward={
                                             rowIndex >=
                                             visibleColumns.length - 2

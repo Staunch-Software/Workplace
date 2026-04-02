@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { FileText, Trello, Ship, Droplet, Activity } from "lucide-react";
@@ -37,6 +37,8 @@ const FullScreenLoader = () => (
   </div>
 );
 
+
+
 const Home = () => {
   const navigate = useNavigate();
   const { user, setUser } = useAuth();
@@ -44,6 +46,8 @@ const Home = () => {
   const [showJobTitleModal, setShowJobTitleModal] = useState(!user?.job_title);
   const [jobTitleInput, setJobTitleInput] = useState('');
   const [savingJobTitle, setSavingJobTitle] = useState(false);
+
+  useEffect(() => { document.title = 'Workplace'; }, []);
 
   const handleSaveJobTitle = async () => {
     if (!jobTitleInput.trim()) return;

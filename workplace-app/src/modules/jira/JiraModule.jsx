@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect} from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 
@@ -11,7 +11,8 @@ function JiraModule() {
   const { user } = useAuth();
 
   const defaultRoute = user?.role === 'VESSEL' ? 'vessel/dashboard' : 'shore/dashboard';
-
+  useEffect(() => { document.title = 'SmartPAL JIRA'; }, []);
+  
   return (
     <Routes>
       <Route index element={<Navigate to={defaultRoute} replace />} />

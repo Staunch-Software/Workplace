@@ -6,7 +6,7 @@
 // that prefix is set in Workspace App.jsx via path="/drs/*").
 // ─────────────────────────────────────────────────────────────
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '@/components/auth/ProtectedRoute'; // ← Workspace's unified ProtectedRoute
 
@@ -28,6 +28,7 @@ import AdminUserPanel from './features/shore/AdminUserPanel';
 import AnalyticsDashboard from './features/shore/AnalyticsDashboard';
 
 function DrsModule() {
+  useEffect(() => { document.title = 'DRS'; }, []);
   return (
     <Routes>
       {/* Default: /drs → /drs/vessel/dashboard or /drs/shore/dashboard
