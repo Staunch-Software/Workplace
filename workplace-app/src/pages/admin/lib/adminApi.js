@@ -24,3 +24,6 @@ export const updateVessel = (imo, payload) => api.patch(`/vessels/${imo}`, paylo
 
 export const updateVesselModuleStatus = (imo, status) =>
   api.patch(`/vessels/${imo}/module-status`, status);
+
+export const getVesselStatus = () =>
+  api.get('/vessels/status');

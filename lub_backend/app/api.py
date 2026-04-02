@@ -172,7 +172,7 @@ logger = logging.getLogger(__name__)
 # Initialize FastAPI
 app = FastAPI(
     title="Luboil Analysis API",
-    description="Luboil module API â€” part of Workplace platform."
+    description="Luboil module API part of Workplace platform."
 )
 
 app.add_middleware(
@@ -291,7 +291,7 @@ async def upload_generated_report(
                 await db.commit()
             
             # For Lube Oil, we might just log it or save to a History Log table if you have one
-            logger.info(f"âœ… Uploaded {report_type} to {blob_url}")
+            logger.info(f"Uploaded {report_type} to {blob_url}")
             return {"status": "success", "url": blob_url}
         else:
             raise HTTPException(status_code=500, detail="Azure upload returned no URL")
@@ -391,7 +391,7 @@ async def upload_luboil_report(
 
         # 2. Process Data (Extract values to DB)
         logger.info(" Parsing PDF Data...")
-        result = save_luboil_report(
+        result = await save_luboil_report(
             pdf_file_stream=pdf_stream,
             filename=file.filename,
             session=db
@@ -414,7 +414,7 @@ async def upload_luboil_report(
             # Create path: lube_oil/raw/YYYY-MM
             folder_path = f"lube_oil/raw/{datetime.now().strftime('%Y-%m')}"
             
-            logger.info(f"â˜ï¸ Uploading to Azure: {folder_path}/{clean_filename}")
+            logger.info(f"Uploading to Azure: {folder_path}/{clean_filename}")
             
             blob_url = upload_file_to_azure(
                 file_data=contents, # Send the bytes we read earlier
@@ -423,7 +423,7 @@ async def upload_luboil_report(
             )
             
             if blob_url:
-                logger.info(f"ðŸŽ‰ Azure Upload Success. URL: {blob_url}")
+                logger.info(f"Azure Upload Success. URL: {blob_url}")
                 
                 # 4. UPDATE THE DATABASE RECORD WITH THE URL
                 res = await db.execute(sa_select(LuboilReport).where(LuboilReport.report_id == report_id))
@@ -433,14 +433,14 @@ async def upload_luboil_report(
                     report_record.report_url = blob_url
                     await db.commit()
                     await db.refresh(report_record)
-                    logger.info(f"ðŸ’¾ Database Updated with URL for Report ID: {report_id}")
+                    logger.info(f"Database Updated with URL for Report ID: {report_id}")
                 else:
-                    logger.error(f"âŒ Critical: Report ID {report_id} not found in DB during update.")
+                    logger.error(f"Critical: Report ID {report_id} not found in DB during update.")
             else:
-                logger.error("âŒ Azure upload returned None (No URL). Check Azure Credentials in .env")
+                logger.error("Azure upload returned None (No URL). Check Azure Credentials in .env")
 
         except Exception as blob_err:
-            logger.error(f"âŒ Exception during Azure Upload: {blob_err}", exc_info=True)
+            logger.error(f"Exception during Azure Upload: {blob_err}", exc_info=True)
 
         # =========================================================
         # ðŸ”¥ IMPROVED LIVE FEED TRIGGER (Multi-line Structured Message)
@@ -483,9 +483,9 @@ async def upload_luboil_report(
             )
             db.add(new_event)
             await db.commit()
-            logger.info(f"ðŸ“¡ Live Feed updated for {vessel_name} (Duplicate: {is_duplicate})")
+            logger.info(f"Live Feed updated for {vessel_name} (Duplicate: {is_duplicate})")
         except Exception as feed_err:
-            logger.error(f"âš ï¸ Failed to add upload event to Live Feed: {feed_err}")
+            logger.error(f"Failed to add upload event to Live Feed: {feed_err}")
         # =========================================================
 
         # --- UPDATED RETURN BLOCK ---
@@ -594,7 +594,7 @@ async def update_luboil_remarks(
                 sample = res.scalars().first()
 
         if not sample: 
-            logger.error(f"âŒ Sample for IMO {str(vessel.imo)} on {request.sample_date} not found.")
+            logger.error(f"Sample for IMO {str(vessel.imo)} on {request.sample_date} not found.")
             raise HTTPException(status_code=404, detail="Sample record not found")
 
         # --- TRACK CHANGES & ROLE DETECTION ---
@@ -663,9 +663,9 @@ async def update_luboil_remarks(
             
             sample.resolution_remarks = request.resolution_remarks
             
-            approval_notif_msg = f"ðŸš¢ Vessel {vessel.name} requested closure for {request.machinery_name}. Verification required."
+            approval_notif_msg = f"Vessel {vessel.name} requested closure for {request.machinery_name}. Verification required."
             
-            line_1 = f"â³ APPROVAL REQUIRED - {vessel.name}"
+            line_1 = f"APPROVAL REQUIRED - {vessel.name}"
             line_2 = f"Vessel submitted corrective actions for {request.machinery_name}."
             line_3 = f"Status: Awaiting Shore Verification | Date: {request.sample_date}"
             feed_msg = f"{line_1}\n{line_2}\n{line_3}"
@@ -679,9 +679,9 @@ async def update_luboil_remarks(
                 if hasattr(sample, 'is_approval_pending'):
                     sample.is_approval_pending = False
                 
-                approval_notif_msg = f"âœ… Shore verified and CLOSED the issue for {request.machinery_name} on {vessel.name}."
+                approval_notif_msg = f"Shore verified and CLOSED the issue for {request.machinery_name} on {vessel.name}."
                 
-                line_1 = f"âœ… RESOLUTION ACCEPTED - {vessel.name}"
+                line_1 = f"RESOLUTION ACCEPTED - {vessel.name}"
                 line_2 = f"Shore verified corrective actions for {request.machinery_name}."
                 line_3 = "Issue is now officially CLOSED."
                 feed_msg = f"{line_1}\n{line_2}\n{line_3}"
@@ -698,9 +698,9 @@ async def update_luboil_remarks(
                 decline_note = f"\n[{timestamp_str}] System: Shore declined resolution request. Issue remains OPEN."
                 sample.office_remarks = (sample.office_remarks or "") + decline_note
                 
-                approval_notif_msg = f"âŒ Shore DECLINED the resolution request for {request.machinery_name} on {vessel.name}."
+                approval_notif_msg = f"Shore DECLINED the resolution request for {request.machinery_name} on {vessel.name}."
                 
-                line_1 = f"âŒ RESOLUTION DECLINED - {vessel.name}"
+                line_1 = f"RESOLUTION DECLINED - {vessel.name}"
                 line_2 = f"Shore declined the closure request for {request.machinery_name}."
                 line_3 = "Vessel action still required."
                 feed_msg = f"{line_1}\n{line_2}\n{line_3}"
@@ -714,7 +714,7 @@ async def update_luboil_remarks(
                 sample.is_approval_pending = False 
             sample.resolution_remarks = request.resolution_remarks
             
-            line_1 = f"âœ… ISSUE CLOSED BY SHORE - {vessel.name}"
+            line_1 = f"ISSUE CLOSED BY SHORE - {vessel.name}"
             line_2 = f"Direct resolution documented for {request.machinery_name}."
             line_3 = f"Remarks: {request.resolution_remarks[:100]}..."
             feed_msg = f"{line_1}\n{line_2}\n{line_3}"
@@ -724,10 +724,10 @@ async def update_luboil_remarks(
         # CASE D: Default status logic for non-resolution changes
         elif status_changed and not request.is_resolved:
             if request.status in ['Critical', 'Action']:
-                line_1 = f"ðŸš¨ CRITICAL STATUS ALERT - {vessel.name}"
+                line_1 = f"CRITICAL STATUS ALERT - {vessel.name}"
                 feed_priority = "CRITICAL"
             else:
-                line_1 = f"âš ï¸ STATUS CHANGE ALERT - {vessel.name}"
+                line_1 = f"STATUS CHANGE ALERT - {vessel.name}"
                 feed_priority = "WARNING"
             line_2 = f"{request.machinery_name} has moved to {request.status} status."
             line_3 = f"Report Date: {request.sample_date} | Status: {sample.status}"
@@ -746,11 +746,11 @@ async def update_luboil_remarks(
             sender_name = userData.get('full_name', 'User') if isinstance(userData, dict) else getattr(userData, 'full_name', 'User')
             
             # This preserves old remarks and simply appends the new "REOPENED" status line
-            reopen_msg = f"\n[{timestamp}] ðŸ”“ ISSUE REOPENED BY {sender_name}: Follow-up required."
+            reopen_msg = f"\n[{timestamp}]  ISSUE REOPENED BY {sender_name}: Follow-up required."
             sample.office_remarks = (sample.office_remarks or "") + reopen_msg
             
             # --- TRIGGER LIVE FEED ---
-            line_1 = f"ðŸ”“ ISSUE REOPENED - {vessel.name}"
+            line_1 = f"ISSUE REOPENED - {vessel.name}"
             line_2 = f"{request.machinery_name} has been reopened by {sender_name} for further action."
             line_3 = f"Original Report: {request.sample_date} | Status: {sample.status}"
             feed_msg = f"{line_1}\n{line_2}\n{line_3}"
@@ -987,7 +987,7 @@ async def update_luboil_remarks(
 
     except HTTPException as he: raise he
     except Exception as e:
-        logger.error(f"âŒ [DB ERROR] update failed: {e}", exc_info=True)
+        logger.error(f"[DB ERROR] update failed: {e}", exc_info=True)
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1070,6 +1070,7 @@ async def get_luboil_fleet_overview(
                 LuboilReport.imo_number,
                 LuboilReport.report_url,
                 LuboilSample.equipment_code,
+                LuboilReport.oil_source,
                 LuboilSample.machinery_name,
                 LuboilSample.status,
                 LuboilSample.sample_date,
@@ -1092,7 +1093,9 @@ async def get_luboil_fleet_overview(
                 LuboilSample.pdf_page_index,
                 LuboilSample.viscosity_40c,
                 LuboilSample.tan,
-                LuboilSample.tbn
+                LuboilSample.tbn,
+                LuboilReport.overdue_remarks,
+                LuboilReport.is_overdue_accepted
             )
             .join(LuboilReport, LuboilSample.report_id == LuboilReport.report_id)
             .where(LuboilReport.imo_number.in_(allowed_imos))
@@ -1211,8 +1214,8 @@ async def get_luboil_fleet_overview(
                     # =========================================================
                     interval_months = eq.default_interval_months or 3
                     limit_days = interval_months * 30
-                    warning_threshold = limit_days + 30  
-                    critical_threshold = limit_days + 60 
+                    warning_threshold = limit_days    
+                    critical_threshold = limit_days + 30
 
                     days_elapsed = (datetime.now().date() - latest_sample.sample_date).days
                     excess_days = days_elapsed - limit_days
@@ -1240,7 +1243,7 @@ async def get_luboil_fleet_overview(
                         if not existing_alert:
                             clean_v_name = format_vessel_name(v.name)
                             line_1 = f"SCHEDULE ALERT ({target_priority}) - {clean_v_name.upper()}" 
-                            status_text = "CRITICAL OVERDUE (>60 days)" if target_priority == "CRITICAL" else "OVERDUE (>30 days)"
+                            status_text = "CRITICAL OVERDUE (>30 days)" if target_priority == "CRITICAL" else "OVERDUE"
                             line_2 = f"{eq.ui_label} is now {status_text} (Overdue by {excess_days} days)."
                             line_3 = f"Report Date: {latest_sample.sample_date} | Status: {latest_sample.status}"
                             
@@ -1273,7 +1276,7 @@ async def get_luboil_fleet_overview(
 
                         if not existing_resample:
                             clean_v_name = format_vessel_name(v.name)
-                            line_1 = f"ðŸ”„ RESAMPLE REMINDER - {clean_v_name.upper()}"
+                            line_1 = f"RESAMPLE REMINDER - {clean_v_name.upper()}"
                             line_2 = f"A mandatory resampling for {eq.ui_label} is still PENDING."
                             line_3 = f"Last Report: {latest_sample.sample_date} | Instruction: Provide follow-up sample."
                             
@@ -1321,12 +1324,15 @@ async def get_luboil_fleet_overview(
                     cell_data.update({
                         "sample_id": latest_sample.sample_id,
                         "status": latest_sample.status,
+                        "oil_source": latest_sample.oil_source,
                         "diagnosis": latest_sample.lab_diagnosis,
                         "summary_error": latest_sample.summary_error, 
                         "last_sample": latest_sample.sample_date.strftime("%Y-%m-%d"),
                         "report_date": latest_sample.report_date.strftime("%Y-%m-%d") if latest_sample.report_date else None,
                         "has_report": True,
                         "report_url": secure_report_url,
+                        "report_overdue_remarks": latest_sample.overdue_remarks,
+                        "report_is_overdue_accepted": latest_sample.is_overdue_accepted,
                         "officer_remarks": latest_sample.officer_remarks,
                         "office_remarks": latest_sample.office_remarks,
                         "internal_remarks": latest_sample.internal_remarks,
@@ -1420,10 +1426,10 @@ def admin_data_sync(
             success = True
 
         if success:
-            logger.info(f"âœ… Data Sync Successful for {engine_type}")
-            return {"message": f"âœ… Successfully synced {engine_type} data."}
+            logger.info(f"Data Sync Successful for {engine_type}")
+            return {"message": f"Successfully synced {engine_type} data."}
         else:
-            logger.error("âŒ Data sync script returned explicit False.")
+            logger.error("Data sync script returned explicit False.")
             raise HTTPException(status_code=500, detail="Script failed to load data (returned False). Check logs.")
 
     except HTTPException as he:
@@ -1668,11 +1674,15 @@ async def upload_luboil_attachment(
                 sender_name = current_user.get('full_name', 'User') if isinstance(current_user, dict) else getattr(current_user, 'full_name', 'User')
                 
                 vessel_name = "Vessel"
-                if sample.report and sample.report.vessel:
-                    vessel_name = sample.report.vessel.name
+                report_res = await db.execute(
+                    sa_select(LuboilReport).where(LuboilReport.report_id == sample.report_id)
+                )
+                report = report_res.scalars().first()
+                if report:
+                    vessel_name = report.vessel_name or vessel_name
                 
                 # Create the two-line structure (Header \n Body)
-                line_1 = f"ðŸ“Ž EVIDENCE UPLOADED BY {sender_name.upper()}"
+                line_1 = f"EVIDENCE UPLOADED BY {sender_name.upper()}"
                 line_2 = f"New evidence provided for {equipment_code} on {vessel_name}."
                 full_feed_msg = f"{line_1}\n{line_2}" 
 
@@ -1687,9 +1697,9 @@ async def upload_luboil_attachment(
                     sample_id=sample.sample_id,
                     created_at=datetime.utcnow()
                 ))
-                logger.info(f"ðŸ“¡ Live Feed triggered for evidence upload by {sender_name}")
+                logger.info(f"Live Feed triggered for evidence upload by {sender_name}")
             except Exception as feed_err:
-                logger.error(f"âš ï¸ Failed to add evidence event to Live Feed: {feed_err}")
+                logger.error(f"Failed to add evidence event to Live Feed: {feed_err}")
             sample.version = (sample.version or 1) + 1
             sample.updated_at = datetime.utcnow()
             await db.commit()
@@ -1697,7 +1707,7 @@ async def upload_luboil_attachment(
             # 4. Generate a signed SAS URL for the file just uploaded
             signed_url = generate_sas_url(blob_url)
             
-            logger.info(f"âœ… Attachment uploaded and linked to Sample ID {sample.sample_id}: {filename}")
+            logger.info(f"Attachment uploaded and linked to Sample ID {sample.sample_id}: {filename}")
             
             return {
                 "status": "success",
@@ -1706,13 +1716,13 @@ async def upload_luboil_attachment(
                 "message": "File uploaded and added to evidence."
             }
         else:
-            logger.error(f"âŒ Sample not found for SampleID: {sample_id} or IMO: {imo}, Code: {equipment_code}, Date: {sample_date}")
+            logger.error(f"Sample not found for SampleID: {sample_id} or IMO: {imo}, Code: {equipment_code}, Date: {sample_date}")
             raise HTTPException(status_code=404, detail="Machinery sample record not found")
                 
     except HTTPException as he:
         raise he
     except Exception as e:
-        logger.error(f"âŒ Upload attachment failed: {str(e)}", exc_info=True)
+        logger.error(f"Upload attachment failed: {str(e)}", exc_info=True)
         await db.rollback() 
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
@@ -1855,7 +1865,7 @@ async def get_notifications(
         user_id = current_user.get('id') or current_user.get('sub') or current_user.get('user_id')
 
     if user_id is None:
-        logger.error(f"âŒ Could not find ID in current_user. Type: {type(current_user)}")
+        logger.error(f"Could not find ID in current_user. Type: {type(current_user)}")
         return {"notifications": [], "unread_count": 0}
 
     # Ensure it is an integer for the database query
@@ -1922,13 +1932,13 @@ async def get_luboil_live_feed(
         user_id = current_user.get('id') or current_user.get('user_id') or current_user.get('sub')
 
     if user_id is None:
-        logger.error(f"âŒ User ID not found in current_user context")
+        logger.error(f"User ID not found in current_user context")
         return []
 
     try:
         user_id = str(user_id)
     except (ValueError, TypeError):
-        logger.error(f"âŒ Could not cast User ID {user_id} to integer")
+        logger.error(f"Could not cast User ID {user_id} to integer")
         return []
 
     # --- ðŸ”¥ DETERMINING ALLOWED VESSELS BASED ON ROLE ---
@@ -2063,6 +2073,109 @@ async def upload_vessel_config_report(
         control_db.close()
     
     return {"url": blob_url}
+
+class VesselOverdueActionRequest(BaseModel):
+    imo: int
+    action: str  # 'SUBMIT', 'ACCEPT', 'DECLINE'
+    remarks: Optional[str] = None
+
+@app.post("/api/luboil/vessel/overdue-workflow", tags=["Lube Oil"])
+async def vessel_overdue_workflow(
+    request: VesselOverdueActionRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
+):
+    from sqlalchemy import select as sa_select
+    from datetime import datetime
+    from app.core.database_control import SessionControl
+    from app.models.control.vessel import Vessel as ControlVessel
+    from app.models.control.user import User as ControlUser
+    from app.models.control.associations import user_vessel_link
+    
+    # 1. Extract User Info & Role
+    user_data = current_user.get('user') if isinstance(current_user, dict) and 'user' in current_user else current_user
+    user_name = getattr(user_data, 'full_name', 'User') if not isinstance(user_data, dict) else user_data.get('full_name', 'User')
+    u_role = str(getattr(user_data, 'role', "") if not isinstance(user_data, dict) else user_data.get('role', "")).upper()
+    is_shore = u_role in["SHORE", "ADMIN", "SUPERUSER", "SUPERINTENDENT"]
+
+    # 2. Get Vessel Name for Notifications
+    control_db = SessionControl()
+    try:
+        vessel = control_db.query(ControlVessel).filter(ControlVessel.imo == str(request.imo)).first()
+        vessel_name = vessel.name if vessel else f"IMO {request.imo}"
+    finally:
+        control_db.close()
+
+    # 3. Find the Active Reports tied to this Vessel
+    stmt = (
+        sa_select(LuboilSample.report_id)
+        .join(LuboilReport, LuboilSample.report_id == LuboilReport.report_id)
+        .where(LuboilReport.imo_number == str(request.imo))
+        .order_by(LuboilSample.sample_date.desc())
+        .limit(20)
+    )
+    res = await db.execute(stmt)
+    report_ids = list(set(res.scalars().all()))
+
+    if not report_ids:
+        raise HTTPException(status_code=404, detail="No active reports found for this vessel.")
+
+    # 4. Update the 2 Columns on those Reports
+    res_reports = await db.execute(sa_select(LuboilReport).where(LuboilReport.report_id.in_(report_ids)))
+    reports_to_update = res_reports.scalars().all()
+
+    justification_text = request.remarks
+    for r in reports_to_update:
+        if request.action == "SUBMIT":
+            r.overdue_remarks = request.remarks
+            r.is_overdue_accepted = None  # NULL means Pending
+            r.updated_at = datetime.utcnow()
+        elif request.action == "ACCEPT":
+            r.is_overdue_accepted = True  # True means Accepted
+            justification_text = r.overdue_remarks
+            r.updated_at = datetime.utcnow()
+        elif request.action == "DECLINE":
+            r.is_overdue_accepted = False # False means Declined
+            justification_text = r.overdue_remarks
+            r.updated_at = datetime.utcnow()
+
+    # 5. Trigger the "MY FEED" Private Notifications
+    control_db = SessionControl()
+    try:
+        if request.action == "SUBMIT":
+            # Send to SHORE users
+            target_users = control_db.query(ControlUser).filter(ControlUser.role.in_(["SHORE", "ADMIN", "SUPERINTENDENT"])).all()
+            priority = "WARNING"
+            event_type = "APPROVAL_REQUEST"
+            msg = f"⏳ PENDING APPROVAL - {vessel_name}\n{user_name} submitted a vessel-wide overdue justification.\nRemarks: '{justification_text}'"
+        else:
+            # Send back to VESSEL users assigned to this ship
+            target_users = control_db.query(ControlUser).join(
+                user_vessel_link, ControlUser.id == user_vessel_link.c.user_id
+            ).filter(user_vessel_link.c.vessel_imo == str(request.imo), ControlUser.role == "VESSEL").all()
+            
+            status_text = "✅ ACCEPTED" if request.action == "ACCEPT" else "❌ DECLINED"
+            priority = "SUCCESS" if request.action == "ACCEPT" else "CRITICAL"
+            event_type = "STATUS_CHANGE"
+            msg = f"{status_text} - {vessel_name}\nShore ({user_name}) has {request.action.lower()} the overdue justification.\nOriginal Remark: '{justification_text}'"
+
+        # Route directly into MY FEED via recipient_id
+        for t_user in target_users:
+            db.add(LuboilEvent(
+                vessel_name=vessel_name,
+                imo=str(request.imo),
+                machinery_name="Vessel-Wide",
+                event_type=event_type,
+                priority=priority,
+                message=msg,
+                recipient_id=t_user.id, # 🔥 Routes strictly to MY FEED
+                created_at=datetime.utcnow()
+            ))
+    finally:
+        control_db.close()
+
+    await db.commit()
+    return {"message": "Vessel overdue workflow updated successfully."}
 
 if __name__ == "__main__":
     import uvicorn

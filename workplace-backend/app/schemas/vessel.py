@@ -48,3 +48,37 @@ class VesselOut(BaseModel):
     last_pull_at: Optional[datetime] = None   # ← add
     class Config:
         from_attributes = True
+        
+class ModuleStatus(BaseModel):
+    key: str
+    available: bool
+
+class SyncError(BaseModel):
+    id: int = 0
+    error_type: str
+    error_msg: str
+    created_at: Optional[str] = None
+
+class VesselStatusOut(BaseModel):
+    imo: str
+    name: str
+    online: bool
+    last_pull_at: Optional[str] = None
+    last_push_at: Optional[str] = None
+    last_sync_success: Optional[bool] = None
+    failed_items_count: int = 0
+    sync_errors: List[SyncError] = []
+    modules: List[ModuleStatus] = []
+
+    class Config:
+        from_attributes = True
+        
+class ModuleStatusUpdate(BaseModel):
+    drs: Optional[bool] = None
+    jira: Optional[bool] = None
+    voyage: Optional[bool] = None
+    lubeoil: Optional[bool] = None
+    engine_performance: Optional[bool] = None
+
+    class Config:
+        extra = "allow"  

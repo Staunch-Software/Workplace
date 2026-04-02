@@ -53,7 +53,7 @@ class LuboilReport(Base):
     file_name = Column(String(255), nullable=False, comment="Original PDF filename (e.g., 'GCL GANGA -96.pdf')")
     lab_name = Column(String(100), nullable=True, comment="Lab provider name (e.g., 'Shell LubeAnalyst')")
     report_date = Column(DATE, nullable=False, comment="Date printed on the report")
-    
+    oil_source = Column(String(100), nullable=True, comment="Extracted Oil Brand e.g., 'SHELL', 'CASTROL'")
     # The Full Data Dump (Stores the entire JSON extraction for detailed chemistry lookup)
     full_json_data = Column(JSONB(none_as_null=True, astext_type=TEXT), nullable=True, comment="Complete raw JSON structure including all chemical elements")
     
@@ -69,6 +69,9 @@ class LuboilReport(Base):
                           foreign_keys="[LuboilReport.imo_number]")
     
     samples = relationship("LuboilSample", back_populates="report", cascade="all, delete-orphan")
+
+    overdue_remarks = Column(TEXT, nullable=True, comment="Stores the justification text")
+    is_overdue_accepted = Column(Boolean, nullable=True, comment="True=Accepted, False=Declined, NULL=Pending")
 
     # Constraints and Indexes
     __table_args__ = (
