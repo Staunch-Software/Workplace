@@ -2219,7 +2219,8 @@ const LuboilAnalysis = () => {
       mCritical = 0;
 
     // --- COUNTERS ---
-    let totalConfigured = Object.keys(data.data).length;
+    // let totalConfigured = Object.keys(data.data).length;
+    let configuredVesselCount = 0;
     let ov30Count = 0;
     let ov60Count = 0;
     let pendingUnresolvedCount = 0; // Tracks vessels needing attention (Action/Approval/Resample)
@@ -2230,6 +2231,11 @@ const LuboilAnalysis = () => {
       let vesselIsOverdue30 = false;
       let vesselIsOverdue60 = false;
       let vesselHasActiveIssue = false; // Flag to see if vessel has pending actions
+
+      const hasConfiguredMachinery = Object.values(vessel.machineries || {}).some(m => m.is_configured === true);
+      if (hasConfiguredMachinery) {
+        configuredVesselCount++; // Only increment if configured
+      }
 
       Object.values(vessel.machineries || {}).forEach((m) => {
         if (!m.is_configured) return;
@@ -2306,7 +2312,7 @@ const LuboilAnalysis = () => {
       critical: mCritical,
     });
     setOverdueStats({
-      configured: totalConfigured,
+      configured: configuredVesselCount,
       pendingUnresolved: pendingUnresolvedCount, // Updated for new UI card
       overdue30: ov30Count,
       overdue60: ov60Count,
@@ -2551,17 +2557,32 @@ const LuboilAnalysis = () => {
     Object.entries(matrixData.data).forEach(([vesselName, vesselData]) => {
       // --- CASE 1: Configured Vessels ---
       if (statusType === "Configured") {
-        matchingVessels.push({
-          name: vesselName,
-          imo: vesselData.imo || "N/A",
-          reportUrl: vesselData.vessel_report_url,
-          overdueItems: Object.values(vesselData.machineries || {})
-            .filter((m) => m.is_configured)
-            .map((m) => ({
-              fullName: m.description || m.code,
-              shortCode: m.analyst_code || m.code,
-            })),
-        });
+        const configuredItems = Object.values(vesselData.machineries || {})
+          .filter((m) => m.is_configured)
+          .map((m) => ({
+            fullName: m.description || m.code,
+            shortCode: m.analyst_code || m.code,
+          }));
+
+        if (configuredItems.length > 0) {
+          matchingVessels.push({
+            name: vesselName,
+            imo: vesselData.imo || "N/A",
+            reportUrl: vesselData.vessel_report_url,
+            overdueItems: configuredItems,
+          });
+        }
+        // matchingVessels.push({
+        //   name: vesselName,
+        //   imo: vesselData.imo || "N/A",
+        //   reportUrl: vesselData.vessel_report_url,
+        //   overdueItems: Object.values(vesselData.machineries || {})
+        //     .filter((m) => m.is_configured)
+        //     .map((m) => ({
+        //       fullName: m.description || m.code,
+        //       shortCode: m.analyst_code || m.code,
+        //     })),
+        // });
         return;
       }
 
@@ -4629,7 +4650,7 @@ const LuboilAnalysis = () => {
                                     });
                                   const limitDays = interval * 30;
                                   const daysElapsed = Math.ceil(
-                                      (today - sampleDate) / (1000 * 60 * 60 * 24)
+                                    (today - sampleDate) / (1000 * 60 * 60 * 24)
                                   );
                                   const daysOverdue = daysElapsed - limitDays;
                                   const hasRemarks =
