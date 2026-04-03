@@ -1115,6 +1115,8 @@ const useColumnResize = (setColumnWidths) => {
 // ✅ Main Dashboard Component
 const VesselDashboard = () => {
   const { user } = useAuth();
+  const ALLOWED_DELETE_EMAILS = ['chief.tapi@drs.com'];
+  const canDelete = ALLOWED_DELETE_EMAILS.includes(user?.email);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1725,12 +1727,11 @@ const VesselDashboard = () => {
   });
 
   const handleDelete = (id) => {
+    if (!canDelete) return;
     const confirmed = window.confirm(
       "⚠️ Are you sure you want to delete this defect?\n\nThis action cannot be undone."
     );
-
     if (!confirmed) return;
-
     deleteMutation.mutate(id);
   };
 
@@ -2375,7 +2376,7 @@ const VesselDashboard = () => {
                       }
                     })}
 
-                    {isEditMode && <th style={{ width: 10 }}>Delete</th>}
+                    {isEditMode && canDelete && <th style={{ width: 10 }}>Delete</th>}
                   </tr>
                 </SortableContext>
               </thead>
@@ -2798,7 +2799,7 @@ const VesselDashboard = () => {
                           }
                         })}
 
-                        {isEditMode && (
+                        {isEditMode && canDelete && (
                           <td style={{ textAlign: 'center' }}>
                             <button
                               className="action-btn"

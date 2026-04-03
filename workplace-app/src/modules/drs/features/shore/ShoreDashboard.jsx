@@ -5,11 +5,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle, Clock, ClipboardList, MessageSquare,
   ChevronDown, ChevronUp, CheckCircle, ShieldAlert, Send, Paperclip,
-  X, Check, Edit2, Save, Edit3, Filter, Edit, Flower, Ship, AlertOctagon, MessageCircle, MoreHorizontal, Trash2, ArrowRightLeft, UserCircle, Download, Flag
+  X, Check, Edit2, Save, Edit3, Filter, Edit, Flower, Ship, AlertOctagon, MessageCircle, MoreHorizontal, Trash2, ArrowRightLeft, UserCircle, Download, Flag, RefreshCw
 } from 'lucide-react';
 import { Image as ImageIcon, Eye, Upload } from 'lucide-react';
 import ColumnCustomizationModal from '@drs/components/modals/ColumnCustomizationModal';
 import ShoreClosureModal from '@drs/components/modals/ShoreClosureModal';
+import PrSyncManager from '@drs/components/shared/PrSyncManager';
 
 import { defectApi } from '@drs/services/defectApi';
 import { blobUploadService } from '@drs/services/blobUploadService';
@@ -126,6 +127,8 @@ const useColumnResize = (setColumnWidths) => {
 
 const ThreadSection = ({ defectId, defectStatus, closureRemarks, initialChatMode = 'external' }) => {
   const { user } = useAuth();
+  const ALLOWED_DELETE_EMAILS = ['gauravsingh.r@ozellar.com']; // ← add whitelisted emails here
+  const canDelete = ALLOWED_DELETE_EMAILS.includes(user?.email);
   const queryClient = useQueryClient();
   const [externalDraft, setExternalDraft] = useState("");
   const [internalDraft, setInternalDraft] = useState("");
@@ -1294,6 +1297,8 @@ const ShoreDashboard = () => {
   // const [openThreadRow, setOpenThreadRow] = useState(null);
 
   const { user } = useAuth();
+  const ALLOWED_DELETE_EMAILS = ['gauravsingh.r@ozellar.com'];
+  const canDelete = ALLOWED_DELETE_EMAILS.includes(user?.email);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -1959,8 +1964,12 @@ const ShoreDashboard = () => {
       }
     }
     // ✅ Always float flagged defects to top (unless user is actively sorting by something else)
+    // Float flagged to top only when no explicit sort is active AND no DD/flag filter is applied
     if (!filters.text_sort?.field && !filters.date_identified_sort && !filters.target_close_date_sort) {
-      data.sort((a, b) => (b.is_flagged ? 1 : 0) - (a.is_flagged ? 1 : 0));
+      data.sort((a, b) => {
+        if (b.is_flagged !== a.is_flagged) return (b.is_flagged ? 1 : 0) - (a.is_flagged ? 1 : 0);
+        return 0; // preserve existing order for non-flagged items
+      });
     }
     return data;
   }, [defects, filters, isEditMode]);
@@ -2199,11 +2208,11 @@ const ShoreDashboard = () => {
   });
 
   const handleDelete = (id) => {
-    const confirmed = window.confirm(
+    if (!ALLOWED_DELETE_EMAILS.includes(user?.email)) return; // silently block
+    if (window.confirm(
       "⚠️ Are you sure you want to delete this defect?\n\nThis action cannot be undone."
-    );
-    if (!confirmed) return;
-    deleteMutation.mutate(id);
+    ))
+      deleteMutation.mutate(id);
   };
 
   const handleSaveColumns = async (selectedColumns) => {
@@ -2250,6 +2259,7 @@ const ShoreDashboard = () => {
 
   // Inside ShoreDashboard component, add these hooks:
   const [showCreateRow, setShowCreateRow] = useState(false);
+  const [showPrSync, setShowPrSync] = useState(false);
   const [newDefect, setNewDefect] = useState(INITIAL_NEW_DEFECT);
   const createRowRef = useRef(null);
 
@@ -2525,6 +2535,35 @@ const ShoreDashboard = () => {
           >
             + Create Defect
           </button>
+
+          {user?.role === 'ADMIN' && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowPrSync(prev => !prev)}
+                style={{
+                  background: '#0f172a',
+                  color: 'white',
+                  border: 'none',
+                  padding: '8px 14px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <RefreshCw size={14} />
+                PR Sync
+              </button>
+              {showPrSync && (
+                <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 1000 }}>
+                  <PrSyncManager onClose={() => setShowPrSync(false)} />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* RIGHT: Legend */}
           <div
@@ -3065,7 +3104,7 @@ const ShoreDashboard = () => {
                       }
                     })}
 
-                    {isEditMode && <th style={{ width: 10 }}>Delete</th>}
+                    {isEditMode && canDelete && <th style={{ width: 10 }}>Delete</th>}
                   </tr>
                 </SortableContext>
               </thead>
@@ -3569,7 +3608,7 @@ const ShoreDashboard = () => {
                           }
                         })}
 
-                        {isEditMode && (
+                        {isEditMode && canDelete && (
                           <td style={{ textAlign: 'center' }}>
                             <button
                               className="action-btn"
