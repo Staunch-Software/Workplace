@@ -11,7 +11,7 @@ import {
   AlertCircle, AlertTriangle, Info, Zap,
   Eye, CheckCircle, Search, Filter,
   Anchor, Wrench, Image, GitPullRequest,
-  Lock, Unlock, ChevronDown, X, RefreshCw,AtSign 
+  Lock, Unlock, ChevronDown, X, RefreshCw, AtSign
 } from 'lucide-react';
 
 // ── Event type config ──────────────────────────────────────────────────────
@@ -628,6 +628,7 @@ const FeedRow = ({ item, onView, onMarkDone, isPending }) => {
   const accentBg = pIconCfg ? pIconCfg.bg : cfg.bg;
   const accentBorder = pIconCfg ? pIconCfg.border : cfg.border;
   const desc = item.defect?.description || '';
+  const meta = typeof item.meta === 'string' ? (() => { try { return JSON.parse(item.meta); } catch { return {}; } })() : (item.meta || {});
   const shortDesc = desc.length > 50 ? desc.slice(0, 50) + '…' : desc;
   const hasFullDesc = desc.length > 50;
 
@@ -666,21 +667,57 @@ const FeedRow = ({ item, onView, onMarkDone, isPending }) => {
             <span style={{ fontWeight: '600', color: '#1e293b', textTransform: 'uppercase', fontSize: '13px' }}>{"(" + item.defect.defect_source + ")"}</span>
           )}
         </div>
-        <span style={{ fontSize: '12px', color: '#334155', lineHeight: '1.4', fontWeight: '500' }}>{item.message}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', color: '#334155', lineHeight: '1.4', fontWeight: '500' }}>
+            {item.message}
+          </span>
+
+          {item.event_type === 'DEFECT_CLOSED' && (() => {
+            const remark = item.defect?.closure_remark
+              || item.defect?.closure_remarks
+              || meta?.closure_remark
+              || '';
+            if (!remark) return null;
+            const shortRemark = remark.length > 50 ? remark.slice(0, 50) + '…' : remark;
+            const isLong = remark.length > 50;
+
+            return (
+              <>
+                <span style={{ color: '#cbd5e1', fontSize: '13px', fontWeight: '300' }}>|</span>
+                {/* <Wrench size={11} color="#10b981" style={{ flexShrink: 0 }} /> */}
+                {/* <span style={{ fontSize: '11px', fontWeight: '700', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.4px', flexShrink: 0 }}>
+                  Work Done:
+                </span> */}
+                {isLong ? (
+                  <DescTooltip text={remark}>
+                    <span style={{
+                      fontSize: '12px', fontWeight: '500', color: '#334155',
+                      cursor: 'default', borderBottom: '1px dashed #cbd5e1', paddingBottom: '1px',
+                    }}>
+                      {shortRemark}
+                    </span>
+                  </DescTooltip>
+                ) : (
+                  <span style={{ fontSize: '12px', fontWeight: '500', color: '#334155' }}>{remark}</span>
+                )}
+              </>
+            );
+          })()}
+        </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0 }}>
         <span style={{ fontSize: '12px', color: '#5f5f5f', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatDateTime(item.created_at)}</span>
         <div style={{ display: 'flex', gap: '6px' }}>
           {item.defect_id && (
             <Tooltip text="View Defect">
-              <button onClick={() => onView(item.defect_id)} style={{ border: '1px solid #e2e8f0', borderRadius: '7px', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569',width:"35px",height:"24px" }}>
+              <button onClick={() => onView(item.defect_id)} style={{ border: '1px solid #e2e8f0', borderRadius: '7px', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', width: "35px", height: "24px" }}>
                 <Eye size={14} />
               </button>
             </Tooltip>
           )}
           {!item.is_read && (
             <Tooltip text="Mark as Done">
-              <button onClick={() => onMarkDone(item.id)} disabled={isPending} style={{ border: `1px solid ${accentBorder}`, borderRadius: '7px', background: accentBg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: accentColor,width:"35px",height:"24px" }}>
+              <button onClick={() => onMarkDone(item.id)} disabled={isPending} style={{ border: `1px solid ${accentBorder}`, borderRadius: '7px', background: accentBg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: accentColor, width: "35px", height: "24px" }}>
                 <CheckCircle size={14} />
               </button>
             </Tooltip>
@@ -780,14 +817,14 @@ const MentionRow = ({ item, onView, onMarkDone, isPending }) => {
         <div style={{ display: 'flex', gap: '6px' }}>
           {item.defect_id && (
             <Tooltip text="View Defect">
-              <button onClick={() => onView(item.defect_id, item.meta?.is_internal)} style={{ border: '1px solid #e2e8f0', borderRadius: '7px', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569',width:"35px",height:"24px" }}>
+              <button onClick={() => onView(item.defect_id, item.meta?.is_internal)} style={{ border: '1px solid #e2e8f0', borderRadius: '7px', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', width: "35px", height: "24px" }}>
                 <Eye size={14} />
               </button>
             </Tooltip>
           )}
           {!item.is_read && (
             <Tooltip text="Mark as Done">
-              <button onClick={() => onMarkDone(item.id)} disabled={isPending} style={{ border: `1px solid ${accentBorder}`, borderRadius: '7px', background: accentBg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: accentColor,width:"35px",height:"24px" }}>
+              <button onClick={() => onMarkDone(item.id)} disabled={isPending} style={{ border: `1px solid ${accentBorder}`, borderRadius: '7px', background: accentBg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: accentColor, width: "35px", height: "24px" }}>
                 <CheckCircle size={14} />
               </button>
             </Tooltip>

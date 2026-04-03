@@ -10,7 +10,7 @@ import {
 import { Image as ImageIcon, Eye, Upload } from 'lucide-react';
 import ColumnCustomizationModal from '@drs/components/modals/ColumnCustomizationModal';
 import ShoreClosureModal from '@drs/components/modals/ShoreClosureModal';
-import PrSyncManager from '@drs/components/shared/PrSyncManager';
+// import PrSyncManager from '@drs/components/shared/PrSyncManager';
 
 import { defectApi } from '@drs/services/defectApi';
 import { blobUploadService } from '@drs/services/blobUploadService';
@@ -153,14 +153,25 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, initialChatMode
 
   // ✅ UPDATED: Robust filtering in ThreadSection
   const threads = useMemo(() => {
-    // Ensure allThreads is treated as an array
-    const safeThreads = Array.isArray(allThreads) ? allThreads : [];
+    const safeThreads = Array.isArray(allThreads) ? [...allThreads] : [];
 
-    if (chatMode === 'internal') {
-      return safeThreads.filter(t => t.is_internal === true);
+    let filtered = chatMode === 'internal'
+      ? safeThreads.filter(t => t.is_internal === true)
+      : safeThreads.filter(t => t.is_internal !== true);
+
+    // ✅ Only inject if closed
+    if (defectStatus === 'CLOSED') {
+      filtered.push({
+        id: 'system-closure-marker',
+        is_system_message: true,
+        is_closure_remarks: true, // Custom flag for styling
+        body: closureRemarks || 'No remarks provided.',
+        created_at: new Date().toISOString()
+      });
     }
-    return safeThreads.filter(t => t.is_internal !== true);
-  }, [allThreads, chatMode]);
+
+    return filtered;
+  }, [allThreads, chatMode, defectStatus, closureRemarks]);
 
   const { data: vesselUsers = [] } = useQuery({
     queryKey: ['vessel-users', defectId],
@@ -395,6 +406,39 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, initialChatMode
         ) : (
           threads.map(t => {
             if (t.is_system_message) {
+              // ✅ NEW: Layout for Closure Remarks specifically
+              if (t.is_closure_remarks) {
+                return (
+                  <div key={t.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '25px 0' }}>
+                    <div style={{
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '12px',
+                      padding: '12px 20px',
+                      maxWidth: '85%',
+                      textAlign: 'center',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                    }}>
+                      <div style={{ color: '#15803d', fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.05em' }}>
+                        Closure Remark
+                      </div>
+                      <div style={{
+                        color: '#44403c',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        lineHeight: '1.5',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'anywhere'
+                      }}>
+                        {t.body}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              // ✅ OLD UI: Remains exactly as it was for standard system messages
               return (
                 <div key={t.id} style={{ textAlign: 'center', margin: '15px 0' }}>
                   <span style={{
@@ -1944,8 +1988,9 @@ const ShoreDashboard = () => {
           }
 
           if (field === 'flag' || field === 'dd') {
-            const bA = valA ? 1 : 0;
-            const bB = valB ? 1 : 0;
+            const bA = !!valA ? 1 : 0;
+            const bB = !!valB ? 1 : 0;
+            // desc = DD active (1) floats to top
             return dir === 'asc' ? bA - bB : bB - bA;
           }
 
@@ -1966,10 +2011,7 @@ const ShoreDashboard = () => {
     // ✅ Always float flagged defects to top (unless user is actively sorting by something else)
     // Float flagged to top only when no explicit sort is active AND no DD/flag filter is applied
     if (!filters.text_sort?.field && !filters.date_identified_sort && !filters.target_close_date_sort) {
-      data.sort((a, b) => {
-        if (b.is_flagged !== a.is_flagged) return (b.is_flagged ? 1 : 0) - (a.is_flagged ? 1 : 0);
-        return 0; // preserve existing order for non-flagged items
-      });
+      data.sort((a, b) => (!!b.is_flagged ? 1 : 0) - (!!a.is_flagged ? 1 : 0));
     }
     return data;
   }, [defects, filters, isEditMode]);
@@ -2240,11 +2282,13 @@ const ShoreDashboard = () => {
   const handleTextSort = (field) => {
     setFilters(prev => {
       const current = prev.text_sort;
+      const booleanColumns = ['flag', 'dd', 'owner'];
+      const defaultDir = booleanColumns.includes(field) ? 'desc' : 'asc';
       const nextDir = current.field === field
-        ? current.dir === 'asc' ? 'desc'
-          : current.dir === 'desc' ? null
-            : 'asc'
-        : 'asc';
+        ? current.dir === 'desc' ? 'asc'
+          : current.dir === 'asc' ? null
+            : 'desc'
+        : defaultDir;
 
       return {
         ...prev,
@@ -2704,7 +2748,7 @@ const ShoreDashboard = () => {
                     <th style={{ width: 20 }}>
                       <EquipmentFilter
                         label="Vessel"
-                        options={VESSEL_OPTIONS}
+                        options={vessels.map(v => v.name)}
                         selectedValues={filters.vessel}
                         onChange={(vals) =>
                           setFilters(prev => ({ ...prev, vessel: vals }))
