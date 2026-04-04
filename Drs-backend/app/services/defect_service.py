@@ -92,6 +92,22 @@ class DefectService:
         """
         logger.info(f"[DefectService] Creating defect for vessel: {defect_in.vessel_imo}")
 
+        # --- Generate defect_number via atomic sequence upsert ---
+        vessel_for_num = await control_db.get(Vessel, defect_in.vessel_imo)
+        vessel_name_for_num = vessel_for_num.name if vessel_for_num else defect_in.vessel_imo
+        prefix = vessel_name_for_num.replace(" ", "").upper()[:6]
+
+        from sqlalchemy import text as sa_text
+        seq_result = await db.execute(sa_text("""
+            INSERT INTO vessel_defect_sequences (vessel_imo, next_seq)
+            VALUES (:imo, 1)
+            ON CONFLICT (vessel_imo)
+            DO UPDATE SET next_seq = vessel_defect_sequences.next_seq + 1
+            RETURNING next_seq
+        """), {"imo": defect_in.vessel_imo})
+        next_seq = seq_result.scalar()
+        defect_number = f"{prefix}#{str(next_seq).zfill(4)}"
+
         # --- Parse dates ---
         date_identified = None
         if defect_in.date:
@@ -137,6 +153,7 @@ class DefectService:
             is_owner=False,
             is_flagged=defect_in.is_flagged or False, # ✅ Added
             is_dd=defect_in.is_dd or False,           # ✅ Added
+            defect_number=defect_number,
             origin="VESSEL" if _should_sync() else "SHORE",
             updated_at=datetime.utcnow(),
         )

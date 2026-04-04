@@ -74,6 +74,7 @@ class Defect(Base):
     is_owner = Column(Boolean, default=False, nullable=False)
     is_flagged = Column(Boolean, default=False, nullable=False)
     is_dd = Column(Boolean, default=False, nullable=False)
+    defect_number = Column(String(20), nullable=True, unique=True, index=True)
     # Relationships
     # vessel = relationship("Vessel", back_populates="defects")
     # reporter = relationship(
@@ -148,6 +149,7 @@ class PrEntry(Base):
     pr_number = Column(String, nullable=False)
     pr_description = Column(String, nullable=True)
     is_deleted = Column(Boolean, default=False, nullable=False)
+    mariapps_pr_status = Column(String, nullable=True)
     version = Column(Integer, nullable=False, default=1)
     origin = Column(String(20), nullable=False, default="VESSEL")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

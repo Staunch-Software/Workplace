@@ -2167,7 +2167,7 @@ const VesselDashboard = () => {
                   items={visibleColumns}
                   strategy={horizontalListSortingStrategy}
                 > <tr>
-                    <th style={{ width: 20 }}>S.No</th>
+                    <th style={{ width: 100 }}>Defect ID</th>
 
                     {visibleColumns.map((colId) => {
                       switch (colId) {
@@ -2404,10 +2404,9 @@ const VesselDashboard = () => {
                       >
 
 
-                        <td className="s-no" style={{ textAlign: "center" }}>
-                          {/* ✅ SCROLL ANCHOR (IMPORTANT) */}
+                        <td style={{ textAlign: "center", fontWeight: 600, fontSize: '12px', color: '#1e293b', whiteSpace: 'nowrap' }}>
                           <div id={`row-${defect.id}`} className="row-anchor" />
-                          {(currentPage - 1) * pageSize + index + 1}
+                          {defect.defect_number || `#${(currentPage - 1) * pageSize + index + 1}`}
                         </td>
 
                         {visibleColumns.map(colId => {
@@ -2875,8 +2874,8 @@ const VesselDashboard = () => {
                     }}
                   >
                     {/* 1. S.No Column */}
-                    <td style={{ width: 20, textAlign: 'center', color: '#ea580c', fontWeight: 700, fontSize: '16px' }}>
-                      *
+                    <td style={{ width: 100, textAlign: 'center', color: '#ea580c', fontWeight: 700, fontSize: '13px' }}>
+                      NEW
                     </td>
 
                     {/* 3. Visible Columns Mapping */}

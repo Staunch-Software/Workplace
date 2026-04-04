@@ -28,6 +28,7 @@ class PrEntryResponse(BaseModel):
     defect_id: UUID
     pr_number: str
     pr_description: Optional[str]
+    mariapps_pr_status: Optional[str] = None
     created_at: datetime
     created_by_id: Optional[UUID]
     
@@ -71,6 +72,7 @@ class DefectCreate(BaseModel):
     is_owner: bool = False 
     is_flagged: bool = False  # ✅ Added
     is_dd: bool = False       # ✅ Added
+    defect_number: Optional[str] = None
     # ✅ Defect Source
     defect_source: str
     pr_status: Optional[str] = 'Not Set' 
@@ -111,6 +113,7 @@ class DefectResponse(BaseModel):
     is_owner: bool = False
     is_flagged: bool = False
     is_dd: bool = False
+    defect_number: Optional[str] = None
     # Other fields
     responsibility: Optional[str] = None
     pr_status: Optional[str] = 'Not Set'
