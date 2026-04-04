@@ -42,7 +42,7 @@
 import uuid
 from uuid import UUID
 from datetime import datetime, timezone, timedelta
-
+from app.core.config import settings
 from fastapi import (
     APIRouter,
     Depends,
@@ -90,7 +90,10 @@ from app.core.blob_storage import (
     generate_write_sas_url,
     generate_read_sas_url,
     get_container_client,
+    download_blob_bytes,
 )
+import httpx
+import base64
 from app.api.deps import get_current_user
 from app.services.email_service import send_defect_email
 from app.services.notification_service import notify_vessel_users, create_task_for_mentions
@@ -176,7 +179,325 @@ COLUMN_MAP = {
     ),
 }
 
+async def get_graph_token() -> str:
+    """Get Microsoft Graph API token using client credentials."""
+    url = f"https://login.microsoftonline.com/{settings.AZURE_TENANT_ID}/oauth2/v2.0/token"
+    async with httpx.AsyncClient(verify=False) as client:
+        response = await client.post(url, data={
+            "grant_type": "client_credentials",
+            "client_id": settings.AZURE_CLIENT_ID,
+            "client_secret": settings.AZURE_CLIENT_SECRET,
+            "scope": "https://graph.microsoft.com/.default"
+        })
+        response.raise_for_status()
+        return response.json()["access_token"]
 
+
+async def create_outlook_draft(
+    user_email: str,
+    to_emails: list[str],
+    subject: str,
+    body_text: str,
+    attachments: list[dict],  # [{"name": str, "content_type": str, "data": bytes}]
+    cc_emails: list[str] = []
+) -> str:
+    """
+    Creates a draft email in user's Outlook via Graph API.
+    Returns the web_link to open the draft directly.
+    """
+    token = await get_graph_token()
+
+    # Build attachment list (base64 encoded)
+    graph_attachments = []
+    for att in attachments:
+        graph_attachments.append({
+            "@odata.type": "#microsoft.graph.fileAttachment",
+            "name": att["name"],
+            "contentType": att.get("content_type", "application/octet-stream"),
+            "contentBytes": base64.b64encode(att["data"]).decode("utf-8")
+        })
+
+    # Build email draft payload
+    draft_payload = {
+        "subject": subject,
+        "importance": "Normal",
+        "body": {
+            "contentType": "Text",
+            "content": body_text
+        },
+        "toRecipients": [
+            {"emailAddress": {"address": email}}
+            for email in to_emails
+        ],
+        "ccRecipients": [
+            {"emailAddress": {"address": email}}
+            for email in cc_emails
+        ],
+        "attachments": graph_attachments
+    }
+
+    async with httpx.AsyncClient(verify=False) as client:
+        response = await client.post(
+            f"https://graph.microsoft.com/v1.0/users/{user_email}/messages",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            },
+            json=draft_payload,
+            timeout=30.0
+        )
+        response.raise_for_status()
+        data = response.json()
+        message_id = data.get("id", "")
+        logger.info(f"✅ Graph API Response: {data}")
+        logger.info(f"✅ Draft message ID: {message_id}")
+        logger.info(f"✅ Draft created for user: {user_email}")
+        web_link = f"https://outlook.office365.com/mail/drafts"
+        return web_link
+    
+@router.get("/{defect_id}/email-recipients")
+async def get_email_recipients(
+    defect_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    control_db: AsyncSession = Depends(get_control_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        # Fetch defect with all relationships
+        result = await db.execute(
+            select(Defect)
+            .where(Defect.id == defect_id)
+            .options(
+                selectinload(Defect.images),
+                selectinload(Defect.threads).selectinload(Thread.attachments)
+            )
+        )
+        defect = result.scalar_one_or_none()
+        if not defect:
+            raise HTTPException(status_code=404, detail="Defect not found")
+
+        vessel = await control_db.get(Vessel, defect.vessel_imo)
+        vessel_name = vessel.name if vessel else defect.vessel_imo
+
+        from app.models.associations import user_vessel_link
+
+        stmt = (
+            select(User)
+            .join(user_vessel_link, User.id == user_vessel_link.c.user_id)
+            .where(user_vessel_link.c.vessel_imo == defect.vessel_imo)
+            .where(User.is_active == True)
+        )
+        users_result = await control_db.execute(stmt)
+        users = users_result.scalars().all()
+        recipients = [u.email for u in users if u.email]
+
+        # Generate SAS URLs for before/after images
+        before_images = []
+        after_images = []
+        for img in defect.images:
+            url = generate_read_sas_url(img.blob_path)
+            entry = {"file_name": img.file_name, "url": url}
+            if img.image_type == "before":
+                before_images.append(entry)
+            else:
+                after_images.append(entry)
+
+        # Generate SAS URLs for thread attachments (skip system messages)
+        thread_attachments = []
+        for thread in defect.threads:
+            if thread.is_system_message:
+                continue
+            for att in thread.attachments:
+                url = generate_read_sas_url(att.blob_path)
+                thread_attachments.append({
+                    "file_name": att.file_name,
+                    "url": url
+                })
+
+        # Build meaningful defect reference ID
+        if defect.defect_number:
+            defect_ref = defect.defect_number
+        else:
+            vessel_initials = ''.join(w[0].upper() for w in vessel_name.split() if w)[:4]
+            date_part = defect.date_identified.strftime("%Y%m%d") if defect.date_identified else defect.created_at.strftime("%Y%m%d")
+            short_uuid = str(defect.id)[:8]
+            defect_ref = f"{vessel_initials}-{date_part}-{short_uuid}"
+
+        return {
+            "recipients": recipients,
+            "vessel_email": vessel.vessel_email if vessel and vessel.vessel_email else None,
+            "defect_ref": defect_ref,
+            "defect": {
+                "id": str(defect.id),
+                "title": defect.title,
+                "vessel_name": vessel_name,
+                "vessel_imo": defect.vessel_imo,
+                "equipment_name": defect.equipment_name,
+                "defect_source": defect.defect_source.value if hasattr(defect.defect_source, "value") else str(defect.defect_source),
+                "priority": defect.priority.value if hasattr(defect.priority, "value") else str(defect.priority),
+                "status": defect.status.value if hasattr(defect.status, "value") else str(defect.status),
+                "responsibility": defect.responsibility or "N/A",
+                "description": defect.description,
+                "date_identified": defect.date_identified.strftime("%Y-%m-%d") if defect.date_identified else "N/A",
+                "target_close_date": defect.target_close_date.strftime("%Y-%m-%d") if defect.target_close_date else "N/A",
+            },
+            "attachments": {
+                "before_images": before_images,
+                "after_images": after_images,
+                "thread_attachments": thread_attachments
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[email-recipients] Failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
+@router.post("/{defect_id}/draft-email")
+async def create_email_draft(
+    defect_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    control_db: AsyncSession = Depends(get_control_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Creates an Outlook draft email with defect details and
+    actual file attachments (before/after images + thread attachments).
+    """
+    try:
+        # 1. Fetch defect with all relationships
+        result = await db.execute(
+            select(Defect)
+            .where(Defect.id == defect_id)
+            .options(
+                selectinload(Defect.images),
+                selectinload(Defect.threads).selectinload(Thread.attachments)
+            )
+        )
+        defect = result.scalar_one_or_none()
+        if not defect:
+            raise HTTPException(status_code=404, detail="Defect not found")
+
+        # 2. Get vessel name
+        vessel = await control_db.get(Vessel, defect.vessel_imo)
+        vessel_name = vessel.name if vessel else defect.vessel_imo
+        vessel_email = vessel.vessel_email if vessel and vessel.vessel_email else None
+        
+        # 3. Get recipients
+        from app.models.associations import user_vessel_link
+        stmt = (
+            select(User)
+            .join(user_vessel_link, User.id == user_vessel_link.c.user_id)
+            .where(user_vessel_link.c.vessel_imo == defect.vessel_imo)
+            .where(User.is_active == True)
+        )
+        users_result = await control_db.execute(stmt)
+        users = users_result.scalars().all()
+        recipients = [u.email for u in users if u.email]
+
+        # Use stored defect_number, fallback to generating if null (old records)
+        if defect.defect_number:
+            defect_ref = defect.defect_number
+        else:
+            vessel_initials = ''.join(w[0].upper() for w in vessel_name.split() if w)[:4]
+            date_part = defect.date_identified.strftime("%Y%m%d") if defect.date_identified else defect.created_at.strftime("%Y%m%d")
+            short_uuid = str(defect.id)[:8]
+            defect_ref = f"{vessel_initials}-{date_part}-{short_uuid}"
+
+        # 5. Build email body
+        date_identified = defect.date_identified.strftime("%Y-%m-%d") if defect.date_identified else "N/A"
+        target_close = defect.target_close_date.strftime("%Y-%m-%d") if defect.target_close_date else "N/A"
+        priority = defect.priority.value if hasattr(defect.priority, "value") else str(defect.priority)
+
+        body_text = "\n".join([
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "DEFECT REPORT — Maritime DRS",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"Vessel        : {vessel_name}",
+            f"Title         : {defect.title}",
+            f"Equipment     : {defect.equipment_name}",
+            f"Priority      : {priority}",
+            f"Identified On : {date_identified}",
+            f"Target Close  : {target_close}",
+            "",
+            "Description:",
+            defect.description,
+            "",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "Generated from Workplace Platform",
+        ])
+
+        # 5. Download blobs and build attachments list
+        attachments = []
+        MAX_ATTACH_SIZE = 3 * 1024 * 1024  # 3MB per file limit
+        total_size = 0
+        MAX_TOTAL_SIZE = 20 * 1024 * 1024  # 20MB total limit
+
+        # Before/After images
+        for img in defect.images:
+            try:
+                data = download_blob_bytes(img.blob_path)
+                if total_size + len(data) > MAX_TOTAL_SIZE:
+                    logger.warning(f"Skipping {img.file_name} — total size limit reached")
+                    continue
+                if len(data) > MAX_ATTACH_SIZE:
+                    logger.warning(f"Skipping {img.file_name} — file too large")
+                    continue
+                attachments.append({
+                    "name": f"[{img.image_type.upper()}] {img.file_name}",
+                    "content_type": "image/jpeg",
+                    "data": data
+                })
+                total_size += len(data)
+            except Exception as e:
+                logger.warning(f"Could not download image {img.file_name}: {e}")
+
+        # Thread attachments
+        for thread in defect.threads:
+            if thread.is_system_message:
+                continue
+            for att in thread.attachments:
+                try:
+                    data = download_blob_bytes(att.blob_path)
+                    if total_size + len(data) > MAX_TOTAL_SIZE:
+                        logger.warning(f"Skipping {att.file_name} — total size limit reached")
+                        continue
+                    if len(data) > MAX_ATTACH_SIZE:
+                        logger.warning(f"Skipping {att.file_name} — file too large")
+                        continue
+                    attachments.append({
+                        "name": att.file_name,
+                        "content_type": att.content_type or "application/octet-stream",
+                        "data": data
+                    })
+                    total_size += len(data)
+                except Exception as e:
+                    logger.warning(f"Could not download attachment {att.file_name}: {e}")
+
+        # 6. Create Outlook draft via Graph API
+        subject = f"Defect Raised - {defect_ref} | [{vessel_name}] {defect.title}"
+        web_link = await create_outlook_draft(
+            # user_email=current_user.email,
+            user_email="techdevops@ozellar.com",
+            to_emails=recipients,
+            cc_emails=[vessel_email] if vessel_email else [],
+            subject=subject,
+            body_text=body_text,
+            attachments=attachments
+        )
+
+        return {
+            "success": True,
+            "web_link": web_link,
+            "attachment_count": len(attachments)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[draft-email] Failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to create draft: {str(e)}")
+    
 def get_image_data(blob_path):
     """
     Downloads blob, resizes to fit strictly within 180x180px thumbnail.
