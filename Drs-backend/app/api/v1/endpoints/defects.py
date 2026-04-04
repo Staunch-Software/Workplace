@@ -113,11 +113,11 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 # Standard equipment list (shared by both import templates as "Area of Concern" dropdown)
 EQUIPMENT_OPTIONS = [
-    "Hull", "Deck", "Ship Access", "Deck Machineries", "Cargo System",
-    "Radio and Navigation", "Ballast and Fuel Tanks", "Paint Store Workshop",
-    "Accommodation Superstructure", "Engine Room", "Emergency Machineries",
-    "Life Saving Appliance", "Fire Fighting Appliance", "Pollution Prevention",
-    "PMS", "Energy Management", "Elevator", "MLC QHSE", "Security", "Crew Interaction",
+    "HULL", "DECK", "SHIP ACCESS", "DECK MACHINERIES", "CARGO SYSTEM",
+    "RADIO AND NAVIGATION", "BALLAST AND FUEL TANKS", "PAINT STORE WORKSHOP",
+    "ACCOMMODATION SUPERSTRUCTURE", "ENGINE ROOM", "EMERGENCY MACHINERIES",
+    "LIFE SAVING APPLIANCE", "FIRE FIGHTING APPLIANCE", "POLLUTION PREVENTION",
+    "PMS", "ENERGY MANAGEMENT", "ELEVATOR", "MLC QHSE", "SECURITY", "CREW INTERACTION",
 ]
 
 
@@ -977,7 +977,7 @@ async def import_defects(
                 if validation_errors:
                     raise ValueError(" | ".join(validation_errors))
 
-                equip_str = str(row_data["Area of Concern"]).strip()
+                equip_str = str(row_data["Area of Concern"]).strip().title()
                 desc_str = str(row_data["Description"]).strip()
 
                 dup_res = await db.execute(
@@ -1024,6 +1024,8 @@ async def import_defects(
                     updated_at=datetime.utcnow(),
                     is_flagged=is_flagged_val,
                     is_dd=is_dd_val,
+                    closed_at=date_dl if status_enum == DefectStatus.CLOSED and date_dl else (date_id if status_enum == DefectStatus.CLOSED else None),
+                    closed_by_id=current_user.id if status_enum == DefectStatus.CLOSED else None,
                 )   
                 
                 defects_to_insert.append(new_defect)

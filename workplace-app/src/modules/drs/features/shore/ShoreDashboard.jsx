@@ -125,7 +125,7 @@ const useColumnResize = (setColumnWidths) => {
 
 // ✅ FIXED: ThreadSection with corrected internal mention filtering
 
-const ThreadSection = ({ defectId, defectStatus, closureRemarks, initialChatMode = 'external' }) => {
+const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, closedById, initialChatMode = 'external' }) => {
   const { user } = useAuth();
   const ALLOWED_DELETE_EMAILS = ['gauravsingh.r@ozellar.com']; // ← add whitelisted emails here
   const canDelete = ALLOWED_DELETE_EMAILS.includes(user?.email);
@@ -161,13 +161,27 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, initialChatMode
 
     // ✅ Only inject if closed
     if (defectStatus === 'CLOSED') {
-      filtered.push({
-        id: 'system-closure-marker',
-        is_system_message: true,
-        is_closure_remarks: true, // Custom flag for styling
-        body: closureRemarks || 'No remarks provided.',
-        created_at: new Date().toISOString()
-      });
+      const hasProperClosure = closedById && closureRemarks;
+
+      if (hasProperClosure) {
+        // Full closure — show green remark block
+        filtered.push({
+          id: 'system-closure-marker',
+          is_system_message: true,
+          is_closure_remarks: true,
+          body: closureRemarks,
+          created_at: closedAt || new Date().toISOString()
+        });
+      } else {
+        // Legacy/imported defect — no closed_by_id or remarks, show plain pill
+        filtered.push({
+          id: 'system-closure-marker',
+          is_system_message: true,
+          is_closure_remarks: false,
+          body: 'Defect Closed via Import',
+          created_at: closedAt || new Date().toISOString()
+        });
+      }
     }
 
     return filtered;
@@ -1915,104 +1929,115 @@ const ShoreDashboard = () => {
     });
 
     /* 🔽 SORTING LOGIC (SINGLE COLUMN AT A TIME) */
-    if (filters.date_identified_sort) {
+    // ─── UNIFIED SORT (flag is permanent secondary on all non-flag columns) ───
+    const hasExplicitSort =
+      filters.text_sort?.field ||
+      filters.date_identified_sort ||
+      filters.target_close_date_sort;
+
+    if (!hasExplicitSort) {
+      // Default: flagged to top, then newest date
       data.sort((a, b) => {
-        const da = a.date_identified ? new Date(a.date_identified) : null;
-        const db = b.date_identified ? new Date(b.date_identified) : null;
-        if (!da || !db) return 0;
-        return filters.date_identified_sort === 'asc'
-          ? da - db
-          : db - da;
+        const flagDiff = (b.is_flagged ? 1 : 0) - (a.is_flagged ? 1 : 0);
+        if (flagDiff !== 0) return flagDiff;
+        const da = a.date_identified ? new Date(a.date_identified) : new Date(0);
+        const db = b.date_identified ? new Date(b.date_identified) : new Date(0);
+        return db - da;
       });
-    }
 
-
-    if (filters.target_close_date_sort) {
+    } else if (filters.text_sort?.field === 'flag') {
+      // Flag column: pure flag sort, date as tiebreaker
       data.sort((a, b) => {
-        const da = a.target_close_date ? new Date(a.target_close_date) : null;
-        const db = b.target_close_date ? new Date(b.target_close_date) : null;
-        if (!da || !db) return 0;
-        return filters.target_close_date_sort === 'asc'
-          ? da - db
-          : db - da;
+        const bA = a.is_flagged ? 1 : 0;
+        const bB = b.is_flagged ? 1 : 0;
+        if (bA !== bB) return filters.text_sort.dir === 'asc' ? bA - bB : bB - bA;
+        const da = a.date_identified ? new Date(a.date_identified) : new Date(0);
+        const db = b.date_identified ? new Date(b.date_identified) : new Date(0);
+        return db - da;
       });
-    }
 
-    // Inside useMemo(() => { ... }, [defects, filters, isEditMode])
-    if (filters.text_sort?.field) {
-      const { field, dir } = filters.text_sort;
-      const fieldMap = {
-        vessel: 'vessel_name',
-        equipment: 'equipment_name',
-        source: 'defect_source',
-        description: 'description',
-        date_identified: 'date_identified',
-        target_close_date: 'target_close_date',
-        priority: 'priority',
-        status: 'status',
-        deadline_icon: 'target_close_date',
-        owner: 'is_owner',
-        flag: 'is_flagged',
-        dd: 'is_dd',
-      };
+    } else {
+      // All other columns: flag floats within each sorted group
+      const primarySort = (() => {
+        if (filters.date_identified_sort) {
+          return (a, b) => {
+            const da = a.date_identified ? new Date(a.date_identified) : null;
+            const db = b.date_identified ? new Date(b.date_identified) : null;
+            if (!da || !db) return 0;
+            return filters.date_identified_sort === 'asc' ? da - db : db - da;
+          };
+        }
+        if (filters.target_close_date_sort) {
+          return (a, b) => {
+            const da = a.target_close_date ? new Date(a.target_close_date) : null;
+            const db = b.target_close_date ? new Date(b.target_close_date) : null;
+            if (!da || !db) return 0;
+            return filters.target_close_date_sort === 'asc' ? da - db : db - da;
+          };
+        }
 
-      const key = fieldMap[field];
-      if (key) {
-        data.sort((a, b) => {
-          let valA = a[key];
-          let valB = b[key];
+        const { field, dir } = filters.text_sort;
+        const fieldMap = {
+          vessel: 'vessel_name',
+          equipment: 'equipment_name',
+          source: 'defect_source',
+          description: 'description',
+          date_identified: 'date_identified',
+          target_close_date: 'target_close_date',
+          priority: 'priority',
+          status: 'status',
+          deadline_icon: 'target_close_date',
+          owner: 'is_owner',
+          dd: 'is_dd',
+        };
 
-          // 1. Priority (Logical: Critical -> High -> Medium -> Low)
+        return (a, b) => {
+          const key = fieldMap[field];
+          const valA = a[key];
+          const valB = b[key];
+
           if (field === 'priority') {
-            const weights = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-            const wA = weights[String(valA).toUpperCase()] ?? 99;
-            const wB = weights[String(valB).toUpperCase()] ?? 99;
+            const w = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+            const wA = w[String(valA).toUpperCase()] ?? 99;
+            const wB = w[String(valB).toUpperCase()] ?? 99;
             return dir === 'asc' ? wA - wB : wB - wA;
           }
-
-          // 2. Status (Workflow: Open -> Pending -> Closed)
-          // ✅ ADDED THIS BLOCK
           if (field === 'status') {
-            const statusWeights = { 'OPEN': 0, 'PENDING_CLOSURE': 1, 'CLOSED': 2 };
-            const wA = statusWeights[String(valA).toUpperCase()] ?? 99;
-            const wB = statusWeights[String(valB).toUpperCase()] ?? 99;
-            return dir === 'asc' ? wA - wB : wB - wA;
+            const w = { OPEN: 0, PENDING_CLOSURE: 1, CLOSED: 2 };
+            return dir === 'asc'
+              ? (w[valA] ?? 99) - (w[valB] ?? 99)
+              : (w[valB] ?? 99) - (w[valA] ?? 99);
           }
-
-          // 3. Owner (Boolean: Yes -> No)
           if (field === 'owner') {
-            const bA = valA ? 1 : 0;
-            const bB = valB ? 1 : 0;
-            // Descending puts "Your" items (1) at the top
-            return dir === 'asc' ? bA - bB : bB - bA;
+            return dir === 'asc'
+              ? (valA ? 1 : 0) - (valB ? 1 : 0)
+              : (valB ? 1 : 0) - (valA ? 1 : 0);
           }
-
-          if (field === 'flag' || field === 'dd') {
-            const bA = !!valA ? 1 : 0;
-            const bB = !!valB ? 1 : 0;
-            // desc = DD active (1) floats to top
-            return dir === 'asc' ? bA - bB : bB - bA;
+          if (field === 'dd') {
+            return dir === 'asc'
+              ? (valA ? 1 : 0) - (valB ? 1 : 0)
+              : (valB ? 1 : 0) - (valA ? 1 : 0);
           }
-
-          // 4. Dates (Report Date, Deadline, Deadline Icon)
           if (['date_identified', 'target_close_date', 'deadline_icon'].includes(field)) {
             const dA = valA ? new Date(valA).getTime() : 0;
             const dB = valB ? new Date(valB).getTime() : 0;
             return dir === 'asc' ? dA - dB : dB - dA;
           }
-
-          // 5. Standard String Sort (Vessel, Equipment, Source, Description)
+          // Default: string sort
           const strA = String(valA || '').toLowerCase();
           const strB = String(valB || '').toLowerCase();
           return dir === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
-        });
-      }
+        };
+      })();
+
+      data.sort((a, b) => {
+        const primaryResult = primarySort(a, b);
+        if (primaryResult !== 0) return primaryResult;
+        // 🚩 Flagged rows rise within same primary-sort group
+        return (b.is_flagged ? 1 : 0) - (a.is_flagged ? 1 : 0);
+      });
     }
-    // ✅ Always float flagged defects to top (unless user is actively sorting by something else)
-    // Float flagged to top only when no explicit sort is active AND no DD/flag filter is applied
-    if (!filters.text_sort?.field && !filters.date_identified_sort && !filters.target_close_date_sort) {
-      data.sort((a, b) => (!!b.is_flagged ? 1 : 0) - (!!a.is_flagged ? 1 : 0));
-    }
+    // ─── END UNIFIED SORT ───
     return data;
   }, [defects, filters, isEditMode]);
 
@@ -2282,13 +2307,12 @@ const ShoreDashboard = () => {
   const handleTextSort = (field) => {
     setFilters(prev => {
       const current = prev.text_sort;
-      const booleanColumns = ['flag', 'dd', 'owner'];
-      const defaultDir = booleanColumns.includes(field) ? 'desc' : 'asc';
+
       const nextDir = current.field === field
-        ? current.dir === 'desc' ? 'asc'
-          : current.dir === 'asc' ? null
-            : 'desc'
-        : defaultDir;
+        ? current.dir === 'asc' ? 'desc'
+          : current.dir === 'desc' ? null
+            : 'asc'
+        : 'asc';
 
       return {
         ...prev,
@@ -2300,7 +2324,6 @@ const ShoreDashboard = () => {
       };
     });
   };
-
   // Inside ShoreDashboard component, add these hooks:
   const [showCreateRow, setShowCreateRow] = useState(false);
   const [showPrSync, setShowPrSync] = useState(false);
@@ -3693,6 +3716,8 @@ const ShoreDashboard = () => {
                                     defectId={defect.id}
                                     defectStatus={defect.status}
                                     closureRemarks={defect.closure_remarks}
+                                    closedAt={defect.closed_at || defect.updated_at}
+                                    closedById={defect.closed_by_id}
                                     initialChatMode={autoChatModes[defect.id] || 'external'}
                                   />
                                   {/* ✅ RIGHT COLUMN: Evidence & Requirements */}
