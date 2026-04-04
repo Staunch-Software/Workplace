@@ -10,7 +10,7 @@ import {
 import { Image as ImageIcon, Eye, Upload } from 'lucide-react';
 import ColumnCustomizationModal from '@drs/components/modals/ColumnCustomizationModal';
 import ShoreClosureModal from '@drs/components/modals/ShoreClosureModal';
-import PrSyncManager from '@drs/components/shared/PrSyncManager';
+// import PrSyncManager from '@drs/components/shared/PrSyncManager';
 
 import { defectApi } from '@drs/services/defectApi';
 import { blobUploadService } from '@drs/services/blobUploadService';
@@ -125,7 +125,7 @@ const useColumnResize = (setColumnWidths) => {
 
 // ✅ FIXED: ThreadSection with corrected internal mention filtering
 
-const ThreadSection = ({ defectId, defectStatus, closureRemarks, initialChatMode = 'external' }) => {
+const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, closedById, initialChatMode = 'external' }) => {
   const { user } = useAuth();
   const ALLOWED_DELETE_EMAILS = ['gauravsingh.r@ozellar.com']; // ← add whitelisted emails here
   const canDelete = ALLOWED_DELETE_EMAILS.includes(user?.email);
@@ -153,14 +153,35 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, initialChatMode
 
   // ✅ UPDATED: Robust filtering in ThreadSection
   const threads = useMemo(() => {
-    // Ensure allThreads is treated as an array
-    const safeThreads = Array.isArray(allThreads) ? allThreads : [];
+    const safeThreads = Array.isArray(allThreads) ? [...allThreads] : [];
 
-    if (chatMode === 'internal') {
-      return safeThreads.filter(t => t.is_internal === true);
+    let filtered = chatMode === 'internal'
+      ? safeThreads.filter(t => t.is_internal === true)
+      : safeThreads.filter(t => t.is_internal !== true);
+
+    // ✅ Only inject if closed
+    if (defectStatus === 'CLOSED') {
+      if (closureRemarks) {
+        filtered.push({
+          id: 'system-closure-marker',
+          is_system_message: true,
+          is_closure_remarks: true,
+          body: closureRemarks,
+          created_at: closedAt || new Date().toISOString()
+        });
+      } else {
+        filtered.push({
+          id: 'system-closure-marker',
+          is_system_message: true,
+          is_closure_remarks: false,
+          body: 'Defect Closed via Import',
+          created_at: closedAt || new Date().toISOString()
+        });
+      }
     }
-    return safeThreads.filter(t => t.is_internal !== true);
-  }, [allThreads, chatMode]);
+
+    return filtered;
+  }, [allThreads, chatMode, defectStatus, closureRemarks]);
 
   const { data: vesselUsers = [] } = useQuery({
     queryKey: ['vessel-users', defectId],
@@ -395,6 +416,39 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, initialChatMode
         ) : (
           threads.map(t => {
             if (t.is_system_message) {
+              // ✅ NEW: Layout for Closure Remarks specifically
+              if (t.is_closure_remarks) {
+                return (
+                  <div key={t.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '25px 0' }}>
+                    <div style={{
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '12px',
+                      padding: '12px 20px',
+                      maxWidth: '85%',
+                      textAlign: 'center',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                    }}>
+                      <div style={{ color: '#15803d', fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.05em' }}>
+                        Closure Remark
+                      </div>
+                      <div style={{
+                        color: '#44403c',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        lineHeight: '1.5',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'anywhere'
+                      }}>
+                        {t.body}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              // ✅ OLD UI: Remains exactly as it was for standard system messages
               return (
                 <div key={t.id} style={{ textAlign: 'center', margin: '15px 0' }}>
                   <span style={{
@@ -1871,106 +1925,115 @@ const ShoreDashboard = () => {
     });
 
     /* 🔽 SORTING LOGIC (SINGLE COLUMN AT A TIME) */
-    if (filters.date_identified_sort) {
+    // ─── UNIFIED SORT (flag is permanent secondary on all non-flag columns) ───
+    const hasExplicitSort =
+      filters.text_sort?.field ||
+      filters.date_identified_sort ||
+      filters.target_close_date_sort;
+
+    if (!hasExplicitSort) {
+      // Default: flagged to top, then newest date
       data.sort((a, b) => {
-        const da = a.date_identified ? new Date(a.date_identified) : null;
-        const db = b.date_identified ? new Date(b.date_identified) : null;
-        if (!da || !db) return 0;
-        return filters.date_identified_sort === 'asc'
-          ? da - db
-          : db - da;
+        const flagDiff = (b.is_flagged ? 1 : 0) - (a.is_flagged ? 1 : 0);
+        if (flagDiff !== 0) return flagDiff;
+        const da = a.date_identified ? new Date(a.date_identified) : new Date(0);
+        const db = b.date_identified ? new Date(b.date_identified) : new Date(0);
+        return db - da;
       });
-    }
 
-
-    if (filters.target_close_date_sort) {
+    } else if (filters.text_sort?.field === 'flag') {
+      // Flag column: pure flag sort, date as tiebreaker
       data.sort((a, b) => {
-        const da = a.target_close_date ? new Date(a.target_close_date) : null;
-        const db = b.target_close_date ? new Date(b.target_close_date) : null;
-        if (!da || !db) return 0;
-        return filters.target_close_date_sort === 'asc'
-          ? da - db
-          : db - da;
+        const bA = a.is_flagged ? 1 : 0;
+        const bB = b.is_flagged ? 1 : 0;
+        if (bA !== bB) return filters.text_sort.dir === 'asc' ? bA - bB : bB - bA;
+        const da = a.date_identified ? new Date(a.date_identified) : new Date(0);
+        const db = b.date_identified ? new Date(b.date_identified) : new Date(0);
+        return db - da;
       });
-    }
 
-    // Inside useMemo(() => { ... }, [defects, filters, isEditMode])
-    if (filters.text_sort?.field) {
-      const { field, dir } = filters.text_sort;
-      const fieldMap = {
-        vessel: 'vessel_name',
-        equipment: 'equipment_name',
-        source: 'defect_source',
-        description: 'description',
-        date_identified: 'date_identified',
-        target_close_date: 'target_close_date',
-        priority: 'priority',
-        status: 'status',
-        deadline_icon: 'target_close_date',
-        owner: 'is_owner',
-        flag: 'is_flagged',
-        dd: 'is_dd',
-      };
+    } else {
+      // All other columns: flag floats within each sorted group
+      const primarySort = (() => {
+        if (filters.date_identified_sort) {
+          return (a, b) => {
+            const da = a.date_identified ? new Date(a.date_identified) : null;
+            const db = b.date_identified ? new Date(b.date_identified) : null;
+            if (!da || !db) return 0;
+            return filters.date_identified_sort === 'asc' ? da - db : db - da;
+          };
+        }
+        if (filters.target_close_date_sort) {
+          return (a, b) => {
+            const da = a.target_close_date ? new Date(a.target_close_date) : null;
+            const db = b.target_close_date ? new Date(b.target_close_date) : null;
+            if (!da || !db) return 0;
+            return filters.target_close_date_sort === 'asc' ? da - db : db - da;
+          };
+        }
 
-      const key = fieldMap[field];
-      if (key) {
-        data.sort((a, b) => {
-          let valA = a[key];
-          let valB = b[key];
+        const { field, dir } = filters.text_sort;
+        const fieldMap = {
+          vessel: 'vessel_name',
+          equipment: 'equipment_name',
+          source: 'defect_source',
+          description: 'description',
+          date_identified: 'date_identified',
+          target_close_date: 'target_close_date',
+          priority: 'priority',
+          status: 'status',
+          deadline_icon: 'target_close_date',
+          owner: 'is_owner',
+          dd: 'is_dd',
+        };
 
-          // 1. Priority (Logical: Critical -> High -> Medium -> Low)
+        return (a, b) => {
+          const key = fieldMap[field];
+          const valA = a[key];
+          const valB = b[key];
+
           if (field === 'priority') {
-            const weights = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-            const wA = weights[String(valA).toUpperCase()] ?? 99;
-            const wB = weights[String(valB).toUpperCase()] ?? 99;
+            const w = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+            const wA = w[String(valA).toUpperCase()] ?? 99;
+            const wB = w[String(valB).toUpperCase()] ?? 99;
             return dir === 'asc' ? wA - wB : wB - wA;
           }
-
-          // 2. Status (Workflow: Open -> Pending -> Closed)
-          // ✅ ADDED THIS BLOCK
           if (field === 'status') {
-            const statusWeights = { 'OPEN': 0, 'PENDING_CLOSURE': 1, 'CLOSED': 2 };
-            const wA = statusWeights[String(valA).toUpperCase()] ?? 99;
-            const wB = statusWeights[String(valB).toUpperCase()] ?? 99;
-            return dir === 'asc' ? wA - wB : wB - wA;
+            const w = { OPEN: 0, PENDING_CLOSURE: 1, CLOSED: 2 };
+            return dir === 'asc'
+              ? (w[valA] ?? 99) - (w[valB] ?? 99)
+              : (w[valB] ?? 99) - (w[valA] ?? 99);
           }
-
-          // 3. Owner (Boolean: Yes -> No)
           if (field === 'owner') {
-            const bA = valA ? 1 : 0;
-            const bB = valB ? 1 : 0;
-            // Descending puts "Your" items (1) at the top
-            return dir === 'asc' ? bA - bB : bB - bA;
+            return dir === 'asc'
+              ? (valA ? 1 : 0) - (valB ? 1 : 0)
+              : (valB ? 1 : 0) - (valA ? 1 : 0);
           }
-
-          if (field === 'flag' || field === 'dd') {
-            const bA = valA ? 1 : 0;
-            const bB = valB ? 1 : 0;
-            return dir === 'asc' ? bA - bB : bB - bA;
+          if (field === 'dd') {
+            return dir === 'asc'
+              ? (valA ? 1 : 0) - (valB ? 1 : 0)
+              : (valB ? 1 : 0) - (valA ? 1 : 0);
           }
-
-          // 4. Dates (Report Date, Deadline, Deadline Icon)
           if (['date_identified', 'target_close_date', 'deadline_icon'].includes(field)) {
             const dA = valA ? new Date(valA).getTime() : 0;
             const dB = valB ? new Date(valB).getTime() : 0;
             return dir === 'asc' ? dA - dB : dB - dA;
           }
-
-          // 5. Standard String Sort (Vessel, Equipment, Source, Description)
+          // Default: string sort
           const strA = String(valA || '').toLowerCase();
           const strB = String(valB || '').toLowerCase();
           return dir === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
-        });
-      }
-    }
-    // ✅ Always float flagged defects to top (unless user is actively sorting by something else)
-    // Float flagged to top only when no explicit sort is active AND no DD/flag filter is applied
-    if (!filters.text_sort?.field && !filters.date_identified_sort && !filters.target_close_date_sort) {
+        };
+      })();
+
       data.sort((a, b) => {
-        if (b.is_flagged !== a.is_flagged) return (b.is_flagged ? 1 : 0) - (a.is_flagged ? 1 : 0);
-        return 0; // preserve existing order for non-flagged items
+        const primaryResult = primarySort(a, b);
+        if (primaryResult !== 0) return primaryResult;
+        // 🚩 Flagged rows rise within same primary-sort group
+        return (b.is_flagged ? 1 : 0) - (a.is_flagged ? 1 : 0);
       });
     }
+    // ─── END UNIFIED SORT ───
     return data;
   }, [defects, filters, isEditMode]);
 
@@ -2240,6 +2303,7 @@ const ShoreDashboard = () => {
   const handleTextSort = (field) => {
     setFilters(prev => {
       const current = prev.text_sort;
+
       const nextDir = current.field === field
         ? current.dir === 'asc' ? 'desc'
           : current.dir === 'desc' ? null
@@ -2256,7 +2320,6 @@ const ShoreDashboard = () => {
       };
     });
   };
-
   // Inside ShoreDashboard component, add these hooks:
   const [showCreateRow, setShowCreateRow] = useState(false);
   const [showPrSync, setShowPrSync] = useState(false);
@@ -2704,7 +2767,7 @@ const ShoreDashboard = () => {
                     <th style={{ width: 20 }}>
                       <EquipmentFilter
                         label="Vessel"
-                        options={VESSEL_OPTIONS}
+                        options={vessels.map(v => v.name)}
                         selectedValues={filters.vessel}
                         onChange={(vals) =>
                           setFilters(prev => ({ ...prev, vessel: vals }))
@@ -3648,6 +3711,8 @@ const ShoreDashboard = () => {
                                     defectId={defect.id}
                                     defectStatus={defect.status}
                                     closureRemarks={defect.closure_remarks}
+                                    closedAt={defect.closed_at || defect.updated_at}
+                                    closedById={defect.closed_by_id}
                                     initialChatMode={autoChatModes[defect.id] || 'external'}
                                   />
                                   {/* ✅ RIGHT COLUMN: Evidence & Requirements */}

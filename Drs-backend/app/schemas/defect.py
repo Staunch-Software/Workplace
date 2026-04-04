@@ -127,6 +127,7 @@ class DefectResponse(BaseModel):
     
     created_at: datetime
     updated_at: Optional[datetime] = None
+    closed_at: Optional[datetime] = None
     closure_remarks: Optional[str] = None
     closure_image_before: Optional[str] = None
     closure_image_after: Optional[str] = None

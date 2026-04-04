@@ -57,7 +57,7 @@ async def create_user(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
                 "status",
                 "deadline_icon",
                 "chat",
-                "pr_details"
+                "pr_details",
             ]
         }
     )
@@ -289,6 +289,7 @@ async def get_live_feed(
                 "priority": feed.defect.priority.value if feed.defect and hasattr(feed.defect.priority, "value") else (feed.defect.priority if feed.defect else None),
                 "description": feed.defect.description if feed.defect else None,
                 "equipment_name": feed.defect.equipment_name if feed.defect else None,
+                "closure_remark": feed.defect.closure_remarks if feed.defect else None,
                 "defect_source": feed.defect.defect_source.value if feed.defect and hasattr(feed.defect.defect_source, "value") else (feed.defect.defect_source if feed.defect else None),
             } if feed.defect else None,
         }

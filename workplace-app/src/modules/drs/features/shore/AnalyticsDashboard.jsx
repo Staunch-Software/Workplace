@@ -1,6 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Ship, RefreshCcw, ChevronDown, X, Check, Flag, TrendingUp } from 'lucide-react';
+import {
+    Ship, RefreshCcw, ChevronDown, X, Check, Flag, TrendingUp,
+    BarChart2, Globe
+} from 'lucide-react';
 import { defectApi } from '@drs/services/defectApi';
 import { useAuth } from '@/context/AuthContext';
 import { getDeadlineStatus } from '@drs/components/shared/constants';
@@ -144,7 +147,7 @@ function VesselMultiSelector({ vessels, selected, onChange }) {
 
             {open && (
                 <div style={{
-                    position: 'absolute', top: '110%', left: 0, zIndex: 300,
+                    position: 'absolute', top: '110%', left: 0, zIndex: 999,
                     background: 'white', border: '1px solid #e2e8f0',
                     borderRadius: '8px', boxShadow: '0 4px 20px rgba(0,0,0,.12)',
                     minWidth: 240, maxHeight: 300, overflowY: 'auto',
@@ -269,7 +272,7 @@ function FlaggedDefectsPanel({ defects }) {
     const GRID_TEMPLATE = "40px 90px 180px 110px 130px 1fr 90px 100px";
 
     return (
-        <div style={{ marginBottom: 24, border: '1px solid #fca5a5', borderRadius: 12, overflow: 'hidden', background: '#fff', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+        <div style={{ marginBottom: 16, border: '1px solid #fca5a5', borderRadius: 12, overflow: 'hidden', background: '#fff', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: '#fff5f5', borderBottom: '1px solid #fca5a5' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                     <div style={{ width: 40, height: 40, borderRadius: 10, background: '#E24B4A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -348,7 +351,6 @@ function buildTrendData(defects, selectedDays) {
     const now = new Date();
     const startDate = new Date(now.getTime() - selectedDays * 24 * 60 * 60 * 1000);
 
-    // Updated grouping thresholds
     let grouping;
     if (selectedDays <= 2) grouping = 'hourly';
     else if (selectedDays <= 30) grouping = 'daily';
@@ -362,7 +364,6 @@ function buildTrendData(defects, selectedDays) {
         for (let i = 0; i < totalHours; i++) {
             const start = new Date(startDate.getTime() + i * 60 * 60 * 1000);
             const end = new Date(start.getTime() + 60 * 60 * 1000);
-            // Label: "01 Mar 10" (DD Mon HH)
             const day = start.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
             const hour = start.getHours().toString().padStart(2, '0');
             buckets.push({ label: `${day} ${hour}`, start, end, created: 0, closed: 0 });
@@ -374,11 +375,9 @@ function buildTrendData(defects, selectedDays) {
             start.setDate(start.getDate() + i);
             const end = new Date(start);
             end.setDate(end.getDate() + 1);
-            // Label: "01 Mar"
             buckets.push({
                 label: start.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
                 start, end, created: 0, closed: 0,
-                // Store month boundary info for separator lines
                 isMonthStart: start.getDate() === 1,
                 dayIndex: i,
             });
@@ -391,7 +390,6 @@ function buildTrendData(defects, selectedDays) {
             start.setDate(start.getDate() + i * 7);
             const end = new Date(start);
             end.setDate(end.getDate() + 7);
-            // Label: "01 Mar" (week start date)
             buckets.push({
                 label: start.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
                 start, end, created: 0, closed: 0,
@@ -407,7 +405,6 @@ function buildTrendData(defects, selectedDays) {
             start.setMonth(start.getMonth() + i);
             const end = new Date(start);
             end.setMonth(end.getMonth() + 1);
-            // Label: "Mar 25"
             buckets.push({
                 label: start.toLocaleString('default', { month: 'short', year: '2-digit' }),
                 start, end, created: 0, closed: 0,
@@ -425,8 +422,8 @@ function buildTrendData(defects, selectedDays) {
                 if (b) b.created++;
             }
         }
-        if (d.status === 'CLOSED' && d.updated_at) {
-            const dt = new Date(d.updated_at);
+        if (d.status === 'CLOSED' && d.closed_at) {
+            const dt = new Date(d.closed_at);
             if (dt >= startDate && dt <= now) {
                 const b = buckets.find(b => dt >= b.start && dt < b.end);
                 if (b) b.closed++;
@@ -439,10 +436,10 @@ function buildTrendData(defects, selectedDays) {
         createdCounts: buckets.map(b => b.created),
         closedCounts: buckets.map(b => b.closed),
         grouping,
-        buckets, // pass full bucket metadata for separator logic
+        buckets,
     };
 }
-// ─── Readable range label ─────────────────────────────────────────────────────
+
 function rangeLabel(days) {
     if (days === 1) return '1 day';
     if (days < 7) return `${days} days`;
@@ -452,13 +449,100 @@ function rangeLabel(days) {
     return `${(days / 365).toFixed(1)} yrs`;
 }
 
+// ─── Collapsible Section Card ─────────────────────────────────────────────────
+function SectionCard({ title, subtitle, icon, accentColor, bgColor, borderColor, defaultOpen = true, headerRight, children, isOpen: isOpenProp, onToggle }) {
+    const [isOpenLocal, setIsOpenLocal] = useState(defaultOpen);
+    const isOpen = isOpenProp !== undefined ? isOpenProp : isOpenLocal;
+
+    const handleToggle = () => {
+        const next = !isOpen;
+        if (onToggle) {
+            onToggle(next);
+        } else {
+            setIsOpenLocal(next);
+        }
+    };
+
+    return (
+        <div style={{
+            border: `1px solid ${borderColor}`,
+            borderRadius: 14,
+            overflow: 'visible',
+            background: '#fff',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+            marginBottom: 20,
+        }}>
+            <div
+                onClick={handleToggle}
+                style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '14px 20px',
+                    background: bgColor,
+                    borderBottom: isOpen ? `1px solid ${borderColor}` : 'none',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    overflow: 'visible',
+                }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                        width: 36, height: 36, borderRadius: 9,
+                        background: accentColor,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0,
+                    }}>
+                        {icon}
+                    </div>
+                    <div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: '#1e293b', lineHeight: 1.2 }}>{title}</div>
+                        {subtitle && <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{subtitle}</div>}
+                    </div>
+                </div>
+
+                {/* RIGHT SIDE — stopPropagation so headerRight clicks don't toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {headerRight && (
+                        <div onClick={e => e.stopPropagation()}>
+                            {headerRight}
+                        </div>
+                    )}
+                    <div
+                        style={{
+                            width: 28, height: 28, borderRadius: 7,
+                            background: isOpen ? accentColor + '22' : '#f1f5f9',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0,
+                            transition: 'background 0.2s',
+                        }}
+                    >
+                        <ChevronDown
+                            size={16}
+                            color={isOpen ? accentColor : '#94a3b8'}
+                            style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {isOpen && (
+                <div style={{ padding: 20, overflow: 'visible' }}>
+                    {children}
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 const AnalyticsDashboard = () => {
     const { user } = useAuth();
     const [selectedVessels, setSelectedVessels] = useState([]);
-    const [selectedDays, setSelectedDays] = useState(180);  // ← NEW
+    const [selectedDays, setSelectedDays] = useState(180);
     const chartRefs = useRef({});
-
+    const [vesselChartMode, setVesselChartMode] = useState('status');
+    const [activeSection, setActiveSection] = useState(null);
+    const [vesselActivityDays, setVesselActivityDays] = useState(30);
+    const [expandedActivityVessel, setExpandedActivityVessel] = useState(null);
     const { data: allDefects = [], isLoading, refetch } = useQuery({
         queryKey: ['defects', 'analytics'],
         queryFn: () => defectApi.getDefects(),
@@ -474,14 +558,18 @@ const AnalyticsDashboard = () => {
         [...new Set(allDefects.map(d => d.vessel_name).filter(Boolean))].sort(),
         [allDefects]);
 
-    const defects = useMemo(() => {
+    // Fleet analytics: all defects (user-assigned, no vessel filter)
+    const fleetDefects = allDefects;
+
+    // Vessel analytics: filtered by selected vessels
+    const vesselFilteredDefects = useMemo(() => {
         if (selectedVessels.length === 0) return allDefects;
         return allDefects.filter(d => selectedVessels.includes(d.vessel_name));
     }, [allDefects, selectedVessels]);
 
-    const isFiltered = selectedVessels.length > 0;
-
-    const stats = useMemo(() => {
+    // ── Fleet stats (no filter) ──
+    const fleetStats = useMemo(() => {
+        const defects = fleetDefects;
         const total = defects.length;
         const open = defects.filter(d => d.status === 'OPEN').length;
         const closed = defects.filter(d => d.status === 'CLOSED').length;
@@ -501,32 +589,45 @@ const AnalyticsDashboard = () => {
             d.status !== 'CLOSED' && getDeadlineStatus(d.target_close_date) === 'NORMAL'
         ).length;
         return { total, open, closed, pending, critical, high, medium, low, overdue, warning, onTrack };
-    }, [defects]);
+    }, [fleetDefects]);
+
+    // ── Vessel analytics stats (with filter) ──
+    const vesselStats = useMemo(() => {
+        const defects = vesselFilteredDefects;
+        const total = defects.length;
+        const open = defects.filter(d => d.status === 'OPEN').length;
+        const closed = defects.filter(d => d.status === 'CLOSED').length;
+        const pending = defects.filter(d => d.status === 'PENDING_CLOSURE').length;
+        const overdue = defects.filter(d =>
+            getDeadlineStatus(d.target_close_date) === 'OVERDUE' &&
+            d.status !== 'CLOSED' && d.status !== 'PENDING_CLOSURE'
+        ).length;
+        return { total, open, closed, pending, overdue };
+    }, [vesselFilteredDefects]);
 
     const vesselData = useMemo(() => {
-        const source = isFiltered
-            ? allDefects.filter(d => selectedVessels.includes(d.vessel_name))
-            : allDefects;
+        const source = vesselFilteredDefects;
         const map = {};
         source.forEach(d => {
             const name = d.vessel_name || 'Unknown';
-            if (!map[name]) map[name] = { name, total: 0, open: 0, closed: 0, pending: 0, critical: 0, overdue: 0 };
+            if (!map[name]) map[name] = { name, total: 0, open: 0, closed: 0, pending: 0, critical: 0, high: 0, medium: 0, low: 0, overdue: 0 };
             map[name].total++;
             if (d.status === 'OPEN') map[name].open++;
             if (d.status === 'CLOSED') map[name].closed++;
             if (d.status === 'PENDING_CLOSURE') map[name].pending++;
             if (d.priority === 'CRITICAL') map[name].critical++;
+            if (d.priority === 'HIGH') map[name].high++;
+            if (d.priority === 'MEDIUM') map[name].medium++;
+            if (d.priority === 'LOW') map[name].low++;
             if (getDeadlineStatus(d.target_close_date) === 'OVERDUE' &&
                 d.status !== 'CLOSED' && d.status !== 'PENDING_CLOSURE')
                 map[name].overdue++;
         });
         return Object.values(map).sort((a, b) => b.total - a.total);
-    }, [allDefects, selectedVessels, isFiltered]);
+    }, [vesselFilteredDefects]);
 
     const overduePriorityData = useMemo(() => {
-        const source = isFiltered
-            ? allDefects.filter(d => selectedVessels.includes(d.vessel_name))
-            : allDefects;
+        const source = vesselFilteredDefects;
         const map = {};
         source.forEach(d => {
             const isOverdue =
@@ -541,26 +642,78 @@ const AnalyticsDashboard = () => {
         return Object.values(map).sort((a, b) =>
             (b.CRITICAL + b.HIGH + b.MEDIUM + b.LOW) - (a.CRITICAL + a.HIGH + a.MEDIUM + a.LOW)
         );
-    }, [allDefects, selectedVessels, isFiltered]);
+    }, [vesselFilteredDefects]);
 
     const equipBreakdown = useMemo(() => {
         const map = {};
-        defects.forEach(d => { const k = d.equipment_name || 'Unknown'; map[k] = (map[k] || 0) + 1; });
-        return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 8);
-    }, [defects]);
+        vesselFilteredDefects.forEach(d => { const k = d.equipment_name || 'Unknown'; map[k] = (map[k] || 0) + 1; });
+        return Object.entries(map).sort((a, b) => b[1] - a[1]);
+    }, [vesselFilteredDefects]);
     const maxEquip = useMemo(() => Math.max(...equipBreakdown.map(e => e[1]), 1), [equipBreakdown]);
 
     const sourceBreakdown = useMemo(() => {
         const map = {};
-        defects.forEach(d => { const k = d.defect_source || 'Unknown'; map[k] = (map[k] || 0) + 1; });
-        return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6);
-    }, [defects]);
+        vesselFilteredDefects.forEach(d => { const k = d.defect_source || 'Unknown'; map[k] = (map[k] || 0) + 1; });
+        return Object.entries(map).sort((a, b) => b[1] - a[1]);
+    }, [vesselFilteredDefects]);
 
-    // ── UPDATED: continuous day-based trend data ──────────────────────────────
     const trendData = useMemo(
-        () => buildTrendData(defects, selectedDays),
-        [defects, selectedDays]
+        () => buildTrendData(fleetDefects, selectedDays),
+        [fleetDefects, selectedDays]
     );
+
+    const vesselActivityData = useMemo(() => {
+        const now = new Date();
+        const startDate = new Date(now.getTime() - vesselActivityDays * 24 * 60 * 60 * 1000);
+
+        const map = {};
+        vesselFilteredDefects.forEach(d => {
+            const name = d.vessel_name || 'Unknown';
+            if (!map[name]) map[name] = {
+                name,
+                r_critical: 0, r_high: 0, r_medium: 0, r_low: 0,
+                c_critical: 0, c_high: 0, c_medium: 0, c_low: 0,
+            };
+
+            if (d.date_identified) {
+                const dt = new Date(d.date_identified);
+                if (dt >= startDate && dt <= now) {
+                    const p = d.priority;
+                    if (p === 'CRITICAL') map[name].r_critical++;
+                    else if (p === 'HIGH') map[name].r_high++;
+                    else if (p === 'MEDIUM') map[name].r_medium++;
+                    else map[name].r_low++;
+                }
+            }
+
+            if (d.status === 'CLOSED' && d.closed_at) {
+                const dt = new Date(d.closed_at);
+                if (dt >= startDate && dt <= now) {
+                    const p = d.priority;
+                    if (p === 'CRITICAL') map[name].c_critical++;
+                    else if (p === 'HIGH') map[name].c_high++;
+                    else if (p === 'MEDIUM') map[name].c_medium++;
+                    else map[name].c_low++;
+                }
+            }
+        });
+
+        return Object.values(map)
+            .filter(v => (v.r_critical + v.r_high + v.r_medium + v.r_low + v.c_critical + v.c_high + v.c_medium + v.c_low) > 0)
+            .sort((a, b) => (b.r_critical + b.r_high + b.r_medium + b.r_low) - (a.r_critical + a.r_high + a.r_medium + a.r_low));
+    }, [vesselFilteredDefects, vesselActivityDays]);
+
+    const expandedVesselDefects = useMemo(() => {
+        if (!expandedActivityVessel) return [];
+        const now = new Date();
+        const startDate = new Date(now.getTime() - vesselActivityDays * 24 * 60 * 60 * 1000);
+        return vesselFilteredDefects.filter(d => {
+            if (d.vessel_name !== expandedActivityVessel) return false;
+            if (!d.date_identified) return false;
+            const dt = new Date(d.date_identified);
+            return dt >= startDate && dt <= now;
+        });
+    }, [expandedActivityVessel, vesselFilteredDefects, vesselActivityDays]);
 
     const buildTrendChart = () => {
         if (!window.Chart) return;
@@ -664,31 +817,56 @@ const AnalyticsDashboard = () => {
         });
     };
 
-    const buildVesselChart = () => {
+    const buildVesselChart = (mode = vesselChartMode) => {
         if (!window.Chart) return;
         const vesselCanvas = document.getElementById('vessel-bar-chart');
         if (!vesselCanvas) return;
         chartRefs.current.vessel?.destroy();
-        const top8 = vesselData.slice(0, 8);
+        const top8 = vesselData;
         const wrapper = vesselCanvas.parentElement;
-        if (wrapper) wrapper.style.height = Math.max(top8.length * 46 + 80, 200) + 'px';
+        if (wrapper) wrapper.style.height = Math.max(vesselActivityData.length * 56 + 40, 150) + 'px';
+        const rowHeight = Math.max(top8.length * 46 + 80, 200) / top8.length;
+        const barMax = Math.round(rowHeight * 0.35);
+
+        const datasets = mode === 'status'
+            ? [
+                { label: 'Open', data: top8.map(v => v.open), backgroundColor: '#3b82f6', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8,maxBarThickness: barMax },
+                { label: 'Pend. Appr.', data: top8.map(v => v.pending), backgroundColor: '#f59e0b', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8,maxBarThickness: barMax },
+                { label: 'Closed', data: top8.map(v => v.closed), backgroundColor: '#22c55e55', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8,maxBarThickness: barMax },
+            ]
+            : [
+                { label: 'Critical', data: top8.map(v => v.critical), backgroundColor: '#dc2626', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8,maxBarThickness: barMax },
+                { label: 'High', data: top8.map(v => v.high), backgroundColor: '#f97316', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8,maxBarThickness: barMax },
+                { label: 'Medium', data: top8.map(v => v.medium), backgroundColor: '#2563eb', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8,maxBarThickness: barMax },
+                { label: 'Low', data: top8.map(v => v.low), backgroundColor: '#16a34a', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8,maxBarThickness: barMax },
+            ];
+
         chartRefs.current.vessel = new window.Chart(vesselCanvas, {
             type: 'bar',
-            data: {
-                labels: top8.map(v => v.name),
-                datasets: [
-                    { label: 'Open', data: top8.map(v => v.open), backgroundColor: '#3b82f6', borderRadius: 3 },
-                    { label: 'Pending', data: top8.map(v => v.pending), backgroundColor: '#f59e0b', borderRadius: 3 },
-                    { label: 'Critical', data: top8.map(v => v.critical), backgroundColor: '#dc2626', borderRadius: 3 },
-                    { label: 'Closed', data: top8.map(v => v.closed), backgroundColor: '#22c55e55', borderRadius: 3 },
-                ],
-            },
+            data: { labels: top8.map(v => v.name), datasets },
             options: {
                 indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            footer: items => {
+                                if (!items.length) return '';
+                                const total = items[0].chart.data.datasets.reduce(
+                                    (sum, ds) => sum + (Number(ds.data[items[0].dataIndex]) || 0), 0
+                                );
+                                return `Total defects: ${total}`;
+                            },
+                        },
+                    },
+                },
                 scales: {
                     x: { stacked: true, beginAtZero: true, ticks: { font: { size: 11 }, color: '#64748b' }, grid: { color: '#f1f5f9' } },
-                    y: { stacked: true, ticks: { font: { size: 11 }, color: '#334155' }, grid: { display: false } },
+                    y: {
+                        stacked: true,
+                        ticks: { font: { size: 11 }, color: '#334155', padding: 8 },
+                        grid: { display: false },
+                    },
                 },
             },
         });
@@ -743,20 +921,148 @@ const AnalyticsDashboard = () => {
         });
     };
 
-    // ── Effect 1: Vessel + Overdue charts (NOT affected by selectedDays) ──
+    const buildVesselActivityChart = () => {
+        if (!window.Chart) return;
+        const canvas = document.getElementById('vessel-activity-chart');
+        if (!canvas) return;
+        chartRefs.current.vesselActivity?.destroy();
+        const wrapper = canvas.parentElement;
+        if (wrapper) wrapper.style.height = Math.max(vesselActivityData.length * 72 + 80, 200) + 'px';
+        
+        // Plugin to draw "Reported" / "Closed" labels beside each bar group
+        const stackLabelPlugin = {
+            id: 'stackLabels',
+            afterDraw(chart) {
+                const { ctx, scales: { x, y } } = chart;
+                const barHeight = Math.abs(y.getPixelForValue(0) - y.getPixelForValue(1));
+                const barThickness = barHeight * 0.55 * 0.8;
+                const quarter = barThickness * 0.28;
+
+                vesselActivityData.forEach((_, i) => {
+                    const centerY = y.getPixelForValue(i);
+
+                    // In Chart.js horizontal stacked bar, first dataset stack renders ABOVE center
+                    // reported stack is first → sits above center (lower pixel value)
+                    // closed stack is second → sits below center (higher pixel value)
+                    const reportedY = centerY - quarter;
+                    const closedY = centerY + quarter;
+
+                    ctx.save();
+                    ctx.font = '600 9px sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'middle';
+
+                    ctx.fillStyle = '#991b1b';
+                    ctx.fillText('Reported', x.getPixelForValue(0) - 6, reportedY);
+
+                    ctx.fillStyle = '#14532d';
+                    ctx.fillText('Closed', x.getPixelForValue(0) - 6, closedY);
+
+                    ctx.restore();
+                });
+            },
+        };
+
+        chartRefs.current.vesselActivity = new window.Chart(canvas, {
+            type: 'bar',
+            plugins: [stackLabelPlugin],
+            data: {
+                labels: vesselActivityData.map(v => v.name),
+                datasets: [
+                    // ── Reported first (renders as top bar) ──
+                    { label: 'R · Critical', data: vesselActivityData.map(v => v.r_critical), backgroundColor: '#991b1b', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8, stack: 'reported' },
+                    { label: 'R · High', data: vesselActivityData.map(v => v.r_high), backgroundColor: '#dc2626', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8, stack: 'reported' },
+                    { label: 'R · Medium', data: vesselActivityData.map(v => v.r_medium), backgroundColor: '#f87171', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8, stack: 'reported' },
+                    { label: 'R · Low', data: vesselActivityData.map(v => v.r_low), backgroundColor: '#fca5a5', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8, stack: 'reported' },
+                    // ── Closed second (renders as bottom bar) ──
+                    { label: 'C · Critical', data: vesselActivityData.map(v => v.c_critical), backgroundColor: '#14532d', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8, stack: 'closed' },
+                    { label: 'C · High', data: vesselActivityData.map(v => v.c_high), backgroundColor: '#16a34a', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8, stack: 'closed' },
+                    { label: 'C · Medium', data: vesselActivityData.map(v => v.c_medium), backgroundColor: '#4ade80', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8, stack: 'closed' },
+                    { label: 'C · Low', data: vesselActivityData.map(v => v.c_low), backgroundColor: '#86efac', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8, stack: 'closed' },
+                ],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'y',
+                    intersect: true
+                },
+                layout: { padding: { top: 0, bottom: 0, left: 0, right: 16 } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'white',
+                        borderColor: '#e2e8f0',
+                        borderWidth: 1,
+                        titleColor: '#334155',
+                        bodyColor: '#64748b',
+                        padding: 10,
+                        callbacks: {
+                            label: item => {
+                                if (item.parsed.x === 0) return null;
+                                const isReported = item.dataset.stack === 'reported';
+                                const priority = item.dataset.label.split(' · ')[1];
+                                const idx = item.dataIndex;
+                                const stackDatasets = item.chart.data.datasets.filter(ds => ds.stack === item.dataset.stack);
+                                const stackTotal = stackDatasets.reduce((sum, ds) => sum + (Number(ds.data[idx]) || 0), 0);
+                                const totalLabel = isReported ? 'Total reported' : 'Total closed';
+                                const line = ` ${isReported ? 'Reported' : 'Closed'} · ${priority}: ${item.parsed.x}`;
+                                return [line, `─────────────────`, ` ${totalLabel}: ${stackTotal}`];
+                            },
+                            footer: () => '',
+                        },
+                        filter: item => item.parsed.x > 0,
+                    },
+                },
+                onClick: (event, elements) => {
+                    if (!elements.length) return;
+                    const index = elements[0].index;
+                    const vesselName = vesselActivityData[index]?.name;
+                    if (!vesselName) return;
+                    setExpandedActivityVessel(prev => prev === vesselName ? null : vesselName);
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        stacked: true,
+                        ticks: { font: { size: 11 }, color: '#64748b', precision: 0 },
+                        grid: { color: '#e2e8f0', lineWidth: 1.5 },
+                    },
+                    y: {
+                        stacked: true,
+                        ticks: {
+                            font: { size: 11 },
+                            color: '#334155',
+                            crossAlign: 'far',
+                            padding: 30,  // ← extra left padding to make room for the labels
+                        },
+                        grid: {
+                            display: true,
+                            color: '#e2e8f0',
+                            lineWidth: 1,
+                            drawTicks: false,
+                            offset: true,
+                        },
+                    },
+                },
+            },
+        });
+    };
+
     useEffect(() => {
         if (!window.Chart) return;
-        buildVesselChart();
+        buildVesselChart(vesselChartMode);
         buildOverdueChart();
-    }, [vesselData, overduePriorityData]);
+    }, [vesselData, overduePriorityData, vesselChartMode]);
 
-    // ── Effect 2: Trend chart ONLY (responds to selectedDays + defects) ──
     useEffect(() => {
         if (!window.Chart) return;
         buildTrendChart();
     }, [trendData]);
 
-    // ── Chart.js loader (runs once) ──
     useEffect(() => {
         if (!document.getElementById('chartjs-cdn')) {
             const s = document.createElement('script');
@@ -766,20 +1072,40 @@ const AnalyticsDashboard = () => {
                 buildVesselChart();
                 buildOverdueChart();
                 buildTrendChart();
+                buildVesselActivityChart();
             };
             document.head.appendChild(s);
         } else {
             buildVesselChart();
             buildOverdueChart();
             buildTrendChart();
+            buildVesselActivityChart();
         }
     }, []);
+
 
     useEffect(() => () => {
         Object.values(chartRefs.current).forEach(c => c?.destroy?.());
     }, []);
 
-    // Summary totals for the trend header pills
+    useEffect(() => {
+        if (!window.Chart) return;
+        buildVesselActivityChart();
+    }, [vesselActivityData]);
+
+    // Add to selectedVessels useEffect:
+    useEffect(() => {
+        if (selectedVessels.length > 0) {
+            setActiveSection('vessel')
+            setTimeout(() => {
+                buildVesselChart(); buildOverdueChart();
+                // buildVesselTrendChart();
+                buildVesselActivityChart();
+            }, 50);
+        }
+    }, [selectedVessels]);
+
+
     const totalCreated = trendData.createdCounts.reduce((a, b) => a + b, 0);
     const totalClosed = trendData.closedCounts.reduce((a, b) => a + b, 0);
 
@@ -788,7 +1114,6 @@ const AnalyticsDashboard = () => {
     return (
         <div className="dashboard-container">
 
-            {/* ── Slider thumb styles (injected once) ── */}
             <style>{`
                 .drs-slider::-webkit-slider-thumb {
                     -webkit-appearance: none;
@@ -805,123 +1130,94 @@ const AnalyticsDashboard = () => {
                 }
             `}</style>
 
-            {/* ── Header ── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 15, marginBottom: 20, flexWrap: 'wrap', justifyContent: 'space-between' }}>
-                <h1 className="page-title" style={{ margin: 0 }}>Fleet Analytics</h1>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <VesselMultiSelector vessels={vesselNames} selected={selectedVessels} onChange={setSelectedVessels} />
-                    {selectedVessels.length > 0 && (
-                        <button onClick={() => setSelectedVessels([])}
-                            style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'white', color: '#64748b', border: '1px solid #cbd5e1', padding: '7px 12px', borderRadius: '6px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                            <X size={12} /> Clear
-                        </button>
-                    )}
-                    <button onClick={() => refetch()}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', color: '#334155', border: '1px solid #cbd5e1', padding: '8px 16px', borderRadius: '6px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                        <RefreshCcw size={13} /> Refresh
-                    </button>
-                </div>
+            {/* ── Page Header ── */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 10 }}>
+                <h1 className="page-title" style={{ margin: 0 }}>Fleet Defect Overview</h1>
+                <button onClick={() => refetch()}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', color: '#334155', border: '1px solid #cbd5e1', padding: '8px 16px', borderRadius: '6px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                    <RefreshCcw size={13} /> Refresh
+                </button>
             </div>
 
-            {/* Filter banner */}
-            {selectedVessels.length > 0 && (
-                <div style={{ marginBottom: 18, padding: '9px 16px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', fontSize: 13, color: '#9a3412', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, flexWrap: 'wrap' }}>
-                    <Ship size={14} />
-                    Filtered to:&nbsp;
-                    {selectedVessels.map(v => (
-                        <span key={v} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#fed7aa', borderRadius: '10px', padding: '2px 10px', fontSize: 12 }}>
-                            {v}
-                            <X size={11} style={{ cursor: 'pointer' }} onClick={() => setSelectedVessels(selectedVessels.filter(s => s !== v))} />
-                        </span>
-                    ))}
-                </div>
-            )}
+            {/* ═══════════════════════════════════════════════════════════════
+                SECTION 1 — FLEET ANALYTICS (no vessel filter)
+            ════════════════════════════════════════════════════════════════ */}
+            <SectionCard
+                title="Fleet Analytics"
+                subtitle={`Overall fleet health · ${fleetStats.total} total defects across all vessels`}
+                icon={<Globe size={18} color="#fff" />}
+                accentColor="#2563eb"
+                bgColor="#f0f7ff"
+                borderColor="#bfdbfe"
+                defaultOpen={true}
+                isOpen={activeSection === 'fleet'}
+                onToggle={(isOpening) => {
+                    setActiveSection(isOpening ? 'fleet' : null);
+                    if (isOpening) setTimeout(buildTrendChart, 50);
+                }}
+            // onOpen={() => setTimeout(buildTrendChart, 0)}
+            >
+                {/* Donut row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                    <div className="table-card" style={{ padding: 0 }}>
+                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Status Distribution</span>
+                        </div>
+                        <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <DonutChart size={100} label="total" data={[
+                                { label: 'Open', value: fleetStats.open, color: STATUS_COLORS.OPEN },
+                                { label: 'Pending', value: fleetStats.pending, color: STATUS_COLORS.PENDING_CLOSURE },
+                                { label: 'Closed', value: fleetStats.closed, color: STATUS_COLORS.CLOSED },
+                            ]} />
+                            <Legend items={[
+                                { label: 'Open', value: fleetStats.open, color: STATUS_COLORS.OPEN, pct: pct(fleetStats.open, fleetStats.total) },
+                                { label: 'Pending Closure', value: fleetStats.pending, color: STATUS_COLORS.PENDING_CLOSURE, pct: pct(fleetStats.pending, fleetStats.total) },
+                                { label: 'Closed', value: fleetStats.closed, color: STATUS_COLORS.CLOSED, pct: pct(fleetStats.closed, fleetStats.total) },
+                            ]} />
+                        </div>
+                    </div>
 
-            {/* ── Row 1: Donut charts ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
+                    <div className="table-card" style={{ padding: 0 }}>
+                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Priority Distribution</span>
+                        </div>
+                        <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <DonutChart size={100} label="total" data={[
+                                { label: 'Critical', value: fleetStats.critical, color: PRIORITY_COLORS.CRITICAL },
+                                { label: 'High', value: fleetStats.high, color: PRIORITY_COLORS.HIGH },
+                                { label: 'Medium', value: fleetStats.medium, color: PRIORITY_COLORS.MEDIUM },
+                                { label: 'Low', value: fleetStats.low, color: PRIORITY_COLORS.LOW },
+                            ]} />
+                            <Legend items={[
+                                { label: 'Critical', value: fleetStats.critical, color: PRIORITY_COLORS.CRITICAL, pct: pct(fleetStats.critical, fleetStats.total) },
+                                { label: 'High', value: fleetStats.high, color: PRIORITY_COLORS.HIGH, pct: pct(fleetStats.high, fleetStats.total) },
+                                { label: 'Medium', value: fleetStats.medium, color: PRIORITY_COLORS.MEDIUM, pct: pct(fleetStats.medium, fleetStats.total) },
+                                { label: 'Low', value: fleetStats.low, color: PRIORITY_COLORS.LOW, pct: pct(fleetStats.low, fleetStats.total) },
+                            ]} />
+                        </div>
+                    </div>
+
+                    <div className="table-card" style={{ padding: 0 }}>
+                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Deadline Status</span>
+                        </div>
+                        <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <DonutChart size={100} label="active" data={[
+                                { label: 'On track', value: fleetStats.onTrack, color: DEADLINE_COLORS.NORMAL },
+                                { label: 'Warning', value: fleetStats.warning, color: DEADLINE_COLORS.WARNING },
+                                { label: 'Overdue', value: fleetStats.overdue, color: DEADLINE_COLORS.OVERDUE },
+                            ]} />
+                            <Legend items={[
+                                { label: 'On track', value: fleetStats.onTrack, color: DEADLINE_COLORS.NORMAL, pct: pct(fleetStats.onTrack, fleetStats.open + fleetStats.pending) },
+                                { label: 'Within 15 days', value: fleetStats.warning, color: DEADLINE_COLORS.WARNING, pct: pct(fleetStats.warning, fleetStats.open + fleetStats.pending) },
+                                { label: 'Overdue', value: fleetStats.overdue, color: DEADLINE_COLORS.OVERDUE, pct: pct(fleetStats.overdue, fleetStats.open + fleetStats.pending) },
+                            ]} />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Trend chart */}
                 <div className="table-card" style={{ padding: 0 }}>
-                    <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Status Distribution</span>
-                    </div>
-                    <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
-                        <DonutChart size={100} label="total" data={[
-                            { label: 'Open', value: stats.open, color: STATUS_COLORS.OPEN },
-                            { label: 'Pending', value: stats.pending, color: STATUS_COLORS.PENDING_CLOSURE },
-                            { label: 'Closed', value: stats.closed, color: STATUS_COLORS.CLOSED },
-                        ]} />
-                        <Legend items={[
-                            { label: 'Open', value: stats.open, color: STATUS_COLORS.OPEN, pct: pct(stats.open, stats.total) },
-                            { label: 'Pending Closure', value: stats.pending, color: STATUS_COLORS.PENDING_CLOSURE, pct: pct(stats.pending, stats.total) },
-                            { label: 'Closed', value: stats.closed, color: STATUS_COLORS.CLOSED, pct: pct(stats.closed, stats.total) },
-                        ]} />
-                    </div>
-                </div>
-
-                <div className="table-card" style={{ padding: 0 }}>
-                    <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Priority Distribution</span>
-                    </div>
-                    <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
-                        <DonutChart size={100} label="total" data={[
-                            { label: 'Critical', value: stats.critical, color: PRIORITY_COLORS.CRITICAL },
-                            { label: 'High', value: stats.high, color: PRIORITY_COLORS.HIGH },
-                            { label: 'Medium', value: stats.medium, color: PRIORITY_COLORS.MEDIUM },
-                            { label: 'Low', value: stats.low, color: PRIORITY_COLORS.LOW },
-                        ]} />
-                        <Legend items={[
-                            { label: 'Critical', value: stats.critical, color: PRIORITY_COLORS.CRITICAL, pct: pct(stats.critical, stats.total) },
-                            { label: 'High', value: stats.high, color: PRIORITY_COLORS.HIGH, pct: pct(stats.high, stats.total) },
-                            { label: 'Medium', value: stats.medium, color: PRIORITY_COLORS.MEDIUM, pct: pct(stats.medium, stats.total) },
-                            { label: 'Low', value: stats.low, color: PRIORITY_COLORS.LOW, pct: pct(stats.low, stats.total) },
-                        ]} />
-                    </div>
-                </div>
-
-                <div className="table-card" style={{ padding: 0 }}>
-                    <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Deadline Status</span>
-                    </div>
-                    <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
-                        <DonutChart size={100} label="active" data={[
-                            { label: 'On track', value: stats.onTrack, color: DEADLINE_COLORS.NORMAL },
-                            { label: 'Warning', value: stats.warning, color: DEADLINE_COLORS.WARNING },
-                            { label: 'Overdue', value: stats.overdue, color: DEADLINE_COLORS.OVERDUE },
-                        ]} />
-                        <Legend items={[
-                            { label: 'On track', value: stats.onTrack, color: DEADLINE_COLORS.NORMAL, pct: pct(stats.onTrack, stats.open + stats.pending) },
-                            { label: 'Within 15 days', value: stats.warning, color: DEADLINE_COLORS.WARNING, pct: pct(stats.warning, stats.open + stats.pending) },
-                            { label: 'Overdue', value: stats.overdue, color: DEADLINE_COLORS.OVERDUE, pct: pct(stats.overdue, stats.open + stats.pending) },
-                        ]} />
-                    </div>
-                </div>
-            </div>
-
-            
-
-            {/* ── Row 2: Vessel breakdown ── */}
-            <div className="table-card" style={{ padding: 0, marginBottom: 16 }}>
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Vessel Defect Breakdown</span>
-                    <div style={{ display: 'flex', gap: 14, fontSize: 11, color: '#64748b' }}>
-                        {[{ label: 'Open', color: '#3b82f6' }, { label: 'Pending', color: '#f59e0b' }, { label: 'Critical', color: '#dc2626' }, { label: 'Closed', color: '#22c55e55' }].map(l => (
-                            <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                <span style={{ width: 10, height: 10, borderRadius: 2, background: l.color, display: 'inline-block' }} />{l.label}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-                <div style={{ padding: 16 }}>
-                    <ChartCanvas id="vessel-bar-chart" height={Math.max(vesselData.slice(0, 8).length * 46 + 80, 200)} />
-                </div>
-            </div>
-            {/* ── Flagged Defects ── */}
-            <FlaggedDefectsPanel defects={defects} />
-            {/* ── Row 3: Trend (with slider) + Equipment ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16, marginBottom: 16 }}>
-
-                {/* ── UPDATED TREND CARD ── */}
-                <div className="table-card" style={{ padding: 0 }}>
-                    {/* Header */}
                     <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <TrendingUp size={14} color="#ea580c" />
@@ -929,7 +1225,6 @@ const AnalyticsDashboard = () => {
                             <span style={{ fontSize: 11, color: '#94a3b8' }}>· last {rangeLabel(selectedDays)}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            {/* Summary pills */}
                             <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 10, background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', display: 'flex', alignItems: 'center', gap: 5 }}>
                                 <span style={{ width: 7, height: 7, borderRadius: 2, background: '#ea580c', display: 'inline-block' }} />
                                 {totalCreated} reported
@@ -938,22 +1233,17 @@ const AnalyticsDashboard = () => {
                                 <span style={{ width: 7, height: 7, borderRadius: 2, background: '#16a34a', display: 'inline-block' }} />
                                 {totalClosed} closed
                             </span>
-                            {/* Legend */}
                             <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#64748b' }}>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#ea580c', display: 'inline-block' }} /> Reported</span>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#16a34a', display: 'inline-block' }} /> Closed</span>
                             </div>
                         </div>
                     </div>
-
-                    {/* Chart */}
                     <div style={{ padding: '16px 16px 8px' }}>
                         <ChartCanvas id="trend-chart" height={200} />
                     </div>
-
                     {/* Slider */}
                     <div style={{ padding: '8px 20px 16px' }}>
-                        {/* Track */}
                         <div style={{ position: 'relative', height: 20, marginBottom: 10 }}>
                             <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 4, background: '#e2e8f0', borderRadius: 2, transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                             <div style={{ position: 'absolute', top: '50%', left: 0, height: 4, borderRadius: 2, background: '#ea580c', transform: 'translateY(-50%)', width: `${((selectedDays - 1) / 729) * 100}%`, transition: 'width .04s', pointerEvents: 'none' }} />
@@ -965,16 +1255,11 @@ const AnalyticsDashboard = () => {
                                 style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', appearance: 'none', background: 'transparent', outline: 'none', cursor: 'pointer', margin: 0, zIndex: 1 }}
                             />
                         </div>
-
-                        {/* Indicator tick marks */}
                         <div style={{ position: 'relative', height: 18, marginBottom: 4 }}>
                             {[
-                                { days: 1, label: '1D' },
-                                { days: 7, label: '1W' },
-                                { days: 30, label: '1M' },
-                                { days: 90, label: '3M' },
-                                { days: 180, label: '6M' },
-                                { days: 365, label: '1Y' },
+                                { days: 1, label: '1D' }, { days: 7, label: '1W' },
+                                { days: 30, label: '1M' }, { days: 90, label: '3M' },
+                                { days: 180, label: '6M' }, { days: 365, label: '1Y' },
                                 { days: 730, label: '2Y' },
                             ].map(({ days, label }) => {
                                 const pctPos = ((days - 1) / 729) * 100;
@@ -986,40 +1271,16 @@ const AnalyticsDashboard = () => {
                                     ) === days;
                                 })();
                                 return (
-                                    <div
-                                        key={days}
-                                        onClick={() => setSelectedDays(days)}
-                                        style={{
-                                            position: 'absolute',
-                                            left: `${pctPos}%`,
-                                            transform: 'translateX(-50%)',
-                                            display: 'flex', flexDirection: 'column', alignItems: 'center',
-                                            cursor: 'pointer', userSelect: 'none',
-                                        }}
-                                    >
-                                        <div style={{
-                                            width: isNearest ? 3 : 1.5,
-                                            height: isNearest ? 8 : 5,
-                                            background: isNearest ? '#ea580c' : isActive ? '#f97316' : '#cbd5e1',
-                                            borderRadius: 1,
-                                            marginBottom: 2,
-                                            transition: 'all .15s',
-                                        }} />
-                                        <span style={{
-                                            fontSize: 9,
-                                            fontWeight: isNearest ? 800 : 600,
-                                            color: isNearest ? '#ea580c' : isActive ? '#94a3b8' : '#cbd5e1',
-                                            letterSpacing: '0.03em',
-                                            transition: 'all .15s',
-                                        }}>
+                                    <div key={days} onClick={() => setSelectedDays(days)}
+                                        style={{ position: 'absolute', left: `${pctPos}%`, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}>
+                                        <div style={{ width: isNearest ? 3 : 1.5, height: isNearest ? 8 : 5, background: isNearest ? '#ea580c' : isActive ? '#f97316' : '#cbd5e1', borderRadius: 1, marginBottom: 2, transition: 'all .15s' }} />
+                                        <span style={{ fontSize: 9, fontWeight: isNearest ? 800 : 600, color: isNearest ? '#ea580c' : isActive ? '#94a3b8' : '#cbd5e1', letterSpacing: '0.03em', transition: 'all .15s' }}>
                                             {label}
                                         </span>
                                     </div>
                                 );
                             })}
                         </div>
-
-                        {/* Current value pill */}
                         <div style={{ display: 'flex', justifyContent: 'center', marginTop: 2 }}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                                 <span style={{ fontSize: 13, fontWeight: 700, color: '#ea580c', padding: '2px 14px', borderRadius: 16, background: '#fff7ed', border: '1px solid #fed7aa' }}>
@@ -1032,76 +1293,379 @@ const AnalyticsDashboard = () => {
                         </div>
                     </div>
                 </div>
+            </SectionCard>
 
-                {/* Equipment — unchanged */}
-                <div className="table-card" style={{ padding: 0 }}>
-                    <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Top Areas of Concern</span>
+            {/* ═══════════════════════════════════════════════════════════════
+                SECTION 2 — VESSEL ANALYTICS (with vessel filter)
+            ════════════════════════════════════════════════════════════════ */}
+            <SectionCard
+                title="Vessel Analytics"
+                subtitle={
+                    selectedVessels.length === 0
+                        ? `Detailed breakdown across all ${vesselNames.length} vessels`
+                        : `Filtered to ${selectedVessels.length} vessel${selectedVessels.length > 1 ? 's' : ''} · ${vesselStats.total} defects`
+                }
+                icon={<Ship size={18} color="#fff" />}
+                accentColor="#ea580c"
+                bgColor="#fff7ed"
+                borderColor="#fed7aa"
+                defaultOpen={true}
+                isOpen={activeSection === 'vessel'}
+                onToggle={(isOpening) => {
+                    setActiveSection(isOpening ? 'vessel' : null);
+                    if (isOpening) {
+                        setTimeout(() => {
+                            buildVesselChart();
+                            buildOverdueChart();
+                            buildVesselActivityChart();
+                        }, 50);
+                    }
+                }}
+                headerRight={
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: 8, overflow: 'visible'
+                    }} onClick={e => e.stopPropagation()}>
+                        {/* Remove the opacity/pointerEvents logic based on vesselSectionOpen */}
+                        <VesselMultiSelector vessels={vesselNames} selected={selectedVessels} onChange={setSelectedVessels} />
+                        {/* ... rest of headerRight */}
                     </div>
-                    <div style={{ padding: 16 }}>
-                        {equipBreakdown.length === 0
-                            ? <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: 20 }}>No data</div>
-                            : equipBreakdown.map(([eq, cnt], i) => (
-                                <HBar key={eq} label={eq} value={cnt} max={maxEquip} count={cnt}
-                                    color={['#ea580c', '#f97316', '#dc2626', '#2563eb', '#16a34a', '#9333ea', '#0891b2', '#b45309'][i % 8]} />
-                            ))
-                        }
-                    </div>
-                </div>
-            </div>
+                }
 
-            {/* ── Row 4: Overdue by vessel + priority ── */}
-            <div className="table-card" style={{ padding: 0, marginBottom: 16 }}>
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Overdue Defects by Vessel</span>
-                        <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 10 }}>broken down by priority — open & active only</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 14, fontSize: 11, color: '#64748b' }}>
-                        {[{ label: 'Critical', color: PRIORITY_COLORS.CRITICAL }, { label: 'High', color: PRIORITY_COLORS.HIGH }, { label: 'Medium', color: PRIORITY_COLORS.MEDIUM }, { label: 'Low', color: PRIORITY_COLORS.LOW }].map(l => (
-                            <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                <span style={{ width: 10, height: 10, borderRadius: 2, background: l.color, display: 'inline-block' }} />{l.label}
+            // onOpen={() => setTimeout(() => {
+            //     buildVesselChart();
+            //     buildOverdueChart();
+            //     buildVesselActivityChart();
+            // }, 50)}
+            >
+                {/* Filter banner */}
+                {selectedVessels.length > 0 && (
+                    <div style={{ marginBottom: 16, padding: '9px 16px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', fontSize: 13, color: '#9a3412', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, flexWrap: 'wrap' }}>
+                        <Ship size={14} />
+                        Filtered to:&nbsp;
+                        {selectedVessels.map(v => (
+                            <span key={v} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#fed7aa', borderRadius: '10px', padding: '2px 10px', fontSize: 12 }}>
+                                {v}
+                                <X size={11} style={{ cursor: 'pointer' }} onClick={() => setSelectedVessels(selectedVessels.filter(s => s !== v))} />
                             </span>
                         ))}
                     </div>
-                </div>
-                <div style={{ padding: 16 }}>
-                    {overduePriorityData.length === 0
-                        ? <div style={{ textAlign: 'center', color: '#16a34a', fontSize: 13, padding: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 18 }}>✓</span> No overdue defects{selectedVessels.length > 0 ? ' for selected vessels' : ' across the fleet'}
+                )}
+
+                {/* Vessel Defect Breakdown */}
+                <div className="table-card" style={{ padding: 0, marginBottom: 16 }}>
+                    <div style={{ padding: '6px 10px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Vessel Defect Breakdown</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            {/* Toggle buttons */}
+                            <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 8, padding: 3, gap: 2 }}>
+                                {[
+                                    { key: 'status', label: 'Status' },
+                                    { key: 'priority', label: 'Priority' },
+                                ].map(({ key, label }) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => setVesselChartMode(key)}
+                                        style={{
+                                            padding: '5px 14px', fontSize: 12, fontWeight: 700,
+                                            borderRadius: 6, border: 'none', cursor: 'pointer',
+                                            background: vesselChartMode === key ? 'white' : 'transparent',
+                                            color: vesselChartMode === key ? '#ea580c' : '#94a3b8',
+                                            boxShadow: vesselChartMode === key ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                                            transition: 'all 0.15s',
+                                        }}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                            {/* Legend — changes with mode */}
+                            <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#64748b' }}>
+                                {(vesselChartMode === 'status'
+                                    ? [{ label: 'Open', color: '#3b82f6' }, { label: 'Pend. Appr.', color: '#f59e0b' }, { label: 'Closed', color: '#22c55e55' }]
+                                    : [{ label: 'Critical', color: '#dc2626' }, { label: 'High', color: '#f97316' }, { label: 'Medium', color: '#2563eb' }, { label: 'Low', color: '#16a34a' }]
+                                ).map(l => (
+                                    <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                        <span style={{ width: 10, height: 10, borderRadius: 2, background: l.color, display: 'inline-block' }} />{l.label}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
-                        : <ChartCanvas id="overdue-priority-chart" height={Math.max(overduePriorityData.length * 48 + 80, 160)} />
-                    }
+                    </div>
+                    <div style={{ padding: 16 }}>
+                        <ChartCanvas id="vessel-bar-chart" height={Math.max(vesselData.slice(0, 8).length * 46 + 80, 200)} />
+                    </div>
                 </div>
-            </div>
 
-            
+                {/* Single grouped chart — Reported vs Closed per vessel */}
+                <div className="table-card" style={{ padding: 0, marginBottom: 16 }}>
 
-            {/* ── Row 5: Defect sources ── */}
-            <div className="table-card" style={{ padding: 0, marginBottom: 16 }}>
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Defect Sources</span>
-                </div>
-                <div style={{ padding: 16 }}>
-                    {sourceBreakdown.length === 0
-                        ? <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: 20 }}>No data</div>
-                        : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
-                            {sourceBreakdown.map(([src, cnt], i) => {
-                                const color = ['#ea580c', '#f97316', '#dc2626', '#2563eb', '#16a34a', '#9333ea'][i % 6];
+                    {/* Header */}
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <BarChart2 size={14} color="#ea580c" />
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Vessel Activity</span>
+                            <span style={{ fontSize: 11, color: '#94a3b8' }}>· last {rangeLabel(vesselActivityDays)}</span>
+                            <span style={{ fontSize: 10, color: '#cbd5e1' }}>·</span>
+                            <span style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>click a bar to inspect</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 11, color: '#64748b' }}>
+                            {/* Activity group */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 11, color: '#64748b' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Reported</span>
+                                    {[
+                                        { label: 'Critical', color: '#991b1b' },
+                                        { label: 'High', color: '#dc2626' },
+                                        { label: 'Medium', color: '#f87171' },
+                                        { label: 'Low', color: '#fca5a5' },
+                                    ].map(l => (
+                                        <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <span style={{ width: 8, height: 8, borderRadius: 2, background: l.color, display: 'inline-block' }} />{l.label}
+                                        </span>
+                                    ))}
+                                </div>
+                                <div style={{ width: 1, height: 14, background: '#e2e8f0' }} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Closed</span>
+                                    {[
+                                        { label: 'Critical', color: '#14532d' },
+                                        { label: 'High', color: '#16a34a' },
+                                        { label: 'Medium', color: '#4ade80' },
+                                        { label: 'Low', color: '#86efac' },
+                                    ].map(l => (
+                                        <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <span style={{ width: 8, height: 8, borderRadius: 2, background: l.color, display: 'inline-block' }} />{l.label}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                            {/* Divider */}
+                            {/* <div style={{ width: 1, height: 14, background: '#e2e8f0' }} /> */}
+                            {/* Priority group */}
+                            {/* <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priority</span>
+                                {[
+                                    { label: 'Critical', color: '#dc2626' },
+                                    { label: 'High', color: '#f97316' },
+                                    { label: 'Medium', color: '#2563eb' },
+                                    { label: 'Low', color: '#16a34a88' },
+                                ].map(l => (
+                                    <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        <span style={{ width: 8, height: 8, borderRadius: 2, background: l.color, display: 'inline-block' }} />
+                                        {l.label}
+                                    </span>
+                                ))}
+                            </div> */}
+                        </div>
+                    </div>
+
+                    {/* Chart */}
+                    <div style={{ padding: "10px 10px" }}>
+                        {/* In JSX ChartCanvas */}
+                        <ChartCanvas id="vessel-activity-chart" height={Math.max(vesselActivityData.length * 56 + 40, 150)} />
+                    </div>
+
+                    {/* Expanded vessel detail table */}
+                    {/* {expandedActivityVessel && (
+                        <div style={{ borderTop: '1px solid #fed7aa', background: '#fffbf5' }}>
+                            
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '1px solid #fed7aa' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <Ship size={14} color="#ea580c" />
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: '#9a3412' }}>{expandedActivityVessel}</span>
+                                    <span style={{ fontSize: 11, color: '#94a3b8' }}>· {expandedVesselDefects.length} defects in last {rangeLabel(vesselActivityDays)}</span>
+                                </div>
+                                <button
+                                    onClick={() => setExpandedActivityVessel(null)}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'white', border: '1px solid #fed7aa', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: '#9a3412', cursor: 'pointer' }}
+                                >
+                                    <X size={11} /> Close
+                                </button>
+                            </div>
+
+                            {expandedVesselDefects.length === 0 ? (
+                                <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: 24 }}>
+                                    No defects reported in this period
+                                </div>
+                            ) : (
+                                <div style={{ overflowX: 'auto' }}>
+                                    
+                                    <div style={{ display: 'grid', gridTemplateColumns: '32px 100px 1fr 120px 90px 80px 80px', gap: 12, padding: '8px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                        {['#', 'Reported', 'Description', 'Area', 'Source', 'Priority', 'Status'].map((h, i) => (
+                                            <div key={h} style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#64748b', textAlign: i === 0 ? 'center' : 'left' }}>
+                                                {h}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    
+                                    {expandedVesselDefects.map((d, i) => {
+                                        const priorityStyle = {
+                                            CRITICAL: { background: '#FCEBEB', color: '#791F1F', border: '1px solid #fca5a5' },
+                                            HIGH: { background: '#FAEEDA', color: '#633806', border: '1px solid #fed7aa' },
+                                            MEDIUM: { background: '#E6F1FB', color: '#0C447C', border: '1px solid #bae6fd' },
+                                            LOW: { background: '#EAF3DE', color: '#27500A', border: '1px solid #d9f99d' },
+                                        }[d.priority] || { background: '#f1f5f9', color: '#64748b' };
+
+                                        const statusStyle = {
+                                            OPEN: { background: '#E6F1FB', color: '#0C447C' },
+                                            PENDING_CLOSURE: { background: '#FAEEDA', color: '#633806' },
+                                            CLOSED: { background: '#EAF3DE', color: '#27500A' },
+                                        }[d.status] || { background: '#f1f5f9', color: '#64748b' };
+
+                                        const fmtDate = dt => dt
+                                            ? new Date(dt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                                            : '—';
+
+                                        return (
+                                            <div key={d.id} style={{ display: 'grid', gridTemplateColumns: '32px 100px 1fr 120px 90px 80px 80px', gap: 12, padding: '10px 20px', borderBottom: i === expandedVesselDefects.length - 1 ? 'none' : '1px solid #f1f5f9', alignItems: 'center' }}>
+                                                <div style={{ fontSize: 11, color: '#cbd5e1', fontWeight: 600, textAlign: 'center' }}>{i + 1}</div>
+                                                <div style={{ fontSize: 12, color: '#475569' }}>{fmtDate(d.date_identified)}</div>
+                                                <div style={{ fontSize: 12, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.description}>{d.description || '—'}</div>
+                                                <div style={{ fontSize: 12, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.equipment_name}>{d.equipment_name || '—'}</div>
+                                                <div style={{ fontSize: 12, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.defect_source || '—'}</div>
+                                                <div>
+                                                    <span style={{ fontSize: 9, fontWeight: 800, padding: '3px 7px', borderRadius: 4, ...priorityStyle }}>
+                                                        {d.priority}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 4, ...statusStyle }}>
+                                                        {d.status?.replace('_', ' ')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )} */}
+
+                    {/* Slider */}
+                    <div style={{ padding: '8px 20px 16px', borderTop: '1px solid #f1f5f9' }}>
+                        <div style={{ position: 'relative', height: 20, marginBottom: 10 }}>
+                            <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 4, background: '#e2e8f0', borderRadius: 2, transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                            <div style={{ position: 'absolute', top: '50%', left: 0, height: 4, borderRadius: 2, background: '#ea580c', transform: 'translateY(-50%)', width: `${((vesselActivityDays - 1) / 729) * 100}%`, transition: 'width .04s', pointerEvents: 'none' }} />
+                            <input
+                                type="range" min={1} max={730} step={1}
+                                value={vesselActivityDays}
+                                onChange={e => setVesselActivityDays(Number(e.target.value))}
+                                className="drs-slider"
+                                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', appearance: 'none', background: 'transparent', outline: 'none', cursor: 'pointer', margin: 0, zIndex: 1 }}
+                            />
+                        </div>
+                        <div style={{ position: 'relative', height: 18, marginBottom: 4 }}>
+                            {[
+                                { days: 1, label: '1D' }, { days: 7, label: '1W' },
+                                { days: 30, label: '1M' }, { days: 90, label: '3M' },
+                                { days: 180, label: '6M' }, { days: 365, label: '1Y' },
+                                { days: 730, label: '2Y' },
+                            ].map(({ days, label }) => {
+                                const pctPos = ((days - 1) / 729) * 100;
+                                const isActive = vesselActivityDays >= days;
+                                const isNearest = (() => {
+                                    const snaps = [1, 7, 30, 90, 180, 365, 730];
+                                    return snaps.reduce((a, b) =>
+                                        Math.abs(b - vesselActivityDays) < Math.abs(a - vesselActivityDays) ? b : a
+                                    ) === days;
+                                })();
                                 return (
-                                    <div key={src} style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>{src}</span>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <span style={{ fontSize: 11, color: '#94a3b8' }}>{pct(cnt, stats.total)}</span>
-                                            <span style={{ fontSize: 13, fontWeight: 700, color, background: color + '18', padding: '2px 9px', borderRadius: '10px' }}>{cnt}</span>
-                                        </div>
+                                    <div key={days} onClick={() => setVesselActivityDays(days)}
+                                        style={{ position: 'absolute', left: `${pctPos}%`, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}>
+                                        <div style={{ width: isNearest ? 3 : 1.5, height: isNearest ? 8 : 5, background: isNearest ? '#ea580c' : isActive ? '#f97316' : '#cbd5e1', borderRadius: 1, marginBottom: 2, transition: 'all .15s' }} />
+                                        <span style={{ fontSize: 9, fontWeight: isNearest ? 800 : 600, color: isNearest ? '#ea580c' : isActive ? '#94a3b8' : '#cbd5e1', letterSpacing: '0.03em', transition: 'all .15s' }}>
+                                            {label}
+                                        </span>
                                     </div>
                                 );
                             })}
                         </div>
-                    }
+                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 2 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: '#ea580c', padding: '2px 14px', borderRadius: 16, background: '#fff7ed', border: '1px solid #fed7aa' }}>
+                                    {rangeLabel(vesselActivityDays)}
+                                </span>
+                                <span style={{ fontSize: 9, color: '#cbd5e1', letterSpacing: '0.04em' }}>
+                                    by {buildTrendData(vesselFilteredDefects, vesselActivityDays).grouping}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+
+                {/* Flagged Defects */}
+                <FlaggedDefectsPanel defects={vesselFilteredDefects} />
+
+                {/* Equipment + Overdue row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                    {/* Top Areas of Concern */}
+                    <div className="table-card" style={{ padding: 0 }}>
+                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Top Areas of Concern</span>
+                        </div>
+                        <div style={{ padding: 16 }}>
+                            {equipBreakdown.length === 0
+                                ? <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: 20 }}>No data</div>
+                                : equipBreakdown.map(([eq, cnt], i) => (
+                                    <HBar key={eq} label={eq} value={cnt} max={maxEquip} count={cnt}
+                                        color={['#ea580c', '#f97316', '#dc2626', '#2563eb', '#16a34a', '#9333ea', '#0891b2', '#b45309'][i % 8]} />
+                                ))
+                            }
+                        </div>
+                    </div>
+
+                    {/* Defect Sources */}
+                    <div className="table-card" style={{ padding: 0 }}>
+                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Defect Sources</span>
+                        </div>
+                        <div style={{ padding: 16 }}>
+                            {sourceBreakdown.length === 0
+                                ? <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: 20 }}>No data</div>
+                                : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {sourceBreakdown.map(([src, cnt], i) => {
+                                        const color = ['#ea580c', '#f97316', '#dc2626', '#2563eb', '#16a34a', '#9333ea'][i % 6];
+                                        return (
+                                            <div key={src} style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>{src}</span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <span style={{ fontSize: 11, color: '#94a3b8' }}>{pct(cnt, vesselStats.total)}</span>
+                                                    <span style={{ fontSize: 13, fontWeight: 700, color, background: color + '18', padding: '2px 9px', borderRadius: '10px' }}>{cnt}</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                {/* Overdue by vessel + priority */}
+                {/* <div className="table-card" style={{ padding: 0 }}>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Overdue Defects by Vessel</span>
+                            <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 10 }}>broken down by priority — open & active only</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 14, fontSize: 11, color: '#64748b' }}>
+                            {[{ label: 'Critical', color: PRIORITY_COLORS.CRITICAL }, { label: 'High', color: PRIORITY_COLORS.HIGH }, { label: 'Medium', color: PRIORITY_COLORS.MEDIUM }, { label: 'Low', color: PRIORITY_COLORS.LOW }].map(l => (
+                                <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                    <span style={{ width: 10, height: 10, borderRadius: 2, background: l.color, display: 'inline-block' }} />{l.label}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                    <div style={{ padding: 16 }}>
+                        {overduePriorityData.length === 0
+                            ? <div style={{ textAlign: 'center', color: '#16a34a', fontSize: 13, padding: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 18 }}>✓</span> No overdue defects{selectedVessels.length > 0 ? ' for selected vessels' : ' across the fleet'}
+                            </div>
+                            : <ChartCanvas id="overdue-priority-chart" height={Math.max(overduePriorityData.length * 48 + 80, 160)} />
+                        }
+                    </div>
+                </div> */}
+            </SectionCard>
 
         </div>
     );
