@@ -161,10 +161,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
 
     // ✅ Only inject if closed
     if (defectStatus === 'CLOSED') {
-      const hasProperClosure = closedById && closureRemarks;
-
-      if (hasProperClosure) {
-        // Full closure — show green remark block
+      if (closureRemarks) {
         filtered.push({
           id: 'system-closure-marker',
           is_system_message: true,
@@ -173,7 +170,6 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
           created_at: closedAt || new Date().toISOString()
         });
       } else {
-        // Legacy/imported defect — no closed_by_id or remarks, show plain pill
         filtered.push({
           id: 'system-closure-marker',
           is_system_message: true,
