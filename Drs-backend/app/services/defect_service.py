@@ -43,6 +43,7 @@ from sqlalchemy.future import select
 
 from app.models.defect import Defect, Thread, Attachment, DefectImage, PrEntry
 from app.models.sync import SyncQueue
+from app.models.mariapps_pr_cache import MariappsPrCache
 from app.models.vessel import Vessel
 from app.models.enums import DefectStatus, DefectPriority
 from app.services.notification_service import notify_vessel_users, create_task_for_mentions
@@ -738,6 +739,14 @@ class DefectService:
         This avoids a race condition where the SyncQueue row is committed
         before the PrEntry row, leaving a dangling entity_id reference.
         """
+        # Look up cache status immediately so the field is populated on creation
+        cache_result = await db.execute(
+            select(MariappsPrCache).where(
+                MariappsPrCache.requisition_no == pr_entry_in.pr_number
+            )
+        )
+        cached = cache_result.scalars().first()
+
         new_pr_entry = PrEntry(
             defect_id=defect_id,
             pr_number=pr_entry_in.pr_number,
@@ -746,6 +755,7 @@ class DefectService:
             origin="VESSEL" if _should_sync() else "SHORE",
             version=1,
             updated_at=datetime.utcnow(),
+            mariapps_pr_status=cached.status if cached else None,
         )
         db.add(new_pr_entry)
 
@@ -791,6 +801,14 @@ class DefectService:
         if pr_update.pr_number is not None:
             pr_entry.pr_number = pr_update.pr_number
             update_payload["pr_number"] = pr_update.pr_number
+            # Update mariapps_pr_status from cache for the new PR number
+            cache_result = await db.execute(
+                select(MariappsPrCache).where(
+                    MariappsPrCache.requisition_no == pr_update.pr_number
+                )
+            )
+            cached = cache_result.scalars().first()
+            pr_entry.mariapps_pr_status = cached.status if cached else None
         if pr_update.pr_description is not None:
             pr_entry.pr_description = pr_update.pr_description
             update_payload["pr_description"] = pr_update.pr_description

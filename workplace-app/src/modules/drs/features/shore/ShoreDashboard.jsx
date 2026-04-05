@@ -10,7 +10,7 @@ import {
 import { Image as ImageIcon, Eye, Upload } from 'lucide-react';
 import ColumnCustomizationModal from '@drs/components/modals/ColumnCustomizationModal';
 import ShoreClosureModal from '@drs/components/modals/ShoreClosureModal';
-// import PrSyncManager from '@drs/components/shared/PrSyncManager';
+import PrSyncManager from '@drs/components/shared/PrSyncManager';
 
 import { defectApi } from '@drs/services/defectApi';
 import { blobUploadService } from '@drs/services/blobUploadService';
