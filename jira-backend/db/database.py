@@ -54,7 +54,7 @@ async def get_control_db() -> AsyncSession:
 
 async def init_models():
     from models.schema import Ticket, Comment  # noqa
-    from models.sync import SyncQueue, SyncState, SyncConflict  # noqa — register sync tables
+    from models.sync import SyncQueue, SyncState, SyncConflict, JiraSyncLog  # noqa — register sync tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     print("Database tables ready.")

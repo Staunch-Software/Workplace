@@ -40,6 +40,39 @@ sync_status = {
 }
 
 
+async def _load_sync_status():
+    """Restore last sync status from DB into memory on startup."""
+    try:
+        from models.sync import JiraSyncLog
+        from db.database import SessionLocal
+        async with SessionLocal() as db:
+            row = (await db.execute(select(JiraSyncLog).where(JiraSyncLog.id == 1))).scalar_one_or_none()
+            if row and row.last_sync:
+                sync_status["lastSync"]   = row.last_sync.isoformat()
+                sync_status["mode"]       = row.mode
+                sync_status["lastResult"] = row.last_result
+    except Exception as e:
+        print(f"[Sync] Could not load sync status from DB: {e}")
+
+
+async def _save_sync_status(mode: str, last_sync: datetime, last_result: dict):
+    """Persist sync status to DB so it survives server restarts."""
+    try:
+        from models.sync import JiraSyncLog
+        from db.database import SessionLocal
+        async with SessionLocal() as db:
+            row = (await db.execute(select(JiraSyncLog).where(JiraSyncLog.id == 1))).scalar_one_or_none()
+            if row:
+                row.mode        = mode
+                row.last_sync   = last_sync
+                row.last_result = last_result
+            else:
+                db.add(JiraSyncLog(id=1, mode=mode, last_sync=last_sync, last_result=last_result))
+            await db.commit()
+    except Exception as e:
+        print(f"[Sync] Could not save sync status to DB: {e}")
+
+
 # ─── INCREMENTAL sync — fast, run every 30 minutes ───────────────────────────
 
 @router.post("/sync")
@@ -552,6 +585,11 @@ async def _run_sync(full_sync: bool = False):
             f"Updated={pull_result['updated']} Created={pull_result['created']}"
         )
         await _update_vessel_sync_state(datetime.utcnow())
+        await _save_sync_status(
+            mode=sync_status["mode"],
+            last_sync=datetime.utcnow(),
+            last_result=sync_status["lastResult"],
+        )
     except Exception as e:
         err = str(e)
         print(f"[Sync] ERROR: {err}")

@@ -49,6 +49,16 @@ class SyncState(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class JiraSyncLog(Base):
+    __tablename__ = "jira_sync_log"
+
+    id         = Column(Integer, primary_key=True, default=1)  # always 1 row
+    mode       = Column(String(20), nullable=True)
+    last_sync  = Column(DateTime(timezone=True), nullable=True)
+    last_result = Column(JSONB, nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class SyncConflict(Base):
     __tablename__ = "sync_conflicts"
 

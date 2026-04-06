@@ -24,6 +24,12 @@ async def lifespan(app: FastAPI):
 
     if settings.is_online_shore:
         print("[SHORE MODE] Jira sync available at /api/jira/sync")
+        try:
+            from routers.jira import sync_status, _load_sync_status
+            await _load_sync_status()
+            print("[SHORE MODE] Restored last sync status from DB.")
+        except Exception as e:
+            print(f"[SHORE MODE] Could not restore sync status: {e}")
 
     if settings.is_offline_vessel:
         from services.sync_worker import start_background_sync

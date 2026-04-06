@@ -102,7 +102,7 @@ export default function SyncLogPanel({ onClose }) {
 
       {/* ── Vessel Sync Section ── */}
       <section className="slp-section">
-        <p className="slp-section-title">Vessel Sync Status</p>
+        <p className="slp-section-title">Last Shore ↔ Vessel Sync</p>
         {vesselLoading ? (
           <div className="slp-vessel-skeleton">
             {[1, 2, 3].map(i => <div key={i} className="slp-skeleton-row" />)}
@@ -115,8 +115,8 @@ export default function SyncLogPanel({ onClose }) {
           <div className="slp-vessel-table">
             <div className="slp-vessel-header-row">
               <span>Vessel</span>
-              <span>Last Pull</span>
-              <span>Last Push</span>
+              <span>Sent to Vessel</span>
+              <span>Received from Vessel</span>
             </div>
             {vessels.map(v => (
               <div key={v.imo} className="slp-vessel-row">

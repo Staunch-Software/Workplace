@@ -1111,7 +1111,8 @@
   z-index: 50;
   transform: translateX(-100%);
   transition: transform 0.25s ease;
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
   padding: 20px 16px;
   display: flex;
   flex-direction: column;
