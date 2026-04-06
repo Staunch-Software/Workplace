@@ -1,5 +1,5 @@
 // src/services/defectApi.js - COMPLETE PRODUCTION-READY VERSION WITH ENHANCED EXCEL EXPORT
-import api from '@drs/api/axiosDrs';
+import api from "@drs/api/axiosDrs";
 
 export const defectApi = {
   // ============================================
@@ -114,7 +114,9 @@ export const defectApi = {
   getDefects: async (vesselImo = "") => {
     const params = vesselImo ? { vessel_imo: vesselImo } : {};
     const response = await api.get("/defects/", { params });
-    return Array.isArray(response.data) ? response.data : (response.data?.results ?? response.data?.defects ?? []);
+    return Array.isArray(response.data)
+      ? response.data
+      : (response.data?.results ?? response.data?.defects ?? []);
   },
 
   getDefectById: async (defectId) => {
@@ -435,8 +437,7 @@ export const defectApi = {
   },
 
   // Add to defectApi object:
-  getLiveFeed: () =>
-    api.get("/users/live-feed").then((r) => r.data),
+  getLiveFeed: () => api.get("/users/live-feed").then((r) => r.data),
 
   markFeedRead: (id) =>
     api.patch(`/users/live-feed/${id}/read`).then((r) => r.data),
@@ -497,6 +498,12 @@ export const defectApi = {
     return response.data;
   },
 
+  // Add inside the defectApi object, after removeDefect:
+  toggleFlag: async (defectId) => {
+    const response = await api.post(`/defects/${defectId}/flag`);
+    return response.data;
+  },
+
   // ============================================
   // DEFECT IMAGES MANAGEMENT
   // ============================================
@@ -527,10 +534,10 @@ export const defectApi = {
   },
 
   getEmailRecipients: (defectId) =>
-    api.get(`/defects/${defectId}/email-recipients`).then(r => r.data),
+    api.get(`/defects/${defectId}/email-recipients`).then((r) => r.data),
 
   createEmailDraft: (defectId) =>
-    api.post(`/defects/${defectId}/draft-email`).then(r => r.data),
+    api.post(`/defects/${defectId}/draft-email`).then((r) => r.data),
 
   // ============================================
   // TASKS & NOTIFICATIONS
@@ -596,7 +603,7 @@ export const defectApi = {
             "chat",
             "pr_details",
             "flag", // ✅ Add this
-            "dd",   // ✅ Add this
+            "dd", // ✅ Add this
           ],
         },
       };
@@ -607,12 +614,12 @@ export const defectApi = {
   // MARIAPPS PR SYNC
   // ============================================
   triggerPrSync: async () => {
-    const response = await api.post('/scraper/pr-sync');
+    const response = await api.post("/scraper/pr-sync");
     return response.data;
   },
 
   getPrSyncStatus: async () => {
-    const response = await api.get('/scraper/pr-status');
+    const response = await api.get("/scraper/pr-status");
     return response.data;
   },
 
@@ -680,7 +687,7 @@ export const defectApi = {
       "chat",
       "pr_details",
       "dd",
-      "flag"
+      "flag",
     ];
 
     // Check if all columns are valid

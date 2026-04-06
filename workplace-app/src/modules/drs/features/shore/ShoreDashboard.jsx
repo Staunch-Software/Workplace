@@ -2087,7 +2087,7 @@ const ShoreDashboard = () => {
   const handleInlineUpdate = async (id, field, value) => {
     const defect = defects.find(d => d.id === id);
     if (!defect || defect[field] === value) return;
-
+    if (field === 'is_flagged') return;
     let finalValue = value;
     if (field === 'is_owner') {
       finalValue = value === true || value === 'true';
@@ -2110,8 +2110,24 @@ const ShoreDashboard = () => {
     }
 
     updateMutation.mutate({ id, updates: { [field]: finalValue } });
+
   };
 
+  const toggleFlagMutation = useMutation({
+    mutationFn: (defectId) => defectApi.toggleFlag(defectId),
+    onMutate: async (defectId) => {
+      await queryClient.cancelQueries(DEFECTS_QUERY_KEY);
+      const prev = queryClient.getQueryData(DEFECTS_QUERY_KEY);
+      queryClient.setQueryData(DEFECTS_QUERY_KEY, (old = []) =>
+        old.map(d => d.id === defectId ? { ...d, is_flagged: !d.is_flagged } : d)
+      );
+      return { prev };
+    },
+    onError: (_, __, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(DEFECTS_QUERY_KEY, ctx.prev);
+    },
+    onSettled: () => queryClient.invalidateQueries(DEFECTS_QUERY_KEY),
+  });
   const scrollRowBelowHeader = (rowId) => {
     const anchor = document.getElementById(`row-${rowId}`);
     if (!anchor) return;
@@ -2447,121 +2463,118 @@ const ShoreDashboard = () => {
     return <div className="dashboard-container">Loading Fleet Overview...</div>;
 
   return (
-    <div className="dashboard-container">
+    <div className="dashboard-container defect-dashboard-container">
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-        <h1 className="page-title">Fleet Overview</h1>
+      <div className="defect-header-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+        <h1 className="page-title defect-page-title" style={{ marginBottom: "0px" }}>Fleet Overview</h1>
         <button
           onClick={() => setIsEditMode(!isEditMode)}
+          className="defect-edit-btn"
           style={{
             background: isEditMode ? '#ea580c' : 'white',
             color: isEditMode ? 'white' : '#334155',
             border: '1px solid #cbd5e1',
-            padding: '8px 16px',
-            borderRadius: '6px',
-            fontSize: '13px',
-            fontWeight: '600',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            fontWeight: "600",
             transition: 'all 0.2s'
           }}
         >
-          <Edit3 size={16} />
+          <Edit3 size={16} className="defect-btn-icon" />
           {isEditMode ? 'Exit Edit Mode' : 'Enable Edit Mode'}
         </button>
       </div>
 
       {/* KPI CARDS */}
-      <div className="kpi-grid">
+      <div className="kpi-grid defect-kpi-grid">
 
 
         <div
-          className={`kpi-card blue ${sf.status.includes('OPEN') ? 'active' : ''}`}
+          className={`kpi-card blue defect-kpi-card ${sf.status.includes('OPEN') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('OPEN')}
 
         >
-          <div className="kpi-icon"
+          <div className="kpi-icon defect-kpi-icon"
           ><AlertTriangle size={24} /></div>
           <div className="kpi-data">
-            <h2>{openCount}</h2>
-            <p>Open Defects</p>
+            <h2 className="defect-kpi-number">{openCount}</h2>
+            <p className="defect-kpi-label">Open Defects</p>
           </div>
         </div>
 
         <div
-          className={`kpi-card orange ${sf.priority.includes('HIGH') ? 'active' : ''}`}
+          className={`kpi-card orange defect-kpi-card ${sf.priority.includes('HIGH') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('HIGH')}
         >
-          <div className="kpi-icon">
+          <div className="kpi-icon defect-kpi-icon">
             <AlertTriangle size={24} />
           </div>
           <div className="kpi-data">
-            <h2>{highPriorityCount}</h2>
-            <p>High Priority</p>
+            <h2 className="defect-kpi-number">{highPriorityCount}</h2>
+            <p className="defect-kpi-label">High Priority</p>
           </div>
         </div>
 
         <div
-          className={`kpi-card red ${sf.priority.includes('CRITICAL') ? 'active' : ''}`}
+          className={`kpi-card red defect-kpi-card ${sf.priority.includes('CRITICAL') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('CRITICAL')}
         >
-          <div className="kpi-icon">
+          <div className="kpi-icon defect-kpi-icon">
             <AlertOctagon size={24} />
           </div>
           <div className="kpi-data">
-            <h2>{criticalCount}</h2>
-            <p>Critical Defects</p>
+            <h2 className="defect-kpi-number">{criticalCount}</h2>
+            <p className="defect-kpi-label">Critical Defects</p>
           </div>
         </div>
 
 
         {/* ✅ NEW OVERDUE CARD */}
         <div
-          className={`kpi-card red ${sf.deadline_status.includes('OVERDUE') ? 'active' : ''}`}
+          className={`kpi-card red defect-kpi-card ${sf.deadline_status.includes('OVERDUE') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('OVERDUE')}
         >
-          <div className="kpi-icon">
+          <div className="kpi-icon defect-kpi-icon">
             <Clock size={24} />
           </div>
           <div className="kpi-data">
-            <h2>{overdueCount}</h2>
-            <p>Overdue Defects</p>
+            <h2 className="defect-kpi-number">{overdueCount}</h2>
+            <p className="defect-kpi-label">Overdue Defects</p>
           </div>
         </div>
 
         <div
-          className={`kpi-card orange ${filters.pending_closure ? 'active' : ''
+          className={`kpi-card orange defect-kpi-card ${filters.pending_closure ? 'active' : ''
             }`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('PENDING_CLOSURE')}
 
         >
-          <div className="kpi-icon">
+          <div className="kpi-icon defect-kpi-icon">
             <Clock size={24} />
           </div>
           <div className="kpi-data">
-            <h2>{pendingClosureCount}</h2>
-            <p>Pending Closure</p>
+            <h2 className="defect-kpi-number">{pendingClosureCount}</h2>
+            <p className="defect-kpi-label">Pending Closure</p>
           </div>
         </div>
 
         <div
-          className={`kpi-card green ${sf.status.includes('CLOSED') ? 'active' : ''}`}
+          className={`kpi-card green defect-kpi-card ${sf.status.includes('CLOSED') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('CLOSED')}
         >
-          <div className="kpi-icon">
+          <div className="kpi-icon defect-kpi-icon">
             <CheckCircle size={24} />
           </div>
           <div className="kpi-data">
-            <h2>{closedCount}</h2>
-            <p>Total Closed</p>
+            <h2 className="defect-kpi-number">{closedCount}</h2>
+            <p className="defect-kpi-label">Total Closed</p>
           </div>
         </div>
 
@@ -3612,12 +3625,13 @@ const ShoreDashboard = () => {
                                   )}
                                 </td>
                               )
+                            // REPLACE with:
                             case 'flag':
                               return (
                                 <td key="flag" style={{ width: 24 }}>
                                   {isEditMode && !isClosed ? (
                                     <div
-                                      onClick={() => handleInlineUpdate(defect.id, 'is_flagged', !defect.is_flagged)}
+                                      onClick={() => toggleFlagMutation.mutate(defect.id)}
                                       style={{
                                         cursor: 'pointer',
                                         display: 'inline-flex',
@@ -3632,9 +3646,21 @@ const ShoreDashboard = () => {
                                       {getFlagIcon(defect.is_flagged)}
                                     </div>
                                   ) : (
-                                    <span title={defect.is_flagged ? 'Flagged' : 'Not Flagged'}>
+                                    <div
+                                      onClick={() => toggleFlagMutation.mutate(defect.id)}
+                                      style={{
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                        transition: 'background 0.2s'
+                                      }}
+                                      onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                      title={defect.is_flagged ? 'Click to unflag' : 'Click to flag'}
+                                    >
                                       {getFlagIcon(defect.is_flagged)}
-                                    </span>
+                                    </div>
                                   )}
                                 </td>
                               );

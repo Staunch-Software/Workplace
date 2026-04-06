@@ -110,7 +110,7 @@ from app.services.live_feed_service import (
     feed_mention,
 )
 from app.services.defect_service import DefectService, _should_sync
-
+from app.models.defect import UserDefectFlag
 logger = logging.getLogger(__name__)
 router = APIRouter(redirect_slashes=False)
 
@@ -724,10 +724,18 @@ async def get_defects(
         select(Vessel).where(Vessel.imo.in_(vessel_imos))
     )
     vessel_map = {v.imo: v.name for v in vessel_result.scalars().all()}
+    flag_result = await db.execute(
+        select(UserDefectFlag.defect_id).where(
+            UserDefectFlag.user_id == current_user.id,
+            UserDefectFlag.defect_id.in_([d.id for d in defects])
+        )
+    )
+    flagged_ids = {row[0] for row in flag_result.all()}
 
     for defect in defects:
         defect.pr_entries = [pr for pr in defect.pr_entries if not pr.is_deleted]
         defect.vessel_name = vessel_map.get(defect.vessel_imo, defect.vessel_imo)
+        defect.is_flagged = defect.id in flagged_ids
 
     return defects
 
@@ -862,23 +870,44 @@ async def export_defects(
         if is_owner is not None:
             query = query.where(Defect.is_owner == is_owner)
 
+        # REPLACE with:
         if is_flagged and len(is_flagged) > 0:
-            # Frontend sends "true"/"false" strings
             if "true" in is_flagged and "false" not in is_flagged:
-                query = query.where(Defect.is_flagged == True)
+                flagged_defect_ids = await db.execute(
+                    select(UserDefectFlag.defect_id).where(
+                        UserDefectFlag.user_id == current_user.id
+                    )
+                )
+                flagged_defect_ids = {row[0] for row in flagged_defect_ids.all()}
+                query = query.where(Defect.id.in_(flagged_defect_ids))
             elif "false" in is_flagged and "true" not in is_flagged:
-                query = query.where(Defect.is_flagged == False)
-            # if both selected → no filter needed
+                flagged_defect_ids = await db.execute(
+                    select(UserDefectFlag.defect_id).where(
+                        UserDefectFlag.user_id == current_user.id
+                    )
+                )
+                flagged_defect_ids = {row[0] for row in flagged_defect_ids.all()}
+                query = query.where(Defect.id.notin_(flagged_defect_ids))
+                    # if both selected → no filter needed
 
-        if is_dd and len(is_dd) > 0:
-            if "true" in is_dd and "false" not in is_dd:
-                query = query.where(Defect.is_dd == True)
-            elif "false" in is_dd and "true" not in is_dd:
-                query = query.where(Defect.is_dd == False)
+                if is_dd and len(is_dd) > 0:
+                    if "true" in is_dd and "false" not in is_dd:
+                        query = query.where(Defect.is_dd == True)
+                    elif "false" in is_dd and "true" not in is_dd:
+                        query = query.where(Defect.is_dd == False)
 
         # Execute query
         result = await db.execute(query)
         defects = result.scalars().all()
+        export_flag_result = await db.execute(
+            select(UserDefectFlag.defect_id).where(
+                UserDefectFlag.user_id == current_user.id,
+                UserDefectFlag.defect_id.in_([d.id for d in defects])
+            )
+        )
+        export_flagged_ids = {row[0] for row in export_flag_result.all()}
+        for d in defects:
+            d.is_flagged = d.id in export_flagged_ids
         vessel_imos = list(set(d.vessel_imo for d in defects))
         if vessel_imos:
             vessel_result = await control_db.execute(
@@ -3059,3 +3088,28 @@ async def create_system_thread(
     db.add(system_thread)
     await db.flush()
     return system_thread
+
+
+@router.post("/{defect_id}/flag")
+async def toggle_flag(
+    defect_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(UserDefectFlag).where(
+            UserDefectFlag.user_id   == current_user.id,
+            UserDefectFlag.defect_id == defect_id,
+        )
+    )
+    row = result.scalar_one_or_none()
+
+    if row:
+        await db.delete(row)
+        flagged = False
+    else:
+        db.add(UserDefectFlag(user_id=current_user.id, defect_id=defect_id))
+        flagged = True
+
+    await db.commit()
+    return {"defect_id": str(defect_id), "is_flagged": flagged}
