@@ -4,7 +4,8 @@
 import logging
 from datetime import date, datetime
 from decimal import Decimal
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 
 from app.generator_models import (
     VesselGenerator, GeneratorMonthlyReportHeader,
@@ -24,8 +25,7 @@ def serialize_for_json(obj):
     return obj
 
 
-def get_or_create_generator(
-    session: Session,
+async def get_or_create_generator(session: AsyncSession,
     imo_number: int,
     engine_no: str = None,
     designation: str = None,
@@ -37,9 +37,10 @@ def get_or_create_generator(
     """
     
     # Validate vessel
-    vessel = session.query(VesselInfo).filter(
-        VesselInfo.imo_number == imo_number
-    ).first()
+    result = await session.execute(
+        select(VesselInfo).where(VesselInfo.imo_number == imo_number)
+    )
+    vessel = result.scalar_one_or_none()
 
     if not vessel:
         raise ValueError(f"Vessel with IMO {imo_number} not found")
@@ -71,15 +72,19 @@ def get_or_create_generator(
 
     # Generate engine_no if missing
     if not engine_no:
-        count = session.query(VesselGenerator).filter(
-            VesselGenerator.imo_number == imo_number
-        ).count()
+        result = await session.execute(
+            select(func.count()).select_from(VesselGenerator).where(
+                VesselGenerator.imo_number == imo_number
+            )
+        )
+        count = result.scalar()
         engine_no = f"E{imo_number}-AE{count + 1}"
 
     # Look up generator by engine_no
-    existing = session.query(VesselGenerator).filter(
-        VesselGenerator.engine_no == engine_no
-    ).first()
+    result = await session.execute(
+        select(VesselGenerator).where(VesselGenerator.engine_no == engine_no)
+    )
+    existing = result.scalar_one_or_none()
 
     if existing:
         logger.info(f"[GENERATOR] Found existing generator by engine_no: {existing.engine_no}")
@@ -87,10 +92,13 @@ def get_or_create_generator(
 
     # Look up generator by designation
     if designation:
-        existing2 = session.query(VesselGenerator).filter(
-            VesselGenerator.imo_number == imo_number,
-            VesselGenerator.designation == designation
-        ).first()
+        result = await session.execute(
+            select(VesselGenerator).where(
+                VesselGenerator.imo_number == imo_number,
+                VesselGenerator.designation == designation
+            )
+        )
+        existing2 = result.scalar_one_or_none()
 
         if existing2:
             logger.info(f"[GENERATOR] Found existing generator by designation: {designation}")
@@ -98,9 +106,12 @@ def get_or_create_generator(
 
     # Auto-generate designation
     if not designation:
-        count = session.query(VesselGenerator).filter(
-            VesselGenerator.imo_number == imo_number
-        ).count()
+        result = await session.execute(
+            select(func.count()).select_from(VesselGenerator).where(
+                VesselGenerator.imo_number == imo_number
+            )
+        )
+        count = result.scalar()
         designation = f"Aux Engine No.{count + 1}"
         logger.info(f"Auto-generated designation â†’ {designation}")
 
@@ -114,7 +125,7 @@ def get_or_create_generator(
     )
 
     session.add(new_gen)
-    session.flush()
+    await session.flush()
 
     logger.info(
         f"âœ… New generator created â†’ ID: {new_gen.generator_id}, "
@@ -124,8 +135,7 @@ def get_or_create_generator(
     return new_gen
 
 
-def save_ae_monthly_report(
-    session: Session,
+async def save_ae_monthly_report(session: AsyncSession,
     generator: VesselGenerator,
     report_date: date,
     report_month: str,
@@ -146,13 +156,13 @@ def save_ae_monthly_report(
         report_date=report_date,
         report_month=report_month,
         total_engine_run_hrs=raw_json_data.get("totalenginerunhrs"),
-        measured_by=raw_json_data.get("measuredby"),
-        chief_engineer_name=raw_json_data.get("chiefengineername_sign"),
+        measured_by=str(raw_json_data.get("measuredby")) if raw_json_data.get("measuredby") is not None else None,
+        chief_engineer_name=str(raw_json_data.get("chiefengineername_sign")) if raw_json_data.get("chiefengineername_sign") is not None else None,
         cylinder_readings=graph_data.get("cylinder_readings")
     )
 
     session.add(header)
-    session.flush()
+    await session.flush()
 
     logger.info(f"📄 Header created → Report ID: {header.report_id}")
 

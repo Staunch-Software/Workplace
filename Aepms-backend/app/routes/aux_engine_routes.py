@@ -3,8 +3,8 @@ import logging
 import io
 from decimal import Decimal
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
-from sqlalchemy.orm import Session
-
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.database import get_db
 from app.ae_report_processor import save_ae_monthly_report_from_pdf
 from app.generator_models import GeneratorPerformanceGraphData, GeneratorMonthlyReportHeader, VesselGenerator, GeneratorBaselineData
@@ -34,7 +34,7 @@ def model_to_dict(model_instance, exclude_keys=None):
 @router.post("/upload")
 async def upload_aux_report(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Upload AE monthly PDF and return full graph data."""
     
@@ -44,23 +44,27 @@ async def upload_aux_report(
     try:
         contents = await file.read()
         # The processor now returns a more detailed result
-        result = save_ae_monthly_report_from_pdf(io.BytesIO(contents), file.filename, db)
+        result = await save_ae_monthly_report_from_pdf(io.BytesIO(contents), file.filename, db)
         
         if not result:
             raise HTTPException(status_code=500, detail="Failed to process the PDF report.")
         
         # --- Fetch all necessary data for the response ---
-        generator = db.query(VesselGenerator).filter(
-            VesselGenerator.generator_id == result['generator_id']
-        ).first()
+        res = await db.execute(
+            select(VesselGenerator).where(VesselGenerator.generator_id == result['generator_id'])
+        )
+        generator = res.scalar_one_or_none()
 
         if not generator:
             raise HTTPException(status_code=404, detail=f"Generator with ID {result['generator_id']} not found.")
 
         # ✅ CORRECT: Fetch baseline data and convert dynamically
-        baseline_records = db.query(GeneratorBaselineData).filter(
-            GeneratorBaselineData.generator_id == generator.generator_id # <--- STRICT FILTERING
-        ).order_by(GeneratorBaselineData.load_percentage).all()
+        res = await db.execute(
+            select(GeneratorBaselineData)
+            .where(GeneratorBaselineData.generator_id == generator.generator_id)
+            .order_by(GeneratorBaselineData.load_percentage)
+        )
+        baseline_records = res.scalars().all()
         
         shop_trial_baseline = [
             model_to_dict(record, exclude_keys=['baseline_id', 'imo_number']) 
@@ -68,9 +72,12 @@ async def upload_aux_report(
         ]
         
         # ✅ CORRECT: Fetch the full monthly performance data
-        graph_data_record = db.query(GeneratorPerformanceGraphData).filter(
-            GeneratorPerformanceGraphData.report_id == result['report_id']
-        ).first()
+        res = await db.execute(
+            select(GeneratorPerformanceGraphData).where(
+                GeneratorPerformanceGraphData.report_id == result['report_id']
+            )
+        )
+        graph_data_record = res.scalar_one_or_none()
 
         monthly_performance = model_to_dict(graph_data_record, exclude_keys=['graph_id', 'report_id'])
 
@@ -103,13 +110,13 @@ async def upload_aux_report(
             "is_duplicate": result.get('is_duplicate', False),
             "graph_data": {
                 "generator_info": {
-                    "vessel_name": generator.vessel.vessel_name,
+                    "vessel_name": vessel.vessel_name if vessel else None,
                     "imo_number": generator.imo_number,
                     "generator_id": generator.generator_id,
                     "engine_no": generator.engine_no,
                     "designation": generator.designation,
-                    "maker": generator.maker,
-                    "model": generator.model,
+                    "maker": generator.engine_maker,   # ✅
+                    "model": generator.engine_model,
                     "rated_engine_output_kw": float(generator.rated_engine_output_kw) if generator.rated_engine_output_kw else None
                 },
                 "report_info": {
@@ -130,18 +137,22 @@ async def upload_aux_report(
 
 
 @router.get("/performance/{generator_id}")
-async def get_aux_performance_by_generator_id(generator_id: int, db: Session = Depends(get_db)):
+async def get_aux_performance_by_generator_id(generator_id: int, db: AsyncSession = Depends(get_db)):
     """
     Get the latest performance data for a specific generator, formatted for graphing.
     """
-    generator = db.query(VesselGenerator).filter(VesselGenerator.generator_id == generator_id).first()
+    res = await db.execute(select(VesselGenerator).where(VesselGenerator.generator_id == generator_id))
+    generator = res.scalar_one_or_none()
     if not generator:
         raise HTTPException(status_code=404, detail="Generator not found")
 
     # The rest of the logic is identical to the upload response, so we can reuse it
-    latest_report = db.query(GeneratorMonthlyReportHeader).filter(
-        GeneratorMonthlyReportHeader.generator_id == generator_id
-    ).order_by(GeneratorMonthlyReportHeader.report_date.desc()).first()
+    res = await db.execute(
+        select(GeneratorMonthlyReportHeader)
+        .where(GeneratorMonthlyReportHeader.generator_id == generator_id)
+        .order_by(GeneratorMonthlyReportHeader.report_date.desc())
+    )
+    latest_report = res.scalars().first()
 
     if not latest_report:
         raise HTTPException(status_code=404, detail="No monthly reports found for this generator.")
@@ -149,18 +160,24 @@ async def get_aux_performance_by_generator_id(generator_id: int, db: Session = D
     # Now, we can reuse the same logic as the upload endpoint to build the full response
     # (This could be refactored into a shared function)
     
-    baseline_records = db.query(GeneratorBaselineData).filter(
-        GeneratorBaselineData.generator_id == generator_id # <--- USE THE URL PARAMETER ID
-    ).order_by(GeneratorBaselineData.load_percentage).all()
+    res = await db.execute(
+        select(GeneratorBaselineData)
+        .where(GeneratorBaselineData.generator_id == generator_id)
+        .order_by(GeneratorBaselineData.load_percentage)
+    )
+    baseline_records = res.scalars().all()
     
     shop_trial_baseline = [
         model_to_dict(record, exclude_keys=['baseline_id', 'imo_number']) 
         for record in baseline_records
     ]
     
-    graph_data_record = db.query(GeneratorPerformanceGraphData).filter(
-        GeneratorPerformanceGraphData.report_id == latest_report.report_id
-    ).first()
+    res = await db.execute(
+        select(GeneratorPerformanceGraphData).where(
+            GeneratorPerformanceGraphData.report_id == latest_report.report_id
+        )
+    )
+    graph_data_record = res.scalar_one_or_none()
 
     monthly_performance = model_to_dict(graph_data_record, exclude_keys=['graph_id', 'report_id'])
 

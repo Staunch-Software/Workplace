@@ -50,12 +50,39 @@ const OverdueVesselRow = ({
   modalType,
   onViewClick,
   amIShore,
+  user,  
   onUpload,
+  canApprove,
+  isOverdueModal,
+  onVesselAction // 🔥 Newly added prop for workflow
 }) => {
-  const [isExpanded, setIsExpanded] = React.useState(false);
+  const[isExpanded, setIsExpanded] = React.useState(false);
+  
+  // 🔥 NEW STATE for the chat input
+  const[isChatOpen, setIsChatOpen] = React.useState(false);
+  const[vesselRemark, setVesselRemark] = React.useState("");
 
   // Check if this is the "Configured" modal to determine which layout to show
   const isConfiguredView = modalType === "Configured";
+
+  // 🔥 MAKER-CHECKER LOGIC: Map the 2 Columns to the 3 States
+  const activeItem = v.overdueItems?.find(i => i.report_overdue_remarks);
+  const hasRemarks = !!activeItem?.report_overdue_remarks;
+  const isAccepted = activeItem?.report_is_overdue_accepted === true;
+  const isDeclined = activeItem?.report_is_overdue_accepted === false;
+  // Pending means it has remarks, but hasn't been accepted or declined yet (it is null)
+  const isPending = hasRemarks && activeItem?.report_is_overdue_accepted === null;
+
+  const allRemarks = activeItem?.report_overdue_remarks || "";
+  const displayRemark = allRemarks.split('\n').filter(r => r.trim()).pop() || "";
+
+  const handleSubmitRemark = (e) => {
+    e.stopPropagation(); // prevent row expansion
+    if (vesselRemark.length < 5) return alert("Please enter a valid justification.");
+    onVesselAction(v.imo, "SUBMIT", vesselRemark);
+    setIsChatOpen(false);
+    setVesselRemark("");
+  };
 
   return (
     <div
@@ -97,8 +124,8 @@ const OverdueVesselRow = ({
               height: "10px",
               borderRadius: "50%",
               backgroundColor: (() => {
-                if (modalType.includes("60")) return "#ef4444";
-                if (modalType.includes("30")) return "#f59e0b";
+                if (modalType.includes("Over30")) return "#ef4444";
+                if (modalType.includes("Under30")) return "#f59e0b";
                 if (v.overdueItems?.some((i) => i.state === "danger"))
                   return "#ef4444";
                 if (v.overdueItems?.some((i) => i.state === "warning"))
@@ -115,9 +142,48 @@ const OverdueVesselRow = ({
                 fontWeight: "700",
                 color: "#1e293b",
                 fontSize: "0.95rem",
+                display: "flex", 
+                alignItems: "center", 
+                gap: "8px"
               }}
             >
-              {v.name}
+              <span>{v.name}</span>
+
+              {/* 🔥 NEW: "+" BUTTON TO ADD REMARK (Hidden if pending or accepted) */}
+              {!isConfiguredView && !isPending && isOverdueModal && 
+  (!isAccepted || v.overdueItems?.some(i => !i.report_overdue_remarks)) && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation(); // prevent row expansion
+                    setIsChatOpen(!isChatOpen);
+                  }}
+                  title={isDeclined ? "Resubmit Overdue Justification" : "Add Vessel Overdue Justification"}
+                  style={{
+                    backgroundColor: "#eff6ff", color: "#2563eb", border: "1px dashed #2563eb",
+                    borderRadius: "50%", width: "22px", height: "22px", display: "flex",
+                    alignItems: "center", justifyContent: "center", cursor: "pointer"
+                  }}
+                >
+                  <span style={{ fontSize: "16px", fontWeight: "bold", marginTop: "-2px" }}>+</span>
+                </button>
+              )}
+              
+              {/* 🔥 NEW: STATUS INDICATORS */}
+              {isPending && (
+                <span style={{ fontSize: "0.65rem", backgroundColor: "#fef3c7", color: "#d97706", padding: "2px 8px", borderRadius: "10px", border: "1px solid #fde68a" }}>
+                  ⏳ PENDING SHORE APPROVAL
+                </span>
+              )}
+              {isAccepted && (
+                <span style={{ fontSize: "0.65rem", backgroundColor: "#dcfce7", color: "#16a34a", padding: "2px 8px", borderRadius: "10px", border: "1px solid #bbf7d0" }}>
+                  ✅ JUSTIFICATION ACCEPTED
+                </span>
+              )}
+              {isDeclined && (
+                <span style={{ fontSize: "0.65rem", backgroundColor: "#fee2e2", color: "#dc2626", padding: "2px 8px", borderRadius: "10px", border: "1px solid #fecaca" }}>
+                  ❌ DECLINED - RESUBMIT
+                </span>
+              )}
             </div>
             <div
               style={{
@@ -131,7 +197,7 @@ const OverdueVesselRow = ({
           </div>
         </div>
 
-        {/* ðŸ”¥ NEW BLOCK: ONLY FOR CONFIGURED MODAL - UPLOAD & VIEW ICONS */}
+        {/* ðŸ”¥ ONLY FOR CONFIGURED MODAL - UPLOAD & VIEW ICONS */}
         {isConfiguredView && (
           <div
             style={{
@@ -141,7 +207,6 @@ const OverdueVesselRow = ({
               marginRight: "15px",
             }}
           >
-            {/* 1. VIEW FILE ICON (Shows green if URL exists, grey if empty) */}
             {/* 1. VIEW FILE ICON (Updated with await) */}
             {v.reportUrl ? (
               <button
@@ -157,7 +222,7 @@ const OverdueVesselRow = ({
                   if (signedUrl) {
                     window.open(signedUrl, "_blank");
                   } else {
-                    alert("âŒ Could not generate secure access link.");
+                    alert("â Œ Could not generate secure access link.");
                   }
                 }}
                 style={{
@@ -247,6 +312,54 @@ const OverdueVesselRow = ({
           {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
         </div>
       </div>
+
+      {/* 🔥 NEW: CHAT INPUT BOX FOR VESSEL JUSTIFICATION */}
+      {isChatOpen && !isPending && !isAccepted && isOverdueModal && (
+        <div style={{ marginTop: "10px", padding: "10px", backgroundColor: "#f8fafc", borderRadius: "8px", border: "1px solid #cbd5e1", animation: "fadeIn 0.2s" }}>
+          <label style={{ fontSize: "0.65rem", fontWeight: "800", color: "#64748b", textTransform: "uppercase" }}>Vessel Overdue Remarks:</label>
+          <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+            <input 
+              type="text" 
+              value={vesselRemark}
+              onChange={(e) => setVesselRemark(e.target.value)}
+              placeholder="E.g., Vessel at anchorage awaiting fresh oil supply..."
+              style={{ flex: 1, padding: "8px", fontSize: "0.8rem", borderRadius: "6px", border: "1px solid #cbd5e1" }}
+              autoFocus
+            />
+            <button 
+              onClick={handleSubmitRemark}
+              style={{ backgroundColor: "#2563eb", color: "white", border: "none", padding: "0 16px", borderRadius: "6px", fontWeight: "700", cursor: "pointer", fontSize: "0.75rem" }}
+            >
+              Send
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 🔥 NEW: MAKER-CHECKER SHORE APPROVAL UI */}
+      {(isPending || isAccepted || isDeclined) && (
+        <div style={{ marginTop: "10px", padding: "10px", backgroundColor: isAccepted ? "#f0fdf4" : isDeclined ? "#fef2f2" : "#fffbeb", borderRadius: "8px", border: `1px solid ${isAccepted ? '#bbf7d0' : isDeclined ? '#fecaca' : '#fde68a'}` }}>
+          <p style={{ margin: "0 0 8px 0", fontSize: "0.75rem", color: isAccepted ? "#166534" : isDeclined ? "#991b1b" : "#92400e", fontStyle: "italic" }}>
+            "{displayRemark}"
+          </p>
+          {isPending && canApprove && (   
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button 
+                onClick={() => onVesselAction(v.imo, "ACCEPT")}
+                style={{ backgroundColor: "#10b981", color: "white", padding: "4px 12px", border: "none", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "bold", cursor: "pointer" }}
+              >
+                ACCEPT
+              </button>
+              <button 
+                onClick={() => onVesselAction(v.imo, "DECLINE")}
+                style={{ backgroundColor: "#ef4444", color: "white", padding: "4px 12px", border: "none", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "bold", cursor: "pointer" }}
+              >
+                DECLINE
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Collapsible Content: Overdue Machinery List - Source Preserved */}
       {isExpanded && v.overdueItems && v.overdueItems.length > 0 && (
@@ -498,8 +611,8 @@ const LuboilAnalysis = () => {
   });
   const [overdueStats, setOverdueStats] = useState({
     configured: 0,
-    overdue30: 0,
-    overdue60: 0,
+    overdueUnder30: 0,
+    overdueOver30: 0,
   });
   const [trendModal, setTrendModal] = useState({
     isOpen: false,
@@ -587,6 +700,15 @@ const LuboilAnalysis = () => {
   const [selectedVesselsFilter, setSelectedVesselsFilter] = useState([]);
   const [isVesselDropdownOpen, setIsVesselDropdownOpen] = useState(false);
   const vesselDropdownRef = useRef(null);
+  const rawJobTitle = (
+    user?.job_title || 
+    user?.user?.job_title || 
+    ""
+  ).toLowerCase().replace(/\s+/g, "");
+
+  const isTechManager = rawJobTitle.includes("techmanager") || rawJobTitle.includes("technicalmanager");
+  const isTechDirector = rawJobTitle.includes("techdirector") || rawJobTitle.includes("technicaldirector");
+  const canApprove = isTechManager || isTechDirector;
   const fetchFeed = async () => {
     setFeedLoading(true);
     try {
@@ -671,6 +793,21 @@ const LuboilAnalysis = () => {
       alert("Upload failed: " + err.message);
     } finally {
       setUploading(false);
+    }
+  };
+  const handleVesselOverdueAction = async (imo, action, remark = "") => {
+    try {
+      await axiosLub.post("/api/luboil/vessel/overdue-workflow", {
+        imo: imo,
+        action: action,
+        remarks: remark
+      });
+      alert(action === "SUBMIT" ? "Vessel justification submitted for approval." : `Justification ${action.toLowerCase()} successfully.`);
+      
+      await loadData(); // Reload matrix to update states visually
+      setListModal((prev) => ({ ...prev, isOpen: false })); // Close modal on success
+    } catch (err) {
+      alert("Failed to process action: " + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -1197,37 +1334,42 @@ const LuboilAnalysis = () => {
   };
   // Deep navigation handler
   const handleFeedItemClick = async (event) => {
-    // 1. Mark as read
-    // await axiosLub.patch(`/api/luboil/live-feed/event.id/read`);
-
-    // 2. Find matching cell in matrix
-    const vesselName = Object.keys(normalizedTable.rows).find(
-      (name) =>
-        String(normalizedTable.rows[name][event.equipment_code]?.imo) ===
-        String(event.imo),
-    );
-
-    if (vesselName) {
-      const cell = normalizedTable.rows[vesselName][event.equipment_code];
-      // 3. Find specific sample within that cell's history
-      const specificSample =
-        cell.history.find((h) => h.sample_id === event.sample_id) ||
-        cell.history[0];
-
-      // 4. Trigger modal logic
-      handleSelectSample(vesselName, cell, specificSample);
-      if (
-        event.event_type === "MENTION" ||
-        event.event_type === "COMMUNICATION"
-      ) {
-        setRightPanelMode("history");
-        setShowHistory(true);
+  // Handle vessel-wide overdue events (no specific equipment_code)
+  if (!event.equipment_code || event.machinery_name === "Vessel-Wide") {
+    // Just open the overdue modal for this vessel instead
+    if (matrixData?.data) {
+      const vesselEntry = Object.entries(matrixData.data).find(
+        ([, vData]) => String(vData.imo) === String(event.imo)
+      );
+      if (vesselEntry) {
+        handleCardClick("CriticalOver30"); // or "WarningUnder30" based on priority
       }
-
-      // 5. Navigate back to matrix view to show the modal
-      // setViewMode('matrix');
     }
-  };
+    return;
+  }
+
+  const vesselName = Object.keys(normalizedTable.rows).find(
+    (name) =>
+      String(normalizedTable.rows[name][event.equipment_code]?.imo) ===
+      String(event.imo),
+  );
+
+  if (vesselName) {
+    const cell = normalizedTable.rows[vesselName][event.equipment_code];
+    const specificSample =
+      cell.history.find((h) => h.sample_id === event.sample_id) ||
+      cell.history[0];
+
+    handleSelectSample(vesselName, cell, specificSample);
+    if (
+      event.event_type === "MENTION" ||
+      event.event_type === "COMMUNICATION"
+    ) {
+      setRightPanelMode("history");
+      setShowHistory(true);
+    }
+  }
+};
   const handleSelectSample = (vesselName, cellData, specificSample) => {
     // 1. Reset Chat Modes & Drafts (Preserving your existing logic)
     setChatMode("external");
@@ -1306,7 +1448,7 @@ const LuboilAnalysis = () => {
 
       // 2. ðŸ”¥ ISOLATE ATTACHMENTS (Images/PDFs) specifically for this dot
       if (s.attachment_url) {
-        const files = s.attachment_url.split("|");
+        const files = s.attachment_url.split("|").filter(f => f && f.trim());
         files.forEach((fileUrl) => {
           if (!fileUrl) return;
 
@@ -1858,7 +2000,7 @@ const LuboilAnalysis = () => {
 
       // 1. Upload the physical file to storage
       // This backend call stores the URL in the 'attachment_url' column automatically
-      (
+      const uploadData = (
         await axiosLub.post("/api/luboil/upload-attachment", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         })
@@ -1890,14 +2032,24 @@ const LuboilAnalysis = () => {
       ).data;
 
       // 3. UPDATE MODAL STATE IMMEDIATELY
-      setSelectedCell((prev) => ({
-        ...prev,
-        data: {
-          ...prev.data,
-          conversation: response.updated_conversation || prev.data.conversation,
-          // is_image_required: false
-        },
-      }));
+      setSelectedCell((prev) => {
+        const existingUrls = prev.data.attachment_url
+          ? prev.data.attachment_url.split('|').filter(Boolean)
+          : [];
+        const rawNewUrl = uploadData.url ? uploadData.url.split('?')[0] : '';
+        const updatedAttachmentUrl = rawNewUrl
+          ? [...existingUrls, rawNewUrl].join('|')
+          : prev.data.attachment_url;
+
+        return {
+          ...prev,
+          data: {
+            ...prev.data,
+            attachment_url: updatedAttachmentUrl,
+            conversation: response.updated_conversation || prev.data.conversation,
+          },
+        };
+      });
 
       // 4. ðŸ”¥ SURGICAL FIX: Update the background table state immediately
       setNormalizedTable((prev) => {
@@ -2220,15 +2372,15 @@ const LuboilAnalysis = () => {
 
     // --- COUNTERS ---
     let totalConfigured = Object.keys(data.data).length;
-    let ov30Count = 0;
-    let ov60Count = 0;
+    let ovUnder30Count = 0;
+    let ovOver30Count = 0;
     let pendingUnresolvedCount = 0; // Tracks vessels needing attention (Action/Approval/Resample)
 
     Object.values(data.data).forEach((vessel) => {
       let vesselHasReport = false;
       let vesselWorstStatus = "Normal";
-      let vesselIsOverdue30 = false;
-      let vesselIsOverdue60 = false;
+      let vesselIsOverdueUnder30 = false;
+      let vesselIsOverdueOver30 = false;
       let vesselHasActiveIssue = false; // Flag to see if vessel has pending actions
 
       Object.values(vessel.machineries || {}).forEach((m) => {
@@ -2258,18 +2410,16 @@ const LuboilAnalysis = () => {
 
         const intervalMonths =
           typeof m.interval === "number" && m.interval > 0 ? m.interval : 3;
-        const limitDays = intervalMonths * 30;
-        const warningStart = limitDays - 30;
         const sampleDate = new Date(m.last_sample);
-        const daysElapsed = Math.ceil(
-          (today - sampleDate) / (1000 * 60 * 60 * 24),
-        );
+        const dueDate = new Date(sampleDate);
+        dueDate.setMonth(dueDate.getMonth() + intervalMonths);
+        const daysOverdue = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
 
         // Health Logic
-        if (daysElapsed > limitDays) {
+        if (daysOverdue > 30) {
           mCritical++;
           vesselWorstStatus = "Critical";
-        } else if (daysElapsed >= warningStart) {
+        } else if (daysOverdue > 0) {
           mWarning++;
           if (vesselWorstStatus !== "Critical") vesselWorstStatus = "Warning";
         } else {
@@ -2277,8 +2427,8 @@ const LuboilAnalysis = () => {
         }
 
         // Overdue Logic
-        if (daysElapsed > limitDays + 60) vesselIsOverdue60 = true;
-        else if (daysElapsed > limitDays + 30) vesselIsOverdue30 = true;
+        if (daysOverdue > 30) vesselIsOverdueOver30 = true;
+        else if (daysOverdue > 0) vesselIsOverdueUnder30 = true;
       });
 
       // Vessel Level Health Updates (Preserved)
@@ -2289,8 +2439,8 @@ const LuboilAnalysis = () => {
       }
 
       // Vessel Level Overdue Updates (Preserved)
-      if (vesselIsOverdue60) ov60Count++;
-      else if (vesselIsOverdue30) ov30Count++;
+      if (vesselIsOverdueOver30) ovOver30Count++;
+      else if (vesselIsOverdueUnder30) ovUnder30Count++;
 
       // Vessel Level Pending/Unresolved Updates (Action Card)
       if (vesselHasActiveIssue) {
@@ -2308,8 +2458,8 @@ const LuboilAnalysis = () => {
     setOverdueStats({
       configured: totalConfigured,
       pendingUnresolved: pendingUnresolvedCount, // Updated for new UI card
-      overdue30: ov30Count,
-      overdue60: ov60Count,
+      overdueUnder30: ovUnder30Count,
+      overdueOver30: ovOver30Count
     });
   };
 
@@ -2609,8 +2759,8 @@ const LuboilAnalysis = () => {
       let vesselWorstHealthStatus = "Normal";
       let vesselMatchedOverdueItems = [];
       let hasReport = false;
-      let vesselIsOverdue60 = false;
-      let vesselIsOverdue30 = false;
+      let vesselIsOverdueOver30 = false;
+      let vesselIsOverdueUnder30 = false;
 
       Object.values(vesselData.machineries || {}).forEach((m) => {
         if (!m.is_configured || !m.has_report || !m.last_sample) return;
@@ -2618,43 +2768,40 @@ const LuboilAnalysis = () => {
 
         const interval =
           typeof m.interval === "number" && m.interval > 0 ? m.interval : 3;
-        const limitDays = interval * 30;
-        const warningStart = limitDays - 30;
         const sampleDate = new Date(m.last_sample);
-        const daysElapsed = Math.ceil(
-          (today - sampleDate) / (1000 * 60 * 60 * 24),
-        );
-        const excessDays = daysElapsed - limitDays;
+        const dueDate = new Date(sampleDate);
+        dueDate.setMonth(dueDate.getMonth() + interval);
+        const daysOverdue = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
 
-        // 1. Health Status Logic (Top Row Cards)
-        if (daysElapsed > limitDays) {
+        // 1. Health Status Logic
+        if (daysOverdue > 30) {
           vesselWorstHealthStatus = "Critical";
-        } else if (
-          daysElapsed >= warningStart &&
-          vesselWorstHealthStatus !== "Critical"
-        ) {
+        } else if (daysOverdue > 0 && vesselWorstHealthStatus !== "Critical") {
           vesselWorstHealthStatus = "Warning";
         }
 
-        // 2. Overdue Logic (Critical60 / Warning30)
+        // 2. Overdue Logic
         const itemData = {
           fullName: m.description || m.code,
           code: m.code,
           status: m.status,
-          reportDate: m.report_date, // Using Report Date
+          reportDate: m.report_date,
           rawData: m,
-          overdueText: `(Overdue by ${excessDays} days)`,
-          state: daysElapsed > limitDays + 60 ? "danger" : "warning",
+          overdueText: `(Overdue by ${daysOverdue} days)`,
+          state: daysOverdue > 30 ? "danger" : "warning",
+          // 🔥 ADDED THESE TWO LINES
+          report_overdue_remarks: m.report_overdue_remarks,
+          report_is_overdue_accepted: m.report_is_overdue_accepted
         };
 
-        if (daysElapsed > limitDays + 60) {
-          vesselIsOverdue60 = true;
-          if (statusType === "Critical60" || statusType === "Warning30") {
+        if (daysOverdue > 30) {
+          vesselIsOverdueOver30 = true;
+          if (statusType === "CriticalOver30" || statusType === "WarningUnder30") {
             vesselMatchedOverdueItems.push(itemData);
           }
-        } else if (daysElapsed > limitDays + 30) {
-          vesselIsOverdue30 = true;
-          if (statusType === "Warning30") {
+        } else if (daysOverdue > 0) {
+          vesselIsOverdueUnder30 = true;
+          if (statusType === "WarningUnder30") {
             vesselMatchedOverdueItems.push(itemData);
           }
         }
@@ -2662,26 +2809,19 @@ const LuboilAnalysis = () => {
 
       // Matching Logic for Overdue/Health Status
       if (hasReport) {
-        if (statusType === "Critical60" && vesselIsOverdue60) {
+        if (statusType === "CriticalOver30" && vesselIsOverdueOver30) {
           matchingVessels.push({
             name: vesselName,
             imo: vesselData.imo || "N/A",
             overdueItems: vesselMatchedOverdueItems,
           });
-        } else if (
-          statusType === "Warning30" &&
-          vesselIsOverdue30 &&
-          !vesselIsOverdue60
-        ) {
+        } else if (statusType === "WarningUnder30" && vesselIsOverdueUnder30 && !vesselIsOverdueOver30) {
           matchingVessels.push({
             name: vesselName,
             imo: vesselData.imo || "N/A",
             overdueItems: vesselMatchedOverdueItems,
           });
-        } else if (
-          vesselWorstHealthStatus === statusType &&
-          !["Warning30", "Critical60"].includes(statusType)
-        ) {
+        } else if (vesselWorstHealthStatus === statusType && !["WarningUnder30", "CriticalOver30"].includes(statusType)) {
           matchingVessels.push({
             name: vesselName,
             imo: vesselData.imo || "N/A",
@@ -2695,8 +2835,8 @@ const LuboilAnalysis = () => {
     matchingVessels.sort((a, b) => a.name.localeCompare(b.name));
 
     let modalTitle = statusType;
-    if (statusType === "Warning30") modalTitle = "Overdue > 30 Days";
-    if (statusType === "Critical60") modalTitle = "Overdue > 60 Days";
+    if (statusType === "WarningUnder30") modalTitle = "Overdue < 30 Days";
+    if (statusType === "CriticalOver30") modalTitle = "Overdue > 30 Days";
     if (statusType === "PendingUnresolved")
       modalTitle = "Pending Unresolved Cases";
 
@@ -2952,6 +3092,7 @@ const LuboilAnalysis = () => {
     onSampleClick,
     hasReport,
     dueText,
+    daysOverdue = 0,
     openUpward,
   }) => {
     // --- STATE FOR DROPDOWN ---
@@ -3236,17 +3377,17 @@ const LuboilAnalysis = () => {
         {/* --- LINE 2: DUE DATE BADGE (ISOLATED BOTTOM) --- */}
         <span
           style={{
-            backgroundColor: "#ffffff",
-            color: "#334155",
+            backgroundColor: daysOverdue > 30 ? "#fee2e2" : daysOverdue > 0 ? "#fff7ed" : "#ffffff",
+            color: daysOverdue > 30 ? "#dc2626" : daysOverdue > 0 ? "#d97706" : "#334155",
             fontSize: "0.65rem",
             padding: "2px 10px",
             borderRadius: "4px",
             fontWeight: "700",
             whiteSpace: "nowrap",
-            border: "1px solid #cbd5e1",
+            border: `1px solid ${daysOverdue > 30 ? "#fca5a5" : daysOverdue > 0 ? "#fcd34d" : "#cbd5e1"}`,
           }}
         >
-          Due: {dueText}
+          {daysOverdue > 30 ? "⚠ " : daysOverdue > 0 ? "⚠ " : ""}Due: {dueText}
         </span>
       </div>
     );
@@ -3981,7 +4122,7 @@ const LuboilAnalysis = () => {
             {/* Card 2: Warning Overdue > 30 Days */}
             <div
               className="stat-card"
-              onClick={() => handleCardClick("Warning30")}
+              onClick={() => handleCardClick("WarningUnder30")}
               style={{
                 backgroundColor: "white",
                 padding: "12px 16px", // Compressed from 20px
@@ -4023,7 +4164,7 @@ const LuboilAnalysis = () => {
                     lineHeight: "1.1",
                   }}
                 >
-                  {overdueStats.overdue30}
+                  {overdueStats.overdueUnder30}
                 </div>
                 <div
                   style={{
@@ -4032,7 +4173,7 @@ const LuboilAnalysis = () => {
                     color: "#334155",
                   }}
                 >
-                  Overdue &gt; 30 Days
+                  Overdue &lt; 30 Days
                 </div>
               </div>
             </div>
@@ -4040,7 +4181,7 @@ const LuboilAnalysis = () => {
             {/* Card 3: Critical Overdue > 60 Days */}
             <div
               className="stat-card"
-              onClick={() => handleCardClick("Critical60")}
+              onClick={() => handleCardClick("CriticalOver30")}
               style={{
                 backgroundColor: "white",
                 padding: "12px 16px", // Compressed from 20px
@@ -4082,7 +4223,7 @@ const LuboilAnalysis = () => {
                     lineHeight: "1.1",
                   }}
                 >
-                  {overdueStats.overdue60}
+                  {overdueStats.overdueOver30}
                 </div>
                 <div
                   style={{
@@ -4091,7 +4232,7 @@ const LuboilAnalysis = () => {
                     color: "#334155",
                   }}
                 >
-                  Overdue &gt; 60 Days
+                  Overdue &gt; 30 Days
                 </div>
               </div>
             </div>
@@ -4313,7 +4454,7 @@ const LuboilAnalysis = () => {
                   <div
                     className="matrix-scroll-container"
                     style={{
-                      maxHeight: "505px",
+                      maxHeight: "495px",
                       width: "100%",
                       overflow: "auto",
                       position: "relative",
@@ -4327,7 +4468,7 @@ const LuboilAnalysis = () => {
                       className="vessel-table-enhanced"
                       style={{
                         width:
-                          selectedVesselsFilter.length > 4
+                          selectedVesselsFilter.length > 5
                             ? `calc(220px + (${selectedVesselsFilter.length} * ((100% - 220px) / 4)))`
                             : "100%",
                         borderCollapse: "separate", // Necessary for sticky headers to not flicker
@@ -4368,14 +4509,19 @@ const LuboilAnalysis = () => {
                             // 1. Logic to find the Lab Name from the machinery data
                             // Searches all machineries for this vessel and picks the first 'lab_name' found.
                             const vesselData = matrixData?.data?.[vesselName];
-                            const foundLab = Object.values(
-                              vesselData?.machineries || {},
-                            ).find(
-                              (m) => m.lab_name && m.lab_name.trim() !== "",
-                            )?.lab_name;
+                            
+                            const uniqueSources =[
+                              ...new Set(
+                                Object.values(vesselData?.machineries || {})
+                                  .map((m) => m.oil_source) // 🟢 Look at the new oil_source from backend
+                                  .filter((source) => source && source.trim() !== "") // Remove nulls/blanks
+                              )
+                            ];
 
-                            // 2. Safety Fallback: If no lab_name is found in any machinery, default to "SHELL"
-                            const labNameDisplay = foundLab || "SHELL";
+                            // 2. Condition: If same, it shows one. If different, it joins them. Fallback if empty.
+                            const labNameDisplay = uniqueSources.length > 0 
+                              ? uniqueSources.join(" / ") 
+                              : "Unknown Source";
 
                             return (
                               <th
@@ -4385,8 +4531,8 @@ const LuboilAnalysis = () => {
                                   position: "sticky",
                                   top: 0,
                                   zIndex: 50,
-                                  width: "calc((100% - 220px) / 4)",
-                                  minWidth: "calc((100% - 220px) / 4)",
+                                  width: "calc((100% - 220px) / 5)",
+                                  minWidth: "calc((100% - 220px) / 5)",
                                   fontSize: "0.8rem",
                                   textAlign: "center",
                                   padding: "10px 4px", // Adjusted padding for better vertical fit
@@ -4543,8 +4689,8 @@ const LuboilAnalysis = () => {
                                   const today = new Date();
 
                                   const cellBaseStyle = {
-                                    width: "calc((100% - 220px) / 4)",
-                                    minWidth: "calc((100% - 220px) / 4)",
+                                    width: "calc((100% - 220px) / 5)",
+                                    minWidth: "calc((100% - 220px) / 5)",
                                     height: "80px",
                                     textAlign: "center",
                                     verticalAlign: "middle",
@@ -4627,11 +4773,7 @@ const LuboilAnalysis = () => {
                                       month: "short",
                                       year: "2-digit",
                                     });
-                                  const limitDays = interval * 30;
-                                  const daysElapsed = Math.ceil(
-                                      (today - sampleDate) / (1000 * 60 * 60 * 24)
-                                  );
-                                  const daysOverdue = daysElapsed - limitDays;
+                                  const daysOverdue = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
                                   const hasRemarks =
                                     cell.officer_remarks || cell.office_remarks;
                                   const isNormal =
@@ -4659,16 +4801,34 @@ const LuboilAnalysis = () => {
                                         ...cellBaseStyle,
                                         cursor: "pointer",
                                         transition: "background 0.2s",
-                                        backgroundColor: daysOverdue > 60
-                                          ? "#fee2e2"  // red
-                                          : daysOverdue > 30
-                                            ? "#fff7ed"  // amber
-                                            : "#ffffff",  // plain white for normal
+                                        backgroundColor: "#ffffff",
                                       }}
                                       className={
                                         isNormal ? "" : "hover:bg-slate-50"
                                       }
                                     >
+                                      {daysOverdue > 0 && (
+                                        <div
+                                          title={`Overdue by ${daysOverdue} days`}
+                                          style={{
+                                            position: "absolute",
+                                            top: 0,
+                                            left: 0,
+                                            width: "28px",
+                                            height: "28px",
+                                            backgroundColor: daysOverdue > 30 ? "#ef4444" : "#f59e0b",
+                                            borderBottomRightRadius: "100%",
+                                            display: "flex",
+                                            alignItems: "flex-start",
+                                            justifyContent: "flex-start",
+                                            padding: "4px 0 0 4px",
+                                            zIndex: 5,
+                                            boxShadow: "1px 1px 3px rgba(0,0,0,0.1)",
+                                          }}
+                                        >
+                                          <Clock size={12} color="white" />
+                                        </div>
+                                      )}
                                       {showVerifiedTick && (
                                         <div
                                           title="Resolution Documented & Verified"
@@ -4714,6 +4874,7 @@ const LuboilAnalysis = () => {
                                           previousStatus={cell.previous_status}
                                           hasReport={cell.has_report}
                                           dueText={formattedDue}
+                                          daysOverdue={daysOverdue}
                                           openUpward={
                                             rowIndex >=
                                             visibleColumns.length - 2
@@ -6783,7 +6944,7 @@ const LuboilAnalysis = () => {
                                   color: "#475569",
                                   whiteSpace: "pre-wrap",
                                   position: "relative",
-                                  zIndex: 1,
+                                  zIndex: 1
                                 }}
                               >
                                 {formatDiagnosisAsList(
@@ -8827,8 +8988,12 @@ const LuboilAnalysis = () => {
                     key={idx}
                     v={v}
                     modalType={listModal.type}
+                    user={user}  
                     amIShore={amIShore} // Pass the shore check here
                     onUpload={handleVesselManualReportUpload}
+                    onVesselAction={handleVesselOverdueAction}
+                    isOverdueModal={listModal.type === "Overdue < 30 Days" || listModal.type === "Overdue > 30 Days"}  // 🔥 ADD THIS
+                    canApprove={canApprove}
                     /* ðŸ”¥ THIS ADDITION HANDLES THE REDIRECT */
                     onViewClick={(vesselName, item) => {
                       // 1. Close the current Pending/Overdue list window
@@ -9921,11 +10086,22 @@ const LuboilAnalysis = () => {
                       <div
                         key={i}
                         // PDFs open in new tab, Images preview on the right
-                        onClick={() =>
-                          isPdf
-                            ? window.open(url, "_blank")
-                            : setPreviewImage(url)
-                        }
+                        onClick={async () => {
+                          if (isPdf) {
+                            try {
+                              const freshUrl = (
+                                await axiosLub.get(
+                                  `/api/blob/freshen-url?blob_url=${encodeURIComponent(url.split('?')[0])}`
+                                )
+                              ).data.signed_url;
+                              window.open(freshUrl, "_blank");
+                            } catch {
+                              window.open(url, "_blank");
+                            }
+                          } else {
+                            setPreviewImage(url);
+                          }
+                        }}
                         style={{
                           padding: "12px",
                           cursor: "pointer",

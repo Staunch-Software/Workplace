@@ -5,7 +5,7 @@ import re
 from typing import Dict, List, Any, Optional, Tuple, Set
 from datetime import datetime, date
 from dataclasses import dataclass, field
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy import and_, select, exists
 from sqlalchemy.dialects.postgresql import insert
@@ -102,23 +102,23 @@ class EfficientDataLoader:
         # Batch processing settings
         self.batch_size = 1000
         
-    def load_all_data(self, extracted_data: Dict[str, List[Dict]]) -> LoadingStats:
+    async def load_all_data(self, extracted_data: Dict[str, List[Dict]]) -> LoadingStats:
         """
         Optimized data loading with batch operations and reduced database calls.
         """
         logger.info("Starting optimized data loading process...")
         
         try:
-            with get_db_session_context() as session:
+            async with get_db_session_context() as session:
                 # Pre-load existing data for efficient lookups
-                self._preload_existing_data(session)
+                await self._preload_existing_data(session)
                 
                 # Load data in dependency order with batch operations
-                self._load_vessels_batch(session, extracted_data.get('vessels', []))
-                self._load_sessions_batch(session, extracted_data.get('sessions', []))
-                self._load_performance_data_batch(session, extracted_data.get('performance_data', []))
-                self._load_monthly_headers_batch(session, extracted_data.get('monthly_headers', []))
-                self._load_monthly_details_batch(session, extracted_data.get('monthly_details', []))
+                await self._load_vessels_batch(session, extracted_data.get('vessels', []))
+                await self._load_sessions_batch(session, extracted_data.get('sessions', []))
+                await self._load_performance_data_batch(session, extracted_data.get('performance_data', []))
+                await self._load_monthly_headers_batch(session, extracted_data.get('monthly_headers', []))
+                await self._load_monthly_details_batch(session, extracted_data.get('monthly_details', []))
                 
                 logger.info("Optimized data loading completed successfully")
                 
@@ -128,12 +128,12 @@ class EfficientDataLoader:
         
         return self.stats
     
-    def _preload_existing_data(self, session: Session) -> None:
+    async def _preload_existing_data(self, session: AsyncSession) -> None:
         """Pre-load existing data to minimize database queries during processing."""
         logger.info("Pre-loading existing data for efficient processing...")
         
         # Load all existing vessels
-        vessels = session.query(VesselInfo).all()
+        vessels = (await session.execute(select(VesselInfo))).scalars().all()
         for vessel in vessels:
             self.existing_vessels[vessel.imo_number] = vessel
             if vessel.engine_no:
@@ -142,7 +142,7 @@ class EfficientDataLoader:
                     self.imo_to_engine_map[vessel.imo_number] = vessel.engine_no
         
         # Load existing sessions
-        sessions = session.query(ShopTrialSession).all()
+        sessions = (await session.execute(select(ShopTrialSession))).scalars().all()
         for session_obj in sessions:
             key = (session_obj.engine_no, session_obj.trial_date)
             self.existing_sessions[key] = session_obj
@@ -157,7 +157,7 @@ class EfficientDataLoader:
             self.engine_default_session_id[eng] = earliest.session_id
         
         # Load existing monthly report headers
-        headers = session.query(MonthlyReportHeader).all()
+        headers = (await session.execute(select(MonthlyReportHeader))).scalars().all()
         for header in headers:
             report_key = f"{header.imo_number}_{header.report_month}"
             self.report_id_cache[report_key] = header.report_id
@@ -166,7 +166,7 @@ class EfficientDataLoader:
                    f"{len(self.existing_sessions)} sessions, "
                    f"{len(self.report_id_cache)} monthly headers")
     
-    def _load_vessels_batch(self, session: Session, vessels_data: List[Dict[str, Any]]) -> None:
+    async def _load_vessels_batch(self, session: AsyncSession, vessels_data: List[Dict[str, Any]]) -> None:
         """Load vessels using batch upsert operations."""
         if not vessels_data:
             return
@@ -212,21 +212,21 @@ class EfficientDataLoader:
         # Batch insert new vessels
         if vessels_to_insert:
             try:
-                session.bulk_insert_mappings(VesselInfo, vessels_to_insert)
+                await session.bulk_insert_mappings(VesselInfo, vessels_to_insert)
                 # Update cache with newly inserted vessels
                 for vessel_data in vessels_to_insert:
                     imo_number = vessel_data['imo_number']
-                    vessel = session.query(VesselInfo).filter_by(imo_number=imo_number).first()
+                    vessel = (await session.execute(select(VesselInfo).where(VesselInfo.imo_number == imo_number))).scalar_one_or_none()
                     if vessel:
                         self.existing_vessels[imo_number] = vessel
             except Exception as e:
                 session.rollback()
                 self.stats.add_error(f"Batch insert failed: {e}", "vessel_loading", "batch operation")
         
-        session.commit()
+        await session.commit()
         logger.info(f"Vessel loading completed: {self.stats.vessels_inserted} inserted, {self.stats.vessels_updated} updated")
     
-    def _load_sessions_batch(self, session: Session, sessions_data: List[Dict[str, Any]]) -> None:
+    async def _load_sessions_batch(self, session: AsyncSession, sessions_data: List[Dict[str, Any]]) -> None:
         """Load sessions using batch operations."""
         if not sessions_data:
             return
@@ -269,16 +269,14 @@ class EfficientDataLoader:
         # Batch insert new sessions
         if sessions_to_insert:
             try:
-                session.bulk_insert_mappings(ShopTrialSession, sessions_to_insert)
-                session.flush()
+                await session.bulk_insert_mappings(ShopTrialSession, sessions_to_insert)
+                await session.flush()
                 
                 # Update cache with newly inserted sessions
                 for session_data in sessions_to_insert:
                     engine_no = session_data['engine_no']
                     trial_date = session_data['trial_date']
-                    session_obj = session.query(ShopTrialSession).filter_by(
-                        engine_no=engine_no, trial_date=trial_date
-                    ).first()
+                    session_obj = (await session.execute(select(ShopTrialSession).where(ShopTrialSession.engine_no == engine_no, ShopTrialSession.trial_date == trial_date))).scalar_one_or_none()
                     if session_obj:
                         key_tuple = (engine_no, trial_date)
                         key_str = f"{engine_no}_{trial_date}"
@@ -286,20 +284,20 @@ class EfficientDataLoader:
                         self.session_id_cache[key_str] = session_obj.session_id
                         
             except Exception as e:
-                session.rollback()
+                await session.rollback()
                 self.stats.add_error(f"Batch insert failed: {e}", "session_loading", "batch operation")
         
-        session.commit()
+        await session.commit()
         # Rebuild session caches so performance resolver can find newly inserted sessions
-        self._rebuild_session_cache(session)
+        await self._rebuild_session_cache(session)
         logger.info(f"Session loading completed: {self.stats.sessions_inserted} inserted, {self.stats.sessions_updated} updated")
 
-    def _rebuild_session_cache(self, session: Session) -> None:
+    async def _rebuild_session_cache(self, session: AsyncSession) -> None:
         """Rebuild in-memory caches for sessions after inserts/updates."""
         self.existing_sessions.clear()
         self.session_id_cache.clear()
         self.engine_default_session_id.clear()
-        sessions = session.query(ShopTrialSession).all()
+        sessions = (await session.execute(select(ShopTrialSession))).scalars().all()
         for session_obj in sessions:
             key = (session_obj.engine_no, session_obj.trial_date)
             self.existing_sessions[key] = session_obj
@@ -313,7 +311,7 @@ class EfficientDataLoader:
             earliest = min(sess_list, key=lambda s: s.trial_date)
             self.engine_default_session_id[eng] = earliest.session_id
     
-    def _load_performance_data_batch(self, session: Session, performance_data: List[Dict[str, Any]]) -> None:
+    async def _load_performance_data_batch(self, session: AsyncSession, performance_data: List[Dict[str, Any]]) -> None:
         """Load performance data using batch operations with auto-session creation."""
         if not performance_data:
             return
@@ -326,7 +324,7 @@ class EfficientDataLoader:
         
         for perf_data in performance_data:
             try:
-                session_id = self._resolve_session_id(perf_data)
+                session_id = await self._resolve_session_id(session, perf_data)
                 if not session_id:
                     self.stats.add_error("Could not resolve session_id", "performance_loading", str(perf_data))
                     continue
@@ -340,13 +338,7 @@ class EfficientDataLoader:
                     continue
                 
                 # Check if performance record exists
-                existing_perf = session.query(ShopTrialPerformanceData).filter(
-                    and_(
-                        ShopTrialPerformanceData.session_id == session_id,
-                        ShopTrialPerformanceData.load_percentage == load_percentage,
-                        ShopTrialPerformanceData.test_sequence == test_sequence
-                    )
-                ).first()
+                existing_perf = (await session.execute(select(ShopTrialPerformanceData).where(and_(ShopTrialPerformanceData.session_id == session_id, ShopTrialPerformanceData.load_percentage == load_percentage, ShopTrialPerformanceData.test_sequence == test_sequence)))).scalar_one_or_none()
                 
                 clean_data = self._clean_performance_data(perf_data)
                 
@@ -369,17 +361,17 @@ class EfficientDataLoader:
                 # Process in smaller batches to avoid memory issues
                 for i in range(0, len(performance_to_insert), self.batch_size):
                     batch = performance_to_insert[i:i + self.batch_size]
-                    session.bulk_insert_mappings(ShopTrialPerformanceData, batch)
-                    session.flush()
+                    await session.bulk_insert_mappings(ShopTrialPerformanceData, batch)
+                    await session.flush()
             except Exception as e:
-                session.rollback()
+                await session.rollback()
                 self.stats.add_error(f"Batch insert failed: {e}", "performance_loading", "batch operation")
         
-        session.commit()
+        await session.commit()
         logger.info(f"Performance data loading completed: {self.stats.performance_records_inserted} inserted, "
                    f"{self.stats.performance_records_updated} updated")
     
-    def _load_monthly_headers_batch(self, session: Session, headers_data: List[Dict[str, Any]]) -> None:
+    async def _load_monthly_headers_batch(self, session: AsyncSession, headers_data: List[Dict[str, Any]]) -> None:
         """Load monthly headers using batch operations."""
         if not headers_data:
             return
@@ -407,9 +399,7 @@ class EfficientDataLoader:
                 
                 if report_key in self.report_id_cache:
                     # Update existing header
-                    existing_header = session.query(MonthlyReportHeader).filter_by(
-                        imo_number=imo_number, report_month=report_month
-                    ).first()
+                    existing_header = (await session.execute(select(MonthlyReportHeader).where(MonthlyReportHeader.imo_number == imo_number, MonthlyReportHeader.report_month == report_month))).scalar_one_or_none()
                     if existing_header:
                         self._update_monthly_header_fields(existing_header, clean_data)
                         headers_to_update.append(existing_header)
@@ -429,29 +419,32 @@ class EfficientDataLoader:
         # Batch insert new headers
         if headers_to_insert:
             try:
-                session.bulk_insert_mappings(MonthlyReportHeader, headers_to_insert)
-                session.flush()
+                await session.bulk_insert_mappings(MonthlyReportHeader, headers_to_insert)
+                await session.flush()
                 
                 # Update cache with newly inserted headers
                 for header_data in headers_to_insert:
                     imo_number = header_data['imo_number']
                     report_month = header_data['report_month']
-                    header_obj = session.query(MonthlyReportHeader).filter_by(
-                        imo_number=imo_number, report_month=report_month
-                    ).first()
+                    header_obj = (await session.execute(
+                        select(MonthlyReportHeader).where(
+                            MonthlyReportHeader.imo_number == imo_number,
+                            MonthlyReportHeader.report_month == report_month
+                        )
+                    )).scalar_one_or_none()
                     if header_obj:
                         report_key = f"{imo_number}_{report_month}"
                         self.report_id_cache[report_key] = header_obj.report_id
                         
             except Exception as e:
-                session.rollback()
+                await session.rollback()
                 self.stats.add_error(f"Batch insert failed: {e}", "monthly_header_loading", "batch operation")
         
-        session.commit()
+        await session.commit()
         logger.info(f"Monthly header loading completed: {self.stats.monthly_headers_inserted} inserted, "
                    f"{self.stats.monthly_headers_updated} updated")
     
-    def _load_monthly_details_batch(self, session: Session, details_data: List[Dict[str, Any]]) -> None:
+    async def _load_monthly_details_batch(self, session: AsyncSession, details_data: List[Dict[str, Any]]) -> None:
         """Load monthly details using batch operations."""
         if not details_data:
             return
@@ -477,9 +470,7 @@ class EfficientDataLoader:
                 clean_data = self._clean_monthly_detail_data(detail_data)
                 
                 # Check if detail exists
-                existing_detail = session.query(MonthlyReportDetailsJsonb).filter_by(
-                    report_id=report_id, section_name=section_name
-                ).first()
+                existing_detail = (await session.execute(select(MonthlyReportDetailsJsonb).where(MonthlyReportDetailsJsonb.report_id == report_id, MonthlyReportDetailsJsonb.section_name == section_name))).scalar_one_or_none()
                 
                 if existing_detail:
                     existing_detail.data_jsonb = clean_data.get('data_jsonb', {})
@@ -496,19 +487,19 @@ class EfficientDataLoader:
         # Batch insert new details
         if details_to_insert:
             try:
-                session.bulk_insert_mappings(MonthlyReportDetailsJsonb, details_to_insert)
+                await session.bulk_insert_mappings(MonthlyReportDetailsJsonb, details_to_insert)
             except Exception as e:
-                session.rollback()
+                await session.rollback()
                 self.stats.add_error(f"Batch insert failed: {e}", "monthly_detail_loading", "batch operation")
         
-        session.commit()
+        await session.commit()
         logger.info(f"Monthly detail loading completed: {self.stats.monthly_details_inserted} inserted, "
                    f"{self.stats.monthly_details_updated} updated")
     
     # Removed auto-creation of sessions and vessels to avoid unintended data
     
     # Helper methods for ID resolution
-    def _resolve_session_id(self, data: Dict[str, Any]) -> Optional[int]:
+    async def _resolve_session_id(self, session: AsyncSession, data: Dict[str, Any]) -> Optional[int]:
         """Resolve session_id for performance data."""
         engine_no = data.get("engine_no")
         # Strategy 1: Exact date match if provided
@@ -522,13 +513,14 @@ class EfficientDataLoader:
             return self.engine_default_session_id[engine_no]
         # Strategy 3: Fallback DB lookup (earliest session)
         try:
-            # Late import to avoid cycles
-            from .models import ShopTrialSession as _STS
-            with get_db_session_context() as s:
-                row = s.query(_STS).filter(_STS.engine_no == engine_no).order_by(_STS.trial_date.asc()).first()
-                if row:
-                    self.engine_default_session_id[engine_no] = row.session_id
-                    return row.session_id
+            row = (await session.execute(
+                select(ShopTrialSession)
+                .where(ShopTrialSession.engine_no == engine_no)
+                .order_by(ShopTrialSession.trial_date.asc())
+            )).scalar_one_or_none()
+            if row:
+                self.engine_default_session_id[engine_no] = row.session_id
+                return row.session_id
         except Exception:
             pass
         return None
@@ -647,7 +639,7 @@ class EfficientDataLoader:
         return {k: v for k, v in detail_data.items() if v is not None and k in allowed_fields}
 
 
-def load_data_to_database(extracted_data: Dict[str, List[Dict]]) -> LoadingStats:
+async def load_data_to_database(extracted_data: Dict[str, List[Dict]]) -> LoadingStats:
     """
     Main function to load extracted Excel data into PostgreSQL database.
     
@@ -658,4 +650,4 @@ def load_data_to_database(extracted_data: Dict[str, List[Dict]]) -> LoadingStats
         LoadingStats: Comprehensive statistics about the loading operation
     """
     loader = EfficientDataLoader()
-    return loader.load_all_data(extracted_data)
+    return await loader.load_all_data(extracted_data)

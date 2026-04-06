@@ -3,7 +3,9 @@
 import logging
 from decimal import Decimal, InvalidOperation, getcontext
 from typing import Optional, Dict, Any, List
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.models import (
     MonthlyReportHeader,
@@ -46,7 +48,7 @@ def safe_decimal(value: Any) -> Optional[Decimal]:
 
 class MEISOCorrector:
     
-    def __init__(self, session: Session):
+    def __init__(self, session: AsyncSession):
         self.session = session
     
     # --- HELPER: Baseline Interpolation (Preserved from original code) ---
@@ -81,20 +83,26 @@ class MEISOCorrector:
         interp = val_lower + (load_pct - load_lower) * (val_upper - val_lower) / (load_upper - load_lower)
         return interp.quantize(Decimal('0.0001'))
     
-    def get_reference_values_for_load(self, engine_no: str, load_pct: Decimal) -> Dict[str, Optional[Decimal]]:
+    async def get_reference_values_for_load(self, engine_no: str, load_pct: Decimal) -> Dict[str, Optional[Decimal]]:
         """
         Preserved for compatibility. 
         Note: The new MAN formula uses static 25C ref, but we keep this in case 
         Shop Trial P_back is needed for other analysis.
         """
         try:
-            session_rec = self.session.query(ShopTrialSession).filter_by(engine_no=engine_no).first()
+            result = await self.session.execute(
+                select(ShopTrialSession).where(ShopTrialSession.engine_no == engine_no)
+            )
+            session_rec = result.scalar_one_or_none()
             if not session_rec:
                 return {'t_sc_ref': ISO_REF_TEMP_C, 'p_back_ref': Decimal('50.0')}
             
-            baseline_records = self.session.query(ShopTrialPerformanceData).filter_by(
-                session_id=session_rec.session_id
-            ).order_by(ShopTrialPerformanceData.load_percentage).all()
+            result = await self.session.execute(
+                select(ShopTrialPerformanceData)
+                .where(ShopTrialPerformanceData.session_id == session_rec.session_id)
+                .order_by(ShopTrialPerformanceData.load_percentage)
+            )
+            baseline_records = result.scalars().all()
             
             if not baseline_records:
                 return {'t_sc_ref': ISO_REF_TEMP_C, 'p_back_ref': Decimal('50.0')}
@@ -106,7 +114,7 @@ class MEISOCorrector:
         except Exception as e:
             logger.exception(f"Error fetching baseline references: {e}")
             return {'t_sc_ref': ISO_REF_TEMP_C, 'p_back_ref': Decimal('50.0')}
-    
+
     # --- NEW: MAN Linear Correction Formula ---
     def _calculate_correction(self, measured_val: Optional[Decimal], 
                               t_air_meas: Optional[Decimal], 
@@ -146,7 +154,7 @@ class MEISOCorrector:
         except Exception:
             return None
 
-    def extract_measured(self, header: MonthlyReportHeader) -> Dict:
+    def extract_measured(self, header: MonthlyReportHeader, json_data: dict = None) -> Dict:
         """
         Extracts measured values with robust fallbacks for all parameters.
         Includes extensive JSON key search for Scavenge Pressure and Fuel Index.
@@ -163,22 +171,8 @@ class MEISOCorrector:
         foc_mt = safe_decimal(header.fo_consumption_mt_hr)
         
         # --- PREPARE JSON DATA (Lazy Loading) ---
-        json_data = None
-        def get_json_data():
-            nonlocal json_data
-            if json_data is None:
-                try:
-                    details = self.session.query(MonthlyReportDetailsJsonb).filter_by(
-                        report_id=header.report_id
-                    ).first()
-                    if details and details.data_jsonb:
-                        json_data = details.data_jsonb
-                    else:
-                        json_data = {}
-                except Exception as e:
-                    logger.error(f"Error fetching JSON details: {e}")
-                    json_data = {}
-            return json_data
+        if json_data is None:
+            json_data = {}
 
         # --- HELPER: Extract Value from potential Dictionary ---
         def get_val_from_json(data, keys):
@@ -202,7 +196,7 @@ class MEISOCorrector:
             t_cw = safe_decimal(header.cwtempaircoolerinlet_1)
         
         if t_cw is None:
-            data = get_json_data()
+            data = json_data
             cw_keys = ['cwtempaircoolerinlet#1', 'cwtempaircoolerinlet_1', 'cw_temp_air_cooler_inlet', 'scav_air_cooler_cw_in_temp_c']
             t_cw = get_val_from_json(data, cw_keys)
             if t_cw is not None:
@@ -219,14 +213,14 @@ class MEISOCorrector:
             t_inlet = safe_decimal(header.turbochargerairinlettemp_1)
             
         if t_inlet is None:
-            data = get_json_data()
+            data = json_data
             inlet_keys = ['turbochargerairinlettemp#1', 'turbochargerairinlettemp_1', 'tc_air_inlet_temp_c']
             t_inlet = get_val_from_json(data, inlet_keys)
 
         # --- 3. SCAVENGE PRESSURE (P_scav) ---
         psc = safe_decimal(header.scavenge_pr_bar)
         if psc is None:
-            data = get_json_data()
+            data = json_data
             psc_keys = ['scavengepr', 'scavenge_pr', 'scavenge_pressure', 'scav_air_pressure', 'scav_pres', 'scavenge_pr_bar']
             psc = get_val_from_json(data, psc_keys)
 
@@ -235,7 +229,7 @@ class MEISOCorrector:
         fipi = safe_decimal(header.fuel_injection_pump_index_mm)
         
         if fipi is None:
-            data = get_json_data()
+            data = json_data
             # 'fuelindexecu%' is the key in your specific JSON
             fipi_keys = [
                 'fuelindexecu%', 
@@ -253,7 +247,7 @@ class MEISOCorrector:
         # --- 5. SFOC (Robust Search) ---
         sfoc = safe_decimal(header.sfoc_measured_g_kwh) or safe_decimal(header.sfoc_calculated_g_kwh)
         if sfoc is None:
-            data = get_json_data()
+            data = json_data
             sfoc = get_val_from_json(data, ['sfoc', 'sfoc_g_kwh', 'sfoccalculated'])
 
         return {
@@ -275,19 +269,28 @@ class MEISOCorrector:
         }
         
              
-    def process_and_save_iso_correction(self, report_id: int) -> Optional[MonthlyISOPerformanceData]:
+    async def process_and_save_iso_correction(self, report_id: int) -> Optional[MonthlyISOPerformanceData]:
         try:
             logger.info(f"🔥 processing_and_save_iso_correction for Report ID: {report_id}")
-            
-            header = self.session.query(MonthlyReportHeader).filter_by(report_id=report_id).first()
+          
+            result = await self.session.execute(
+                select(MonthlyReportHeader)
+                .options(selectinload(MonthlyReportHeader.vessel))
+                .where(MonthlyReportHeader.report_id == report_id)
+            )
+            header = result.scalar_one_or_none()
             if not header: return None
             
-            measured = self.extract_measured(header)
             load_pct = safe_decimal(header.load_percent) or Decimal('0')
-            
+
             # Fetch JSON Data for robust searching
-            json_rec = self.session.query(MonthlyReportDetailsJsonb).filter_by(report_id=report_id).first()
+            json_result = await self.session.execute(
+                select(MonthlyReportDetailsJsonb).where(MonthlyReportDetailsJsonb.report_id == report_id)
+            )
+            json_rec = json_result.scalar_one_or_none()
             json_data = json_rec.data_jsonb if json_rec and json_rec.data_jsonb else {}
+
+            measured = self.extract_measured(header, json_data)
 
             # =========================================================
             # PART A: ENSURE CORRECT ACTUAL SFOC (Fix for 179.2 vs 194.68)
@@ -411,7 +414,10 @@ class MEISOCorrector:
                         prop_margin = ((actual_p - svc_power) / svc_power * Decimal('100')).quantize(Decimal('0.01'))
 
             # Save to Database
-            iso_record = self.session.query(MonthlyISOPerformanceData).filter_by(report_id=report_id).first()
+            iso_result = await self.session.execute(
+                select(MonthlyISOPerformanceData).where(MonthlyISOPerformanceData.report_id == report_id)
+            )
+            iso_record = iso_result.scalar_one_or_none()
             if not iso_record:
                 iso_record = MonthlyISOPerformanceData(report_id=report_id)
             
@@ -441,7 +447,7 @@ class MEISOCorrector:
             iso_record.propeller_margin_percent = prop_margin
             
             self.session.add(iso_record)
-            self.session.flush()
+            await self.session.flush()
             
             logger.info(f"✅ MonthlyISOPerformanceData saved for Report {report_id} (SFOC ISO: {iso_sfoc})")
             return iso_record

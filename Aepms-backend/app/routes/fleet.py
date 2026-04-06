@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/fleet", tags=["fleet"])
 async def get_fleet(
     current_user: dict = Depends(get_current_user),    # ← added
     control_db: AsyncSession = Depends(get_control_db),
-    aepms_db: Session = Depends(get_aepms_db),
+    aepms_db: AsyncSession = Depends(get_aepms_db),
 ):
     """Get all vessels with their current status for the fleet overview."""
     try:
@@ -58,12 +58,12 @@ async def get_fleet(
 
             latest_report = None
             if imo_int is not None:
-                latest_report = (
-                    aepms_db.query(MonthlyReportHeader)
-                    .filter(MonthlyReportHeader.imo_number == imo_int)
+                result = await aepms_db.execute(
+                    select(MonthlyReportHeader)
+                    .where(MonthlyReportHeader.imo_number == imo_int)
                     .order_by(desc(MonthlyReportHeader.report_date))
-                    .first()
                 )
+                latest_report = result.scalars().first()
 
             status = calculate_vessel_status(vessel, latest_report)
 

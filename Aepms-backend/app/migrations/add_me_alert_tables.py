@@ -3,7 +3,9 @@ Database migration to add ME alert categorization tables
 """
 
 from sqlalchemy import create_engine, text
-from app.database import engine
+from app.config import get_sync_database_url
+from sqlalchemy import create_engine
+engine = create_engine(get_sync_database_url())
 import logging
 
 logger = logging.getLogger(__name__)

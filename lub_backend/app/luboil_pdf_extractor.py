@@ -202,7 +202,8 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
         "metadata": {
             "vessel_name": None,
             "report_date": None,
-            "lab_name": "Shell LubeAnalyst"
+            "lab_name": "Shell LubeAnalyst",
+            "oil_source": None
         },
         "machineries": []
     }
@@ -213,6 +214,19 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
             # ── STEP A: GLOBAL METADATA (Page 1) ──────────────────────────
             if len(pdf.pages) > 0:
                 p1_text = pdf.pages[0].extract_text() or ""
+                
+                header_text = p1_text.lower()
+                if "shell lubeanalyst" in header_text or "shell" in header_text:
+                    full_report['metadata']['lab_name'] = "Shell LubeAnalyst"
+                    full_report['metadata']['oil_source'] = "SHELL"
+                elif "castrol" in header_text or "labcheck" in header_text:
+                    full_report['metadata']['lab_name'] = "Castrol Labcheck"
+                    full_report['metadata']['oil_source'] = "CASTROL"
+                elif "mobil" in header_text or "mobil serv" in header_text:
+                    full_report['metadata']['lab_name'] = "Mobil Serv"
+                    full_report['metadata']['oil_source'] = "MOBIL"
+                else:
+                    full_report['metadata']['oil_source'] = "UNKNOWN"
 
                 # 1. EXTRACT VESSEL NAME
                 # Strategy A: "Report Summary" Header (AM TARANG style)
@@ -413,7 +427,22 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
                 adds['boron']      = extract_value_by_regex(text, r"Boron \(B\) ppm\s+([\d.]+)")
                 adds['molybdenum'] = extract_value_by_regex(text, r"Molybdenum \(Mo\) ppm\s+([\d.]+)")
                 adds['barium']     = extract_value_by_regex(text, r"Barium \(Ba\).*?%\s+([\d.]+)")
-
+                
+                
+                if not full_report['metadata'].get('oil_source'):
+                    mfg_line_match = re.search(r"Manufacturer\s*-\s*Model[^\n]*\n([^\n]+)", text, re.IGNORECASE)
+                    
+                    if mfg_line_match:
+                        full_line = mfg_line_match.group(1).strip()
+                        
+                        # Split using the 6+ digit LubeAnalyst Code as the divider
+                        parts = re.split(r'\s+\d{6,}[A-Z0-9]*\s+', full_line)
+                        
+                        if len(parts) > 1:
+                            lubricant_string = parts[-1].strip() # Isolates "Shell - Melina S 30"
+                            if lubricant_string and "Equipment" not in lubricant_string:
+                                brand = lubricant_string.split('-')[0].strip().upper()
+                                full_report['metadata']['oil_source'] = brand
                 # ── 5. DEDUPLICATION & STORAGE ────────────────────────────
                 if machine['name']:
                     exists = False

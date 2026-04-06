@@ -1,12 +1,13 @@
 # app/crud.py
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.models import VesselInfo
 import logging
 
 logger = logging.getLogger(__name__)
 
-def get_or_create_vessel(session: Session, 
+async def get_or_create_vessel(session: AsyncSession,
                         vessel_name_from_pdf: str = None, 
                         imo_number_from_pdf: str = None,
                         engine_type_from_pdf: str = None,
@@ -39,9 +40,10 @@ def get_or_create_vessel(session: Session,
         raise ValueError("Vessel name is required but not found in PDF")
     
     # Try to find existing vessel by IMO number (primary key)
-    existing_vessel = session.query(VesselInfo).filter(
-        VesselInfo.imo_number == imo_int
-    ).first()
+    result = await session.execute(
+        select(VesselInfo).where(VesselInfo.imo_number == imo_int)
+    )
+    existing_vessel = result.scalar_one_or_none()
     
     if existing_vessel:
         logger.info(f"Found existing vessel with IMO {imo_int}: {existing_vessel.vessel_name}")
@@ -52,7 +54,7 @@ def get_or_create_vessel(session: Session,
             existing_vessel.vessel_name = vessel_name_from_pdf
             updated = True
         if engine_type_from_pdf and existing_vessel.engine_type != engine_type_from_pdf:
-            existing_vessel.engine_type = engine_type_from_pdf
+            existing_vessel.engine_type = str(engine_type_from_pdf) if engine_type_from_pdf is not None else None
             updated = True
         if engine_model_from_pdf and existing_vessel.engine_model != engine_model_from_pdf:
             existing_vessel.engine_model = engine_model_from_pdf
@@ -65,7 +67,7 @@ def get_or_create_vessel(session: Session,
             updated = True
             
         if updated:
-            session.flush()
+            await session.flush()
             logger.info(f"Updated vessel info for IMO {imo_int}")
             
         return existing_vessel
@@ -79,14 +81,14 @@ def get_or_create_vessel(session: Session,
             imo_number=imo_int,  # Primary key is now imo_number as integer
             vessel_name=vessel_name_from_pdf,
             engine_no=engine_no,  # Generated engine identifier
-            engine_type=engine_type_from_pdf,
+            engine_type=str(engine_type_from_pdf) if engine_type_from_pdf is not None else None,
             engine_model=engine_model_from_pdf,
             engine_maker=engine_maker_from_pdf,
             number_of_cylinders=number_of_cylinders_from_pdf
         )
         
         session.add(new_vessel)
-        session.flush()  # Get the auto-generated vessel_id
+        await session.flush()  # Get the auto-generated vessel_id
         
         logger.info(f"Created new vessel: IMO {imo_int}, Name: {vessel_name_from_pdf}, Engine No: {engine_no}")
         return new_vessel

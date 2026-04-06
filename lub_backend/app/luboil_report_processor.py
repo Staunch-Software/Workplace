@@ -5,7 +5,8 @@ import difflib  # Standard library for comparison
 from typing import BinaryIO, Dict, Any, Optional, Set
 from sqlalchemy.orm import Session
 from datetime import datetime
-
+from sqlalchemy import select
+from datetime import date as date_type
 # Import extractor
 from app.luboil_pdf_extractor import extract_lube_oil_report_data
 
@@ -189,7 +190,7 @@ def find_smart_match(target_name: str, candidates: Dict[str, str]) -> Optional[s
 
 # --- MAIN PROCESSOR ---
 
-def save_luboil_report(
+async def save_luboil_report(
     pdf_file_stream: BinaryIO, 
     filename: str, 
     session: Session
@@ -247,20 +248,27 @@ def save_luboil_report(
     logger.info(f"Matched Vessel: {vessel_display_name} (IMO: {vessel_imo}, Shell Code: {vessel_code})")
 
     # 3. PREPARE MASTER LIST FOR MATCHING
-    all_equipment = session.query(LuboilEquipmentType).all()
+    result = await session.execute(select(LuboilEquipmentType))
+    all_equipment = result.scalars().all()
     equipment_candidates = {eq.ui_label: eq.code for eq in all_equipment}
     machineries = extracted_data.get('machineries', [])
     pdf_sample_numbers = [
         str(m.get('sample_info', {}).get('number')) 
         for m in machineries if m.get('sample_info', {}).get('number')
     ]
-
+    oil_source_extracted = meta.get('oil_source', 'UNKNOWN') 
     # 4. HANDLE REPORT HEADER (Update without deleting children)
-    existing_report = session.query(LuboilReport).filter(LuboilReport.imo_number == vessel_imo,
-        LuboilReport.report_date == report_date_str,
-        LuboilReport.file_name == filename,
-        LuboilSample.sample_number.in_(pdf_sample_numbers)
-    ).first()
+    report_date_parsed = date_type.fromisoformat(report_date_str)
+
+    result = await session.execute(
+        select(LuboilReport).filter(
+            LuboilReport.imo_number == vessel_imo,
+            LuboilReport.report_date == report_date_parsed,
+            LuboilReport.file_name == filename,
+            LuboilSample.sample_number.in_(pdf_sample_numbers)
+        )
+    )
+    existing_report = result.scalars().first()
 
     is_duplicate = False
     if existing_report:
@@ -268,18 +276,20 @@ def save_luboil_report(
         report = existing_report
         report.file_name = filename
         report.full_json_data = extracted_data
+        report.oil_source = oil_source_extracted 
         is_duplicate = True
     else:
         report = LuboilReport(
             imo_number=vessel_imo,
             file_name=filename,
             lab_name=meta.get('lab_name', 'Shell LubeAnalyst'),
-            report_date=report_date_str,
-            full_json_data=extracted_data
+            report_date=report_date_parsed,
+            full_json_data=extracted_data,
+            oil_source=oil_source_extracted 
         )
         session.add(report)
     
-    session.flush() # Ensure report.report_id is available
+    await session.flush() # Ensure report.report_id is available
 
     # 5. PROCESS SAMPLES (Upsert Logic)
     machineries = extracted_data.get('machineries', [])
@@ -296,10 +306,13 @@ def save_luboil_report(
         # ── PRIORITY 1: Match by Lube Analyst Code via VesselConfig ──
         # PRIORITY 1: VesselConfig lookup by lube analyst code
         if lube_analyst_code and config_imo:
-            config_match = session.query(LuboilVesselConfig).filter(
-                LuboilVesselConfig.imo_number == config_imo,
-                LuboilVesselConfig.lab_analyst_code == lube_analyst_code
-            ).first()
+            result = await session.execute(
+                select(LuboilVesselConfig).filter(
+                    LuboilVesselConfig.imo_number == config_imo,
+                    LuboilVesselConfig.lab_analyst_code == lube_analyst_code
+                )
+            )
+            config_match = result.scalars().first()
             if config_match:
                 equipment_code = config_match.equipment_code
                 logger.info(f"✅ VesselConfig Match: '{lube_analyst_code}' → '{equipment_code}'")
@@ -308,9 +321,12 @@ def save_luboil_report(
 
         # PRIORITY 2: Name mapping cache
         if not equipment_code:
-            mapping = session.query(LuboilNameMapping).filter(
-                LuboilNameMapping.lab_raw_string == clean_name
-            ).first()
+            result = await session.execute(
+                select(LuboilNameMapping).filter(
+                    LuboilNameMapping.lab_raw_string == clean_name
+                )
+            )
+            mapping = result.scalars().first()
             if mapping:
                 equipment_code = mapping.equipment_code
                 logger.info(f"✅ Name Mapping cache: '{clean_name}' → '{equipment_code}'")
@@ -326,29 +342,35 @@ def save_luboil_report(
                             equipment_code=equipment_code
                         )
                         session.add(new_map)
-                        session.flush()
+                        await session.flush()
                     except Exception:
-                        session.rollback()
+                        await session.rollback()
                 logger.info(f"✅ Smart match: '{clean_name}' → '{equipment_code}' (score: {match_score:.2f})")
             else:
                 logger.warning(f"⚠️ No match found for: '{clean_name}' — saving with null equipment_code")
 
         # --- SMART MERGE CHECK ---
         # Check if this specific machinery sample already exists in this report
-        existing_sample = session.query(LuboilSample).filter(
-            LuboilSample.report_id == report.report_id,
-            LuboilSample.equipment_code == equipment_code
-        ).first()
+        result = await session.execute(
+            select(LuboilSample).filter(
+                LuboilSample.report_id == report.report_id,
+                LuboilSample.equipment_code == equipment_code
+            )
+        )
+        existing_sample = result.scalars().first()
 
         m_sample_info = machine.get('sample_info', {})
         lab_sample_number = m_sample_info.get('number') # This is e.g. "990166001"
 
         # 2. Update the check logic
-        existing_sample = session.query(LuboilSample).filter(
-            LuboilSample.report_id == report.report_id,
-            LuboilSample.equipment_code == equipment_code,
-            LuboilSample.sample_number == lab_sample_number  # ðŸ”¥ ADD THIS LINE
-        ).first()
+        result = await session.execute(
+            select(LuboilSample).filter(
+                LuboilSample.report_id == report.report_id,
+                LuboilSample.equipment_code == equipment_code,
+                LuboilSample.sample_number == lab_sample_number
+            )
+        )
+        existing_sample = result.scalars().first()
 
         chem = machine.get('chemistry', {})
         phys = chem.get('physical', {})
@@ -360,7 +382,7 @@ def save_luboil_report(
         tech_data = {
             "machinery_name": clean_name,
             "sample_number": m_sample_info.get('number'),
-            "sample_date": m_sample_info.get('date') or report_date_str,
+            "sample_date": date_type.fromisoformat(m_sample_info.get('date')) if m_sample_info.get('date') else report_date_parsed,
             "status": machine.get('status', 'Unknown'),
             "equipment_hours": m_sample_info.get('hours_equipment'),
             "summary_error": machine.get('summary_error'),
@@ -415,7 +437,7 @@ def save_luboil_report(
             session.add(new_sample)
             logger.info(f"âž• Added new sample for: {clean_name}")
 
-    session.commit()
+    await session.commit()
 
     # Calculate Summary for Response
     critical_count = sum(1 for m in machineries if m.get('status') in ['Critical', 'Action'])

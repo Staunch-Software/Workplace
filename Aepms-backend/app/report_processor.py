@@ -19,9 +19,8 @@ logger = logging.getLogger(__name__)
 logger.addHandler(file_handler)
 logger.setLevel(logging.DEBUG)
 
-from sqlalchemy.orm import Session
-from sqlalchemy import func
-
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
 from app.models import VesselInfo, MonthlyReportHeader, MonthlyReportDetailsJsonb, ShopTrialPerformanceData, MonthlyISOPerformanceData
 from app.field_metadata import FIELD_METADATA_MAPPING
 from app.pdf_extractor import extract_data_from_monthly_report_pdf
@@ -119,7 +118,7 @@ def enrich_with_units(raw_data: Dict[str, Any], mapping: Dict[str, Dict[str, Opt
 def build_header_from_enriched(
     enriched_data: Dict[str, Any],
     vessel_info: VesselInfo,
-    session: Session,
+    session: AsyncSession,
     mapping: Dict[str, Dict[str, Optional[str]]]
 ) -> MonthlyReportHeader:
     
@@ -216,7 +215,7 @@ def validate_me_report_type(raw_data: Dict[str, Any]) -> bool:
     
     return me_count >= ae_count
 
-def process_me_alerts(db: Session, report_id: int, baseline_data: List[Dict], monthly_data: Dict) -> Dict[str, int]:
+async def process_me_alerts(db: AsyncSession, report_id: int, baseline_data: List[Dict], monthly_data: Dict) -> Dict[str, int]:
     from app.models import MENormalStatus, MEWarningAlert, MECriticalAlert
     
     if not baseline_data or not monthly_data: return {}
@@ -316,17 +315,23 @@ def process_me_alerts(db: Session, report_id: int, baseline_data: List[Dict], mo
             logger.error(f"Alert error {metric}: {e}")
 
     # 🔥 CRITICAL FIX: Flush records so they are visible to the count query
-    db.flush()
+    await db.flush()
     
     return alerts_added
 
-def update_me_alert_summary(db: Session, report_id: int, vessel_name: str, imo_number: int, report_date: date, report_month: str):
+async def update_me_alert_summary(db: AsyncSession, report_id: int, vessel_name: str, imo_number: int, report_date: date, report_month: str):
     from app.models import MENormalStatus, MEWarningAlert, MECriticalAlert, MEAlertSummary
     
     # 1. Count current alerts from the specific alert tables
-    nc = db.query(func.count(MENormalStatus.id)).filter_by(report_id=report_id).scalar() or 0
-    wc = db.query(func.count(MEWarningAlert.id)).filter_by(report_id=report_id).scalar() or 0
-    cc = db.query(func.count(MECriticalAlert.id)).filter_by(report_id=report_id).scalar() or 0
+    nc = (await db.execute(
+        select(func.count(MENormalStatus.id)).where(MENormalStatus.report_id == report_id)
+    )).scalar() or 0
+    wc = (await db.execute(
+        select(func.count(MEWarningAlert.id)).where(MEWarningAlert.report_id == report_id)
+    )).scalar() or 0
+    cc = (await db.execute(
+        select(func.count(MECriticalAlert.id)).where(MECriticalAlert.report_id == report_id)
+    )).scalar() or 0
     
     logger.info(f"Alert Summary Counts - Normal: {nc}, Warning: {wc}, Critical: {cc}")
 
@@ -343,7 +348,10 @@ def update_me_alert_summary(db: Session, report_id: int, vessel_name: str, imo_n
     logger.info(f"Final Dominant Status Determined: {dom}")
     
     # 3. Find existing summary or create a new one
-    summ = db.query(MEAlertSummary).filter_by(report_id=report_id).first()
+    result = await db.execute(
+        select(MEAlertSummary).where(MEAlertSummary.report_id == report_id)
+    )
+    summ = result.scalar_one_or_none()
     if not summ:
         summ = MEAlertSummary(report_id=report_id)
         db.add(summ)
@@ -360,7 +368,7 @@ def update_me_alert_summary(db: Session, report_id: int, vessel_name: str, imo_n
     summ.updated_at = datetime.utcnow()
     
     # 5. Flush to ensure data is prepared for the transaction commit
-    db.flush()
+    await db.flush()
     
     return {
         "dominant": dom, 
@@ -489,7 +497,7 @@ def validate_parameter_intervals(raw_data: Dict[str, Any]) -> List[str]:
                 
     return interval_errors
 
-def save_monthly_report(pdf_file_stream: BinaryIO, filename: str, session: Session, mapping: Dict) -> Optional[Dict]:
+async def save_monthly_report(pdf_file_stream: BinaryIO, filename: str, session: AsyncSession, mapping: Dict) -> Optional[Dict]:
     logger.info(f"Processing monthly report: {filename}")
     
     # 1. Extract Raw Data from PDF
@@ -505,7 +513,7 @@ def save_monthly_report(pdf_file_stream: BinaryIO, filename: str, session: Sessi
         raise ValueError("Invalid Report Type (Not ME)")
         
     try:
-        vessel_info = get_or_create_vessel(
+        vessel_info = await get_or_create_vessel(
             session,
             imo_number_from_pdf=raw_data.get('imo'),
             vessel_name_from_pdf=raw_data.get('vesselname'),
@@ -516,7 +524,7 @@ def save_monthly_report(pdf_file_stream: BinaryIO, filename: str, session: Sessi
         )
         if not vessel_info: raise ValueError("Vessel creation failed")
     except Exception as e:
-        session.rollback()
+        await session.rollback()
         raise e
 
     # 3. Enrich and Build Header
@@ -533,10 +541,13 @@ def save_monthly_report(pdf_file_stream: BinaryIO, filename: str, session: Sessi
             return None
 
     # 4. Duplicate Check Logic (Based on Date and Time)
-    candidates = session.query(MonthlyReportHeader).filter_by(
-        imo_number=header.imo_number, 
-        report_date=header.report_date 
-    ).all()
+    result = await session.execute(
+        select(MonthlyReportHeader).where(
+            MonthlyReportHeader.imo_number == header.imo_number,
+            MonthlyReportHeader.report_date == header.report_date
+        )
+    )
+    candidates = result.scalars().all()
 
     existing = None
     new_time_str = str(header.time_start)[:5] if header.time_start else None
@@ -558,7 +569,7 @@ def save_monthly_report(pdf_file_stream: BinaryIO, filename: str, session: Sessi
                 "exhaust_temp": to_json_val(raw_data.get(f'exhausttemp#{i}'))
             }
         existing.cylinder_readings = cyl_data
-        session.flush()
+        await session.flush()
 
         # Apply ISO correction to cylinder readings (same as new report path)
         try:
@@ -589,7 +600,7 @@ def save_monthly_report(pdf_file_stream: BinaryIO, filename: str, session: Sessi
             print(f"❌ ISO FAILED: {e}")
             logger.warning(f"ISO correction skipped for duplicate: {e}")
         print(f"📤 RETURNING: {existing.cylinder_readings}")
-        session.commit()
+        await session.commit()
         return {
             "report_id": existing.report_id,
             "is_duplicate": True,
@@ -615,7 +626,7 @@ def save_monthly_report(pdf_file_stream: BinaryIO, filename: str, session: Sessi
             header.shaft_power_kw = header.effective_power_kw
             
         session.add(header)
-        session.flush() 
+        await session.flush()
         
         # 6. Store Raw JSON Data (Audit Trail - Never loses original values)
         def _make_json_serializable(obj):
@@ -634,14 +645,14 @@ def save_monthly_report(pdf_file_stream: BinaryIO, filename: str, session: Sessi
             section_name="raw_extract",
             data_jsonb=_make_json_serializable(enriched)
         ))
-        session.flush()
+        await session.flush()
 
         # =========================================================
         # 🔥 7. ISO CORRECTION (Averages & Individual Cylinders)
         # =========================================================
         logger.info("🔧 Running ISO Correction...")
         iso_corrector = MEISOCorrector(session)
-        iso_record = iso_corrector.process_and_save_iso_correction(header.report_id)
+        iso_record = await iso_corrector.process_and_save_iso_correction(header.report_id)
         
         if not iso_record:
             logger.error("❌ ISO Correction returned None")
@@ -680,17 +691,23 @@ def save_monthly_report(pdf_file_stream: BinaryIO, filename: str, session: Sessi
             
             # Update header with corrected values
             header.cylinder_readings = corrected_readings
-            session.flush()
+            await session.flush()
 
         # 8. Deviation Calculation
         logger.info("🔧 Running Deviation Calculation...")
-        deviation_record = compute_and_save_me_deviation(session, header.report_id)
+        deviation_record = await compute_and_save_me_deviation(session, header.report_id)
         
         # 9. Alert Processing
         if iso_record:
-            st_sess = session.query(ShopTrialPerformanceData).filter(
-                ShopTrialPerformanceData.session.has(engine_no=vessel_info.engine_no)
-            ).order_by(ShopTrialPerformanceData.load_percentage).all()
+            from app.models import ShopTrialSession as ShopTrialSessionModel
+            st_result = await session.execute(
+                select(ShopTrialPerformanceData)
+                .join(ShopTrialSessionModel,
+                      ShopTrialPerformanceData.session_id == ShopTrialSessionModel.session_id)
+                .where(ShopTrialSessionModel.engine_no == vessel_info.engine_no)
+                .order_by(ShopTrialPerformanceData.load_percentage)
+            )
+            st_sess = st_result.scalars().all()
             
             baseline_list = [{
                 "load_percentage": float(r.load_percentage),
@@ -722,10 +739,10 @@ def save_monthly_report(pdf_file_stream: BinaryIO, filename: str, session: Sessi
                 "load_percent": float(header.load_percent or 0)
             }
             
-            process_me_alerts(session, header.report_id, baseline_list, monthly_dict)
-            update_me_alert_summary(session, header.report_id, vessel_info.vessel_name, vessel_info.imo_number, header.report_date, header.report_month)
+            await process_me_alerts(session, header.report_id, baseline_list, monthly_dict)
+            await update_me_alert_summary(session, header.report_id, vessel_info.vessel_name, vessel_info.imo_number, header.report_date, header.report_month)
 
-        session.commit()
+        await session.commit()
         logger.info("✅ All Data Committed Successfully.")
 
         return {
@@ -736,6 +753,6 @@ def save_monthly_report(pdf_file_stream: BinaryIO, filename: str, session: Sessi
         }
 
     except Exception as e:
-        session.rollback()
+        await session.rollback()
         logger.exception(f"Pipeline Failed: {e}")
         raise

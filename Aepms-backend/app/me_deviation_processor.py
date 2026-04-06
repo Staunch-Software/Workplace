@@ -3,7 +3,8 @@
 import logging
 from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Optional, Any
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from sqlalchemy import func
 
 from app.models import (
@@ -82,30 +83,35 @@ def interpolate_baseline(load_pct: Decimal, baseline_data: List, field: str, fal
             return res.quantize(Decimal('0.0001'))
     return None
 
-def compute_and_save_me_deviation(session: Session, report_id: int) -> Optional[MEDeviationHistory]:
+async def compute_and_save_me_deviation(session: AsyncSession, report_id: int) -> Optional[MEDeviationHistory]:
     try:
         logger.info(f"🚀 Computing ME Deviation for Report {report_id}")
         
-        header = session.query(MonthlyReportHeader).filter_by(report_id=report_id).first()
-        iso = session.query(MonthlyISOPerformanceData).filter_by(report_id=report_id).first()
+        result = await session.execute(select(MonthlyReportHeader).where(MonthlyReportHeader.report_id == report_id))
+        header = result.scalar_one_or_none()
+        result = await session.execute(select(MonthlyISOPerformanceData).where(MonthlyISOPerformanceData.report_id == report_id))
+        iso = result.scalar_one_or_none()
         
         if not iso:
             logger.error("❌ ISO data missing. Cannot compute deviation.")
             return None
             
-        json_rec = session.query(MonthlyReportDetailsJsonb).filter(
+        result = await session.execute(select(MonthlyReportDetailsJsonb).where(
             MonthlyReportDetailsJsonb.report_id == report_id,
             MonthlyReportDetailsJsonb.section_name.in_(['raw_extract', 'raw_extract_me'])
-        ).first()
+        ))
+        json_rec = result.scalar_one_or_none()
         json_data = json_rec.data_jsonb if json_rec else {}
         
         vessel = header.vessel
-        st_session = session.query(ShopTrialSession).filter_by(engine_no=vessel.engine_no).first()
+        result = await session.execute(select(ShopTrialSession).where(ShopTrialSession.engine_no == vessel.engine_no))
+        st_session = result.scalar_one_or_none()
         baselines = []
         if st_session:
-            baselines = session.query(ShopTrialPerformanceData).filter_by(
-                session_id=st_session.session_id
-            ).order_by(ShopTrialPerformanceData.load_percentage).all()
+            result = await session.execute(select(ShopTrialPerformanceData).where(
+                ShopTrialPerformanceData.session_id == st_session.session_id
+            ).order_by(ShopTrialPerformanceData.load_percentage))
+            baselines = result.scalars().all()
             
         load_pct = safe_decimal(header.load_percent) or Decimal('0')
         
@@ -172,7 +178,8 @@ def compute_and_save_me_deviation(session: Session, report_id: int) -> Optional[
             prop_dp = prop_d 
 
         # Save
-        dev_rec = session.query(MEDeviationHistory).filter_by(report_id=report_id).first()
+        result = await session.execute(select(MEDeviationHistory).where(MEDeviationHistory.report_id == report_id))
+        dev_rec = result.scalar_one_or_none()
         if not dev_rec:
             dev_rec = MEDeviationHistory(report_id=report_id, imo_number=header.imo_number)
             
@@ -256,7 +263,7 @@ def compute_and_save_me_deviation(session: Session, report_id: int) -> Optional[
         dev_rec.fuel_index_dev_pct = fipi_dp
         
         session.add(dev_rec)
-        session.flush()
+        await session.flush()
         
         logger.info("✅ ME Deviation Calculated and Saved (Incl. Engine RPM & Propeller Margin).")
         return dev_rec

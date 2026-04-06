@@ -1,7 +1,7 @@
 # app/routes/dashboard.py
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import desc, distinct, func
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import desc, distinct, func, select
 from typing import Dict, List, Optional
 import logging
 import math
@@ -46,8 +46,8 @@ def _imo_to_int(imo_str: str) -> Optional[int]:
 @router.get("/kpis")
 async def get_dashboard_kpis(
     ship_id: Optional[str] = Query(None),
-    control_db: Session = Depends(get_control_db),      # workplace vessels
-    aepms_db: Session = Depends(get_aepms_db),          # vessel_info / reports
+    control_db: AsyncSession = Depends(get_control_db),      # workplace vessels
+    aepms_db: AsyncSession = Depends(get_aepms_db),          # vessel_info / reports
 ):
     """
     Get fleet-wide KPIs for dashboard.
@@ -63,7 +63,8 @@ async def get_dashboard_kpis(
         logger.info(f"Dashboard KPIs requested for ship_id: {ship_id}")
 
         # ── 1. TOTAL FLEET from workplace vessels ─────────────────────────────
-        all_vessels = control_db.query(Vessel).filter(Vessel.is_active == True).all()
+        result = await control_db.execute(select(Vessel).where(Vessel.is_active == True))
+        all_vessels = result.scalars().all()
         total_fleet = len(all_vessels)
 
         # Integer IMO set for cross-DB comparisons
@@ -75,45 +76,51 @@ async def get_dashboard_kpis(
         }
 
         # ── 2. ME CONFIGURED ─────────────────────────────────────────────────
-        me_configured_rows = aepms_db.query(
-            distinct(VesselInfo.imo_number)
-        ).join(
-            ShopTrialSession,
-            VesselInfo.engine_no == ShopTrialSession.engine_no
-        ).all()
+        result = await aepms_db.execute(
+            select(distinct(VesselInfo.imo_number)).join(
+                ShopTrialSession,
+                VesselInfo.engine_no == ShopTrialSession.engine_no
+            )
+        )
+        me_configured_rows = result.all()
         me_configured_set = {row[0] for row in me_configured_rows}
         me_configured_count = len(me_configured_set & fleet_imo_set)
 
         # ── 3. AE CONFIGURED ─────────────────────────────────────────────────
-        ae_configured_rows = aepms_db.query(
-            distinct(VesselInfo.imo_number)
-        ).join(
-            GeneratorBaselineData,
-            VesselInfo.imo_number == GeneratorBaselineData.imo_number
-        ).all()
+        result = await aepms_db.execute(
+            select(distinct(VesselInfo.imo_number)).join(
+                GeneratorBaselineData,
+                VesselInfo.imo_number == GeneratorBaselineData.imo_number
+            )
+        )
+        ae_configured_rows = result.all()
         ae_configured_set = {row[0] for row in ae_configured_rows}
         ae_configured_count = len(ae_configured_set & fleet_imo_set)
 
         # ── 4. CONFIG GAPS ────────────────────────────────────────────────────
-        all_vessel_info_imos = {
-            row[0]
-            for row in aepms_db.query(VesselInfo.imo_number).all()
-        }
+        result = await aepms_db.execute(select(VesselInfo.imo_number))
+        all_vessel_info_imos = {row[0] for row in result.all()}
         unregistered      = fleet_imo_set - all_vessel_info_imos
         me_not_configured = (fleet_imo_set & all_vessel_info_imos) - me_configured_set
         ae_not_configured = (fleet_imo_set & all_vessel_info_imos) - ae_configured_set
         total_config_gaps = len(unregistered) + len(me_not_configured) + len(ae_not_configured)
 
         # ── 5. UNCONFIGURED LISTS (for dashboard tables) ──────────────────────
-        me_unconfigured_vessels = aepms_db.query(VesselInfo).filter(
-            VesselInfo.imo_number.notin_(me_configured_set),
-            VesselInfo.imo_number.in_(fleet_imo_set),
-        ).all()
+        result = await aepms_db.execute(
+            select(VesselInfo).where(
+                VesselInfo.imo_number.notin_(me_configured_set),
+                VesselInfo.imo_number.in_(fleet_imo_set),
+            )
+        )
+        me_unconfigured_vessels = result.scalars().all()
 
-        ae_unconfigured_vessels = aepms_db.query(VesselInfo).filter(
-            VesselInfo.imo_number.notin_(ae_configured_set),
-            VesselInfo.imo_number.in_(fleet_imo_set),
-        ).all()
+        result = await aepms_db.execute(
+            select(VesselInfo).where(
+                VesselInfo.imo_number.notin_(ae_configured_set),
+                VesselInfo.imo_number.in_(fleet_imo_set),
+            )
+        )
+        ae_unconfigured_vessels = result.scalars().all()
 
         # ── 6. FLEET HEALTH ───────────────────────────────────────────────────
         health_counts = {"Healthy": 0, "Watch": 0, "Alert": 0}
@@ -121,17 +128,17 @@ async def get_dashboard_kpis(
             imo_int = _imo_to_int(vessel.imo)
             if not imo_int:
                 continue
-            latest_report = (
-                aepms_db.query(MonthlyReportHeader)
-                .filter(MonthlyReportHeader.imo_number == imo_int)
+            result = await aepms_db.execute(
+                select(MonthlyReportHeader)
+                .where(MonthlyReportHeader.imo_number == imo_int)
                 .order_by(desc(MonthlyReportHeader.report_date))
-                .first()
             )
+            latest_report = result.scalars().first()
             status = calculate_vessel_status(None, latest_report)   # vessel arg unused
             health_counts[status] += 1
 
         # ── 7. BASELINE SERIES for charts (unchanged logic) ───────────────────
-        baseline_data = generate_baseline_series(aepms_db, ship_id)
+        baseline_data = await generate_baseline_series(aepms_db, ship_id)
         logger.info(f"Generated baseline data keys: {list(baseline_data.keys())}")
         kpi_load = 75
         kpi_sfoc = interpolate_value(baseline_data.get("SFOC", []), kpi_load)
@@ -202,19 +209,24 @@ def calculate_vessel_status(vessel: Optional[VesselInfo], latest_report) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 # HELPER — baseline series  (logic 100 % preserved, only db arg renamed)
 # ─────────────────────────────────────────────────────────────────────────────
-def generate_baseline_series(db: Session, vessel_imo: Optional[str] = None) -> Dict:
+async def generate_baseline_series(db: AsyncSession, vessel_imo: Optional[str] = None) -> Dict:
     """Get real baseline data from shop trial performance data."""
     if vessel_imo:
         try:
-            vessel = db.query(VesselInfo).filter_by(imo_number=int(vessel_imo)).first()
+            result = await db.execute(select(VesselInfo).where(VesselInfo.imo_number == int(vessel_imo)))
+            vessel = result.scalar_one_or_none()
             if vessel:
                 logger.info(f"Found vessel: {vessel.vessel_name}, engine_no: {vessel.engine_no}")
-                sessions = db.query(ShopTrialSession).filter_by(engine_no=vessel.engine_no).all()
+                result = await db.execute(select(ShopTrialSession).where(ShopTrialSession.engine_no == vessel.engine_no))
+                sessions = result.scalars().all()
                 logger.info(f"Found {len(sessions)} sessions for engine_no: {vessel.engine_no}")
                 session_ids = [s.session_id for s in sessions]
-                shop_data = db.query(ShopTrialPerformanceData).filter(
-                    ShopTrialPerformanceData.session_id.in_(session_ids)
-                ).all()
+                result = await db.execute(
+                    select(ShopTrialPerformanceData).where(
+                        ShopTrialPerformanceData.session_id.in_(session_ids)
+                    )
+                )
+                shop_data = result.scalars().all()
                 logger.info(f"Found {len(shop_data)} shop trial data points")
             else:
                 logger.warning(f"No vessel found for imo_number: {vessel_imo}")
@@ -223,7 +235,8 @@ def generate_baseline_series(db: Session, vessel_imo: Optional[str] = None) -> D
             logger.error(f"Error processing vessel_imo {vessel_imo}: {e}")
             shop_data = []
     else:
-        first_vessel = db.query(VesselInfo).first()
+        result = await db.execute(select(VesselInfo))
+        first_vessel = result.scalars().first()
         if first_vessel:
             sessions = db.query(ShopTrialSession).filter_by(engine_no=first_vessel.engine_no).all()
             session_ids = [s.session_id for s in sessions]
