@@ -9,11 +9,8 @@ import {
 } from 'lucide-react';
 import './Shore.css';
 import { createVessel } from '@drs/api/vessels';
-<<<<<<< HEAD
 import DrsAiAssistant from './DrsAiAssistant';
-=======
 import "../../components/shared/defects-responsive.css"
->>>>>>> a94d72603b300231deeb2631bee82ed1f8fdac20
 
 const ShoreLayout = () => {
   const { user, logout } = useAuth();
