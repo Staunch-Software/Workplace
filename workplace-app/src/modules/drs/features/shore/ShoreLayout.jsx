@@ -898,7 +898,7 @@ const ShoreLayout = () => {
           </div>
         );
       })()}
-      <DrsAiAssistant />
+      {/* <DrsAiAssistant /> */}
 
     </div>
   );
