@@ -54,7 +54,8 @@ const OverdueVesselRow = ({
   onUpload,
   canApprove,
   isOverdueModal,
-  onVesselAction // 🔥 Newly added prop for workflow
+  onVesselAction,
+  canAddJustification  // 🔥 Newly added prop for workflow
 }) => {
   const[isExpanded, setIsExpanded] = React.useState(false);
   
@@ -150,7 +151,7 @@ const OverdueVesselRow = ({
               <span>{v.name}</span>
 
               {/* 🔥 NEW: "+" BUTTON TO ADD REMARK (Hidden if pending or accepted) */}
-              {!isConfiguredView && !isPending && isOverdueModal && 
+              {!isConfiguredView && !isPending && isOverdueModal && canAddJustification &&
   (!isAccepted || v.overdueItems?.some(i => !i.report_overdue_remarks)) && (
                 <button
                   onClick={(e) => {
@@ -171,7 +172,7 @@ const OverdueVesselRow = ({
               {/* 🔥 NEW: STATUS INDICATORS */}
               {isPending && (
                 <span style={{ fontSize: "0.65rem", backgroundColor: "#fef3c7", color: "#d97706", padding: "2px 8px", borderRadius: "10px", border: "1px solid #fde68a" }}>
-                  ⏳ PENDING SHORE APPROVAL
+                  ⏳ PENDING APPROVAL
                 </span>
               )}
               {isAccepted && (
@@ -709,6 +710,13 @@ const LuboilAnalysis = () => {
   const isTechManager = rawJobTitle.includes("techmanager") || rawJobTitle.includes("technicalmanager");
   const isTechDirector = rawJobTitle.includes("techdirector") || rawJobTitle.includes("technicaldirector");
   const canApprove = isTechManager || isTechDirector;
+  const canAddJustification = 
+    isTechManager || 
+    isTechDirector || 
+    rawJobTitle.includes("vesselmanager") || 
+    rawJobTitle.includes("assistantvesselmanager") ||
+    rawJobTitle.includes("assistanttechnicalmanager") ||
+    userRole === "ADMIN";
   const fetchFeed = async () => {
     setFeedLoading(true);
     try {
@@ -4253,7 +4261,7 @@ const LuboilAnalysis = () => {
                     color: "#334155",
                   }}
                 >
-                  Overdue &gt; 30 Days
+                  Overdue &gt; 30 Days With Concern
                 </div>
               </div>
             </div>
@@ -4490,7 +4498,7 @@ const LuboilAnalysis = () => {
                       style={{
                         width:
                           selectedVesselsFilter.length > 5
-                            ? `calc(220px + (${selectedVesselsFilter.length} * ((100% - 220px) / 4)))`
+                            ? `calc(220px + (${selectedVesselsFilter.length} * ((100% - 220px) / 5)))`
                             : "100%",
                         borderCollapse: "separate", // Necessary for sticky headers to not flicker
                         borderSpacing: 0,
@@ -9012,6 +9020,7 @@ const LuboilAnalysis = () => {
                     user={user}  
                     amIShore={amIShore} // Pass the shore check here
                     onUpload={handleVesselManualReportUpload}
+                    canAddJustification={canAddJustification}
                     onVesselAction={handleVesselOverdueAction}
                     isOverdueModal={listModal.type === "Overdue < 30 Days" || listModal.type === "Overdue > 30 Days"}  // 🔥 ADD THIS
                     canApprove={canApprove}
