@@ -12,8 +12,9 @@ import logging
 from decimal import Decimal
 from typing import Optional, Dict, List, Tuple, Any
 
-from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_, select, func
+from sqlalchemy.orm import selectinload
 
 from app.generator_models import (
     GeneratorMonthlyReportHeader,
@@ -25,19 +26,27 @@ from app.generator_models import (
 logger = logging.getLogger(__name__)
 
 
-def compute_and_save_ae_deviation(session: Session, report_id: int) -> None:
+async def compute_and_save_ae_deviation(session: AsyncSession, report_id: int) -> None:
     """
     Main entry point: Computes and saves AE deviation data for a given report.
     """
     try:
         # 🛑 DUPLICATE PREVENTION: Check if record already exists
-        existing = session.query(AEDeviationHistory).filter_by(report_id=report_id).first()
+        result = await session.execute(
+            select(AEDeviationHistory).where(AEDeviationHistory.report_id == report_id)
+        )
+        existing = result.scalar_one_or_none()
         if existing:
             logger.info(f"[AE DEVIATION] Record already exists for report_id={report_id}, skipping.")
             return
 
         # 📥 Step 1: Fetch report header
-        header = session.query(GeneratorMonthlyReportHeader).filter_by(report_id=report_id).first()
+        result = await session.execute(
+            select(GeneratorMonthlyReportHeader)
+            .options(selectinload(GeneratorMonthlyReportHeader.details_json))
+            .where(GeneratorMonthlyReportHeader.report_id == report_id)
+        )
+        header = result.scalar_one_or_none()
         if not header:
             logger.error(f"[AE DEVIATION] No header found for report_id={report_id}")
             return
@@ -46,7 +55,10 @@ def compute_and_save_ae_deviation(session: Session, report_id: int) -> None:
         logger.info(f"[AE DEVIATION] Processing report_id={report_id}, generator_id={generator_id}")
 
         # 📥 Step 2: Fetch graph data (contains load%)
-        graph = session.query(GeneratorPerformanceGraphData).filter_by(report_id=report_id).first()
+        result = await session.execute(
+            select(GeneratorPerformanceGraphData).where(GeneratorPerformanceGraphData.report_id == report_id)
+        )
+        graph = result.scalar_one_or_none()
         if not graph or graph.load_percentage is None:
             raise ValueError(f"[AE DEVIATION] Missing load_percentage for report_id={report_id}")
 
@@ -54,10 +66,12 @@ def compute_and_save_ae_deviation(session: Session, report_id: int) -> None:
         load_kw = float(graph.load_kw) if graph.load_kw else None
         
         # 📥 Step 3: Fetch baseline data for this generator
-        baseline_rows = session.query(GeneratorBaselineData)\
-            .filter_by(generator_id=generator_id)\
-            .order_by(GeneratorBaselineData.load_percentage)\
-            .all()
+        result = await session.execute(
+            select(GeneratorBaselineData)
+            .where(GeneratorBaselineData.generator_id == generator_id)
+            .order_by(GeneratorBaselineData.load_percentage)
+        )
+        baseline_rows = result.scalars().all()
 
         if not baseline_rows:
             logger.error(f"[AE DEVIATION] No baseline data for generator_id={generator_id}")
@@ -91,14 +105,12 @@ def compute_and_save_ae_deviation(session: Session, report_id: int) -> None:
 
         # 💾 Step 7: Save to database
         session.add(deviation_record)
-        session.commit()
-        session.flush()
+        await session.flush()
         logger.info(f"[AE DEVIATION] ✅ Successfully saved deviations for report_id={report_id}")
 
     except Exception as e:
-        session.rollback()
+        await session.rollback()
         logger.error(f"[AE DEVIATION] ❌ Error processing report_id={report_id}: {str(e)}", exc_info=True)
-
 
 def _extract_cylinder_data(header: GeneratorMonthlyReportHeader) -> Dict[str, Any]:
     """

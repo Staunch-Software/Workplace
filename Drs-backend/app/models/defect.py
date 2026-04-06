@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import Column, String, Integer, Text, DateTime, Boolean, ForeignKey, Enum as SQLEnum, ARRAY, CheckConstraint
 from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.dialects.postgresql import UUID
@@ -8,6 +10,8 @@ from app.core.database import Base
 from app.models.enums import DefectPriority, DefectStatus, DefectSource
 from typing import Optional
 from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Column, DateTime, func
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 class Defect(Base):
     __tablename__ = "defects"
@@ -72,7 +76,7 @@ class Defect(Base):
     json_backup_path = Column(String, nullable=True)
     is_deleted = Column(Boolean, default=False, nullable=False)
     is_owner = Column(Boolean, default=False, nullable=False)
-    is_flagged = Column(Boolean, default=False, nullable=False)
+    # is_flagged = Column(Boolean, default=False, nullable=False)
     is_dd = Column(Boolean, default=False, nullable=False)
     defect_number = Column(String(20), nullable=True, unique=True, index=True)
     # Relationships
@@ -185,4 +189,13 @@ class DefectImage(Base):
         onupdate=func.now()
     )
 
-    defect = relationship("Defect", back_populates="images")
+    defect = relationship("Defect", back_populates="images") 
+
+
+
+class UserDefectFlag(Base):
+    __tablename__ = "user_defect_flags"
+
+    user_id   = Column(PG_UUID(as_uuid=True), primary_key=True, nullable=False)
+    defect_id = Column(PG_UUID(as_uuid=True), ForeignKey("defects.id"), primary_key=True, nullable=False)
+    created_at = Column(DateTime, default=func.now())

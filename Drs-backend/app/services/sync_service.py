@@ -318,8 +318,13 @@ class SyncService:
 
                     # Update fields dynamically
                     for key, value in clean_data.items():
-                        if hasattr(existing_entity, key):
-                            setattr(existing_entity, key, value)
+                        if not hasattr(existing_entity, key):
+                            continue
+                        # Never overwrite a NOT NULL column with a falsy value
+                        col = model_class.__table__.columns.get(key)
+                        if col is not None and not col.nullable and not value:
+                            continue
+                        setattr(existing_entity, key, value)
                 elif incoming_version == current_version and hasattr(model_class, 'version'):
                     incoming_origin = data.get('origin', 'SYNC')
                     local_origin = getattr(existing_entity, 'origin', 'VESSEL')

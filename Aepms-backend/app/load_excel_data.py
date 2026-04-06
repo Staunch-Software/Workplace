@@ -7,6 +7,7 @@ Supports both Main Engine (ME) and Auxiliary Engine (AE) data loading.
 import argparse
 import sys
 import os
+import asyncio
 import logging
 from pathlib import Path
 from typing import Optional
@@ -94,7 +95,7 @@ def print_config_info():
     logger.info(f"  Log Level: {app_config.LOG_LEVEL}")
     logger.info(f"  Data Directory: {app_config.DATA_DIR}")
 
-def load_excel_to_database(excel_path: Optional[str] = None, ae_excel_path: Optional[str] = None, 
+async def load_excel_to_database(excel_path: Optional[str] = None, ae_excel_path: Optional[str] = None, 
                           create_tables: bool = True, dry_run: bool = False) -> bool:
     """
     Main function to orchestrate Excel data loading into PostgreSQL.
@@ -143,7 +144,8 @@ def load_excel_to_database(excel_path: Optional[str] = None, ae_excel_path: Opti
         
         # Step 4: Initialize database connection
         logger.info("Initializing database connection...")
-        if not init_database(create_tables=create_tables):
+        
+        if not await init_database(create_tables=create_tables):
             logger.error("Failed to initialize database")
             return False
         
@@ -243,7 +245,7 @@ def load_excel_to_database(excel_path: Optional[str] = None, ae_excel_path: Opti
         if me_extracted_data and me_total_records > 0:
             logger.info("Loading Main Engine data into PostgreSQL database...")
             try:
-                me_stats = load_data_to_database(me_extracted_data)
+                me_stats = await load_data_to_database(me_extracted_data)
             except Exception as e:
                 logger.error(f"Failed to load Main Engine data into database: {e}")
                 if not ae_extracted_data:
@@ -255,7 +257,7 @@ def load_excel_to_database(excel_path: Optional[str] = None, ae_excel_path: Opti
         if ae_extracted_data and ae_total_records > 0:
             logger.info("Loading Auxiliary Engine data into PostgreSQL database...")
             try:
-                ae_stats = load_ae_data_to_database(ae_extracted_data)
+                ae_stats = await load_ae_data_to_database(ae_extracted_data)
             except Exception as e:
                 logger.error(f"Failed to load AE data into database: {e}")
                 if not me_stats:
@@ -400,8 +402,8 @@ ENVIRONMENT VARIABLES:
         # Handle database check
         if args.check_db:
             logger.info("Testing database connection...")
-            if init_database(create_tables=False):
-                table_info = get_table_info()
+            if asyncio.run(init_database(create_tables=False)):
+                table_info = asyncio.run(get_table_info())
                 if table_info:
                     print("\nDatabase Tables and Row Counts:")
                     print("-" * 50)
@@ -445,18 +447,19 @@ ENVIRONMENT VARIABLES:
             logger.info(f"Processing Auxiliary Engine Excel file: {ae_excel_path}")
         
         # Main processing
-        success = load_excel_to_database(
+        success = asyncio.run(load_excel_to_database(
             excel_path=excel_path,
             ae_excel_path=ae_excel_path,
             create_tables=not args.no_create_tables,
             dry_run=args.dry_run
-        )
+        ))
+
         
         if success:
             if not args.dry_run:
                 print("\n✅ Data loading completed successfully!")
                 
-                table_info = get_table_info()
+                table_info = asyncio.run(get_table_info())
                 if table_info:
                     print("\nFinal Database State:")
                     print("-" * 30)

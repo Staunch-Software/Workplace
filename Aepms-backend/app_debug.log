@@ -186,3 +186,56 @@ DETAIL:  A field with precision 5, scale 2 must round to an absolute value less 
 2026-03-26 22:58:32,889 [INFO] app.report_processor: Processing monthly report: TE-07 ME Performance Sheet JAN 2025.pdf
 2026-03-26 22:58:34,351 [INFO] app.report_processor: Alert Summary Counts - Normal: 13, Warning: 0, Critical: 0
 2026-03-26 22:58:34,352 [INFO] app.report_processor: Final Dominant Status Determined: Normal
+2026-04-01 10:16:00,813 [INFO] app.report_processor: Processing monthly report: 08. TECH-07 ME Performance Sheet DEC 2025.pdf
+2026-04-01 10:16:02,277 [INFO] app.report_processor: Alert Summary Counts - Normal: 9, Warning: 0, Critical: 4
+2026-04-01 10:16:02,278 [INFO] app.report_processor: Final Dominant Status Determined: Critical
+2026-04-01 10:20:00,947 [INFO] app.report_processor: Processing monthly report: 08. TECH-07 ME Performance Sheet DEC 2025.pdf
+2026-04-01 10:21:31,797 [INFO] app.report_processor: Processing monthly report: 08. TECH-07 ME Performance Sheet DEC 2025.pdf
+2026-04-01 10:26:06,652 [INFO] app.report_processor: Processing monthly report: 08. TECH-07 ME Performance Sheet NOV 2025.pdf
+2026-04-01 10:26:07,407 [INFO] app.report_processor: Alert Summary Counts - Normal: 7, Warning: 4, Critical: 2
+2026-04-01 10:26:07,407 [INFO] app.report_processor: Final Dominant Status Determined: Critical
+2026-04-01 14:39:13,974 [INFO] app.report_processor: Processing monthly report: 3. TE-07 ME Performance.pdf
+2026-04-01 14:39:15,720 [INFO] app.report_processor: Alert Summary Counts - Normal: 9, Warning: 4, Critical: 0
+2026-04-01 14:39:15,722 [INFO] app.report_processor: Final Dominant Status Determined: Warning
+2026-04-01 14:40:02,668 [INFO] app.report_processor: Processing monthly report: 08. TECH - 07 ME Performance Sheet.pdf
+2026-04-01 14:41:16,750 [INFO] app.report_processor: Processing monthly report: 08. TECH - 07 ME Performance Sheet.pdf
+2026-04-01 14:43:24,465 [INFO] app.report_processor: Processing monthly report: 08. TECH - 07 ME Performance Sheet.pdf
+2026-04-01 14:46:01,700 [INFO] app.report_processor: Processing monthly report: 08. TECH - 07 ME Performance Sheet.pdf
+2026-04-01 14:50:06,743 [INFO] app.report_processor: Processing monthly report: 08. TECH-07 ME Performance Sheet.pdf
+2026-04-01 15:24:52,379 [INFO] app.report_processor: Processing monthly report: 08. TECH - 07 ME Performance Sheet.pdf
+2026-04-01 15:26:42,133 [INFO] app.report_processor: Processing monthly report: 08. TECH - 07 ME Performance Sheet.pdf
+2026-04-01 15:27:27,188 [INFO] app.report_processor: Processing monthly report: 3. TE-07 ME Performance.pdf
+2026-04-01 15:51:50,700 [INFO] app.report_processor: Processing monthly report: 1.TE - 07 ME Performance Sheet.pdf
+2026-04-01 15:51:52,078 [INFO] app.report_processor: Alert Summary Counts - Normal: 12, Warning: 1, Critical: 0
+2026-04-01 15:51:52,081 [INFO] app.report_processor: Final Dominant Status Determined: Warning
+2026-04-01 15:52:41,622 [INFO] app.report_processor: Processing monthly report: 08. TECH - 07 ME Performance Sheet.pdf
+2026-04-01 15:56:37,371 [INFO] app.report_processor: Processing monthly report: 08. TECH - 07 ME Performance Sheet.pdf
+2026-04-01 16:04:23,454 [INFO] app.report_processor: Processing monthly report: 08. TECH - 07 ME Performance Sheet.pdf
+2026-04-01 16:40:12,301 [INFO] app.report_processor: Processing monthly report: 08. TECH - 07 ME Performance Sheet.pdf
+2026-04-01 16:43:58,081 [INFO] app.report_processor: Processing monthly report: 08. TECH-07 ME Performance Sheet.pdf
+2026-04-01 16:45:17,820 [INFO] app.report_processor: Processing monthly report: 08. TECH - 07 ME Performance Sheet.pdf
+2026-04-01 16:49:21,646 [INFO] app.report_processor: Processing monthly report: 08. TECH - 07 ME Performance Sheet.pdf
+2026-04-01 16:49:56,948 [INFO] app.report_processor: Processing monthly report: 08. TECH-07 ME Performance Sheet.pdf
+2026-04-03 15:22:04,697 [INFO] app.report_processor: Processing monthly report: 08. TECH - 07 ME Performance Sheet.pdf
+2026-04-03 15:37:10,951 [INFO] app.report_processor: Processing monthly report: 08. TECH-07 ME Performance Sheet.pdf
+2026-04-03 15:38:52,784 [INFO] app.report_processor: Processing monthly report: 08. TECH-07 ME Performance Sheet.pdf
+2026-04-03 15:41:03,988 [INFO] app.report_processor: Processing monthly report: 12. TECH-07 ME Performance Sheet - Dec 2025.pdf
+2026-04-03 15:42:31,989 [INFO] app.report_processor: Processing monthly report: 12. TECH-07 ME Performance Sheet - Nov 2025.pdf
+2026-04-03 15:42:34,099 [ERROR] app.report_processor: Pipeline Failed: object NoneType can't be used in 'await' expression
+Traceback (most recent call last):
+  File "C:\Users\GOKUL\Desktop\WORKPLACE\workplace\Aepms-backend\app\report_processor.py", line 698, in save_monthly_report
+    deviation_record = await compute_and_save_me_deviation(session, header.report_id)
+TypeError: object NoneType can't be used in 'await' expression
+2026-04-03 15:52:17,393 [INFO] app.report_processor: Processing monthly report: 12. TECH-07 ME Performance Sheet - Oct 2025.pdf
+2026-04-03 15:52:19,065 [INFO] app.report_processor: Alert Summary Counts - Normal: 6, Warning: 6, Critical: 1
+2026-04-03 15:52:19,066 [INFO] app.report_processor: Final Dominant Status Determined: Critical
+2026-04-03 15:55:59,584 [INFO] app.report_processor: Processing monthly report: 12. TECH-07 ME Performance Sheet - Oct 2025.pdf
+2026-04-03 15:56:20,399 [INFO] app.report_processor: Processing monthly report: 1.TE - 07 ME Performance Sheet.pdf
+2026-04-03 15:58:57,225 [INFO] app.report_processor: Processing monthly report: 1.TE - 07 ME Performance Sheet.pdf
+2026-04-03 15:58:58,459 [INFO] app.report_processor: Alert Summary Counts - Normal: 10, Warning: 2, Critical: 1
+2026-04-03 15:58:58,460 [INFO] app.report_processor: Final Dominant Status Determined: Critical
+2026-04-03 16:02:32,950 [INFO] app.report_processor: Processing monthly report: 12. TECH-07 ME Performance Sheet - Nov 2025.pdf
+2026-04-03 16:02:34,337 [INFO] app.report_processor: Alert Summary Counts - Normal: 7, Warning: 5, Critical: 1
+2026-04-03 16:02:34,338 [INFO] app.report_processor: Final Dominant Status Determined: Critical
+2026-04-03 16:06:52,040 [INFO] app.report_processor: Processing monthly report: 12. TECH - 12 AE-1 Performance Sheet.pdf
+2026-04-05 11:31:00,117 [INFO] app.report_processor: Processing monthly report: 3. TE-12 AE 1 Performance Sheet.pdf

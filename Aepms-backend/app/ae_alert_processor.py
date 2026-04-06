@@ -8,9 +8,9 @@ based on the thresholds defined in the reference documentation.
 import logging
 from decimal import Decimal
 from typing import Dict, Any, Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import func
+from sqlalchemy import func, select, delete
 
 from app.generator_models import (
     VesselGenerator,
@@ -200,7 +200,7 @@ def interpolate_baseline(baseline_low, baseline_high, load_pct, metric_key):
 # MAIN ALERT PROCESSING FUNCTION
 # =================================================================
 
-def process_ae_alerts(session: Session, report_id: int) -> Dict[str, Any]:
+async def process_ae_alerts(session: AsyncSession, report_id: int) -> Dict[str, Any]:
     """
     Main function to process AE alerts for a given report.
     
@@ -223,31 +223,35 @@ def process_ae_alerts(session: Session, report_id: int) -> Dict[str, Any]:
     
     try:
         # 1. Get report header and generator info
-        header = session.query(GeneratorMonthlyReportHeader).filter_by(
-            report_id=report_id
-        ).first()
+        result = await session.execute(
+            select(GeneratorMonthlyReportHeader).where(GeneratorMonthlyReportHeader.report_id == report_id)
+        )
+        header = result.scalar_one_or_none()
         
         if not header:
             raise ValueError(f"Report {report_id} not found")
         
-        generator = session.query(VesselGenerator).filter_by(
-            generator_id=header.generator_id
-        ).first()
+        result = await session.execute(
+            select(VesselGenerator).where(VesselGenerator.generator_id == header.generator_id)
+        )
+        generator = result.scalar_one_or_none()
         
         if not generator:
             raise ValueError(f"Generator {header.generator_id} not found")
         
-        vessel = session.query(VesselInfo).filter_by(
-            imo_number=generator.imo_number
-        ).first()
+        result = await session.execute(
+            select(VesselInfo).where(VesselInfo.imo_number == generator.imo_number)
+        )
+        vessel = result.scalar_one_or_none()
         
         if not vessel:
             raise ValueError(f"Vessel with IMO {generator.imo_number} not found")
         
         # 2. Get actual performance data
-        actual_data = session.query(GeneratorPerformanceGraphData).filter_by(
-            report_id=report_id
-        ).first()
+        result = await session.execute(
+            select(GeneratorPerformanceGraphData).where(GeneratorPerformanceGraphData.report_id == report_id)
+        )
+        actual_data = result.scalar_one_or_none()
         
         if not actual_data:
             raise ValueError(f"No graph data found for report {report_id}")
@@ -258,15 +262,25 @@ def process_ae_alerts(session: Session, report_id: int) -> Dict[str, Any]:
             raise ValueError(f"Load percentage not found in report {report_id}")
         
         # Find nearest lower and higher baseline load points
-        baseline_low = session.query(GeneratorBaselineData).filter(
-            GeneratorBaselineData.generator_id == generator.generator_id, # MUST BE generator_id
-            GeneratorBaselineData.load_percentage <= load_pct
-        ).order_by(GeneratorBaselineData.load_percentage.desc()).first()
+        result = await session.execute(
+            select(GeneratorBaselineData)
+            .where(
+                GeneratorBaselineData.generator_id == generator.generator_id,
+                GeneratorBaselineData.load_percentage <= load_pct
+            )
+            .order_by(GeneratorBaselineData.load_percentage.desc())
+        )
+        baseline_low = result.scalars().first()
 
-        baseline_high = session.query(GeneratorBaselineData).filter(
-            GeneratorBaselineData.generator_id == generator.generator_id, # MUST BE generator_id
-            GeneratorBaselineData.load_percentage >= load_pct
-        ).order_by(GeneratorBaselineData.load_percentage.asc()).first()
+        result = await session.execute(
+            select(GeneratorBaselineData)
+            .where(
+                GeneratorBaselineData.generator_id == generator.generator_id,
+                GeneratorBaselineData.load_percentage >= load_pct
+            )
+            .order_by(GeneratorBaselineData.load_percentage.asc())
+        )
+        baseline_high = result.scalars().first()
 
         if not baseline_low or not baseline_high:
             raise ValueError(f"Not enough baseline points to interpolate at load {load_pct}%")
@@ -274,9 +288,9 @@ def process_ae_alerts(session: Session, report_id: int) -> Dict[str, Any]:
         logger.info(f"✓ Load interpolation between {baseline_low.load_percentage}% and {baseline_high.load_percentage}% for actual {load_pct}%")
 
         # 4. Clear existing alerts for this report
-        session.query(AENormalStatus).filter_by(report_id=report_id).delete()
-        session.query(AEWarningAlert).filter_by(report_id=report_id).delete()
-        session.query(AECriticalAlert).filter_by(report_id=report_id).delete()
+        await session.execute(delete(AENormalStatus).where(AENormalStatus.report_id == report_id))
+        await session.execute(delete(AEWarningAlert).where(AEWarningAlert.report_id == report_id))
+        await session.execute(delete(AECriticalAlert).where(AECriticalAlert.report_id == report_id))
         
         # 5. Process each metric
         alert_counts = {'normal': 0, 'warning': 0, 'critical': 0}
@@ -338,7 +352,7 @@ def process_ae_alerts(session: Session, report_id: int) -> Dict[str, Any]:
                 logger.error(f"🔴 Critical: {metric_config['name']} = {dev_result['deviation_pct']}%")
         
         # 6. Update summary table
-        update_ae_alert_summary(
+        await update_ae_alert_summary(
             session=session,
             report_id=report_id,
             generator_id=generator.generator_id,
@@ -350,7 +364,7 @@ def process_ae_alerts(session: Session, report_id: int) -> Dict[str, Any]:
             alert_counts=alert_counts
         )
         
-        session.commit()
+        await session.flush()
         logger.info(f"✅ Alert processing complete: {alert_counts}")
         
         return {
@@ -363,7 +377,7 @@ def process_ae_alerts(session: Session, report_id: int) -> Dict[str, Any]:
         
     except Exception as e:
         logger.error(f"❌ Error processing AE alerts: {e}", exc_info=True)
-        session.rollback()
+        await session.rollback()
         raise
 
 
@@ -371,8 +385,8 @@ def process_ae_alerts(session: Session, report_id: int) -> Dict[str, Any]:
 # SUMMARY UPDATE FUNCTION
 # =================================================================
 
-def update_ae_alert_summary(
-    session: Session,
+async def update_ae_alert_summary(
+    session: AsyncSession,
     report_id: int,
     generator_id: int,
     vessel_name: str,
@@ -387,7 +401,10 @@ def update_ae_alert_summary(
     dominant_status = _determine_dominant_status(alert_counts)
     
     # Check if summary exists
-    summary = session.query(AEAlertSummary).filter_by(report_id=report_id).first()
+    result = await session.execute(
+        select(AEAlertSummary).where(AEAlertSummary.report_id == report_id)
+    )
+    summary = result.scalar_one_or_none()
     
     if summary:
         # Update existing
@@ -432,14 +449,19 @@ def _determine_dominant_status(alert_counts: Dict[str, int]) -> str:
 # API HELPER FUNCTIONS
 # =================================================================
 
-def get_ae_alerts_by_report(session: Session, report_id: int) -> Dict[str, Any]:
+async def get_ae_alerts_by_report(session: AsyncSession, report_id: int) -> Dict[str, Any]:
     """
     Fetch all AE alerts for a specific report (for API endpoint).
     """
     try:
-        normal_alerts = session.query(AENormalStatus).filter_by(report_id=report_id).all()
-        warning_alerts = session.query(AEWarningAlert).filter_by(report_id=report_id).all()
-        critical_alerts = session.query(AECriticalAlert).filter_by(report_id=report_id).all()
+        result = await session.execute(select(AENormalStatus).where(AENormalStatus.report_id == report_id))
+        normal_alerts = result.scalars().all()
+
+        result = await session.execute(select(AEWarningAlert).where(AEWarningAlert.report_id == report_id))
+        warning_alerts = result.scalars().all()
+
+        result = await session.execute(select(AECriticalAlert).where(AECriticalAlert.report_id == report_id))
+        critical_alerts = result.scalars().all()
         
         def alert_to_dict(alert):
             return {
@@ -465,12 +487,15 @@ def get_ae_alerts_by_report(session: Session, report_id: int) -> Dict[str, Any]:
         raise
 
 
-def get_ae_alert_summary(session: Session, report_id: int) -> Dict[str, Any]:
+async def get_ae_alert_summary(session: AsyncSession, report_id: int) -> Dict[str, Any]:
     """
     Fetch precomputed AE alert summary (O(1) query for dashboard).
     """
     try:
-        summary = session.query(AEAlertSummary).filter_by(report_id=report_id).first()
+        result = await session.execute(
+            select(AEAlertSummary).where(AEAlertSummary.report_id == report_id)
+        )
+        summary = result.scalar_one_or_none()
         
         if not summary:
             raise ValueError(f"No AE alert summary found for report {report_id}")

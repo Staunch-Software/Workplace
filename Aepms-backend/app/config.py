@@ -60,7 +60,13 @@ class SSOSettings(BaseSettings):
 
 
 def get_database_url(include_password: bool = True) -> str:
-    """Get database URL for SQLAlchemy (handles special characters in password)."""
+    """Get async database URL for SQLAlchemy (handles special characters in password)."""
+    password = quote_plus(db_config.PASSWORD) if include_password else "****"
+    return f"postgresql+asyncpg://{db_config.USER}:{password}@{db_config.HOST}:{db_config.PORT}/{db_config.NAME}"
+
+
+def get_sync_database_url(include_password: bool = True) -> str:
+    """Get sync database URL — only used for Alembic migrations or CLI scripts."""
     password = quote_plus(db_config.PASSWORD) if include_password else "****"
     return f"postgresql+psycopg2://{db_config.USER}:{password}@{db_config.HOST}:{db_config.PORT}/{db_config.NAME}"
 

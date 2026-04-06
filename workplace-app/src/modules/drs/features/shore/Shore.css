@@ -692,6 +692,10 @@
   outline: none;
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* 9-DOT GRID BUTTON (Odoo-style app switcher) */
 .nine-dot-btn {
   background: transparent;

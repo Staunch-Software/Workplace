@@ -7,16 +7,17 @@ import { defectApi } from '@drs/services/defectApi';
 import { getVessels } from '@drs/api/vessels';
 import {
   Bell, LogOut, Ship, X, User, CheckCircle,
-  MessageSquare, AlertOctagon, Info, Columns, FileText, ArrowLeft, ChevronLeft, Mail
+  MessageSquare, AlertOctagon, Info, Columns, FileText, ArrowLeft, ChevronLeft, Mail, Menu, ListTodo
 } from 'lucide-react';
 import './Vessel.css';
+import "../../components/shared/vessel-responsive.css"
 
 const VesselLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   // --- UI STATES ---
   const [showNotifications, setShowNotifications] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -184,12 +185,15 @@ const VesselLayout = () => {
   const isActive = (path) => location.pathname.includes(path);
 
   return (
-    <div className="modern-shell">
-      <nav className="top-nav">
+    <div className="modern-shell defect-main-shell">
+      {isSidebarOpen && (
+        <div className="defect-mobile-overlay" onClick={() => setIsSidebarOpen(false)} />
+      )}
+      <nav className="top-nav defect-top-navbar">
         <div className="nav-left">
           {/* 9-DOT — ALL APPS */}
           <button
-            className="nine-dot-btn"
+            className="nine-dot-btn defect-nav-app-switcher"
             onClick={() => navigate('/dashboard')}
             title="All apps"
             aria-label="All apps"
@@ -204,36 +208,36 @@ const VesselLayout = () => {
             <div className="brand-logo">
               <Ship size={24} />
             </div>
-            <div className="vessel-info">
-              <h1>{shipName}</h1>
-              <span className="imo-badge">IMO: {shipImo}</span>
+            <div className="vessel-info defect-nav-vessel-info">
+              <h1 className="defect-nav-title">{shipName}</h1>
+              <span className="imo-badge defect-nav-badge">IMO: {shipImo}</span>
             </div>
           </div>
 
-          <div className="nav-divider"></div>
+          <div className="nav-divider defect-nav-divider"></div>
 
-          <div className="nav-links">
+          <div className="nav-links defect-desktop-nav">
             <button
               className={`nav-item ${isActive('/vessel/dashboard') ? 'active' : ''}`}
               onClick={() => navigate('/drs/vessel/dashboard')}
             >
-              Defect List
+              <span className="pill-label">Defect List</span>
             </button>
             <button
               className={`nav-item ${isActive('/vessel/tasks') ? 'active' : ''}`}
               onClick={() => navigate('/drs/vessel/tasks')}
             >
-              My Feed
+              <span className="pill-label">My Feed</span>
             </button>
 
             <button className={`nav-item ${isActive('/vessel/reports') ? 'active' : ''}`} onClick={() => navigate('/drs/vessel/reports')}>
               <FileText size={16} />
-              <span>Reports</span>
+              <span className="pill-label">Reports</span>
             </button>
           </div>
         </div>
 
-        <div className="nav-right">
+        <div className="nav-right defect-nav-right">
 
           {/* --- ✅ NOTIFICATIONS BELL --- */}
           <div className="nav-action-wrapper" ref={notifRef}>
@@ -252,7 +256,21 @@ const VesselLayout = () => {
             </button>
 
             <button
-              className={`notif-btn ${showNotifications ? 'active' : ''}`}
+              onClick={() => { setShowEmailModal(true); setEmailSearch(''); }}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: '8px', margin: '0 4px', borderRadius: '8px',
+                display: 'flex', alignItems: 'center', color: '#334155', transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+              title="Draft Defect Email"
+            >
+              <Mail size={20} />
+            </button>
+
+            <button
+              className={`notif-btn defect-bell-scaling  ${showNotifications ? 'active' : ''}`}
               onClick={handleToggleNotif}
               aria-label="Notifications"
               style={{ margin: "10px" }}
@@ -262,25 +280,24 @@ const VesselLayout = () => {
             </button>
 
             {showNotifications && (
-              <div className="nav-dropdown notif-panel">
-                <div className="notif-header">
+              <div className="nav-dropdown notif-panel defect-notif-panel-scaling">
+                <div className="notif-header defect-notif-header-scaling">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Bell size={18} color="#ea580c" />
-                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#0f172a' }}>
+                    <h3 className="defect-notif-panel-title" style={{ margin: 0, fontWeight: '700', color: '#0f172a' }}>
                       Notifications
                     </h3>
                   </div>
                   {displayList.length > 0 && (
                     <button
                       onClick={handleClearAll}
+                      className="defect-notif-clear-btn"
                       style={{
                         background: 'none',
                         border: 'none',
                         color: '#ea580c',
-                        fontSize: '13px',
                         fontWeight: '600',
                         cursor: 'pointer',
-                        padding: '4px 8px',
                         borderRadius: '4px',
                         transition: 'all 0.2s ease'
                       }}
@@ -292,9 +309,9 @@ const VesselLayout = () => {
                   )}
                 </div>
 
-                <div className="notif-list" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                <div className="notif-list defect-notif-list-scaling" style={{ overflowY: 'auto' }}>
                   {displayList.length === 0 ? (
-                    <div style={{
+                    <div className="defect-notif-empty-state" style={{
                       padding: '40px 20px',
                       textAlign: 'center',
                       color: '#94a3b8'
@@ -315,6 +332,7 @@ const VesselLayout = () => {
                         <div
                           key={n.id}
                           onClick={() => handleNotificationClick(n)}
+                          className="defect-notif-item-scaling"
                           style={{
                             padding: '14px 16px',
                             borderBottom: '1px solid #f1f5f9',
@@ -336,87 +354,45 @@ const VesselLayout = () => {
                         >
                           <div style={{ flex: 1, minWidth: 0 }}>
                             {/* Icon + Title Row */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                            <div className="defect-notif-title-row"  style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                               {/* Type Icon */}
                               {n.type === 'MENTION' && (
-                                <div style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  width: '20px',
-                                  height: '20px',
-                                  borderRadius: '4px',
-                                  background: '#dbeafe',
-                                  flexShrink: 0
-                                }}>
+                                <div className="defect-notif-icon-box">
                                   <MessageSquare size={12} color="#3b82f6" />
                                 </div>
                               )}
                               {n.type === 'ALERT' && (
-                                <div style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  width: '20px',
-                                  height: '20px',
-                                  borderRadius: '4px',
-                                  background: '#fed7aa',
-                                  flexShrink: 0
-                                }}>
+                                <div className="defect-notif-icon-box">
                                   <AlertOctagon size={12} color="#ea580c" />
                                 </div>
                               )}
                               {n.type === 'SYSTEM' && (
-                                <div style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  width: '20px',
-                                  height: '20px',
-                                  borderRadius: '4px',
-                                  background: '#e5e7eb',
-                                  flexShrink: 0
-                                }}>
+                                <div className="defect-notif-icon-box">
                                   <Info size={12} color="#64748b" />
                                 </div>
                               )}
 
                               {/* Title */}
-                              <strong style={{
-                                fontSize: '13px',
-                                color: '#1e293b',
-                                fontWeight: isClicked ? '600' : '700',
-                                lineHeight: '1.3',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                              }}>
+                              <strong className="defect-notif-title-text" style={{ color: '#1e293b', lineHeight: '1.3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {n.title}
                               </strong>
                             </div>
 
                             {/* Message */}
-                            <p style={{
-                              fontSize: '12px',
-                              color: '#64748b',
-                              margin: '0 0 8px 0',
-                              lineHeight: '1.5',
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}>
+                            <p className="defect-notif-msg-text" style={{ color: '#64748b', margin: '0 0 8px 0', lineHeight: '1.5', display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {n.message}
                             </p>
 
                             {/* Timestamp */}
-                            <div style={{
+                            <div 
+                            className="defect-notif-footer-row" style={{
                               display: 'flex',
                               alignItems: 'center',
                               gap: '8px'
                             }}>
-                              <span style={{
+                              <span
+                              className="defect-notif-time-text"
+                               style={{
                                 fontSize: '11px',
                                 color: '#94a3b8',
                                 fontWeight: '500'
@@ -430,8 +406,10 @@ const VesselLayout = () => {
                                 })}
                               </span>
 
-                              <span style={{
-                                fontSize: '10px',
+                              <span
+                              className="defect-notif-badge-text"
+                              style={{
+                                // fontSize: '10px',
                                 padding: '2px 6px',
                                 borderRadius: '4px',
                                 fontWeight: '600',
@@ -454,6 +432,7 @@ const VesselLayout = () => {
 
                           {/* ✅ X Button */}
                           <button
+                          className="defect-notif-x-btn"
                             onClick={(e) => handleDismissNotification(n.id, e)}
                             style={{
                               background: 'none',
@@ -539,9 +518,37 @@ const VesselLayout = () => {
                 </button>
               </div>
             )}
+            <button className="defect-hamburger-btn" onClick={() => setIsSidebarOpen(true)}>
+              <Menu size={24} />
+            </button>
           </div>
         </div>
       </nav>
+
+      <aside className={`defect-mobile-sidebar-right ${isSidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          <h2 style={{ color: '#ea580c', fontWeight: '800' }}>Vessel Menu</h2>
+          <button onClick={() => setIsSidebarOpen(false)} style={{ background: 'none', border: 'none', color: 'white' }}>
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="sidebar-links">
+          <button className={`side-nav-item ${isActive('/vessel/dashboard') ? 'active' : ''}`}
+            onClick={() => { navigate('/drs/vessel/dashboard'); setIsSidebarOpen(false); }}>
+            <ListTodo size={20} /> Defect List
+          </button>
+          <button className={`side-nav-item ${isActive('/vessel/tasks') ? 'active' : ''}`}
+            onClick={() => { navigate('/drs/vessel/tasks'); setIsSidebarOpen(false); }}>
+            <MessageSquare size={20} /> My Feed
+          </button>
+          <button className={`side-nav-item ${isActive('/vessel/reports') ? 'active' : ''}`}
+            onClick={() => { navigate('/drs/vessel/reports'); setIsSidebarOpen(false); }}>
+            <FileText size={20} /> Reports
+          </button>
+        </div>
+      </aside>
+
       <main className="main-viewport">
         <Outlet />
       </main>

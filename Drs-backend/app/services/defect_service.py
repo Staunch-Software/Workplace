@@ -152,7 +152,6 @@ class DefectService:
             before_image_path=defect_in.before_image_path,
             after_image_path=defect_in.after_image_path,
             is_owner=False,
-            is_flagged=defect_in.is_flagged or False, # ✅ Added
             is_dd=defect_in.is_dd or False,           # ✅ Added
             defect_number=defect_number,
             origin="VESSEL" if _should_sync() else "SHORE",

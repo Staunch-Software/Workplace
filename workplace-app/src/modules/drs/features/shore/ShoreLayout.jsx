@@ -5,18 +5,22 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { defectApi } from '@drs/services/defectApi';
 import {
   LayoutGrid, ListTodo, LogOut, FileText,
-  Building2, Bell, X, ChevronDown, UserPlus, Plus, Mail, Ship, Columns, AlertOctagon, MessageSquare, CheckCircle, Info, ArrowLeft, ChevronLeft
+  Building2, Bell, X, ChevronDown, UserPlus, Plus, Mail, Ship, Columns, AlertOctagon, MessageSquare, CheckCircle, Info, ArrowLeft, ChevronLeft, Menu
 } from 'lucide-react';
 import './Shore.css';
 import { createVessel } from '@drs/api/vessels';
+<<<<<<< HEAD
 import DrsAiAssistant from './DrsAiAssistant';
+=======
+import "../../components/shared/defects-responsive.css"
+>>>>>>> a94d72603b300231deeb2631bee82ed1f8fdac20
 
 const ShoreLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // --- UI STATES ---
   const [showNotifications, setShowNotifications] = useState(false);
@@ -199,12 +203,19 @@ const ShoreLayout = () => {
 
   return (
     <div className="shore-shell-topnav">
-      <nav className="top-nav">
+      {isSidebarOpen && (
+        <div
+          className="defect-mobile-overlay"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+      <nav className="top-nav defect-top-navbar">
         {/* LEFT */}
         <div className="nav-left">
+
           {/* 9-DOT — ALL APPS */}
           <button
-            className="nine-dot-btn"
+            className="nine-dot-btn defect-nav-app-switcher"
             onClick={() => navigate('/dashboard')}
             title="All apps"
             aria-label="All apps"
@@ -215,15 +226,15 @@ const ShoreLayout = () => {
             <span className="nine-dot-label"><ChevronLeft size={20} /></span>
           </button>
 
-          <div className="vessel-brand">
-            <div className="brand-logo"><Building2 size={24} color="#2dd4bf" /></div>
+          <div className="vessel-brand defect-nav-brand">
+            <div className="brand-logo" style={{margin:"0px"}}><Building2 size={24} color="#2dd4bf" /></div>
             <div className="vessel-info">
-              <h1>Ozellar Marine</h1>
-              <span className="imo-badge">Shore HQ</span>
+              <h1 className="defect-nav-title">Ozellar Marine</h1>
+              <span className="imo-badge defect-nav-badge">Shore HQ</span>
             </div>
           </div>
-          <div className="nav-divider-v"></div>
-          <div className="nav-pill-group">
+          <div className="nav-divider-v defect-nav-divider"></div>
+          <div className="nav-pill-group defect-desktop-nav">
             <button
               className={`nav-pill ${isActive('/drs/shore/analytics-dashboard') ? 'active' : ''}`}
               onClick={() => navigate('/drs/shore/analytics-dashboard')}
@@ -233,22 +244,25 @@ const ShoreLayout = () => {
             </button>
             <button className={`nav-pill ${isActive('/drs/shore/dashboard') ? 'active' : ''}`} onClick={() => navigate('/drs/shore/dashboard')}>
               {/* <LayoutGrid size={16} /> */}
-              <span>Defect List</span>
+              <span className="pill-label">Defect List</span>
             </button>
             <button className={`nav-pill ${isActive('/drs/shore/tasks') ? 'active' : ''}`} onClick={() => navigate('/drs/shore/tasks')}>
               {/* <ListTodo size={16} /> */}
-              <span>My Feed</span>
+              <span className="pill-label">My Feed</span>
             </button>
             {/* ✅ NEW: Reports Tab */}
             <button className={`nav-pill ${isActive('/drs/shore/reports') ? 'active' : ''}`} onClick={() => navigate('/drs/shore/reports')}>
               <FileText size={16} />
-              <span>Reports</span>
+              <span className="pill-label">Reports</span>
             </button>
           </div>
         </div>
 
         {/* RIGHT */}
-        <div className="nav-right">
+        <div className="nav-right defect-nav-right">
+
+
+
 
           {/* NOTIFICATION UI INTEGRATED */}
           <div className="nav-action-wrapper" ref={notifRef}>
@@ -271,7 +285,7 @@ const ShoreLayout = () => {
             </button>
 
             <button
-              className={`notif-btn ${showNotifications ? 'active' : ''}`}
+              className={`notif-btn  notif-bell-scaling ${showNotifications ? 'active' : ''}`}
               onClick={handleToggleNotif}
               aria-label="Notifications"
               style={{ margin: "10px" }}
@@ -281,25 +295,24 @@ const ShoreLayout = () => {
             </button>
 
             {showNotifications && (
-              <div className="nav-dropdown notif-panel">
-                <div className="notif-header">
+              <div className="nav-dropdown notif-panel notif-panel-scaling">
+                <div className="notif-header notif-header-scaling">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Bell size={18} color="#ea580c" />
-                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#0f172a' }}>
+                    <h3 className="notif-panel-title notif-title-main-scaling" style={{ margin: 0, fontWeight: '700', color: '#0f172a' }}>
                       Notifications
                     </h3>
                   </div>
                   {displayList.length > 0 && (
                     <button
                       onClick={handleClearAll}
+                      className="notif-clear-btn-scaling"
                       style={{
                         background: 'none',
                         border: 'none',
                         color: '#ea580c',
-                        fontSize: '13px',
                         fontWeight: '600',
                         cursor: 'pointer',
-                        padding: '4px 8px',
                         borderRadius: '4px',
                         transition: 'all 0.2s ease'
                       }}
@@ -311,9 +324,9 @@ const ShoreLayout = () => {
                   )}
                 </div>
 
-                <div className="notif-list" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                <div className="notif-list notif-list-height-scaling" style={{ overflowY: 'auto' }}>
                   {displayList.length === 0 ? (
-                    <div style={{
+                    <div className="notif-empty-state-scaling" style={{
                       padding: '40px 20px',
                       textAlign: 'center',
                       color: '#94a3b8'
@@ -334,6 +347,7 @@ const ShoreLayout = () => {
                         <div
                           key={n.id}
                           onClick={() => handleNotificationClick(n)}
+                          className="notif-item-scaling"
                           style={{
                             padding: '14px 16px',
                             borderBottom: '1px solid #f1f5f9',
@@ -358,79 +372,34 @@ const ShoreLayout = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                               {/* Type Icon */}
                               {n.type === 'MENTION' && (
-                                <div style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  width: '20px',
-                                  height: '20px',
-                                  borderRadius: '4px',
-                                  background: '#dbeafe',
-                                  flexShrink: 0
-                                }}>
+                                <div className="notif-icon-box-scaling" >
                                   <MessageSquare size={12} color="#3b82f6" />
                                 </div>
                               )}
                               {n.type === 'ALERT' && (
-                                <div style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  width: '20px',
-                                  height: '20px',
-                                  borderRadius: '4px',
-                                  background: '#fed7aa',
-                                  flexShrink: 0
-                                }}>
+                                <div className="notif-icon-box-scaling">
                                   <AlertOctagon size={12} color="#ea580c" />
                                 </div>
                               )}
                               {n.type === 'SYSTEM' && (
-                                <div style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  width: '20px',
-                                  height: '20px',
-                                  borderRadius: '4px',
-                                  background: '#e5e7eb',
-                                  flexShrink: 0
-                                }}>
+                                <div className="notif-icon-box-scaling">
                                   <Info size={12} color="#64748b" />
                                 </div>
                               )}
 
                               {/* Title */}
-                              <strong style={{
-                                fontSize: '13px',
-                                color: '#1e293b',
-                                fontWeight: isClicked ? '600' : '700',
-                                lineHeight: '1.3',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                              }}>
+                              <strong className="notif-item-title-scaling" style={{ color: '#1e293b', lineHeight: '1.3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {n.title}
                               </strong>
                             </div>
 
                             {/* Message */}
-                            <p style={{
-                              fontSize: '12px',
-                              color: '#64748b',
-                              margin: '0 0 8px 0',
-                              lineHeight: '1.5',
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}>
+                            <p className="notif-item-msg-scaling" style={{ color: '#64748b', margin: '0 0 8px 0', lineHeight: '1.5', display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {n.message}
                             </p>
 
                             {/* Timestamp */}
-                            <div style={{
+                            <div className="notif-footer-scaling" style={{
                               display: 'flex',
                               alignItems: 'center',
                               gap: '8px'
@@ -449,7 +418,7 @@ const ShoreLayout = () => {
                                 })}
                               </span>
 
-                              <span style={{
+                              <span className="notif-badge-scaling" style={{
                                 fontSize: '10px',
                                 padding: '2px 6px',
                                 borderRadius: '4px',
@@ -557,14 +526,14 @@ const ShoreLayout = () => {
             </button>
 
             {showUserMenu && (
-              <div className="nav-dropdown user-menu">
-                <div className="user-profile-header">
+              <div className="nav-dropdown user-menu defect-user-menu-scaling">
+                <div className="user-profile-header defect-user-header-scaling">
                   <div className="avatar-large">
                     {user?.full_name?.charAt(0) || 'U'}
                   </div>
-                  <div className="profile-details">
-                    <strong>{user?.full_name}</strong>
-                    <span>{user?.email}</span>
+                  <div className="profile-details defect-avatar-scaling">
+                    <strong className="defect-user-name-scaling">{user?.full_name}</strong>
+                    <span className="defect-user-email-scaling">{user?.email}</span>
                   </div>
                 </div>
 
@@ -572,7 +541,7 @@ const ShoreLayout = () => {
 
                 {/* ✅ NEW: Customize Columns Button */}
                 <button
-                  className="dropdown-item customize-columns"
+                  className="dropdown-item customize-columns defect-item-scaling"
                   onClick={handleCustomizeColumns}
                 >
                   <Columns size={16} />
@@ -581,16 +550,53 @@ const ShoreLayout = () => {
 
                 <div className="dropdown-divider"></div>
 
-                <button className="dropdown-item logout" onClick={() => navigate('/dashboard')}>
+                <button className="dropdown-item logout defect-item-scaling" onClick={() => navigate('/dashboard')}>
                   <ArrowLeft size={16} />
                   Back to Dashboard
                 </button>
               </div>
             )}
 
+            <button
+              className="defect-hamburger-btn"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            >
+              <Menu size={24} />
+            </button>
+
           </div>
         </div>
       </nav>
+
+      {/* 5. ADD THE COLLAPSIBLE SIDEBAR DRAWER */}
+      <aside className={`defect-mobile-sidebar ${isSidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#2dd4bf' }}>Ozellar Navigation</h2>
+          <button onClick={() => setIsSidebarOpen(false)}><X size={24} /></button>
+        </div>
+
+        <div className="sidebar-links">
+          <button className={`side-nav-item ${isActive('/drs/shore/analytics-dashboard') ? 'active' : ''}`}
+            onClick={() => { navigate('/drs/shore/analytics-dashboard'); setIsSidebarOpen(false); }}>
+            <LayoutGrid size={18} /> Dashboard
+          </button>
+
+          <button className={`side-nav-item ${isActive('/drs/shore/dashboard') ? 'active' : ''}`}
+            onClick={() => { navigate('/drs/shore/dashboard'); setIsSidebarOpen(false); }}>
+            <ListTodo size={18} /> Defect List
+          </button>
+
+          <button className={`side-nav-item ${isActive('/drs/shore/tasks') ? 'active' : ''}`}
+            onClick={() => { navigate('/drs/shore/tasks'); setIsSidebarOpen(false); }}>
+            <MessageSquare size={18} /> My Feed
+          </button>
+
+          <button className={`side-nav-item ${isActive('/drs/shore/reports') ? 'active' : ''}`}
+            onClick={() => { navigate('/drs/shore/reports'); setIsSidebarOpen(false); }}>
+            <FileText size={18} /> Reports
+          </button>
+        </div>
+      </aside>
 
       <main className="main-viewport">
         <div className="page-content">

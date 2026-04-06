@@ -388,7 +388,7 @@ export default function AllUsers() {
     const fetchData = async () => {
         try {
             const [usersRes, vesselsRes] = await Promise.all([getUsers(), getVessels()]);
-            setUsers(usersRes.data);
+            setUsers(Array.isArray(usersRes.data) ? usersRes.data : usersRes.data.results ?? []);
             setVessels(vesselsRes.data);
         } catch (err) {
             console.error("Failed to fetch:", err);

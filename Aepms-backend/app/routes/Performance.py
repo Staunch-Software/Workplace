@@ -1,10 +1,11 @@
 # app/routes/Performance.py
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from sqlalchemy.orm import Session
-from sqlalchemy import desc, extract
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import desc, extract, select
 from typing import Dict, Any, Optional
 import pandas as pd
 import io
+from sqlalchemy.orm import Session
 import logging
 import math
 from datetime import datetime, date
@@ -30,22 +31,27 @@ async def get_baseline_performance(vessel_id: str, db: Session = Depends(get_db)
     """Get baseline performance data for charts."""
     try:
         # Resolve vessel_id (IMO number) to engine_no, then fetch session and performance rows
-        vessel = db.query(VesselInfo).filter(VesselInfo.imo_number == int(vessel_id)).first()
+        result = await db.execute(select(VesselInfo).where(VesselInfo.imo_number == int(vessel_id)))
+        vessel = result.scalar_one_or_none()
         if not vessel:
             raise HTTPException(status_code=404, detail=f"Vessel with IMO {vessel_id} not found")
 
-        sessions = db.query(ShopTrialSession) \
-            .filter(ShopTrialSession.engine_no == vessel.engine_no) \
-            .order_by(desc(ShopTrialSession.trial_date)) \
-            .all()
+        result = await db.execute(
+            select(ShopTrialSession)
+            .where(ShopTrialSession.engine_no == vessel.engine_no)
+            .order_by(desc(ShopTrialSession.trial_date))
+        )
+        sessions = result.scalars().all()
         if not sessions:
             raise HTTPException(status_code=404, detail="No shop trial sessions found")
 
         session_id = sessions[0].session_id
-        shop_data = db.query(ShopTrialPerformanceData) \
-            .filter(ShopTrialPerformanceData.session_id == session_id) \
-            .order_by(ShopTrialPerformanceData.load_percentage) \
-            .all()
+        result = await db.execute(
+            select(ShopTrialPerformanceData)
+            .where(ShopTrialPerformanceData.session_id == session_id)
+            .order_by(ShopTrialPerformanceData.load_percentage)
+        )
+        shop_data = result.scalars().all()
 
         # Map frontend metric names to actual database column names
         column_mapping = {
@@ -92,7 +98,7 @@ async def get_me_dashboard_summary(
     year: int,
     month: Optional[int] = None,
     imo_number: Optional[int] = None,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     🎯 CRITICAL ENDPOINT: Returns monthly or daily dominant performance status summary.
@@ -130,28 +136,27 @@ async def get_me_dashboard_summary(
         logger.info(f"📊 ME Dashboard Summary Request: year={year}, month={month}, imo={imo_number}")
         
         # Build base query - join reports with vessel info
-        query = db.query(
+        stmt = select(
             MonthlyReportHeader.report_id,
             MonthlyReportHeader.imo_number,
             MonthlyReportHeader.report_date,
             MonthlyReportHeader.report_month,
             VesselInfo.vessel_name
         ).join(
-            VesselInfo, 
+            VesselInfo,
             MonthlyReportHeader.imo_number == VesselInfo.imo_number
-        ).filter(
+        ).where(
             extract('year', MonthlyReportHeader.report_date) == year
         )
-        
-        # Apply optional filters
+
         if month is not None:
-            query = query.filter(extract('month', MonthlyReportHeader.report_date) == month)
-        
+            stmt = stmt.where(extract('month', MonthlyReportHeader.report_date) == month)
+
         if imo_number is not None:
-            query = query.filter(MonthlyReportHeader.imo_number == imo_number)
-        
-        # Execute query
-        reports = query.all()
+            stmt = stmt.where(MonthlyReportHeader.imo_number == imo_number)
+
+        result = await db.execute(stmt)
+        reports = result.all()
         
         if not reports:
             logger.warning(f"⚠️ No reports found for year={year}, month={month}, imo={imo_number}")
@@ -161,9 +166,10 @@ async def get_me_dashboard_summary(
         
         # Fetch alert summaries for these reports (efficient batch query)
         report_ids = [r.report_id for r in reports]
-        summaries = db.query(MEAlertSummary).filter(
-            MEAlertSummary.report_id.in_(report_ids)
-        ).all()
+        result = await db.execute(
+            select(MEAlertSummary).where(MEAlertSummary.report_id.in_(report_ids))
+        )
+        summaries = result.scalars().all()
         
         # Create lookup dictionary for O(1) access
         summary_dict = {s.report_id: s for s in summaries}
@@ -180,9 +186,12 @@ async def get_me_dashboard_summary(
                 dom_params = []
                 
                 if dominant_status == "Critical":
-                    params = db.query(MECriticalAlert).filter_by(
-                        report_id=report.report_id
-                    ).limit(5).all()
+                    result = await db.execute(
+                        select(MECriticalAlert)
+                        .where(MECriticalAlert.report_id == report.report_id)
+                        .limit(5)
+                    )
+                    params = result.scalars().all()
                     
                     dom_params = [{
                         "parameter": p.metric_name,
@@ -193,9 +202,12 @@ async def get_me_dashboard_summary(
                     } for p in params]
                     
                 elif dominant_status == "Warning":
-                    params = db.query(MEWarningAlert).filter_by(
-                        report_id=report.report_id
-                    ).limit(5).all()
+                    result = await db.execute(
+                        select(MEWarningAlert)
+                        .where(MEWarningAlert.report_id == report.report_id)
+                        .limit(5)
+                    )
+                    params = result.scalars().all()
                     
                     dom_params = [{
                         "parameter": p.metric_name,
@@ -206,9 +218,12 @@ async def get_me_dashboard_summary(
                     } for p in params]
                     
                 else:  # Normal
-                    params = db.query(MENormalStatus).filter_by(
-                        report_id=report.report_id
-                    ).limit(5).all()
+                    result = await db.execute(
+                        select(MENormalStatus)
+                        .where(MENormalStatus.report_id == report.report_id)
+                        .limit(5)
+                    )
+                    params = result.scalars().all()
                     
                     dom_params = [{
                         "parameter": p.metric_name,

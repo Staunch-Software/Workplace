@@ -1304,7 +1304,7 @@ async def get_luboil_fleet_overview(
                             "office_remarks": h.office_remarks,
                             "internal_remarks": h.internal_remarks,
                             "status_change_log": h.status_change_log,
-                            "attachment_url": h.attachment_url,
+                            "attachment_url": generate_sas_url(h.attachment_url) if h.attachment_url else None,
                             "diagnosis": h.lab_diagnosis,
                             "is_image_required": h.is_image_required, 
                             "is_resolved": h.is_resolved,
@@ -2096,7 +2096,14 @@ async def vessel_overdue_workflow(
     user_data = current_user.get('user') if isinstance(current_user, dict) and 'user' in current_user else current_user
     user_name = getattr(user_data, 'full_name', 'User') if not isinstance(user_data, dict) else user_data.get('full_name', 'User')
     u_role = str(getattr(user_data, 'role', "") if not isinstance(user_data, dict) else user_data.get('role', "")).upper()
-    is_shore = u_role in["SHORE", "ADMIN", "SUPERUSER", "SUPERINTENDENT"]
+    is_shore = u_role in ["SHORE", "ADMIN", "SUPERUSER", "SUPERINTENDENT"]
+
+    # 🔥 NEW: Capture submitter ID for MY FEED on accept/decline
+    submitter_id = None
+    if isinstance(current_user, dict):
+        submitter_id = current_user.get('id') or current_user.get('user_id')
+    else:
+        submitter_id = getattr(current_user, 'id', None)
 
     # 2. Get Vessel Name for Notifications
     control_db = SessionControl()
@@ -2124,53 +2131,149 @@ async def vessel_overdue_workflow(
     res_reports = await db.execute(sa_select(LuboilReport).where(LuboilReport.report_id.in_(report_ids)))
     reports_to_update = res_reports.scalars().all()
 
-    justification_text = request.remarks
+    # 🔥 UPDATED: Capture justification_text before loop as fallback
+    justification_text = request.remarks or ""
+
     for r in reports_to_update:
         if request.action == "SUBMIT":
-            r.overdue_remarks = request.remarks
-            r.is_overdue_accepted = None  # NULL means Pending
+            timestamp = datetime.utcnow().strftime("%d/%m/%Y %H:%M")
+            existing = r.overdue_remarks or ""
+            r.overdue_remarks = f"{existing}\n[{timestamp}] {request.remarks}".strip()
+            r.is_overdue_accepted = None  # NULL means Pending → new approval required
             r.updated_at = datetime.utcnow()
         elif request.action == "ACCEPT":
             r.is_overdue_accepted = True  # True means Accepted
-            justification_text = r.overdue_remarks
+            justification_text = r.overdue_remarks or justification_text
             r.updated_at = datetime.utcnow()
         elif request.action == "DECLINE":
-            r.is_overdue_accepted = False # False means Declined
-            justification_text = r.overdue_remarks
+            r.is_overdue_accepted = False  # False means Declined
+            justification_text = r.overdue_remarks or justification_text
             r.updated_at = datetime.utcnow()
 
-    # 5. Trigger the "MY FEED" Private Notifications
+    # 5. 🔥 UPDATED: Trigger FLEET FEED + MY FEED with proper routing
     control_db = SessionControl()
     try:
-        if request.action == "SUBMIT":
-            # Send to SHORE users
-            target_users = control_db.query(ControlUser).filter(ControlUser.role.in_(["SHORE", "ADMIN", "SUPERINTENDENT"])).all()
-            priority = "WARNING"
-            event_type = "APPROVAL_REQUEST"
-            msg = f"⏳ PENDING APPROVAL - {vessel_name}\n{user_name} submitted a vessel-wide overdue justification.\nRemarks: '{justification_text}'"
-        else:
-            # Send back to VESSEL users assigned to this ship
-            target_users = control_db.query(ControlUser).join(
-                user_vessel_link, ControlUser.id == user_vessel_link.c.user_id
-            ).filter(user_vessel_link.c.vessel_imo == str(request.imo), ControlUser.role == "VESSEL").all()
-            
-            status_text = "✅ ACCEPTED" if request.action == "ACCEPT" else "❌ DECLINED"
-            priority = "SUCCESS" if request.action == "ACCEPT" else "CRITICAL"
-            event_type = "STATUS_CHANGE"
-            msg = f"{status_text} - {vessel_name}\nShore ({user_name}) has {request.action.lower()} the overdue justification.\nOriginal Remark: '{justification_text}'"
+        # 🔥 NEW: Helper to normalize job_title for fuzzy matching
+        def normalize(s):
+            return (s or "").lower().replace(" ", "")
 
-        # Route directly into MY FEED via recipient_id
-        for t_user in target_users:
+        # 🔥 NEW: Get ALL assigned shore users for this specific vessel only
+        assigned_shore_users = control_db.query(ControlUser).join(
+            user_vessel_link, ControlUser.id == user_vessel_link.c.user_id
+        ).filter(
+            user_vessel_link.c.vessel_imo == str(request.imo),
+            ControlUser.role.in_(["SHORE", "ADMIN", "SUPERUSER", "SUPERINTENDENT"])
+        ).all()
+
+        # 🔥 NEW: Get ALL assigned vessel users for this specific vessel only
+        assigned_vessel_users = control_db.query(ControlUser).join(
+            user_vessel_link, ControlUser.id == user_vessel_link.c.user_id
+        ).filter(
+            user_vessel_link.c.vessel_imo == str(request.imo),
+            ControlUser.role == "VESSEL"
+        ).all()
+
+        # 🔥 NEW: Find Tech Manager among assigned shore users (normalized match)
+        tech_managers = [
+            u for u in assigned_shore_users
+            if "techmanager" in normalize(u.job_title) or "technicalmanager" in normalize(u.job_title)
+        ]
+
+        tech_directors = [
+            u for u in assigned_shore_users
+            if "techdirector" in normalize(u.job_title) or "technicaldirector" in normalize(u.job_title)
+        ]
+
+        # Tech Manager first, fallback to Tech Director
+        approvers = tech_managers if tech_managers else tech_directors
+
+        if request.action == "SUBMIT":
+            # -------------------------------------------------------
+            # LAYER 1: FLEET FEED (recipient_id=None)
+            # Visible to ALL assigned shore + vessel users of this vessel
+            # -------------------------------------------------------
+            fleet_msg = (
+                f"⏳ OVERDUE JUSTIFICATION SUBMITTED - {vessel_name}\n"
+                f"{user_name} submitted a vessel-wide overdue justification for review.\n"
+                f"Remarks: '{justification_text}'"
+            )
             db.add(LuboilEvent(
                 vessel_name=vessel_name,
                 imo=str(request.imo),
                 machinery_name="Vessel-Wide",
-                event_type=event_type,
-                priority=priority,
-                message=msg,
-                recipient_id=t_user.id, # 🔥 Routes strictly to MY FEED
+                event_type="APPROVAL_REQUEST",
+                priority="WARNING",
+                message=fleet_msg,
+                recipient_id=None,  # 🔥 Fleet Feed — visible to all assigned users
                 created_at=datetime.utcnow()
             ))
+
+            # -------------------------------------------------------
+            # LAYER 2: MY FEED (only Tech Manager or Director fallback)
+            # Private action request to approver only
+            # -------------------------------------------------------
+            my_feed_msg = (
+                f"⚠️ APPROVAL REQUIRED - {vessel_name}\n"
+                f"Overdue justification submitted by {user_name} needs your approval.\n"
+                f"Remarks: '{justification_text}'"
+            )
+            for approver in approvers:
+                db.add(LuboilEvent(
+                    vessel_name=vessel_name,
+                    imo=str(request.imo),
+                    machinery_name="Vessel-Wide",
+                    event_type="APPROVAL_REQUEST",
+                    priority="WARNING",
+                    message=my_feed_msg,
+                    recipient_id=str(approver.id),  # 🔥 MY FEED — only to approver
+                    created_at=datetime.utcnow()
+                ))
+
+        elif request.action in ["ACCEPT", "DECLINE"]:
+            status_text = "✅ ACCEPTED" if request.action == "ACCEPT" else "❌ DECLINED"
+            priority = "SUCCESS" if request.action == "ACCEPT" else "CRITICAL"
+
+            # -------------------------------------------------------
+            # LAYER 1: FLEET FEED (recipient_id=None)
+            # Everyone assigned (shore + vessel) sees the decision
+            # -------------------------------------------------------
+            fleet_msg = (
+                f"OVERDUE JUSTIFICATION {status_text} - {vessel_name}\n"
+                f"Shore ({user_name}) has {request.action.lower()}ed the overdue justification.\n"
+                f"Original Remarks: '{justification_text}'"
+            )
+            db.add(LuboilEvent(
+                vessel_name=vessel_name,
+                imo=str(request.imo),
+                machinery_name="Vessel-Wide",
+                event_type="STATUS_CHANGE",
+                priority=priority,
+                message=fleet_msg,
+                recipient_id=None,  # 🔥 Fleet Feed — visible to all assigned users
+                created_at=datetime.utcnow()
+            ))
+
+            # -------------------------------------------------------
+            # LAYER 2: MY FEED (only the original submitter)
+            # Private confirmation back to whoever submitted the remarks
+            # -------------------------------------------------------
+            my_feed_msg = (
+                f"{status_text} - {vessel_name}\n"
+                f"Your overdue justification has been {request.action.lower()}ed by {user_name}.\n"
+                f"Original Remarks: '{justification_text}'"
+            )
+            for vessel_user in assigned_vessel_users:
+                db.add(LuboilEvent(
+                    vessel_name=vessel_name,
+                    imo=str(request.imo),
+                    machinery_name="Vessel-Wide",
+                    event_type="STATUS_CHANGE",
+                    priority=priority,
+                    message=my_feed_msg,
+                    recipient_id=str(vessel_user.id),  # ← CORRECT: vessel submitter
+                    created_at=datetime.utcnow()
+                ))
+
     finally:
         control_db.close()
 

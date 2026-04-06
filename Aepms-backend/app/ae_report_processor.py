@@ -2,7 +2,7 @@ import logging
 from decimal import Decimal
 from datetime import date
 from typing import Dict, Any, Optional, BinaryIO, List
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # Assuming necessary imports from your application structure
 from app.ae_pdf_extractor import extract_ae_performance_data
@@ -223,10 +223,10 @@ def validate_ae_report_type(raw_data: dict) -> bool:
 # -----------------------------------------------------------
 # MAIN ENTRY - SAVE REPORT FROM PDF
 # -----------------------------------------------------------
-def save_ae_monthly_report_from_pdf(
+async def save_ae_monthly_report_from_pdf(
     pdf_file_stream: BinaryIO,
     filename: str,
-    session: Session
+    session: AsyncSession
 ) -> Optional[Dict[str, Any]]:
     """
     Main entry point for processing and saving an AE monthly report from PDF.
@@ -293,7 +293,7 @@ def save_ae_monthly_report_from_pdf(
         model = str(raw_data.get("aemodel", "6EY18ALW")).strip()
 
         # 6️⃣ Get or create generator master record
-        generator = get_or_create_generator(
+        generator = await get_or_create_generator(
             session=session,
             imo_number=imo,
             designation=designation,
@@ -314,24 +314,32 @@ def save_ae_monthly_report_from_pdf(
         new_load_kw = _safe_decimal(raw_data, "load")
 
         # Query Header joined with GraphData to check all fields
-        existing = session.query(GeneratorMonthlyReportHeader).join(
-            GeneratorPerformanceGraphData,
-            GeneratorMonthlyReportHeader.report_id == GeneratorPerformanceGraphData.report_id
-        ).filter(
-            GeneratorMonthlyReportHeader.generator_id == generator_id,
-            GeneratorMonthlyReportHeader.report_date == rpt_date,
-            GeneratorMonthlyReportHeader.total_engine_run_hrs == new_run_hrs,
-            GeneratorPerformanceGraphData.load_kw == new_load_kw
-        ).first()
+        from sqlalchemy import select
+        existing_result = await session.execute(
+            select(GeneratorMonthlyReportHeader)
+            .join(
+                GeneratorPerformanceGraphData,
+                GeneratorMonthlyReportHeader.report_id == GeneratorPerformanceGraphData.report_id
+            )
+            .where(
+                GeneratorMonthlyReportHeader.generator_id == generator_id,
+                GeneratorMonthlyReportHeader.report_date == rpt_date,
+                GeneratorMonthlyReportHeader.total_engine_run_hrs == new_run_hrs,
+                GeneratorPerformanceGraphData.load_kw == new_load_kw
+            )
+        )
+        existing = existing_result.scalar_one_or_none()
 
         if existing:
-            session.rollback()
+            existing_report_id = existing.report_id
+            existing_report_date = existing.report_date
+            await session.rollback()
             logger.info(f"📋 Exact duplicate detected (Date: {rpt_date}, KW: {new_load_kw}, Hrs: {new_run_hrs})")
             return {
-                "report_id": existing.report_id,
+                "report_id": existing_report_id,
                 "generator_id": generator_id,
                 "report_month": rpt_month,
-                "report_date": existing.report_date,
+                "report_date": existing_report_date,
                 "is_duplicate": True,
                 "missing_parameters": validation_errors
             }
@@ -340,7 +348,7 @@ def save_ae_monthly_report_from_pdf(
         graph = build_graph_data(raw_data)
 
         # 9️⃣ Save report (header + JSON + graph data)
-        header = save_ae_monthly_report(
+        header = await save_ae_monthly_report(
             session=session,
             generator=generator,
             report_date=rpt_date,
@@ -349,30 +357,31 @@ def save_ae_monthly_report_from_pdf(
             graph_data=graph
         )
 
-        session.commit()
-        session.flush()  # Ensure all data is written to database
+        saved_report_id = header.report_id  # capture before commit expires the object
+
+        # await session.flush()   
+        await session.commit()
 
         # 🔥 NEW: Compute and save deviation analysis
-        logger.info(f"[AE_PROCESSOR] 📊 Computing deviations for report_id={header.report_id}")
+        logger.info(f"[AE_PROCESSOR] 📊 Computing deviations for report_id={saved_report_id}")
         try:
-            compute_and_save_ae_deviation(session, header.report_id)
+            await compute_and_save_ae_deviation(session, saved_report_id)
             logger.info(f"[AE_PROCESSOR] ✅ Deviations computed successfully")
         except Exception as dev_err:
             logger.error(f"[DEVIATION] ⚠️ Non-critical error: {dev_err}", exc_info=True)
-            # Continue processing even if deviation fails
 
-        # 🚨 Process alerts (runs AFTER deviation computation)
-        logger.info(f"[AE_PROCESSOR] 🚨 Processing alerts for report_id={header.report_id}")
+        logger.info(f"[AE_PROCESSOR] 🚨 Processing alerts for report_id={saved_report_id}")
+
         try:
             from app.ae_alert_processor import process_ae_alerts
-            process_ae_alerts(session, header.report_id)
+            await process_ae_alerts(session, saved_report_id)
             logger.info(f"[AE_PROCESSOR] ✅ Alerts processed successfully")
         except Exception as alert_err:
             logger.error(f"[ALERT] ⚠️ Non-critical error: {alert_err}", exc_info=True)
 
         # 🎯 Return success response
         return {
-            "report_id": header.report_id,
+            "report_id": saved_report_id,
             "generator_id": generator_id,
             "generator_designation": generator_designation,
             "engine_maker": generator_engine_maker,
@@ -385,11 +394,11 @@ def save_ae_monthly_report_from_pdf(
 
     except ValueError as e:
         logger.error(f"[AE_PROCESSOR] ❌ Validation Error: {e}", exc_info=True)
-        session.rollback()
+        await session.rollback()
         raise
     except Exception as e:
         logger.error(f"[AE_PROCESSOR] ❌ Critical Error: {e}", exc_info=True)
-        session.rollback()
+        await session.rollback()
         raise
 
 def check_ae_parameters_integrity(raw_data: Dict[str, Any]) -> List[str]:
