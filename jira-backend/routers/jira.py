@@ -17,7 +17,10 @@ FIRST TIME SETUP:
 
 from fastapi import APIRouter, Depends, BackgroundTasks, Query
 from fastapi.responses import Response
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from core.deps import require_role, get_current_user
+from db.database import get_db
 from datetime import datetime
 import traceback
 import asyncio
@@ -35,6 +38,39 @@ sync_status = {
     "lastResult":  None,
     "lastError":   None,
 }
+
+
+async def _load_sync_status():
+    """Restore last sync status from DB into memory on startup."""
+    try:
+        from models.sync import JiraSyncLog
+        from db.database import SessionLocal
+        async with SessionLocal() as db:
+            row = (await db.execute(select(JiraSyncLog).where(JiraSyncLog.id == 1))).scalar_one_or_none()
+            if row and row.last_sync:
+                sync_status["lastSync"]   = row.last_sync.isoformat()
+                sync_status["mode"]       = row.mode
+                sync_status["lastResult"] = row.last_result
+    except Exception as e:
+        print(f"[Sync] Could not load sync status from DB: {e}")
+
+
+async def _save_sync_status(mode: str, last_sync: datetime, last_result: dict):
+    """Persist sync status to DB so it survives server restarts."""
+    try:
+        from models.sync import JiraSyncLog
+        from db.database import SessionLocal
+        async with SessionLocal() as db:
+            row = (await db.execute(select(JiraSyncLog).where(JiraSyncLog.id == 1))).scalar_one_or_none()
+            if row:
+                row.mode        = mode
+                row.last_sync   = last_sync
+                row.last_result = last_result
+            else:
+                db.add(JiraSyncLog(id=1, mode=mode, last_sync=last_sync, last_result=last_result))
+            await db.commit()
+    except Exception as e:
+        print(f"[Sync] Could not save sync status to DB: {e}")
 
 
 # ─── INCREMENTAL sync — fast, run every 30 minutes ───────────────────────────
@@ -103,6 +139,42 @@ async def retry_failed(
 @router.get("/status")
 async def get_status(user=Depends(require_role("SHORE", "ADMIN"))):
     return sync_status
+
+
+# ─── Vessel sync status ───────────────────────────────────────────────────────
+
+@router.get("/vessel-sync-status")
+async def get_vessel_sync_status(
+    user=Depends(get_current_user),
+    jira_db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns the last push/pull sync timestamps for all vessels assigned
+    to the current user. Used by the Shore Dashboard Sync Log panel.
+    """
+    from models.sync import SyncState
+
+    if not user.vessels:
+        return []
+
+    imos = [v.imo for v in user.vessels]
+
+    result = await jira_db.execute(
+        select(SyncState)
+        .where(SyncState.vessel_imo.in_(imos))
+        .where(SyncState.sync_scope == "TICKET")
+    )
+    sync_map = {row.vessel_imo: row for row in result.scalars().all()}
+
+    return [
+        {
+            "imo": v.imo,
+            "name": v.name,
+            "last_push_at": sync_map[v.imo].last_push_at.isoformat() if v.imo in sync_map and sync_map[v.imo].last_push_at else None,
+            "last_pull_at": sync_map[v.imo].last_pull_at.isoformat() if v.imo in sync_map and sync_map[v.imo].last_pull_at else None,
+        }
+        for v in user.vessels
+    ]
 
 
 # ─── Image proxy ─────────────────────────────────────────────────────────────
@@ -446,6 +518,46 @@ async def image_proxy(
 
 # ─── Background task runners ──────────────────────────────────────────────────
 
+async def _update_vessel_sync_state(now: datetime):
+    """Update SyncState last_push_at/last_pull_at for all active vessels after a successful sync."""
+    try:
+        from models.sync import SyncState
+        from models.control import Vessel as ControlVessel
+        from db.database import SessionLocal, AsyncSessionControl
+
+        async with AsyncSessionControl() as control_db:
+            result = await control_db.execute(
+                select(ControlVessel).where(ControlVessel.is_active == True)
+            )
+            vessels = result.scalars().all()
+
+        if not vessels:
+            return
+
+        async with SessionLocal() as jira_db:
+            for vessel in vessels:
+                existing = (await jira_db.execute(
+                    select(SyncState)
+                    .where(SyncState.vessel_imo == vessel.imo)
+                    .where(SyncState.sync_scope == "TICKET")
+                )).scalar_one_or_none()
+
+                if existing:
+                    existing.last_push_at = now
+                    existing.last_pull_at = now
+                else:
+                    jira_db.add(SyncState(
+                        vessel_imo=vessel.imo,
+                        sync_scope="TICKET",
+                        last_push_at=now,
+                        last_pull_at=now,
+                    ))
+            await jira_db.commit()
+        print(f"[Sync] Updated SyncState for {len(vessels)} vessels")
+    except Exception as e:
+        print(f"[Sync] SyncState update failed (non-critical): {e}")
+
+
 async def _run_sync(full_sync: bool = False):
     from automation.push_service import push_pending_tickets
     from automation.pull_service import pull_jira_updates
@@ -471,6 +583,12 @@ async def _run_sync(full_sync: bool = False):
             f"DetailFetched={pull_result['detailFetched']} "
             f"Skipped={pull_result['detailSkipped']} "
             f"Updated={pull_result['updated']} Created={pull_result['created']}"
+        )
+        await _update_vessel_sync_state(datetime.utcnow())
+        await _save_sync_status(
+            mode=sync_status["mode"],
+            last_sync=datetime.utcnow(),
+            last_result=sync_status["lastResult"],
         )
     except Exception as e:
         err = str(e)

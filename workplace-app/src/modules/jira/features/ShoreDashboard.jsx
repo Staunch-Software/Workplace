@@ -2,38 +2,44 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import JiraHeader from '../components/JiraHeader'
 import axiosJira from '../api/axiosJira'
+import SyncLogPanel from './SyncLogPanel'
 import '../styles/ShoreDashboard.css'
 
 // ── Status config ────────────────────────────────────────────────────────────
 const STATUS_CLASS = {
-  'Sup In Progress':               'sd-badge--sup-in-progress',
-  'Dev In Progress':               'sd-badge--dev-in-progress',
-  'Waiting for Customer':          'sd-badge--waiting-customer',
-  'Waiting for Support':           'sd-badge--waiting-support',
-  'In Progress':                   'sd-badge--in-progress',
-  'Pending':                       'sd-badge--pending',
-  'FSD TO REVIEW':                 'sd-badge--fsd-review',
-  'FSD APPROVED':                  'sd-badge--fsd-approved',
-  'FSD  IN PROGRESS':              'sd-badge--fsd-in-progress',
-  'READY FOR UAT':                 'sd-badge--ready-uat',
-  'UAT IN PROGRESS':               'sd-badge--uat-in-progress',
-  'QA IN PROGRESS':                'sd-badge--qa-in-progress',
-  'CR Approved':                   'sd-badge--cr-approved',
-  'Ready for Production':          'sd-badge--ready-production',
-  'RELEASE TO PRODUCTION':         'sd-badge--release-production',
-  'Awaiting Release':              'sd-badge--awaiting-release',
-  'Resolved':                      'sd-badge--resolved',
-  'Resolved Awaiting Confirmation':'sd-badge--resolved-awaiting',
-  'Cancelled':                     'sd-badge--cancelled',
-  'Closed':                        'sd-badge--closed',
-  'SUP IN PROGRESS':               'sd-badge--sup-in-progress',
+  'Sup In Progress': 'sd-badge--sup-in-progress',
+  'Dev In Progress': 'sd-badge--dev-in-progress',
+  'Waiting for Customer': 'sd-badge--waiting-customer',
+  'Waiting for Support': 'sd-badge--waiting-support',
+  'In Progress': 'sd-badge--in-progress',
+  'Pending': 'sd-badge--pending',
+  'FSD TO REVIEW': 'sd-badge--fsd-review',
+  'FSD APPROVED': 'sd-badge--fsd-approved',
+  'FSD  IN PROGRESS': 'sd-badge--fsd-in-progress',
+  'READY FOR UAT': 'sd-badge--ready-uat',
+  'UAT IN PROGRESS': 'sd-badge--uat-in-progress',
+  'QA IN PROGRESS': 'sd-badge--qa-in-progress',
+  'CR Approved': 'sd-badge--cr-approved',
+  'Ready for Production': 'sd-badge--ready-production',
+  'RELEASE TO PRODUCTION': 'sd-badge--release-production',
+  'Awaiting Release': 'sd-badge--awaiting-release',
+  'Resolved': 'sd-badge--resolved',
+  'Resolved Awaiting Confirmation': 'sd-badge--resolved-awaiting',
+  'Cancelled': 'sd-badge--cancelled',
+  'Closed': 'sd-badge--closed',
+  'SUP IN PROGRESS': 'sd-badge--sup-in-progress',
 }
 
 const PRIORITY_CONFIG = {
   Critical: { icon: '▲▲', cls: 'sd-priority-icon--critical', label: 'Severity 1 - Critical' },
-  Major:    { icon: '▲',  cls: 'sd-priority-icon--major',    label: 'Severity 2 - Major' },
-  Minor:    { icon: '—',  cls: 'sd-priority-icon--minor',    label: 'Severity 3 - Minor' },
+  Major: { icon: '▲', cls: 'sd-priority-icon--major', label: 'Severity 2 - Major' },
+  Minor: { icon: '—', cls: 'sd-priority-icon--minor', label: 'Severity 3 - Minor' },
 }
+
+const FULL_SYNC_WHITELIST = [
+  // Add emails of users who should see the Full Sync button
+  'admin@example.com',
+]
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
@@ -61,8 +67,8 @@ function TypeIcon({ requestType }) {
   if (!requestType) return <span style={{ width: 28, height: 28, display: 'inline-block' }} />
   const t = requestType.toLowerCase()
   const isEmail = t.includes('email')
-  const isBug   = t.includes('bug') || t.includes('error')
-  const isTask  = t.includes('task')
+  const isBug = t.includes('bug') || t.includes('error')
+  const isTask = t.includes('task')
 
   let variant = 'default'
   if (isEmail) variant = 'email'
@@ -92,6 +98,26 @@ function TypeIcon({ requestType }) {
   )
 }
 
+function TopbarLegend() {
+  const items = [
+    { label: 'Refresh', desc: 'Reload the current page of tickets from the local database. Does not contact Jira.' },
+    { label: 'Export', desc: 'Download the currently filtered ticket list as an Excel (.xlsx) file.' },
+    { label: 'Sync with Jira', desc: 'Incremental sync — fetches only new or changed tickets from Jira. Fast, runs in seconds. Use this for regular updates.' },
+    { label: 'Full Sync', desc: 'Re-fetches ALL ticket details from Jira (~300+ tickets). Takes 20–45 minutes and runs in the background. Use only when needed.' },
+  ]
+
+  return (
+    <div className="sd-legend-popover">
+      {items.map(item => (
+        <div key={item.label} className="sd-legend-row">
+          <span className="sd-legend-label">{item.label}</span>
+          <span className="sd-legend-desc">{item.desc}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Main Component ───────────────────────────────────────────────────────────
 export default function ShoreDashboard() {
   const navigate = useNavigate()
@@ -102,6 +128,10 @@ export default function ShoreDashboard() {
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
+  const [showSyncLog, setShowSyncLog] = useState(false)
+
+  const _platformUser = JSON.parse(localStorage.getItem('platform_user') || '{}')
+  const canFullSync = FULL_SYNC_WHITELIST.includes((_platformUser?.email || '').toLowerCase())
 
   const [vesselName, setVesselName] = useState('all')
   const [statusMode, setStatusMode] = useState('open')
@@ -200,7 +230,7 @@ export default function ShoreDashboard() {
     const token = localStorage.getItem('platform_token') || sessionStorage.getItem('platform_token')
     const params = new URLSearchParams({
       vesselName, priority, search: searchDebounce,
-      ...(statusMode === 'open'   ? { status: 'open' }   : {}),
+      ...(statusMode === 'open' ? { status: 'open' } : {}),
       ...(statusMode === 'closed' ? { status: 'closed' } : {}),
     })
     const res = await fetch(`http://localhost:8004/api/export?${params}`, {
@@ -240,10 +270,10 @@ export default function ShoreDashboard() {
     'Resolved Awaiting Confirmation', 'Resolved', 'Cancelled', 'Closed',
   ]
 
-  const statusLabel = statusMode === 'open'   ? 'Open requests'
+  const statusLabel = statusMode === 'open' ? 'Open requests'
     : statusMode === 'closed' ? 'Closed requests'
-    : statusMode === 'all'    ? 'All statuses'
-    : `${selectedStatuses.size} selected`
+      : statusMode === 'all' ? 'All statuses'
+        : `${selectedStatuses.size} selected`
 
   const toggleStatus = (s) => {
     setSelectedStatuses(prev => {
@@ -260,316 +290,337 @@ export default function ShoreDashboard() {
     <div className="sd-page">
       <JiraHeader />
 
-      <main className="sd-main">
+      <div className={`sd-layout${showSyncLog ? ' sd-layout--with-panel' : ''}`}>
+        <main className="sd-main">
 
-        {/* Top bar */}
-        <div className="sd-topbar">
-          <div>
-            <p className="sd-topbar-label">Help Center</p>
-            <h1 className="sd-topbar-title">Requests</h1>
-          </div>
-          <div className="sd-topbar-actions">
-            <button onClick={() => fetchTickets(currentPage)} className="sd-btn">
-              <svg className="sd-btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Refresh
-            </button>
-            <button onClick={handleExport} className="sd-btn">
-              <svg className="sd-btn-icon sd-btn-icon--green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Export
-            </button>
-            <button onClick={handleSync} disabled={syncing} className="sd-btn-sync">
-              {syncing ? (
-                <>
-                  <span className="sd-spinner" />
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <svg className="sd-btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Sync with Jira
-                </>
-              )}
-            </button>
-            <button
-              onClick={handleFullSync}
-              disabled={syncing}
-              title="Fetch ALL ticket details (run once to populate old tickets)"
-              className="sd-btn-fullsync"
-            >
-              <svg className="sd-btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Full Sync
-            </button>
-          </div>
-        </div>
-
-        {/* Sync result banner */}
-        {syncResult && (
-          <div className={`sd-banner ${isFullBanner ? 'sd-banner--warning' : 'sd-banner--success'}`}>
-            <div className="sd-banner-content">
-              <svg className={`sd-banner-icon ${isFullBanner ? 'sd-banner-icon--warning' : 'sd-banner-icon--success'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              {isFullBanner ? (
-                <span className={`sd-banner-text--warning`}>
-                  {syncResult.done
-                    ? 'Full sync complete — ticket list refreshed.'
-                    : 'Full sync started in background — fetching all ticket details (~20–45 min). Keep using the app normally.'}
-                </span>
-              ) : (
-                <>
-                  <span className="sd-banner-text--success">Sync complete —</span>
-                  <span className="sd-banner-sub">
-                    {syncResult.totalScraped || 0} scraped, <strong>{syncResult.updated || 0}</strong> updated, <strong>{syncResult.created || 0}</strong> created
-                  </span>
-                  {syncResult.errors?.length > 0 && (
-                    <span className="sd-banner-errors">({syncResult.errors.length} warnings)</span>
-                  )}
-                </>
-              )}
+          {/* Top bar */}
+          <div className="sd-topbar">
+            <div>
+              <p className="sd-topbar-label">Help Center</p>
+              <h1 className="sd-topbar-title">Requests</h1>
             </div>
-            <button
-              onClick={() => setSyncResult(null)}
-              className={`sd-banner-close ${isFullBanner ? 'sd-banner-close--warning' : 'sd-banner-close--success'}`}
-            >
-              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        )}
+            <div className="sd-topbar-actions">
+              <button onClick={() => fetchTickets(currentPage)} className="sd-btn">
+                <svg className="sd-btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </button>
+              <button onClick={handleExport} className="sd-btn">
+                <svg className="sd-btn-icon sd-btn-icon--green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export
+              </button>
+              <button onClick={handleSync} disabled={syncing} className="sd-btn-sync">
+                {syncing ? (
+                  <>
+                    <span className="sd-spinner" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <svg className="sd-btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Sync with Jira
+                  </>
+                )}
+              </button>
+              {canFullSync && (
+                <button
+                  onClick={handleFullSync}
+                  disabled={syncing}
+                  title="Fetch ALL ticket details (run once to populate old tickets)"
+                  className="sd-btn-fullsync"
+                >
+                  <svg className="sd-btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Full Sync
+                </button>
+              )}
+              <button
+                onClick={() => setShowSyncLog(v => !v)}
+                className={`sd-btn ${showSyncLog ? 'sd-btn--active' : ''}`}
+                title="Sync log"
+              >
+                <svg className="sd-btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                Sync Log
+              </button>
 
-        {/* Filters */}
-        <div className="sd-filters">
-          {/* Search */}
-          <div className="sd-search-wrap">
-            <svg className="sd-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Request contains..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="sd-search-input"
-            />
+            </div>
           </div>
 
-          {/* Status multi-select */}
-          <div className="sd-status-wrap" ref={statusMenuRef}>
-            <button onClick={() => setShowStatusMenu(v => !v)} className="sd-status-btn">
-              <span className="sd-status-dot" />
-              Status: {statusLabel}
-              <svg className={`sd-chevron ${showStatusMenu ? 'sd-chevron--open' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {showStatusMenu && (
-              <div className="sd-status-menu">
-                <div className="sd-status-presets">
-                  {[
-                    { key: 'open',   label: 'Open' },
-                    { key: 'closed', label: 'Closed' },
-                    { key: 'all',    label: 'All' },
-                  ].map(p => (
-                    <button
-                      key={p.key}
-                      onClick={() => { setStatusMode(p.key); setSelectedStatuses(new Set()); setShowStatusMenu(false) }}
-                      className={`sd-preset-btn ${statusMode === p.key && selectedStatuses.size === 0 ? 'sd-preset-btn--active' : ''}`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-                <p className="sd-status-list-label">Or pick specific statuses:</p>
-                <div className="sd-status-list">
-                  {ALL_STATUSES.map(s => (
-                    <label key={s} className="sd-status-item">
-                      <input
-                        type="checkbox"
-                        checked={selectedStatuses.has(s)}
-                        onChange={() => toggleStatus(s)}
-                      />
-                      <span className="sd-status-item-label">{s}</span>
-                    </label>
-                  ))}
-                </div>
-                {selectedStatuses.size > 0 && (
-                  <div className="sd-status-footer">
-                    <span className="sd-status-count">{selectedStatuses.size} selected</span>
-                    <button
-                      onClick={() => { setSelectedStatuses(new Set()); setStatusMode('open'); setShowStatusMenu(false) }}
-                      className="sd-status-clear"
-                    >
-                      Clear
-                    </button>
-                  </div>
+          {/* Sync result banner */}
+          {syncResult && (
+            <div className={`sd-banner ${isFullBanner ? 'sd-banner--warning' : 'sd-banner--success'}`}>
+              <div className="sd-banner-content">
+                <svg className={`sd-banner-icon ${isFullBanner ? 'sd-banner-icon--warning' : 'sd-banner-icon--success'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                {isFullBanner ? (
+                  <span className={`sd-banner-text--warning`}>
+                    {syncResult.done
+                      ? 'Full sync complete — ticket list refreshed.'
+                      : 'Full sync started in background — fetching all ticket details (~20–45 min). Keep using the app normally.'}
+                  </span>
+                ) : (
+                  <>
+                    <span className="sd-banner-text--success">Sync complete —</span>
+                    <span className="sd-banner-sub">
+                      {syncResult.totalScraped || 0} scraped, <strong>{syncResult.updated || 0}</strong> updated, <strong>{syncResult.created || 0}</strong> created
+                    </span>
+                    {syncResult.errors?.length > 0 && (
+                      <span className="sd-banner-errors">({syncResult.errors.length} warnings)</span>
+                    )}
+                  </>
                 )}
               </div>
+              <button
+                onClick={() => setSyncResult(null)}
+                className={`sd-banner-close ${isFullBanner ? 'sd-banner-close--warning' : 'sd-banner-close--success'}`}
+              >
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+          <TopbarLegend />
+          {/* Filters */}
+          <div className="sd-filters">
+            {/* Search */}
+            <div className="sd-search-wrap">
+              <svg className="sd-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Request contains..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="sd-search-input"
+              />
+            </div>
+
+            {/* Status multi-select */}
+            <div className="sd-status-wrap" ref={statusMenuRef}>
+              <button onClick={() => setShowStatusMenu(v => !v)} className="sd-status-btn">
+                <span className="sd-status-dot" />
+                Status: {statusLabel}
+                <svg className={`sd-chevron ${showStatusMenu ? 'sd-chevron--open' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {showStatusMenu && (
+                <div className="sd-status-menu">
+                  <div className="sd-status-presets">
+                    {[
+                      { key: 'open', label: 'Open' },
+                      { key: 'closed', label: 'Closed' },
+                      { key: 'all', label: 'All' },
+                    ].map(p => (
+                      <button
+                        key={p.key}
+                        onClick={() => { setStatusMode(p.key); setSelectedStatuses(new Set()); setShowStatusMenu(false) }}
+                        className={`sd-preset-btn ${statusMode === p.key && selectedStatuses.size === 0 ? 'sd-preset-btn--active' : ''}`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="sd-status-list-label">Or pick specific statuses:</p>
+                  <div className="sd-status-list">
+                    {ALL_STATUSES.map(s => (
+                      <label key={s} className="sd-status-item">
+                        <input
+                          type="checkbox"
+                          checked={selectedStatuses.has(s)}
+                          onChange={() => toggleStatus(s)}
+                        />
+                        <span className="sd-status-item-label">{s}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {selectedStatuses.size > 0 && (
+                    <div className="sd-status-footer">
+                      <span className="sd-status-count">{selectedStatuses.size} selected</span>
+                      <button
+                        onClick={() => { setSelectedStatuses(new Set()); setStatusMode('open'); setShowStatusMenu(false) }}
+                        className="sd-status-clear"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Vessel */}
+            <select value={vesselName} onChange={e => setVesselName(e.target.value)} className="sd-select">
+              <option value="all">All Vessels</option>
+              {vessels.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
+            </select>
+
+            {/* Priority */}
+            <select value={priority} onChange={e => setPriority(e.target.value)} className="sd-select">
+              <option value="all">All Priorities</option>
+              <option value="Critical">Critical</option>
+              <option value="Major">Major</option>
+              <option value="Minor">Minor</option>
+            </select>
+
+            {!loading && (
+              <span className="sd-ticket-count">
+                {pagination.total.toLocaleString()} tickets
+              </span>
             )}
           </div>
 
-          {/* Vessel */}
-          <select value={vesselName} onChange={e => setVesselName(e.target.value)} className="sd-select">
-            <option value="all">All Vessels</option>
-            {vessels.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
-          </select>
-
-          {/* Priority */}
-          <select value={priority} onChange={e => setPriority(e.target.value)} className="sd-select">
-            <option value="all">All Priorities</option>
-            <option value="Critical">Critical</option>
-            <option value="Major">Major</option>
-            <option value="Minor">Minor</option>
-          </select>
-
-          {!loading && (
-            <span className="sd-ticket-count">
-              {pagination.total.toLocaleString()} tickets
-            </span>
-          )}
-        </div>
-
-        {/* Table */}
-        <div className="sd-table-card">
-          <div className="sd-table-scroll">
-            <table className="sd-table">
-              <thead>
-                <tr>
-                  <th className="sd-th sd-th--type">Type</th>
-                  <th className="sd-th sd-th--sortable" onClick={() => handleSort('reference')}>
-                    Reference <SortIcon field="reference" />
-                  </th>
-                  <th className="sd-th">Summary</th>
-                  <th className="sd-th">Status</th>
-                  <th className="sd-th">Vessel</th>
-                  <th className="sd-th sd-th--sortable" onClick={() => handleSort('requester')}>
-                    Requester <SortIcon field="requester" />
-                  </th>
-                  <th className="sd-th sd-th--sortable" onClick={() => handleSort('createdAt')}>
-                    Created <SortIcon field="createdAt" />
-                  </th>
-                  <th className="sd-th sd-th--sortable" onClick={() => handleSort('updatedAt')}>
-                    Updated <SortIcon field="updatedAt" />
-                  </th>
-                  <th className="sd-th sd-th--sortable" onClick={() => handleSort('priority')}>
-                    Priority <SortIcon field="priority" />
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  [...Array(8)].map((_, i) => (
-                    <tr key={i}>
-                      {[...Array(9)].map((_, j) => (
-                        <td key={j} className="sd-td">
-                          <div
-                            className="sd-skeleton-cell"
-                            style={{ width: j === 2 ? '80%' : j === 0 ? '28px' : '60%' }}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : tickets.length === 0 ? (
+          {/* Table */}
+          <div className="sd-table-card">
+            <div className="sd-table-scroll">
+              <table className="sd-table">
+                <thead>
                   <tr>
-                    <td colSpan={9} className="sd-td">
-                      <div className="sd-empty">
-                        <div className="sd-empty-inner">
-                          <svg className="sd-empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          <p className="sd-empty-text">No tickets match your filters</p>
-                        </div>
-                      </div>
-                    </td>
+                    <th className="sd-th sd-th--type">Type</th>
+                    <th className="sd-th sd-th--sortable" onClick={() => handleSort('reference')}>
+                      Reference <SortIcon field="reference" />
+                    </th>
+                    <th className="sd-th">Summary</th>
+                    <th className="sd-th">Status</th>
+                    <th className="sd-th">Vessel</th>
+                    <th className="sd-th sd-th--sortable" onClick={() => handleSort('requester')}>
+                      Requester <SortIcon field="requester" />
+                    </th>
+                    <th className="sd-th sd-th--sortable" onClick={() => handleSort('createdAt')}>
+                      Created <SortIcon field="createdAt" />
+                    </th>
+                    <th className="sd-th sd-th--sortable" onClick={() => handleSort('updatedAt')}>
+                      Updated <SortIcon field="updatedAt" />
+                    </th>
+                    <th className="sd-th sd-th--sortable" onClick={() => handleSort('priority')}>
+                      Priority <SortIcon field="priority" />
+                    </th>
                   </tr>
-                ) : (
-                  tickets.map(ticket => (
-                    <tr key={ticket.id} onClick={() => navigate(`/jira/shore/tickets/${ticket.id}`)}>
-                      <td className="sd-td"><TypeIcon requestType={ticket.requestType} /></td>
-                      <td className="sd-td">
-                        {ticket.reference ? (
-                          <span className="sd-ref">{ticket.reference}</span>
-                        ) : (
-                          <span className="sd-ref-pending">
-                            <span className="sd-pending-dot" />
-                            Pending
-                          </span>
-                        )}
+                </thead>
+                <tbody>
+                  {loading ? (
+                    [...Array(8)].map((_, i) => (
+                      <tr key={i}>
+                        {[...Array(9)].map((_, j) => (
+                          <td key={j} className="sd-td">
+                            <div
+                              className="sd-skeleton-cell"
+                              style={{ width: j === 2 ? '80%' : j === 0 ? '28px' : '60%' }}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : tickets.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="sd-td">
+                        <div className="sd-empty">
+                          <div className="sd-empty-inner">
+                            <svg className="sd-empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <p className="sd-empty-text">No tickets match your filters</p>
+                          </div>
+                        </div>
                       </td>
-                      <td className="sd-td">
-                        <span className="sd-summary">{ticket.summary}</span>
-                      </td>
-                      <td className="sd-td">
-                        <StatusBadge status={ticket.jiraStatus || ticket.status} />
-                      </td>
-                      <td className="sd-td">
-                        <span className="sd-vessel">
-                          {ticket.vesselName || <span className="sd-vessel-empty">—</span>}
-                        </span>
-                      </td>
-                      <td className="sd-td"><span className="sd-requester">{ticket.requester}</span></td>
-                      <td className="sd-td"><span className="sd-date">{formatDate(ticket.jiraCreatedAt || ticket.createdAt)}</span></td>
-                      <td className="sd-td"><span className="sd-date">{formatDate(ticket.jiraUpdatedAt || ticket.updatedAt)}</span></td>
-                      <td className="sd-td"><PriorityCell priority={ticket.priority} /></td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {pagination.total > 0 && (
-            <div className="sd-pagination">
-              <p className="sd-pagination-info">
-                Showing{' '}
-                <strong>{(currentPage - 1) * pagination.limit + 1}–{Math.min(currentPage * pagination.limit, pagination.total)}</strong>
-                {' '}of <strong>{pagination.total}</strong> tickets
-              </p>
-              <div className="sd-pagination-pages">
-                <button
-                  onClick={() => fetchTickets(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="sd-page-btn"
-                >
-                  ← Previous
-                </button>
-                {pageNums.map((p, i) => {
-                  const prev = pageNums[i - 1]
-                  const showEllipsis = prev && p - prev > 1
-                  return (
-                    <span key={p} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      {showEllipsis && <span className="sd-ellipsis">…</span>}
-                      <button
-                        onClick={() => fetchTickets(p)}
-                        className={`sd-page-num ${p === currentPage ? 'sd-page-num--active' : ''}`}
-                      >
-                        {p}
-                      </button>
-                    </span>
-                  )
-                })}
-                <button
-                  onClick={() => fetchTickets(currentPage + 1)}
-                  disabled={currentPage >= pagination.totalPages}
-                  className="sd-page-btn"
-                >
-                  Next →
-                </button>
-              </div>
+                  ) : (
+                    tickets.map(ticket => (
+                      <tr key={ticket.id} onClick={() => navigate(`/jira/shore/tickets/${ticket.id}`)}>
+                        <td className="sd-td"><TypeIcon requestType={ticket.requestType} /></td>
+                        <td className="sd-td">
+                          {ticket.reference ? (
+                            <span className="sd-ref">{ticket.reference}</span>
+                          ) : (
+                            <span className="sd-ref-pending">
+                              <span className="sd-pending-dot" />
+                              Pending
+                            </span>
+                          )}
+                        </td>
+                        <td className="sd-td">
+                          <span className="sd-summary">{ticket.summary}</span>
+                        </td>
+                        <td className="sd-td">
+                          <StatusBadge status={ticket.jiraStatus || ticket.status} />
+                        </td>
+                        <td className="sd-td">
+                          <span className="sd-vessel">
+                            {ticket.vesselName || <span className="sd-vessel-empty">—</span>}
+                          </span>
+                        </td>
+                        <td className="sd-td"><span className="sd-requester">{ticket.requester}</span></td>
+                        <td className="sd-td"><span className="sd-date">{formatDate(ticket.jiraCreatedAt || ticket.createdAt)}</span></td>
+                        <td className="sd-td"><span className="sd-date">{formatDate(ticket.jiraUpdatedAt || ticket.updatedAt)}</span></td>
+                        <td className="sd-td"><PriorityCell priority={ticket.priority} /></td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
-        </div>
-      </main>
+
+            {/* Pagination */}
+            {pagination.total > 0 && (
+              <div className="sd-pagination">
+                <p className="sd-pagination-info">
+                  Showing{' '}
+                  <strong>{(currentPage - 1) * pagination.limit + 1}–{Math.min(currentPage * pagination.limit, pagination.total)}</strong>
+                  {' '}of <strong>{pagination.total}</strong> tickets
+                </p>
+                <div className="sd-pagination-pages">
+                  <button
+                    onClick={() => fetchTickets(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="sd-page-btn"
+                  >
+                    ← Previous
+                  </button>
+                  {pageNums.map((p, i) => {
+                    const prev = pageNums[i - 1]
+                    const showEllipsis = prev && p - prev > 1
+                    return (
+                      <span key={p} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        {showEllipsis && <span className="sd-ellipsis">…</span>}
+                        <button
+                          onClick={() => fetchTickets(p)}
+                          className={`sd-page-num ${p === currentPage ? 'sd-page-num--active' : ''}`}
+                        >
+                          {p}
+                        </button>
+                      </span>
+                    )
+                  })}
+                  <button
+                    onClick={() => fetchTickets(currentPage + 1)}
+                    disabled={currentPage >= pagination.totalPages}
+                    className="sd-page-btn"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+        {showSyncLog && (
+          <>
+            <div className="slp-backdrop" onClick={() => setShowSyncLog(false)} />
+            <SyncLogPanel onClose={() => setShowSyncLog(false)} />
+          </>
+        )}
+      </div>
     </div>
   )
 }

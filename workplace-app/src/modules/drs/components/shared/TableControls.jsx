@@ -13,7 +13,7 @@ import {
   X,
   Check,
   Edit3,
-  Trash2
+  Trash2, AlertCircle, Info
 } from 'lucide-react';
 
 
@@ -39,6 +39,7 @@ export const FilterHeader = ({
   const [tempRange, setTempRange] = useState(currentFilter || { from: '', to: '' });
   const [tempDate, setTempDate] = useState(currentFilter || '');
   const filterRef = useRef(null);
+
   // const isActive =
   //   type === 'date-range'
   //     ? !!currentFilter?.from || !!currentFilter?.to
@@ -569,7 +570,10 @@ export const PrManagerPopover = ({ defect, onClose, onRefresh }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [inputValue, setInputValue] = useState('');
+  const [tooltip, setTooltip] = useState(null);
+  const [infoTooltip, setInfoTooltip] = useState(null);
   const popoverRef = useRef(null);
+  const PR_FORMAT_REGEX = /^[A-Z]{2,5}\/(V|O)-\d{4}\/REQ\d{2}$/;
 
   // Close on click outside
   useEffect(() => {
@@ -645,7 +649,27 @@ export const PrManagerPopover = ({ defect, onClose, onRefresh }) => {
               />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                <span style={{ fontSize: '12px', fontWeight: '600' }}>{pr.pr_number}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {!pr.mariapps_pr_status && !PR_FORMAT_REGEX.test(pr.pr_number) && (
+                    <span
+                      onMouseEnter={(e) => setTooltip({ x: e.clientX, y: e.clientY })}
+                      onMouseLeave={() => setTooltip(null)}
+                      style={{ cursor: 'help', flexShrink: 0, display: 'flex' }}
+                    >
+                      <AlertCircle size={13} color="#ef4444" />
+                    </span>
+                  )}
+                  {!pr.mariapps_pr_status && PR_FORMAT_REGEX.test(pr.pr_number) && (
+                    <span
+                      onMouseEnter={(e) => setInfoTooltip({ x: e.clientX, y: e.clientY })}
+                      onMouseLeave={() => setInfoTooltip(null)}
+                      style={{ cursor: 'help', flexShrink: 0, display: 'flex' }}
+                    >
+                      <Info size={13} color="#2563eb" />
+                    </span>
+                  )}
+                  <span style={{ fontSize: '12px', fontWeight: '600' }}>{pr.pr_number}</span>
+                </div>
                 {pr.mariapps_pr_status && (
                   <span style={{
                     fontSize: '10px',
@@ -755,16 +779,24 @@ export const PrManagerPopover = ({ defect, onClose, onRefresh }) => {
       </div>
 
       {isAdding ? (
-        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
+        <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <input
             autoFocus
-            placeholder="PR Number"
+            placeholder="PR Number e.g. KIRT/V-0030/REQ26"
             className="ghost-input"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
           />
-          <button title='Save' onClick={handleAdd} style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '4px', padding: '4px' }}><Check size={14} /></button>
-          <button title='Delete' onClick={() => { setIsAdding(false); setInputValue(''); }} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '4px' }}><X size={14} /></button>
+          {inputValue && !PR_FORMAT_REGEX.test(inputValue) && (
+            <span style={{ fontSize: '10px', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <AlertCircle size={11} color="#ef4444" />
+              PR number format mismatch
+            </span>
+          )}
+          <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+            <button title='Save' onClick={handleAdd} style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '4px', padding: '4px' }}><Check size={14} /></button>
+            <button title='Cancel' onClick={() => { setIsAdding(false); setInputValue(''); }} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '4px' }}><X size={14} /></button>
+          </div>
         </div>
       ) : (
         <button
@@ -773,6 +805,68 @@ export const PrManagerPopover = ({ defect, onClose, onRefresh }) => {
         >
           + Add PR Number
         </button>
+      )}
+
+      {infoTooltip && (
+        <div style={{
+          position: 'fixed',
+          top: infoTooltip.y - 52,
+          left: infoTooltip.x,
+          transform: 'translateX(-50%)',
+          background: '#1e293b',
+          color: '#f8fafc',
+          fontSize: '11px',
+          fontWeight: '500',
+          padding: '6px 10px',
+          borderRadius: '6px',
+          whiteSpace: 'nowrap',
+          zIndex: 9999,
+          pointerEvents: 'none',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          lineHeight: 1.4,
+        }}>
+          PR not found in Mariapps — status unavailable
+          <div style={{
+            position: 'absolute',
+            bottom: -4,
+            left: '50%',
+            transform: 'translateX(-50%) rotate(45deg)',
+            width: 8,
+            height: 8,
+            background: '#1e293b',
+          }} />
+        </div>
+      )}
+
+      {tooltip && (
+        <div style={{
+          position: 'fixed',
+          top: tooltip.y - 52,
+          left: tooltip.x,
+          transform: 'translateX(-50%)',
+          background: '#1e293b',
+          color: '#f8fafc',
+          fontSize: '11px',
+          fontWeight: '500',
+          padding: '6px 10px',
+          borderRadius: '6px',
+          whiteSpace: 'nowrap',
+          zIndex: 9999,
+          pointerEvents: 'none',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          lineHeight: 1.4,
+        }}>
+          PR number format mismatch
+          <div style={{
+            position: 'absolute',
+            bottom: -4,
+            left: '50%',
+            transform: 'translateX(-50%) rotate(45deg)',
+            width: 8,
+            height: 8,
+            background: '#1e293b',
+          }} />
+        </div>
       )}
     </div>
   );

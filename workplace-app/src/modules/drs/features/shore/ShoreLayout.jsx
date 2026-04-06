@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import './Shore.css';
 import { createVessel } from '@drs/api/vessels';
+import DrsAiAssistant from './DrsAiAssistant';
 import "../../components/shared/defects-responsive.css"
 
 const ShoreLayout = () => {
@@ -20,6 +21,10 @@ const ShoreLayout = () => {
 
   // --- UI STATES ---
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailSearch, setEmailSearch] = useState('');
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [draftSuccess, setDraftSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isVesselModalOpen, setIsVesselModalOpen] = useState(false);
   const [isSelectOpen, setIsSelectOpen] = useState(false);
@@ -34,6 +39,12 @@ const ShoreLayout = () => {
     queryKey: ['notifications'],
     queryFn: defectApi.getNotifications,
     refetchInterval: 15000,
+  });
+
+  const { data: allDefects = [] } = useQuery({
+    queryKey: ['defects', 'global-list'],
+    queryFn: () => defectApi.getDefects(),
+    enabled: showEmailModal,
   });
 
   // --- VESSEL REGISTRATION STATE ---
@@ -252,6 +263,24 @@ const ShoreLayout = () => {
 
           {/* NOTIFICATION UI INTEGRATED */}
           <div className="nav-action-wrapper" ref={notifRef}>
+
+            {/* ✅ EMAIL DRAFT BUTTON */}
+            <button
+              onClick={() => { setShowEmailModal(true); setEmailSearch(''); }}
+              aria-label="Email Draft"
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: '8px', margin: '0 4px', borderRadius: '8px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#334155', transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+              title="Draft Defect Email"
+            >
+              <Mail size={20} />
+            </button>
+
             <button
               className={`notif-btn  notif-bell-scaling ${showNotifications ? 'active' : ''}`}
               onClick={handleToggleNotif}
@@ -643,6 +672,233 @@ const ShoreLayout = () => {
           </div>
         </div>
       )}
+
+      {/* ✅ EMAIL DRAFT MODAL */}
+      {showEmailModal && (() => {
+        const modalDefects = allDefects.filter(d =>
+          d.status === 'OPEN' || d.status === 'PENDING_CLOSURE'
+        );
+        const filtered = modalDefects.filter(d => {
+          const q = emailSearch.toLowerCase();
+          return !q ||
+            d.title?.toLowerCase().includes(q) ||
+            d.vessel_name?.toLowerCase().includes(q) ||
+            d.equipment_name?.toLowerCase().includes(q);
+        });
+
+        const handleSelect = async (defect) => {
+          try {
+            setDraftLoading(true);
+            setDraftSuccess(false);
+
+            // Open blank tab immediately on user click (before async call)
+            // This prevents browser popup blocker from blocking it
+            const outlookTab = window.open('', '_blank');
+            if (outlookTab) {
+              outlookTab.document.write(`
+    <html>
+      <head><title>Opening Outlook...</title></head>
+      <body style="
+        font-family: sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        background: #f8fafc;
+        color: #334155;
+      ">
+        <div style="
+          width: 40px; height: 40px;
+          border: 3px solid #e2e8f0;
+          border-top: 3px solid #0078d4;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+          margin-bottom: 20px;
+        "></div>
+        <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+        <h2 style="margin: 0 0 8px 0; font-size: 18px;">Preparing your Outlook draft...</h2>
+        <p style="margin: 0; font-size: 14px; color: #64748b;">
+          This will open automatically. Please wait.
+        </p>
+      </body>
+    </html>
+  `);
+            }
+
+            const data = await defectApi.createEmailDraft(defect.id);
+            setDraftLoading(false);
+            setDraftSuccess(true);
+
+            // Now redirect the already-open tab to Outlook
+            if (outlookTab) {
+              outlookTab.location.href = data.web_link || 'https://outlook.office365.com/mail/drafts';
+            }
+
+            setTimeout(() => {
+              setShowEmailModal(false);
+              setDraftSuccess(false);
+            }, 1500);
+
+          } catch (err) {
+            setDraftLoading(false);
+            console.error('Email draft failed:', err);
+            alert('Failed to create email draft. Please try again.');
+          }
+        };
+
+        return (
+          <div
+            onClick={() => setShowEmailModal(false)}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+              zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: 'white', borderRadius: '12px', width: '480px',
+                maxHeight: '560px', display: 'flex', flexDirection: 'column',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.2)', overflow: 'hidden'
+              }}
+            >
+              {/* Header */}
+              <div style={{
+                padding: '16px 20px', borderBottom: '1px solid #e2e8f0',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                background: '#f8fafc'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Mail size={18} color="#0078d4" />
+                  <span style={{ fontWeight: '700', fontSize: '15px', color: '#0f172a' }}>
+                    Draft Defect Email
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowEmailModal(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Search */}
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                <input
+                  autoFocus
+                  placeholder="Search by title, vessel, equipment..."
+                  value={emailSearch}
+                  onChange={e => setEmailSearch(e.target.value)}
+                  style={{
+                    width: '100%', padding: '8px 12px', borderRadius: '8px',
+                    border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>
+                  Showing {filtered.length} open / pending defects
+                </div>
+              </div>
+
+              {/* Defect List */}
+              <div style={{ overflowY: 'auto', flex: 1 }}>
+                {filtered.length === 0 ? (
+                  <div style={{ padding: '30px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+                    No defects found
+                  </div>
+                ) : (
+                  filtered.map(defect => (
+                    <div
+                      key={defect.id}
+                      onClick={() => !draftLoading && handleSelect(defect)}
+                      style={{
+                        padding: '12px 20px', borderBottom: '1px solid #f1f5f9',
+                        cursor: draftLoading ? 'not-allowed' : 'pointer',
+                        opacity: draftLoading ? 0.6 : 1,
+                        transition: 'background 0.15s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f0f9ff'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: '13px', fontWeight: '600', color: '#1e293b',
+                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                          }}>
+                            {defect.title}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
+                            {defect.vessel_name} · {defect.equipment_name}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', marginLeft: '10px', flexShrink: 0 }}>
+                          <span style={{
+                            fontSize: '10px', fontWeight: '700', padding: '2px 7px',
+                            borderRadius: '10px',
+                            background: defect.priority === 'CRITICAL' ? '#fee2e2' : defect.priority === 'HIGH' ? '#ffedd5' : defect.priority === 'MEDIUM' ? '#dbeafe' : '#dcfce7',
+                            color: defect.priority === 'CRITICAL' ? '#dc2626' : defect.priority === 'HIGH' ? '#ea580c' : defect.priority === 'MEDIUM' ? '#2563eb' : '#16a34a',
+                          }}>
+                            {defect.priority}
+                          </span>
+                          <span style={{
+                            fontSize: '10px', fontWeight: '700', padding: '2px 7px',
+                            borderRadius: '10px',
+                            background: defect.status === 'PENDING_CLOSURE' ? '#fef3c7' : '#dbeafe',
+                            color: defect.status === 'PENDING_CLOSURE' ? '#d97706' : '#2563eb',
+                          }}>
+                            {defect.status === 'PENDING_CLOSURE' ? 'PENDING' : defect.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Loading / Success Footer */}
+              {(draftLoading || draftSuccess) && (
+                <div style={{
+                  padding: '16px 20px',
+                  borderTop: '1px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  background: draftSuccess ? '#f0fdf4' : '#f8fafc'
+                }}>
+                  {draftLoading && (
+                    <>
+                      <div style={{
+                        width: '18px', height: '18px',
+                        border: '2px solid #e2e8f0',
+                        borderTop: '2px solid #0078d4',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite'
+                      }} />
+                      <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>
+                        Creating draft in Outlook...
+                      </span>
+                    </>
+                  )}
+                  {draftSuccess && (
+                    <>
+                      <span style={{ fontSize: '18px' }}>✅</span>
+                      <span style={{ fontSize: '13px', color: '#16a34a', fontWeight: '600' }}>
+                        Draft created! Opening Outlook...
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+
+            </div>
+          </div>
+        );
+      })()}
+      {/* <DrsAiAssistant /> */}
 
     </div>
   );

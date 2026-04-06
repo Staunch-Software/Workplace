@@ -74,6 +74,7 @@ class FeedEventType(str, enum.Enum):
     PIC_MADE_MANDATORY = "PIC_MADE_MANDATORY"
     PIC_MADE_OPTIONAL  = "PIC_MADE_OPTIONAL"
     PR_ADDED           = "PR_ADDED" 
+    PR_INVALID_FORMAT  = "PR_INVALID_FORMAT" 
     MENTION            = "MENTION"
 
 

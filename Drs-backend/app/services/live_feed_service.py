@@ -252,7 +252,29 @@ async def feed_pr_added(
         extra_meta={"pr_number": pr_number},
     )
 
+async def feed_pr_invalid_format(
+    db: AsyncSession,
+    control_db: AsyncSession,
+    defect: Defect,
+    pr_number: str,
+    actor_id: Optional[uuid.UUID] = None,
+) -> None:
+    vessel_name = await _get_vessel_name(control_db, defect.vessel_imo)
+    actor_name  = await _get_actor_name(control_db, actor_id)
+    actor_role  = await _get_actor_role(control_db, actor_id)
 
+    await _write(
+        db,
+        defect=defect,
+        event_type=FeedEventType.PR_INVALID_FORMAT,
+        title=f"Invalid PR Format - {defect.title}",
+        message=f"PR '{pr_number}' added by {actor_name} has a format mismatch.",
+        user_id=actor_id,
+        vessel_name=vessel_name,
+        triggered_by_role=actor_role,
+        extra_meta={"pr_number": pr_number, "warning": True},
+    )
+    
 async def feed_mention(
     db: AsyncSession,
     control_db: AsyncSession,

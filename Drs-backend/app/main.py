@@ -7,6 +7,7 @@ from app.core.blob_storage import configure_cors
 import asyncio
 from app.services.sync_worker import start_background_sync
 from app.core.config import settings
+from app.scraper.pr_scheduler import start_pr_scheduler, stop_pr_scheduler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -16,8 +17,10 @@ async def lifespan(app: FastAPI):
     if settings.is_offline_vessel:
         asyncio.create_task(start_background_sync())
         print("Sync Worker started in background.")
+    start_pr_scheduler()
     yield
-
+    stop_pr_scheduler()
+    
 app = FastAPI(title="Maritime DRS API", lifespan=lifespan)
 
 origins = [

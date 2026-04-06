@@ -107,7 +107,8 @@ from app.services.live_feed_service import (
     feed_image_uploaded,
     feed_pic_mandatory_changed,
     feed_pr_added,
-    feed_mention,
+    feed_pr_invalid_format,
+    feed_mention
 )
 from app.services.defect_service import DefectService, _should_sync
 from app.models.defect import UserDefectFlag
@@ -735,7 +736,7 @@ async def get_defects(
     for defect in defects:
         defect.pr_entries = [pr for pr in defect.pr_entries if not pr.is_deleted]
         defect.vessel_name = vessel_map.get(defect.vessel_imo, defect.vessel_imo)
-        defect.is_flagged = defect.id in flagged_ids
+        defect.__dict__['is_flagged'] = defect.id in flagged_ids
 
     return defects
 
@@ -890,11 +891,11 @@ async def export_defects(
                 query = query.where(Defect.id.notin_(flagged_defect_ids))
                     # if both selected → no filter needed
 
-                if is_dd and len(is_dd) > 0:
-                    if "true" in is_dd and "false" not in is_dd:
-                        query = query.where(Defect.is_dd == True)
-                    elif "false" in is_dd and "true" not in is_dd:
-                        query = query.where(Defect.is_dd == False)
+        if is_dd and len(is_dd) > 0:
+            if "true" in is_dd and "false" not in is_dd:
+                query = query.where(Defect.is_dd == True)
+            elif "false" in is_dd and "true" not in is_dd:
+                query = query.where(Defect.is_dd == False)
 
         # Execute query
         result = await db.execute(query)
@@ -1822,7 +1823,25 @@ async def import_defects(
                     existing_defect.date_identified = date_id
                     existing_defect.target_close_date = date_dl
                     existing_defect.is_owner = is_owner_val
-                    existing_defect.is_flagged = is_flagged_val
+                    if is_flagged_val:
+                        existing_flag = await db.execute(
+                            select(UserDefectFlag).where(
+                                UserDefectFlag.user_id == current_user.id,
+                                UserDefectFlag.defect_id == existing_defect.id,
+                            )
+                        )
+                        if not existing_flag.scalar_one_or_none():
+                            db.add(UserDefectFlag(user_id=current_user.id, defect_id=existing_defect.id))
+                    else:
+                        existing_flag = await db.execute(
+                            select(UserDefectFlag).where(
+                                UserDefectFlag.user_id == current_user.id,
+                                UserDefectFlag.defect_id == existing_defect.id,
+                            )
+                        )
+                        flag_row = existing_flag.scalar_one_or_none()
+                        if flag_row:
+                            await db.delete(flag_row)
                     existing_defect.is_dd = is_dd_val
                     existing_defect.updated_at = datetime.utcnow()
                     # FIX: (or 0) + 1 so None → 1, not None → 2
@@ -1890,10 +1909,26 @@ async def import_defects(
                 )
                 if dup_res.scalars().first():
                     raise ValueError("Duplicate: defect already exists.")
- 
+                
+                from sqlalchemy import text as sa_text
+                vessel_for_num = await control_db.get(Vessel, vessel.imo)
+                vessel_name_for_num = vessel_for_num.name if vessel_for_num else vessel.imo
+                prefix = vessel_name_for_num.replace(" ", "").upper()[:6]
+
+                seq_result = await db.execute(sa_text("""
+                    INSERT INTO vessel_defect_sequences (vessel_imo, next_seq)
+                    VALUES (:imo, 1)
+                    ON CONFLICT (vessel_imo)
+                    DO UPDATE SET next_seq = vessel_defect_sequences.next_seq + 1
+                    RETURNING next_seq
+                """), {"imo": vessel.imo})
+                next_seq = seq_result.scalar()
+                defect_number = f"{prefix}#{str(next_seq).zfill(4)}"
+
                 new_id = uuid.uuid4()
                 new_defect = Defect(
                     id=new_id,
+                    defect_number=defect_number,
                     vessel_imo=vessel.imo,
                     reported_by_id=current_user.id,
                     title=equip_str,
@@ -1914,7 +1949,6 @@ async def import_defects(
                     origin="VESSEL" if _should_sync() else "SHORE",
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow(),
-                    is_flagged=is_flagged_val,
                     is_dd=is_dd_val,
                     closed_at=(
                         date_dl
@@ -1926,7 +1960,8 @@ async def import_defects(
                     ),
                 )
                 defects_to_insert.append(new_defect)
- 
+                if is_flagged_val:
+                    db.add(UserDefectFlag(user_id=current_user.id, defect_id=new_id))
                 if _should_sync():
                     syncs_to_insert.append(
                         SyncQueue(
@@ -2940,6 +2975,9 @@ async def delete_defect_image(
 # =============================================================================
 # PR ENTRIES — Flat URLs matching original production routes
 # =============================================================================
+import re
+PR_FORMAT_REGEX = re.compile(r'^[A-Z]{2,5}\/(V|O)-\d{4}\/REQ\d{2}$')
+
 @router.post("/pr-entries", response_model=PrEntryResponse)
 async def create_pr_entry(
     pr_in: PrEntryCreate,
@@ -2963,13 +3001,9 @@ async def create_pr_entry(
 
         # Live feed (non-fatal)
         try:
-            await feed_pr_added(
-                db,
-                control_db,
-                defect=defect,
-                pr_number=pr_in.pr_number,
-                actor_id=current_user.id,
-            )
+            await feed_pr_added(db, control_db, defect=defect, pr_number=pr_in.pr_number, actor_id=current_user.id)
+            if not PR_FORMAT_REGEX.match(pr_in.pr_number):
+                await feed_pr_invalid_format(db, control_db, defect=defect, pr_number=pr_in.pr_number, actor_id=current_user.id)
             await db.commit()
         except Exception as e:
             logger.error(f"⚠️ Live feed error (non-fatal): {e}")
