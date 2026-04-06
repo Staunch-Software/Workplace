@@ -485,6 +485,46 @@ async def image_proxy(
 
 # ─── Background task runners ──────────────────────────────────────────────────
 
+async def _update_vessel_sync_state(now: datetime):
+    """Update SyncState last_push_at/last_pull_at for all active vessels after a successful sync."""
+    try:
+        from models.sync import SyncState
+        from models.control import Vessel as ControlVessel
+        from db.database import SessionLocal, AsyncSessionControl
+
+        async with AsyncSessionControl() as control_db:
+            result = await control_db.execute(
+                select(ControlVessel).where(ControlVessel.is_active == True)
+            )
+            vessels = result.scalars().all()
+
+        if not vessels:
+            return
+
+        async with SessionLocal() as jira_db:
+            for vessel in vessels:
+                existing = (await jira_db.execute(
+                    select(SyncState)
+                    .where(SyncState.vessel_imo == vessel.imo)
+                    .where(SyncState.sync_scope == "TICKET")
+                )).scalar_one_or_none()
+
+                if existing:
+                    existing.last_push_at = now
+                    existing.last_pull_at = now
+                else:
+                    jira_db.add(SyncState(
+                        vessel_imo=vessel.imo,
+                        sync_scope="TICKET",
+                        last_push_at=now,
+                        last_pull_at=now,
+                    ))
+            await jira_db.commit()
+        print(f"[Sync] Updated SyncState for {len(vessels)} vessels")
+    except Exception as e:
+        print(f"[Sync] SyncState update failed (non-critical): {e}")
+
+
 async def _run_sync(full_sync: bool = False):
     from automation.push_service import push_pending_tickets
     from automation.pull_service import pull_jira_updates
@@ -511,6 +551,7 @@ async def _run_sync(full_sync: bool = False):
             f"Skipped={pull_result['detailSkipped']} "
             f"Updated={pull_result['updated']} Created={pull_result['created']}"
         )
+        await _update_vessel_sync_state(datetime.utcnow())
     except Exception as e:
         err = str(e)
         print(f"[Sync] ERROR: {err}")
