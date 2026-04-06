@@ -1541,6 +1541,7 @@ const VesselDashboard = () => {
   const handleInlineUpdate = async (id, field, value) => {
     const defect = defects.find(d => d.id === id);
     if (!defect || defect[field] === value) return;
+    if (field === 'is_flagged') return;
 
     // ✅ If changing status to CLOSED, open enhanced modal
     if (field === 'status' && value === 'CLOSED') {
@@ -1561,6 +1562,22 @@ const VesselDashboard = () => {
 
     updateMutation.mutate({ id, updates: { [field]: value } });
   };
+
+  const toggleFlagMutation = useMutation({
+    mutationFn: (defectId) => defectApi.toggleFlag(defectId),
+    onMutate: async (defectId) => {
+      await queryClient.cancelQueries(['defects', vesselImo]);
+      const prev = queryClient.getQueryData(['defects', vesselImo]);
+      queryClient.setQueryData(['defects', vesselImo], (old = []) =>
+        old.map(d => d.id === defectId ? { ...d, is_flagged: !d.is_flagged } : d)
+      );
+      return { prev };
+    },
+    onError: (_, __, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['defects', vesselImo], ctx.prev);
+    },
+    onSettled: () => queryClient.invalidateQueries(['defects', vesselImo]),
+  });
 
   const scrollRowBelowHeader = (rowId) => {
     const anchor = document.getElementById(`row-${rowId}`);
@@ -3126,27 +3143,21 @@ const VesselDashboard = () => {
                             case 'flag':
                               return (
                                 <td key="flag" style={{ width: 24 }}>
-                                  {isEditMode && !isClosed ? (
-                                    <div
-                                      onClick={() => handleInlineUpdate(defect.id, 'is_flagged', !defect.is_flagged)}
-                                      style={{
-                                        cursor: 'pointer',
-                                        display: 'inline-flex',
-                                        padding: '4px',
-                                        borderRadius: '4px',
-                                        transition: 'background 0.2s'
-                                      }}
-                                      onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
-                                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                      title={defect.is_flagged ? 'Click to unflag' : 'Click to flag'}
-                                    >
-                                      {getFlagIcon(defect.is_flagged)}
-                                    </div>
-                                  ) : (
-                                    <span title={defect.is_flagged ? 'Flagged' : 'Not Flagged'}>
-                                      {getFlagIcon(defect.is_flagged)}
-                                    </span>
-                                  )}
+                                  <div
+                                    onClick={() => toggleFlagMutation.mutate(defect.id)}
+                                    style={{
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      padding: '4px',
+                                      borderRadius: '4px',
+                                      transition: 'background 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                    title={defect.is_flagged ? 'Click to unflag' : 'Click to flag'}
+                                  >
+                                    {getFlagIcon(defect.is_flagged)}
+                                  </div>
                                 </td>
                               );
 
