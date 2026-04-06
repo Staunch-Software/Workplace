@@ -1,7 +1,8 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 const LuboilAnalysis = lazy(() => import('./features/LuboilAnalysis'));
 
 function LubModule() {
+  useEffect(() => { document.title = 'Lubeoil Analysis'; }, []);
   return (
     <Suspense fallback={
       <div style={{

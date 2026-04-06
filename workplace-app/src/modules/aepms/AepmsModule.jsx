@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 
 const Dashboard = lazy(() => import('./features/Dashboard'));
@@ -9,6 +9,7 @@ const UnifiedPerformance = lazy(() => import('./features/UnifiedPerformance'));
 const Voyage = lazy(() => import('./features/Voyage'));
 
 function AepmsModule() {
+  useEffect(() => { document.title = 'Engine Performance'; }, []);
   return (
     <Suspense fallback={
       <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

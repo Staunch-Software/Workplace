@@ -1,7 +1,8 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
-const api = axios.create({ 
+const api = axios.create({
+  // baseURL: 'http://localhost:8003/api/v1', 
   // baseURL: 'http://localhost:8000/api/v1', 
   // baseURL: 'http://52.172.91.85:8003/api/v1',
   baseURL: "/api/v1", 

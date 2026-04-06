@@ -2369,9 +2369,10 @@ const LuboilAnalysis = () => {
     let mNormal = 0,
       mWarning = 0,
       mCritical = 0;
-
+    let totalConfigured = 0;  // 🔥 RENAME THIS
+    let configuredVesselCount = 0;  
     // --- COUNTERS ---
-    let totalConfigured = Object.keys(data.data).length;
+    // let totalConfigured = Object.keys(data.data).length;
     let ovUnder30Count = 0;
     let ovOver30Count = 0;
     let pendingUnresolvedCount = 0; // Tracks vessels needing attention (Action/Approval/Resample)
@@ -2382,6 +2383,11 @@ const LuboilAnalysis = () => {
       let vesselIsOverdueUnder30 = false;
       let vesselIsOverdueOver30 = false;
       let vesselHasActiveIssue = false; // Flag to see if vessel has pending actions
+
+      const hasConfiguredMachinery = Object.values(vessel.machineries || {}).some(m => m.is_configured === true);
+      if (hasConfiguredMachinery) {
+        configuredVesselCount++; // Only increment if configured
+      }
 
       Object.values(vessel.machineries || {}).forEach((m) => {
         if (!m.is_configured) return;
@@ -2456,7 +2462,7 @@ const LuboilAnalysis = () => {
       critical: mCritical,
     });
     setOverdueStats({
-      configured: totalConfigured,
+      configured: configuredVesselCount,
       pendingUnresolved: pendingUnresolvedCount, // Updated for new UI card
       overdueUnder30: ovUnder30Count,
       overdueOver30: ovOver30Count
@@ -2701,17 +2707,32 @@ const LuboilAnalysis = () => {
     Object.entries(matrixData.data).forEach(([vesselName, vesselData]) => {
       // --- CASE 1: Configured Vessels ---
       if (statusType === "Configured") {
-        matchingVessels.push({
-          name: vesselName,
-          imo: vesselData.imo || "N/A",
-          reportUrl: vesselData.vessel_report_url,
-          overdueItems: Object.values(vesselData.machineries || {})
-            .filter((m) => m.is_configured)
-            .map((m) => ({
-              fullName: m.description || m.code,
-              shortCode: m.analyst_code || m.code,
-            })),
-        });
+        const configuredItems = Object.values(vesselData.machineries || {})
+          .filter((m) => m.is_configured)
+          .map((m) => ({
+            fullName: m.description || m.code,
+            shortCode: m.analyst_code || m.code,
+          }));
+
+        if (configuredItems.length > 0) {
+          matchingVessels.push({
+            name: vesselName,
+            imo: vesselData.imo || "N/A",
+            reportUrl: vesselData.vessel_report_url,
+            overdueItems: configuredItems,
+          });
+        }
+        // matchingVessels.push({
+        //   name: vesselName,
+        //   imo: vesselData.imo || "N/A",
+        //   reportUrl: vesselData.vessel_report_url,
+        //   overdueItems: Object.values(vesselData.machineries || {})
+        //     .filter((m) => m.is_configured)
+        //     .map((m) => ({
+        //       fullName: m.description || m.code,
+        //       shortCode: m.analyst_code || m.code,
+        //     })),
+        // });
         return;
       }
 

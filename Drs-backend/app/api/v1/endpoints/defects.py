@@ -42,7 +42,7 @@
 import uuid
 from uuid import UUID
 from datetime import datetime, timezone, timedelta
-
+from app.core.config import settings
 from fastapi import (
     APIRouter,
     Depends,
@@ -90,10 +90,16 @@ from app.core.blob_storage import (
     generate_write_sas_url,
     generate_read_sas_url,
     get_container_client,
+    download_blob_bytes,
 )
+import httpx
+import base64
 from app.api.deps import get_current_user
 from app.services.email_service import send_defect_email
-from app.services.notification_service import notify_vessel_users, create_task_for_mentions
+from app.services.notification_service import (
+    notify_vessel_users,
+    create_task_for_mentions,
+)
 from app.services.live_feed_service import (
     feed_defect_opened,
     feed_defect_closed,
@@ -101,7 +107,7 @@ from app.services.live_feed_service import (
     feed_image_uploaded,
     feed_pic_mandatory_changed,
     feed_pr_added,
-    feed_mention
+    feed_mention,
 )
 from app.services.defect_service import DefectService, _should_sync
 
@@ -113,11 +119,26 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 # Standard equipment list (shared by both import templates as "Area of Concern" dropdown)
 EQUIPMENT_OPTIONS = [
-    "Hull", "Deck", "Ship Access", "Deck Machineries", "Cargo System",
-    "Radio and Navigation", "Ballast and Fuel Tanks", "Paint Store Workshop",
-    "Accommodation Superstructure", "Engine Room", "Emergency Machineries",
-    "Life Saving Appliance", "Fire Fighting Appliance", "Pollution Prevention",
-    "PMS", "Energy Management", "Elevator", "MLC QHSE", "Security", "Crew Interaction",
+    "HULL",
+    "DECK",
+    "SHIP ACCESS",
+    "DECK MACHINERIES",
+    "CARGO SYSTEM",
+    "RADIO AND NAVIGATION",
+    "BALLAST AND FUEL TANKS",
+    "PAINT STORE WORKSHOP",
+    "ACCOMMODATION SUPERSTRUCTURE",
+    "ENGINE ROOM",
+    "EMERGENCY MACHINERIES",
+    "LIFE SAVING APPLIANCE",
+    "FIRE FIGHTING APPLIANCE",
+    "POLLUTION PREVENTION",
+    "PMS",
+    "ENERGY MANAGEMENT",
+    "ELEVATOR",
+    "MLC QHSE",
+    "SECURITY",
+    "CREW INTERACTION",
 ]
 
 
@@ -125,15 +146,28 @@ EQUIPMENT_OPTIONS = [
 # HELPERS
 # =============================================================================
 
+
 def prepare_email_data(defect: Defect) -> dict:
     """Safely converts defect object to dictionary for email template."""
     return {
         "vessel_imo": defect.vessel_imo,
         "title": defect.title,
         "equipment_name": defect.equipment_name,
-        "priority": defect.priority.value if hasattr(defect.priority, "value") else str(defect.priority),
-        "status": defect.status.value if hasattr(defect.status, "value") else str(defect.status),
-        "defect_source": defect.defect_source.value if hasattr(defect.defect_source, "value") else str(defect.defect_source),
+        "priority": (
+            defect.priority.value
+            if hasattr(defect.priority, "value")
+            else str(defect.priority)
+        ),
+        "status": (
+            defect.status.value
+            if hasattr(defect.status, "value")
+            else str(defect.status)
+        ),
+        "defect_source": (
+            defect.defect_source.value
+            if hasattr(defect.defect_source, "value")
+            else str(defect.defect_source)
+        ),
         "description": defect.description,
     }
 
@@ -141,40 +175,438 @@ def prepare_email_data(defect: Defect) -> dict:
 # "Area of Concern" is the correct production column label (not "Equipment")
 COLUMN_MAP = {
     "sno": ("S.No", lambda d, idx: idx),
+    "defect_number": (
+        "Defect ID",
+        lambda d, idx: d.defect_number if d.defect_number else f"#{idx}",
+    ),
     "date": (
         "Report Date",
-        lambda d, idx: d.date_identified.astimezone(IST).strftime("%Y-%m-%d") if d.date_identified else "-",
+        lambda d, idx: (
+            d.date_identified.astimezone(IST).strftime("%Y-%m-%d")
+            if d.date_identified
+            else "-"
+        ),
     ),
     "deadline": (
         "Deadline",
-        lambda d, idx: d.target_close_date.astimezone(IST).strftime("%Y-%m-%d") if d.target_close_date else "-",
+        lambda d, idx: (
+            d.target_close_date.astimezone(IST).strftime("%Y-%m-%d")
+            if d.target_close_date
+            else "-"
+        ),
     ),
     "source": (
         "Defect Source",
-        lambda d, idx: d.defect_source.value if hasattr(d.defect_source, "value") else str(d.defect_source),
+        lambda d, idx: (
+            d.defect_source.value
+            if hasattr(d.defect_source, "value")
+            else str(d.defect_source)
+        ),
     ),
-    "equipment": ("Area of Concern", lambda d, idx: d.equipment_name),   # ← "Area of Concern" not "Equipment"
+    "equipment": (
+        "Area of Concern",
+        lambda d, idx: d.equipment_name,
+    ),  # ← "Area of Concern" not "Equipment"
     "description": ("Description", lambda d, idx: d.description),
     "priority": (
         "Priority",
-        lambda d, idx: d.priority.value if hasattr(d.priority, "value") else str(d.priority),
+        lambda d, idx: (
+            d.priority.value if hasattr(d.priority, "value") else str(d.priority)
+        ),
     ),
     "status": (
         "Status",
         lambda d, idx: d.status.value if hasattr(d.status, "value") else str(d.status),
     ),
     "owner": ("Owner", lambda d, idx: "Owner" if d.is_owner else "Not Owner"),
-    "flag": ("Flagged", lambda d, idx: "Yes" if d.is_flagged else "No"), # ✅ Added
-    "dd": ("Dry Dock", lambda d, idx: "Yes" if d.is_dd else "No"),      # ✅ Added
+    "flag": ("Flagged", lambda d, idx: "Yes" if d.is_flagged else "No"),  # ✅ Added
+    "dd": ("Dry Dock", lambda d, idx: "Yes" if d.is_dd else "No"),  # ✅ Added
     "pr_details": (
         "PR Number",
-        lambda d, idx: ", ".join([p.pr_number for p in d.pr_entries if not p.is_deleted]),
+        lambda d, idx: ", ".join(
+            [p.pr_number for p in d.pr_entries if not p.is_deleted]
+        ),
     ),
     "closure_remarks": (
         "Closure Remarks",
         lambda d, idx: d.closure_remarks if d.closure_remarks else "-",
     ),
 }
+
+
+async def get_graph_token() -> str:
+    """Get Microsoft Graph API token using client credentials."""
+    url = f"https://login.microsoftonline.com/{settings.AZURE_TENANT_ID}/oauth2/v2.0/token"
+    async with httpx.AsyncClient(verify=False) as client:
+        response = await client.post(
+            url,
+            data={
+                "grant_type": "client_credentials",
+                "client_id": settings.AZURE_CLIENT_ID,
+                "client_secret": settings.AZURE_CLIENT_SECRET,
+                "scope": "https://graph.microsoft.com/.default",
+            },
+        )
+        response.raise_for_status()
+        return response.json()["access_token"]
+
+
+async def create_outlook_draft(
+    user_email: str,
+    to_emails: list[str],
+    subject: str,
+    body_text: str,
+    attachments: list[dict],  # [{"name": str, "content_type": str, "data": bytes}]
+    cc_emails: list[str] = [],
+) -> str:
+    """
+    Creates a draft email in user's Outlook via Graph API.
+    Returns the web_link to open the draft directly.
+    """
+    token = await get_graph_token()
+
+    # Build attachment list (base64 encoded)
+    graph_attachments = []
+    for att in attachments:
+        graph_attachments.append(
+            {
+                "@odata.type": "#microsoft.graph.fileAttachment",
+                "name": att["name"],
+                "contentType": att.get("content_type", "application/octet-stream"),
+                "contentBytes": base64.b64encode(att["data"]).decode("utf-8"),
+            }
+        )
+
+    # Build email draft payload
+    draft_payload = {
+        "subject": subject,
+        "importance": "Normal",
+        "body": {"contentType": "Text", "content": body_text},
+        "toRecipients": [{"emailAddress": {"address": email}} for email in to_emails],
+        "ccRecipients": [{"emailAddress": {"address": email}} for email in cc_emails],
+        "attachments": graph_attachments,
+    }
+
+    async with httpx.AsyncClient(verify=False) as client:
+        response = await client.post(
+            f"https://graph.microsoft.com/v1.0/users/{user_email}/messages",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+            json=draft_payload,
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+        message_id = data.get("id", "")
+        logger.info(f"✅ Graph API Response: {data}")
+        logger.info(f"✅ Draft message ID: {message_id}")
+        logger.info(f"✅ Draft created for user: {user_email}")
+        web_link = f"https://outlook.office365.com/mail/drafts"
+        return web_link
+
+
+@router.get("/{defect_id}/email-recipients")
+async def get_email_recipients(
+    defect_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    control_db: AsyncSession = Depends(get_control_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        # Fetch defect with all relationships
+        result = await db.execute(
+            select(Defect)
+            .where(Defect.id == defect_id)
+            .options(
+                selectinload(Defect.images),
+                selectinload(Defect.threads).selectinload(Thread.attachments),
+            )
+        )
+        defect = result.scalar_one_or_none()
+        if not defect:
+            raise HTTPException(status_code=404, detail="Defect not found")
+
+        vessel = await control_db.get(Vessel, defect.vessel_imo)
+        vessel_name = vessel.name if vessel else defect.vessel_imo
+
+        from app.models.associations import user_vessel_link
+
+        stmt = (
+            select(User)
+            .join(user_vessel_link, User.id == user_vessel_link.c.user_id)
+            .where(user_vessel_link.c.vessel_imo == defect.vessel_imo)
+            .where(User.is_active == True)
+        )
+        users_result = await control_db.execute(stmt)
+        users = users_result.scalars().all()
+        recipients = [u.email for u in users if u.email]
+
+        # Generate SAS URLs for before/after images
+        before_images = []
+        after_images = []
+        for img in defect.images:
+            url = generate_read_sas_url(img.blob_path)
+            entry = {"file_name": img.file_name, "url": url}
+            if img.image_type == "before":
+                before_images.append(entry)
+            else:
+                after_images.append(entry)
+
+        # Generate SAS URLs for thread attachments (skip system messages)
+        thread_attachments = []
+        for thread in defect.threads:
+            if thread.is_system_message:
+                continue
+            for att in thread.attachments:
+                url = generate_read_sas_url(att.blob_path)
+                thread_attachments.append({"file_name": att.file_name, "url": url})
+
+        # Build meaningful defect reference ID
+        if defect.defect_number:
+            defect_ref = defect.defect_number
+        else:
+            vessel_initials = "".join(w[0].upper() for w in vessel_name.split() if w)[
+                :4
+            ]
+            date_part = (
+                defect.date_identified.strftime("%Y%m%d")
+                if defect.date_identified
+                else defect.created_at.strftime("%Y%m%d")
+            )
+            short_uuid = str(defect.id)[:8]
+            defect_ref = f"{vessel_initials}-{date_part}-{short_uuid}"
+
+        return {
+            "recipients": recipients,
+            "vessel_email": (
+                vessel.vessel_email if vessel and vessel.vessel_email else None
+            ),
+            "defect_ref": defect_ref,
+            "defect": {
+                "id": str(defect.id),
+                "title": defect.title,
+                "vessel_name": vessel_name,
+                "vessel_imo": defect.vessel_imo,
+                "equipment_name": defect.equipment_name,
+                "defect_source": (
+                    defect.defect_source.value
+                    if hasattr(defect.defect_source, "value")
+                    else str(defect.defect_source)
+                ),
+                "priority": (
+                    defect.priority.value
+                    if hasattr(defect.priority, "value")
+                    else str(defect.priority)
+                ),
+                "status": (
+                    defect.status.value
+                    if hasattr(defect.status, "value")
+                    else str(defect.status)
+                ),
+                "responsibility": defect.responsibility or "N/A",
+                "description": defect.description,
+                "date_identified": (
+                    defect.date_identified.strftime("%Y-%m-%d")
+                    if defect.date_identified
+                    else "N/A"
+                ),
+                "target_close_date": (
+                    defect.target_close_date.strftime("%Y-%m-%d")
+                    if defect.target_close_date
+                    else "N/A"
+                ),
+            },
+            "attachments": {
+                "before_images": before_images,
+                "after_images": after_images,
+                "thread_attachments": thread_attachments,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[email-recipients] Failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
+
+@router.post("/{defect_id}/draft-email")
+async def create_email_draft(
+    defect_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    control_db: AsyncSession = Depends(get_control_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Creates an Outlook draft email with defect details and
+    actual file attachments (before/after images + thread attachments).
+    """
+    try:
+        # 1. Fetch defect with all relationships
+        result = await db.execute(
+            select(Defect)
+            .where(Defect.id == defect_id)
+            .options(
+                selectinload(Defect.images),
+                selectinload(Defect.threads).selectinload(Thread.attachments),
+            )
+        )
+        defect = result.scalar_one_or_none()
+        if not defect:
+            raise HTTPException(status_code=404, detail="Defect not found")
+
+        # 2. Get vessel name
+        vessel = await control_db.get(Vessel, defect.vessel_imo)
+        vessel_name = vessel.name if vessel else defect.vessel_imo
+        vessel_email = vessel.vessel_email if vessel and vessel.vessel_email else None
+
+        # 3. Get recipients
+        from app.models.associations import user_vessel_link
+
+        stmt = (
+            select(User)
+            .join(user_vessel_link, User.id == user_vessel_link.c.user_id)
+            .where(user_vessel_link.c.vessel_imo == defect.vessel_imo)
+            .where(User.is_active == True)
+        )
+        users_result = await control_db.execute(stmt)
+        users = users_result.scalars().all()
+        recipients = [u.email for u in users if u.email]
+
+        # Use stored defect_number, fallback to generating if null (old records)
+        if defect.defect_number:
+            defect_ref = defect.defect_number
+        else:
+            vessel_initials = "".join(w[0].upper() for w in vessel_name.split() if w)[
+                :4
+            ]
+            date_part = (
+                defect.date_identified.strftime("%Y%m%d")
+                if defect.date_identified
+                else defect.created_at.strftime("%Y%m%d")
+            )
+            short_uuid = str(defect.id)[:8]
+            defect_ref = f"{vessel_initials}-{date_part}-{short_uuid}"
+
+        # 5. Build email body
+        date_identified = (
+            defect.date_identified.strftime("%Y-%m-%d")
+            if defect.date_identified
+            else "N/A"
+        )
+        target_close = (
+            defect.target_close_date.strftime("%Y-%m-%d")
+            if defect.target_close_date
+            else "N/A"
+        )
+        priority = (
+            defect.priority.value
+            if hasattr(defect.priority, "value")
+            else str(defect.priority)
+        )
+
+        body_text = "\n".join(
+            [
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                "DEFECT REPORT — Maritime DRS",
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"Vessel        : {vessel_name}",
+                f"Title         : {defect.title}",
+                f"Equipment     : {defect.equipment_name}",
+                f"Priority      : {priority}",
+                f"Identified On : {date_identified}",
+                f"Target Close  : {target_close}",
+                "",
+                "Description:",
+                defect.description,
+                "",
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                "Generated from Workplace Platform",
+            ]
+        )
+
+        # 5. Download blobs and build attachments list
+        attachments = []
+        MAX_ATTACH_SIZE = 3 * 1024 * 1024  # 3MB per file limit
+        total_size = 0
+        MAX_TOTAL_SIZE = 20 * 1024 * 1024  # 20MB total limit
+
+        # Before/After images
+        for img in defect.images:
+            try:
+                data = download_blob_bytes(img.blob_path)
+                if total_size + len(data) > MAX_TOTAL_SIZE:
+                    logger.warning(
+                        f"Skipping {img.file_name} — total size limit reached"
+                    )
+                    continue
+                if len(data) > MAX_ATTACH_SIZE:
+                    logger.warning(f"Skipping {img.file_name} — file too large")
+                    continue
+                attachments.append(
+                    {
+                        "name": f"[{img.image_type.upper()}] {img.file_name}",
+                        "content_type": "image/jpeg",
+                        "data": data,
+                    }
+                )
+                total_size += len(data)
+            except Exception as e:
+                logger.warning(f"Could not download image {img.file_name}: {e}")
+
+        # Thread attachments
+        for thread in defect.threads:
+            if thread.is_system_message:
+                continue
+            for att in thread.attachments:
+                try:
+                    data = download_blob_bytes(att.blob_path)
+                    if total_size + len(data) > MAX_TOTAL_SIZE:
+                        logger.warning(
+                            f"Skipping {att.file_name} — total size limit reached"
+                        )
+                        continue
+                    if len(data) > MAX_ATTACH_SIZE:
+                        logger.warning(f"Skipping {att.file_name} — file too large")
+                        continue
+                    attachments.append(
+                        {
+                            "name": att.file_name,
+                            "content_type": att.content_type
+                            or "application/octet-stream",
+                            "data": data,
+                        }
+                    )
+                    total_size += len(data)
+                except Exception as e:
+                    logger.warning(
+                        f"Could not download attachment {att.file_name}: {e}"
+                    )
+
+        # 6. Create Outlook draft via Graph API
+        subject = f"Defect Raised - {defect_ref} | [{vessel_name}] {defect.title}"
+        web_link = await create_outlook_draft(
+            # user_email=current_user.email,
+            user_email="techdevops@ozellar.com",
+            to_emails=recipients,
+            cc_emails=[vessel_email] if vessel_email else [],
+            subject=subject,
+            body_text=body_text,
+            attachments=attachments,
+        )
+
+        return {
+            "success": True,
+            "web_link": web_link,
+            "attachment_count": len(attachments),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[draft-email] Failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to create draft: {str(e)}")
 
 
 def get_image_data(blob_path):
@@ -215,11 +647,13 @@ def get_image_data(blob_path):
         logger.error(f"Image Error: {e}")
         return None, 0, 0
 
+
 async def get_vessel_name(control_db: AsyncSession, vessel_imo: str) -> str:
     """Fetch vessel name from workplace_control by IMO."""
     result = await control_db.execute(select(Vessel).where(Vessel.imo == vessel_imo))
     vessel = result.scalars().first()
     return vessel.name if vessel else vessel_imo
+
 
 # =============================================================================
 # GET ALL DEFECTS
@@ -232,13 +666,15 @@ async def get_defects(
     defect_source: str | None = None,
     equipment_name: str | None = None,
     is_owner: bool | None = None,
+    is_flagged: bool | None = None,  # ✅ Add this
+    is_dd: bool | None = None,  # ✅ Add this
     db: AsyncSession = Depends(get_db),
     control_db: AsyncSession = Depends(get_control_db),
     current_user: User = Depends(get_current_user),
 ):
     query = (
         select(Defect)
-        .options(selectinload(Defect.pr_entries))   # ← vessel removed
+        .options(selectinload(Defect.pr_entries))  # ← vessel removed
         .where(Defect.is_deleted == False)
         .order_by(Defect.date_identified.desc(), Defect.created_at.desc())
     )
@@ -274,6 +710,10 @@ async def get_defects(
         query = query.where(Defect.equipment_name.ilike(f"%{equipment_name}%"))
     if is_owner is not None:
         query = query.where(Defect.is_owner == is_owner)
+    if is_flagged is not None:
+        query = query.where(Defect.is_flagged == is_flagged)
+    if is_dd is not None:
+        query = query.where(Defect.is_dd == is_dd)
 
     result = await db.execute(query)
     defects = result.scalars().all()
@@ -312,6 +752,8 @@ async def export_defects(
     target_close_date: str | None = None,
     # OTHER FILTERS
     is_owner: bool | None = None,
+    is_flagged: list[str] | None = Query(None),
+    is_dd: list[str] | None = Query(None),
     # COLUMN CUSTOMIZATION
     visible_columns: str | None = None,
     db: AsyncSession = Depends(get_db),
@@ -420,14 +862,31 @@ async def export_defects(
         if is_owner is not None:
             query = query.where(Defect.is_owner == is_owner)
 
+        if is_flagged and len(is_flagged) > 0:
+            # Frontend sends "true"/"false" strings
+            if "true" in is_flagged and "false" not in is_flagged:
+                query = query.where(Defect.is_flagged == True)
+            elif "false" in is_flagged and "true" not in is_flagged:
+                query = query.where(Defect.is_flagged == False)
+            # if both selected → no filter needed
+
+        if is_dd and len(is_dd) > 0:
+            if "true" in is_dd and "false" not in is_dd:
+                query = query.where(Defect.is_dd == True)
+            elif "false" in is_dd and "true" not in is_dd:
+                query = query.where(Defect.is_dd == False)
+
         # Execute query
         result = await db.execute(query)
         defects = result.scalars().all()
         vessel_imos = list(set(d.vessel_imo for d in defects))
-        vessel_result = await control_db.execute(
-            select(Vessel).where(Vessel.imo.in_(vessel_imos))
-        )
-        vessel_map = {v.imo: v.name for v in vessel_result.scalars().all()}
+        if vessel_imos:
+            vessel_result = await control_db.execute(
+                select(Vessel).where(Vessel.imo.in_(vessel_imos))
+            )
+            vessel_map = {v.imo: v.name for v in vessel_result.scalars().all()}
+        else:
+            vessel_map = {}
 
         # Filter by PR Number (post-query filter for complex join)
         if pr_number:
@@ -490,16 +949,37 @@ async def export_defects(
         # ================= SHEET 1: DEFECT LIST =================
         ws1 = wb.add_worksheet("Defect List")
 
-        # Write S.No and Vessel Name headers
-        ws1.write(0, 0, "S.No", header_fmt)
+        # IMPORTANT: Unlock ALL cells by default first — then re-lock only col 0
+        # xlsxwriter locks everything by default; we must explicitly unlock the rest
+        ws1.set_column(0, 0, 18)   # Defect ID column width
+
+        locked_fmt = wb.add_format({
+            "text_wrap": True, "valign": "top", "border": 1,
+            "bg_color": "#e2e8f0", "font_color": "#475569",
+            "bold": False, "locked": True,
+            "italic": True,
+        })
+        text_fmt = wb.add_format({
+            "text_wrap": True, "valign": "top", "border": 1, "locked": False
+        })
+        center_fmt = wb.add_format({
+            "align": "center", "valign": "top", "border": 1, "locked": False
+        })
+
+        # col 1 gets its width here too, since this call overrides the earlier set_column
+        ws1.set_column(1, 1, 20, wb.add_format({"locked": False}))   # Vessel — unlocked, width 20
+        ws1.set_column(2, 50, None, wb.add_format({"locked": False})) # All other data cols — unlocked
+
+        ws1.write(0, 0, "Defect ID", header_fmt)
         ws1.write(0, 1, "Vessel Name", header_fmt)
 
         # Write dynamic column headers
+        unlocked_col_fmt = wb.add_format({"locked": False})
         col = 2
         for key in column_keys:
             ws1.write(0, col, COLUMN_MAP[key][0], header_fmt)
             width = 50 if key == "description" else 20
-            ws1.set_column(col, col, width)
+            ws1.set_column(col, col, width, unlocked_col_fmt)
             col += 1
 
         # Write data rows
@@ -507,23 +987,33 @@ async def export_defects(
             row = i + 1
             vessel_name = defect.vessel_imo
 
-            ws1.write(row, 0, i + 1, center_fmt)
-            ws1.write(row, 1, vessel_map.get(defect.vessel_imo, defect.vessel_imo), text_fmt)
+            defect_id_val = defect.defect_number if defect.defect_number else f"#{i + 1}"
+            ws1.write(row, 0, defect_id_val, locked_fmt)
+            ws1.write(
+                row, 1, vessel_map.get(defect.vessel_imo, defect.vessel_imo), text_fmt
+            )
 
             col = 2
             for key in column_keys:
                 # ✅ FIX: Convert dates to simple strings to prevent timezone shifts
                 if key == "date":
-                    val = defect.date_identified.astimezone(IST).strftime("%Y-%m-%d") if defect.date_identified else "-"
+                    val = (
+                        defect.date_identified.astimezone(IST).strftime("%Y-%m-%d")
+                        if defect.date_identified
+                        else "-"
+                    )
                     ws1.write(row, col, val, center_fmt)
 
                 elif key == "deadline":
-                    val = defect.target_close_date.astimezone(IST).strftime("%Y-%m-%d") if defect.target_close_date else "-"
+                    val = (
+                        defect.target_close_date.astimezone(IST).strftime("%Y-%m-%d")
+                        if defect.target_close_date
+                        else "-"
+                    )
                     ws1.write(row, col, val, center_fmt)
 
                 elif key == "closure_remarks":
-                    val = COLUMN_MAP[key][1](defect,
-                                             i + 1)
+                    val = COLUMN_MAP[key][1](defect, i + 1)
                     ws1.write(row, col, val, text_fmt)  # Use text_fmt for wrapping
                 else:
                     # Use standard mapper for other columns
@@ -537,6 +1027,110 @@ async def export_defects(
         ws1.freeze_panes(1, 0)
         ws1.autofilter(0, 0, len(defects), col - 1)
 
+        # ===== ADD IMPORT-COMPATIBLE DROPDOWNS =====
+        # Build a hidden Lists sheet with dropdown sources
+        ws_lists = wb.add_worksheet("_Lists")
+        ws_lists.hide()
+
+        # from app.models.enums import DefectSource, DefectPriority, DefectStatus
+
+        source_options = [e.value for e in DefectSource]
+        priority_options = [e.name for e in DefectPriority]
+        status_options = [e.name for e in DefectStatus]
+
+        for i, opt in enumerate(EQUIPMENT_OPTIONS):
+            ws_lists.write(i, 0, opt)
+        for i, opt in enumerate(source_options):
+            ws_lists.write(i, 1, opt)
+        for i, opt in enumerate(priority_options):
+            ws_lists.write(i, 2, opt)
+        for i, opt in enumerate(status_options):
+            ws_lists.write(i, 3, opt)
+
+        # Map column keys to their Excel column index (col 0=DefectID, 1=Vessel, 2+ dynamic)
+        key_to_col = {key: 2 + idx for idx, key in enumerate(column_keys)}
+
+        if "source" in key_to_col:
+            c = key_to_col["source"]
+            ws1.data_validation(1, c, len(defects) + 100, c, {
+                "validate": "list",
+                "source": f"=_Lists!$B$1:$B${len(source_options)}",
+            })
+
+        if "equipment" in key_to_col:
+            c = key_to_col["equipment"]
+            ws1.data_validation(1, c, len(defects) + 100, c, {
+                "validate": "list",
+                "source": f"=_Lists!$A$1:$A${len(EQUIPMENT_OPTIONS)}",
+            })
+
+        if "priority" in key_to_col:
+            c = key_to_col["priority"]
+            ws1.data_validation(1, c, len(defects) + 100, c, {
+                "validate": "list",
+                "source": f"=_Lists!$C$1:$C${len(priority_options)}",
+            })
+
+        if "status" in key_to_col:
+            c = key_to_col["status"]
+            ws1.data_validation(1, c, len(defects) + 100, c, {
+                "validate": "list",
+                "source": f"=_Lists!$D$1:$D${len(status_options)}",
+            })
+
+        for flag_key in ["flag", "dd"]:
+            if flag_key in key_to_col:
+                c = key_to_col[flag_key]
+                ws1.data_validation(1, c, len(defects) + 100, c, {
+                    "validate": "list",
+                    "source": ["Yes", "No"],
+                })
+
+        if "owner" in key_to_col:
+            c = key_to_col["owner"]
+            ws1.data_validation(1, c, len(defects) + 100, c, {
+                "validate": "list",
+                "source": ["Owner", "Not Owner"],
+            })
+
+        if "date" in key_to_col:
+            c = key_to_col["date"]
+            ws1.data_validation(1, c, len(defects) + 100, c, {
+                "validate": "date",
+                "criteria": "between",
+                "minimum": datetime(2000, 1, 1).date(),
+                "maximum": datetime(2100, 12, 31).date(),
+                "input_message": "Format: YYYY-MM-DD",
+            })
+
+        if "deadline" in key_to_col:
+            c = key_to_col["deadline"]
+            ws1.data_validation(1, c, len(defects) + 100, c, {
+                "validate": "date",
+                "criteria": "between",
+                "minimum": datetime(2000, 1, 1).date(),
+                "maximum": datetime(2100, 12, 31).date(),
+                "input_message": "Format: YYYY-MM-DD",
+            })
+        # ===== END DROPDOWNS =====
+
+        # Protect sheet but allow editing all cells except Defect ID (col 0)
+        ws1.protect('', {
+            'sheet':                  True,
+            'select_locked_cells':    True,
+            'select_unlocked_cells':  True,
+            'format_cells':           False,
+            'format_columns':         False,
+            'format_rows':            False,
+            'insert_columns':         False,
+            'insert_rows':            False,
+            'delete_columns':         False,
+            'delete_rows':            False,
+            'sort':                   True,
+            'autofilter':             True,
+            'objects':                False,
+            'scenarios':              False,
+        })
         # ================= SHEET 2: DETAILED REPORT (IMAGES) =================
         ws2 = wb.add_worksheet("Detailed Report")
 
@@ -554,7 +1148,7 @@ async def export_defects(
         ]
 
         # Set column widths
-        ws2.set_column("A:A", 8)   # S.No
+        ws2.set_column("A:A", 8)  # S.No
         ws2.set_column("B:B", 20)  # Vessel
         ws2.set_column("C:C", 15)  # Report Date
         ws2.set_column("D:D", 20)  # Area of Concern
@@ -577,9 +1171,11 @@ async def export_defects(
                 else "-"
             )
             # Write text columns
-            ws2.write(row, 0, i + 1, center_fmt)        # Col 0: S.No
-            ws2.write(row, 1, vessel_map.get(defect.vessel_imo, defect.vessel_imo), text_fmt)     # Col 1: Vessel     # Col 1: Vessel
-            ws2.write(row, 2, report_date, center_fmt)   # Col 2: Report Date
+            ws2.write(row, 0, i + 1, center_fmt)  # Col 0: S.No
+            ws2.write(
+                row, 1, vessel_map.get(defect.vessel_imo, defect.vessel_imo), text_fmt
+            )  # Col 1: Vessel     # Col 1: Vessel
+            ws2.write(row, 2, report_date, center_fmt)  # Col 2: Report Date
             ws2.write(row, 3, defect.equipment_name, text_fmt)
             ws2.write(row, 4, defect.description, text_fmt)
 
@@ -607,7 +1203,7 @@ async def export_defects(
                     # Container is 340px high.
                     # We force the image to fit inside a 310px box.
                     container_h = 340
-                    container_w = 350 # Based on Column Width 50
+                    container_w = 350  # Based on Column Width 50
                     max_target = 310
 
                     # Calculate scale so the largest side is 310px
@@ -628,13 +1224,12 @@ async def export_defects(
                                 "y_scale": scale,
                                 "x_offset": x_off,
                                 "y_offset": y_off,
-                                "object_position": 1, # Move and size with cells
+                                "object_position": 1,  # Move and size with cells
                             },
                         )
                     except Exception as img_err:
                         logger.error(f"Failed to insert image: {img_err}")
-                        ws2.write(row, col_idx, "Err", center_fmt)# Insert images
-
+                        ws2.write(row, col_idx, "Err", center_fmt)  # Insert images
 
             place_image(5, before[0] if len(before) > 0 else None)
             place_image(6, before[1] if len(before) > 1 else None)
@@ -673,7 +1268,9 @@ async def get_upload_sas(blobName: str, current_user: User = Depends(get_current
         return {"url": url}
     except Exception as e:
         logger.error(f"❌ Error generating upload SAS: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to generate upload URL: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate upload URL: {str(e)}"
+        )
 
 
 # =============================================================================
@@ -697,18 +1294,22 @@ async def validate_defect_images(
         missing_images = []
 
         if defect.before_image_required:
-            result = await db.execute(select(DefectImage).where(
-                DefectImage.defect_id == defect_id,
-                DefectImage.image_type == "before",
-            ))
+            result = await db.execute(
+                select(DefectImage).where(
+                    DefectImage.defect_id == defect_id,
+                    DefectImage.image_type == "before",
+                )
+            )
             if not result.scalars().all():
                 missing_images.append("⚠️ Before images are mandatory but none uploaded")
 
         if defect.after_image_required:
-            result = await db.execute(select(DefectImage).where(
-                DefectImage.defect_id == defect_id,
-                DefectImage.image_type == "after",
-            ))
+            result = await db.execute(
+                select(DefectImage).where(
+                    DefectImage.defect_id == defect_id,
+                    DefectImage.image_type == "after",
+                )
+            )
             if not result.scalars().all():
                 missing_images.append("⚠️ After images are mandatory but none uploaded")
 
@@ -725,7 +1326,10 @@ async def validate_defect_images(
 # IMPORT TEMPLATE — SHORE (Vessel Name dropdown populated live from DB)
 # =============================================================================
 @router.get("/import-template")
-async def download_import_template(db: AsyncSession = Depends(get_db), control_db: AsyncSession = Depends(get_control_db),):
+async def download_import_template(
+    db: AsyncSession = Depends(get_db),
+    control_db: AsyncSession = Depends(get_control_db),
+):
     """
     Shore-side import template.
     Includes Vessel Name dropdown populated live from the database.
@@ -734,20 +1338,26 @@ async def download_import_template(db: AsyncSession = Depends(get_db), control_d
     vessel_stmt = await control_db.execute(select(Vessel.name).order_by(Vessel.name))
     vessel_names = [v[0] for v in vessel_stmt.all()]
 
-    source_options   = [e.value for e in DefectSource]
+    source_options = [e.value for e in DefectSource]
     priority_options = [e.name for e in DefectPriority]
-    status_options   = [e.name for e in DefectStatus]
+    status_options = [e.name for e in DefectStatus]
 
     output = io.BytesIO()
     workbook = xlsxwriter.Workbook(output, {"in_memory": True})
-    ws      = workbook.add_worksheet("Defects")
+    ws = workbook.add_worksheet("Defects")
     data_ws = workbook.add_worksheet("Lists")
     data_ws.hide()
 
-    header_fmt = workbook.add_format({
-        "bold": True, "bg_color": "#366092", "font_color": "white",
-        "border": 1, "align": "center", "valign": "vcenter",
-    })
+    header_fmt = workbook.add_format(
+        {
+            "bold": True,
+            "bg_color": "#366092",
+            "font_color": "white",
+            "border": 1,
+            "align": "center",
+            "valign": "vcenter",
+        }
+    )
 
     # Populate hidden Lists sheet for dropdown sources
     for i, name in enumerate(vessel_names):
@@ -762,36 +1372,97 @@ async def download_import_template(db: AsyncSession = Depends(get_db), control_d
         data_ws.write(i, 4, opt)
 
     headers = [
-        "Vessel Name", "Report Date", "Deadline", "Defect Source",
-        "Area of Concern", "Description", "Priority", "Status", "PR Number",
+        "Vessel Name",
+        "Report Date",
+        "Deadline",
+        "Defect Source",
+        "Area of Concern",
+        "Description",
+        "Priority",
+        "Status",
+        "PR Number",
+        "Flagged",
+        "Dry Dock",
     ]
     for col, text in enumerate(headers):
         ws.write(0, col, text, header_fmt)
         ws.set_column(col, col, 22)
 
     # Dropdowns
-    ws.data_validation(1, 0, 1000, 0, {
-        "validate": "list",
-        "source": f"=Lists!$A$1:$A${len(vessel_names)}",
-        "ignore_blank": True,
-    })
-    ws.data_validation(1, 3, 1000, 3, {"validate": "list", "source": f"=Lists!$C$1:$C${len(source_options)}"})
-    ws.data_validation(1, 4, 1000, 4, {"validate": "list", "source": f"=Lists!$B$1:$B${len(EQUIPMENT_OPTIONS)}"})
-    ws.data_validation(1, 6, 1000, 6, {"validate": "list", "source": f"=Lists!$D$1:$D${len(priority_options)}"})
-    ws.data_validation(1, 7, 1000, 7, {"validate": "list", "source": f"=Lists!$E$1:$E${len(status_options)}"})
+    ws.data_validation(
+        1,
+        0,
+        1000,
+        0,
+        {
+            "validate": "list",
+            "source": f"=Lists!$A$1:$A${len(vessel_names)}",
+            "ignore_blank": True,
+        },
+    )
+    ws.data_validation(
+        1,
+        3,
+        1000,
+        3,
+        {"validate": "list", "source": f"=Lists!$C$1:$C${len(source_options)}"},
+    )
+    ws.data_validation(
+        1,
+        4,
+        1000,
+        4,
+        {"validate": "list", "source": f"=Lists!$B$1:$B${len(EQUIPMENT_OPTIONS)}"},
+    )
+    ws.data_validation(
+        1,
+        6,
+        1000,
+        6,
+        {"validate": "list", "source": f"=Lists!$D$1:$D${len(priority_options)}"},
+    )
+    ws.data_validation(
+        1,
+        7,
+        1000,
+        7,
+        {"validate": "list", "source": f"=Lists!$E$1:$E${len(status_options)}"},
+    )
 
     # Date columns with validation
     date_hint_fmt = workbook.add_format({"num_format": "yyyy-mm-dd"})
     for col_idx in [1, 2]:
         ws.set_column(col_idx, col_idx, 20, date_hint_fmt)
-        ws.data_validation(1, col_idx, 1000, col_idx, {
-            "validate": "date", "criteria": "between",
-            "minimum": datetime(2000, 1, 1), "maximum": datetime(2100, 12, 31),
-            "input_title": "Date Required",
-            "input_message": "Please enter date as YYYY-MM-DD",
-            "error_title": "Invalid Date",
-            "error_message": "Please use the format: 2023-12-31",
-        })
+        ws.data_validation(
+            1,
+            col_idx,
+            1000,
+            col_idx,
+            {
+                "validate": "date",
+                "criteria": "between",
+                "minimum": datetime(2000, 1, 1).date(),
+                "maximum": datetime(2100, 12, 31).date(),
+                "input_title": "Date Required",
+                "input_message": "Please enter date as YYYY-MM-DD",
+                "error_title": "Invalid Date",
+                "error_message": "Please use the format: 2023-12-31",
+            },
+        )
+    start_col = 9 if "Vessel Name" in headers else 8
+    for col_idx in [start_col, start_col + 1]:
+        ws.data_validation(
+            1,
+            col_idx,
+            1000,
+            col_idx,
+            {
+                "validate": "list",
+                "source": ["Yes", "No"],
+                "input_title": "Select Option",
+                "input_message": "Please select Yes or No",
+            },
+        )
 
     workbook.close()
     output.seek(0)
@@ -807,19 +1478,21 @@ async def download_import_template(db: AsyncSession = Depends(get_db), control_d
 # IMPORT TEMPLATE — VESSEL (No Vessel Name column — auto-filled on import)
 # =============================================================================
 @router.get("/import-template-vessel")
-async def download_import_template_vessel(current_user: User = Depends(get_current_user)):
+async def download_import_template_vessel(
+    current_user: User = Depends(get_current_user),
+):
     """
     Vessel-side import template.
     EXCLUDES Vessel Name column — auto-filled from logged-in user's vessel during import.
     Uses "Area of Concern" as the equipment column header.
     """
-    source_options   = [e.value for e in DefectSource]
+    source_options = [e.value for e in DefectSource]
     priority_options = [e.name for e in DefectPriority]
-    status_options   = [e.name for e in DefectStatus]
+    status_options = [e.name for e in DefectStatus]
 
     output = io.BytesIO()
     workbook = xlsxwriter.Workbook(output, {"in_memory": True})
-    ws      = workbook.add_worksheet("Defects")
+    ws = workbook.add_worksheet("Defects")
     data_ws = workbook.add_worksheet("Lists")
     data_ws.hide()
 
@@ -833,32 +1506,91 @@ async def download_import_template_vessel(current_user: User = Depends(get_curre
     for i, opt in enumerate(status_options):
         data_ws.write(i, 3, opt)
 
-    header_fmt = workbook.add_format({
-        "bold": True, "bg_color": "#366092", "font_color": "white",
-        "border": 1, "align": "center", "valign": "vcenter",
-    })
+    header_fmt = workbook.add_format(
+        {
+            "bold": True,
+            "bg_color": "#366092",
+            "font_color": "white",
+            "border": 1,
+            "align": "center",
+            "valign": "vcenter",
+        }
+    )
 
     headers = [
-        "Report Date", "Deadline", "Defect Source", "Area of Concern",
-        "Description", "Priority", "Status", "PR Number",
+        "Report Date",
+        "Deadline",
+        "Defect Source",
+        "Area of Concern",
+        "Description",
+        "Priority",
+        "Status",
+        "PR Number",
+        "Flagged",  # ✅ Added
+        "Dry Dock",  # ✅ Added
     ]
     for col, text in enumerate(headers):
         ws.write(0, col, text, header_fmt)
         ws.set_column(col, col, 22)
 
-    ws.data_validation(1, 2, 1000, 2, {"validate": "list", "source": f"=Lists!$B$1:$B${len(source_options)}"})
-    ws.data_validation(1, 3, 1000, 3, {"validate": "list", "source": f"=Lists!$A$1:$A${len(EQUIPMENT_OPTIONS)}"})
-    ws.data_validation(1, 5, 1000, 5, {"validate": "list", "source": f"=Lists!$C$1:$C${len(priority_options)}"})
-    ws.data_validation(1, 6, 1000, 6, {"validate": "list", "source": f"=Lists!$D$1:$D${len(status_options)}"})
+    ws.data_validation(
+        1,
+        2,
+        1000,
+        2,
+        {"validate": "list", "source": f"=Lists!$B$1:$B${len(source_options)}"},
+    )
+    ws.data_validation(
+        1,
+        3,
+        1000,
+        3,
+        {"validate": "list", "source": f"=Lists!$A$1:$A${len(EQUIPMENT_OPTIONS)}"},
+    )
+    ws.data_validation(
+        1,
+        5,
+        1000,
+        5,
+        {"validate": "list", "source": f"=Lists!$C$1:$C${len(priority_options)}"},
+    )
+    ws.data_validation(
+        1,
+        6,
+        1000,
+        6,
+        {"validate": "list", "source": f"=Lists!$D$1:$D${len(status_options)}"},
+    )
 
     date_fmt = workbook.add_format({"num_format": "yyyy-mm-dd"})
     ws.set_column(0, 1, 20, date_fmt)
     for col_idx in [0, 1]:
-        ws.data_validation(1, col_idx, 1000, col_idx, {
-            "validate": "date", "criteria": "between",
-            "minimum": datetime(2000, 1, 1), "maximum": datetime(2100, 12, 31),
-            "input_message": "Format: YYYY-MM-DD",
-        })
+        ws.data_validation(
+            1,
+            col_idx,
+            1000,
+            col_idx,
+            {
+                "validate": "date",
+                "criteria": "between",
+                "minimum": datetime(2000, 1, 1).date(),
+                "maximum": datetime(2100, 12, 31).date(),
+                "input_message": "Format: YYYY-MM-DD",
+            },
+        )
+    for col_idx in [8, 9]:
+        ws.data_validation(
+            1,
+            col_idx,
+            1000,
+            col_idx,
+            {
+                "validate": "list",
+                "source": ["Yes", "No"],
+                "input_title": "Select Option",
+                "input_message": "Please select Yes or No",
+            },
+        )
 
     workbook.close()
     output.seek(0)
@@ -884,30 +1616,45 @@ async def import_defects(
     skip_errors: bool = Query(True),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: AsyncSession = Depends(get_db),
-    control_db: AsyncSession = Depends(get_control_db),  # ✅ ADDED
+    control_db: AsyncSession = Depends(get_control_db),
     current_user: User = Depends(get_current_user),
 ):
+    """
+    Bulk import/update defects from Excel.
+ 
+    Rows WITH a valid Defect ID (matching defect_number in DB) → UPDATE existing defect.
+    Rows WITHOUT a Defect ID (or with a placeholder like #1) → CREATE new defect.
+ 
+    Returns separate counts for created vs updated rows.
+    """
     try:
         if not file.filename.endswith(".xlsx"):
             raise HTTPException(status_code=400, detail="Only .xlsx files allowed")
-
+ 
         contents = await file.read()
         workbook = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
         sheet = workbook.active
-
+ 
         headers = [str(cell.value).strip() if cell.value else "" for cell in sheet[1]]
-
+ 
         required_columns = [
-            "Area of Concern", "Description", "Defect Source",
-            "Priority", "Status", "Report Date", "Deadline",
+            "Area of Concern",
+            "Description",
+            "Defect Source",
+            "Priority",
+            "Status",
+            "Report Date",
+            "Deadline",
         ]
         if current_user.role != UserRole.VESSEL:
             required_columns.insert(0, "Vessel Name")
-
+ 
         for col in required_columns:
             if col not in headers:
-                raise HTTPException(status_code=400, detail=f"Missing required column: '{col}'")
-
+                raise HTTPException(
+                    status_code=400, detail=f"Missing required column: '{col}'"
+                )
+ 
         def get_enum_value(enum_class, value):
             if not value:
                 return None
@@ -916,7 +1663,7 @@ async def import_defects(
                 if e.name.lower() == val_str or e.value.lower() == val_str:
                     return e
             return None
-
+ 
         def parse_date(val):
             if isinstance(val, datetime):
                 return val
@@ -926,60 +1673,182 @@ async def import_defects(
                 return datetime.strptime(str(val).strip()[:10], "%Y-%m-%d")
             except Exception:
                 return None
-
-        defects_to_insert = []
-        prs_to_insert = []
-        syncs_to_insert = []
-        
-        success_count = 0
+ 
+        # Track objects to persist — kept separate so we can report counts accurately
+        defects_to_insert = []    # new Defect ORM objects
+        defects_to_update = []    # existing Defect ORM objects (already fetched + mutated)
+        prs_to_insert = []        # new PrEntry ORM objects (for both create and update paths)
+        syncs_to_insert = []      # SyncQueue entries
+ 
+        created_count = 0
+        updated_count = 0
         errors = []
-
-        for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+ 
+        for row_idx, row in enumerate(
+            sheet.iter_rows(min_row=2, values_only=True), start=2
+        ):
             try:
-                # 1. Skip completely blank rows (Excel trailing empty rows)
+                # Skip completely blank rows (Excel trailing empty rows)
                 if all(v is None or str(v).strip() == "" for v in row):
                     continue
-
+ 
                 row_data = dict(zip(headers, row))
-
-                # 2. Treat "none"/"None" string as missing
+ 
+                # Treat "none" / "None" string as missing
                 missing_fields = [
-                    f for f in required_columns
+                    f
+                    for f in required_columns
                     if row_data.get(f) is None
                     or str(row_data.get(f)).strip() == ""
                     or str(row_data.get(f)).strip().lower() == "none"
                 ]
                 if missing_fields:
-                    raise ValueError(f"Missing required field(s): {', '.join(missing_fields)}")
-
-                # Resolve vessel
+                    raise ValueError(
+                        f"Missing required field(s): {', '.join(missing_fields)}"
+                    )
+ 
+                # ── Resolve vessel ─────────────────────────────────────────
                 if current_user.role == UserRole.VESSEL:
                     vessel = current_user.vessels[0]
                 else:
-                    v_name = str(row_data["Vessel Name"]).encode("ascii", "ignore").decode().strip()
-                    v_res = await control_db.execute(select(Vessel).where(Vessel.name.ilike(v_name)))
+                    v_name = (
+                        str(row_data["Vessel Name"])
+                        .encode("ascii", "ignore")
+                        .decode()
+                        .strip()
+                    )
+                    v_res = await control_db.execute(
+                        select(Vessel).where(Vessel.name.ilike(v_name))
+                    )
                     vessel = v_res.scalars().first()
                     if not vessel:
                         raise ValueError(f"Vessel '{v_name}' not found in database")
-
+ 
+                # ── Parse enums and dates ──────────────────────────────────
                 source_enum = get_enum_value(DefectSource, row_data["Defect Source"])
                 priority_enum = get_enum_value(DefectPriority, row_data["Priority"])
                 status_enum = get_enum_value(DefectStatus, row_data["Status"])
                 date_id = parse_date(row_data["Report Date"])
                 date_dl = parse_date(row_data["Deadline"])
-
+ 
                 validation_errors = []
-                if not source_enum: validation_errors.append(f"Invalid Source: {row_data.get('Defect Source')}")
-                if not priority_enum: validation_errors.append(f"Invalid Priority: {row_data.get('Priority')}")
-                if not status_enum: validation_errors.append(f"Invalid Status: {row_data.get('Status')}")
-                if not date_id: validation_errors.append("Invalid Report Date format")
-                if not date_dl: validation_errors.append("Invalid Deadline format")
+                if not source_enum:
+                    validation_errors.append(
+                        f"Invalid Source: {row_data.get('Defect Source')}"
+                    )
+                if not priority_enum:
+                    validation_errors.append(
+                        f"Invalid Priority: {row_data.get('Priority')}"
+                    )
+                if not status_enum:
+                    validation_errors.append(
+                        f"Invalid Status: {row_data.get('Status')}"
+                    )
+                if not date_id:
+                    validation_errors.append("Invalid Report Date format")
+                if not date_dl:
+                    validation_errors.append("Invalid Deadline format")
                 if validation_errors:
                     raise ValueError(" | ".join(validation_errors))
-
+ 
                 equip_str = str(row_data["Area of Concern"]).strip()
                 desc_str = str(row_data["Description"]).strip()
-
+ 
+                # FIX: strip whitespace before boolean comparisons
+                is_owner_val = (
+                    str(row_data.get("Owner", "")).strip().lower() == "owner"
+                )
+                is_flagged_val = (
+                    str(row_data.get("Flagged", "")).strip().lower()
+                    in ["yes", "true", "1"]
+                )
+                is_dd_val = (
+                    str(row_data.get("Dry Dock", "")).strip().lower()
+                    in ["yes", "true", "1"]
+                )
+ 
+                # ── Determine CREATE vs UPDATE ─────────────────────────────
+                defect_id_from_row = (
+                    str(row_data.get("Defect ID", "") or "").strip()
+                )
+                existing_defect = None
+ 
+                if defect_id_from_row and not defect_id_from_row.startswith("#"):
+                    existing_res = await db.execute(
+                        select(Defect).where(
+                            Defect.defect_number == defect_id_from_row,
+                            Defect.is_deleted == False,
+                        )
+                    )
+                    existing_defect = existing_res.scalars().first()
+ 
+                # ── UPDATE PATH ────────────────────────────────────────────
+                if existing_defect:
+                    existing_defect.equipment_name = equip_str
+                    existing_defect.title = equip_str
+                    existing_defect.description = desc_str
+                    existing_defect.defect_source = source_enum
+                    existing_defect.priority = priority_enum
+                    existing_defect.status = status_enum
+                    existing_defect.date_identified = date_id
+                    existing_defect.target_close_date = date_dl
+                    existing_defect.is_owner = is_owner_val
+                    existing_defect.is_flagged = is_flagged_val
+                    existing_defect.is_dd = is_dd_val
+                    existing_defect.updated_at = datetime.utcnow()
+                    # FIX: (or 0) + 1 so None → 1, not None → 2
+                    existing_defect.version = (existing_defect.version or 0) + 1
+ 
+                    if (
+                        status_enum == DefectStatus.CLOSED
+                        and existing_defect.closed_at is None
+                    ):
+                        existing_defect.closed_at = datetime.utcnow()
+                        existing_defect.closed_by_id = current_user.id
+ 
+                    db.add(existing_defect)
+                    defects_to_update.append(existing_defect)
+ 
+                    # Handle PR entries for updated defect
+                    pr_aliases = ["PR Number", "PR No", "PR No.", "PR #", "PR Details"]
+                    pr_val = next(
+                        (row_data[a] for a in pr_aliases if row_data.get(a)), None
+                    )
+                    if pr_val and str(pr_val).strip().lower() not in [
+                        "none", "nan", "", "null"
+                    ]:
+                        for pr_no in [
+                            p.strip() for p in str(pr_val).split(",") if p.strip()
+                        ]:
+                            existing_pr_res = await db.execute(
+                                select(PrEntry).where(
+                                    PrEntry.defect_id == existing_defect.id,
+                                    PrEntry.pr_number == pr_no,
+                                    PrEntry.is_deleted == False,
+                                )
+                            )
+                            if not existing_pr_res.scalars().first():
+                                pr_id = uuid.uuid4()
+                                prs_to_insert.append(
+                                    PrEntry(
+                                        id=pr_id,
+                                        defect_id=existing_defect.id,
+                                        pr_number=pr_no,
+                                        pr_description="Updated via Excel",
+                                        created_by_id=current_user.id,
+                                        is_deleted=False,
+                                        version=1,
+                                        origin="SHORE",
+                                        created_at=datetime.utcnow(),
+                                        updated_at=datetime.utcnow(),
+                                    )
+                                )
+ 
+                    # FIX: increment BEFORE the update path ends — do NOT continue yet
+                    updated_count += 1
+                    continue  # skip the create path below
+ 
+                # ── CREATE PATH (no matching Defect ID found) ──────────────
                 dup_res = await db.execute(
                     select(Defect).where(
                         Defect.vessel_imo == vessel.imo,
@@ -992,14 +1861,8 @@ async def import_defects(
                 )
                 if dup_res.scalars().first():
                     raise ValueError("Duplicate: defect already exists.")
-
+ 
                 new_id = uuid.uuid4()
-                is_owner_val = str(row_data.get("Owner", "")).strip().lower() == "owner"
-                is_flagged_val = str(row_data.get("Flagged", "")).strip().lower() in ["yes", "true", "1"]
-                is_dd_val = str(row_data.get("Dry Dock", "")).strip().lower() in ["yes", "true", "1"]
-
-                # ✅ FIX 2: Create real ORM Objects (guarantees ID generation & defaults)
-                # In the Defect() constructor inside the loop, add version:
                 new_defect = Defect(
                     id=new_id,
                     vessel_imo=vessel.imo,
@@ -1018,146 +1881,215 @@ async def import_defects(
                     is_deleted=False,
                     before_image_required=False,
                     after_image_required=False,
-                    version=1,                    # ← ADD THIS
-                    origin="VESSEL" if _should_sync() else "SHORE",  # ← ADD THIS
+                    version=1,
+                    origin="VESSEL" if _should_sync() else "SHORE",
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow(),
                     is_flagged=is_flagged_val,
                     is_dd=is_dd_val,
-                )   
-                
+                    closed_at=(
+                        date_dl
+                        if status_enum == DefectStatus.CLOSED and date_dl
+                        else (date_id if status_enum == DefectStatus.CLOSED else None)
+                    ),
+                    closed_by_id=(
+                        current_user.id if status_enum == DefectStatus.CLOSED else None
+                    ),
+                )
                 defects_to_insert.append(new_defect)
-
+ 
                 if _should_sync():
-                    syncs_to_insert.append(SyncQueue(
-                        entity_id=new_id,
-                        entity_type="DEFECT",
-                        operation="CREATE",
-                        payload={
-                            "id": str(new_id),
-                            "vessel_imo": vessel.imo,
-                            "reported_by_id": str(current_user.id),
-                            "title": equip_str,
-                            "equipment_name": equip_str,
-                            "description": desc_str,
-                            "defect_source": source_enum.value,
-                            "priority": priority_enum.value,
-                            "status": status_enum.value,
-                            "date_identified": date_id.isoformat() if date_id else None,
-                            "target_close_date": date_dl.isoformat() if date_dl else None,
-                            "responsibility": "Engine Dept",
-                            "pr_status": "Not Set",
-                            "is_owner": is_owner_val,
-                            "is_deleted": False,
-                            "before_image_required": False,
-                            "after_image_required": False
-                        },
-                        status="PENDING",
-                        origin="VESSEL" if current_user.role == UserRole.VESSEL else "SHORE",
-                        sync_scope="DEFECT",
-                        version=1
-                    ))
-
+                    syncs_to_insert.append(
+                        SyncQueue(
+                            entity_id=new_id,
+                            entity_type="DEFECT",
+                            operation="CREATE",
+                            payload={
+                                "id": str(new_id),
+                                "vessel_imo": vessel.imo,
+                                "reported_by_id": str(current_user.id),
+                                "title": equip_str,
+                                "equipment_name": equip_str,
+                                "description": desc_str,
+                                "defect_source": source_enum.value,
+                                "priority": priority_enum.value,
+                                "status": status_enum.value,
+                                "date_identified": (
+                                    date_id.isoformat() if date_id else None
+                                ),
+                                "target_close_date": (
+                                    date_dl.isoformat() if date_dl else None
+                                ),
+                                "responsibility": "Engine Dept",
+                                "pr_status": "Not Set",
+                                "is_owner": is_owner_val,
+                                "is_flagged": is_flagged_val,
+                                "is_dd": is_dd_val,
+                                "is_deleted": False,
+                                "before_image_required": False,
+                                "after_image_required": False,
+                            },
+                            status="PENDING",
+                            origin=(
+                                "VESSEL"
+                                if current_user.role == UserRole.VESSEL
+                                else "SHORE"
+                            ),
+                            sync_scope="DEFECT",
+                            version=1,
+                        )
+                    )
+ 
                 pr_aliases = ["PR Number", "PR No", "PR No.", "PR #", "PR Details"]
-                pr_val = next((row_data[a] for a in pr_aliases if row_data.get(a)), None)
-                if pr_val and str(pr_val).strip().lower() not in ["none", "nan", "", "null"]:
-                    for pr_no in [p.strip() for p in str(pr_val).split(",") if p.strip()]:
+                pr_val = next(
+                    (row_data[a] for a in pr_aliases if row_data.get(a)), None
+                )
+                if pr_val and str(pr_val).strip().lower() not in [
+                    "none", "nan", "", "null"
+                ]:
+                    for pr_no in [
+                        p.strip() for p in str(pr_val).split(",") if p.strip()
+                    ]:
                         pr_id = uuid.uuid4()
-                        prs_to_insert.append(PrEntry(
-                            id=pr_id,
-                            defect_id=new_id,
-                            pr_number=pr_no,
-                            pr_description="Imported via Excel",
-                            created_by_id=current_user.id,
-                            is_deleted=False,
-                            version=1,                      # ← ADD THIS
-                            origin="SHORE",  
-                            created_at=datetime.utcnow(),
-                            updated_at=datetime.utcnow(),
-                        ))
-                        
+                        prs_to_insert.append(
+                            PrEntry(
+                                id=pr_id,
+                                defect_id=new_id,
+                                pr_number=pr_no,
+                                pr_description="Imported via Excel",
+                                created_by_id=current_user.id,
+                                is_deleted=False,
+                                version=1,
+                                origin="SHORE",
+                                created_at=datetime.utcnow(),
+                                updated_at=datetime.utcnow(),
+                            )
+                        )
+ 
                         if _should_sync():
-                            syncs_to_insert.append(SyncQueue(
-                                entity_id=pr_id,
-                                entity_type="PR_ENTRY",
-                                operation="CREATE",
-                                payload={
-                                    "id": str(pr_id),
-                                    "defect_id": str(new_id),
-                                    "pr_number": pr_no,
-                                    "pr_description": "Imported via Excel",
-                                    "created_by_id": str(current_user.id),
-                                    "is_deleted": False
-                                },
-                                status="PENDING",
-                                origin="VESSEL" if current_user.role == UserRole.VESSEL else "SHORE",
-                                sync_scope="DEFECT",
-                                version=1
-                            ))
-
-                success_count += 1
-
+                            syncs_to_insert.append(
+                                SyncQueue(
+                                    entity_id=pr_id,
+                                    entity_type="PR_ENTRY",
+                                    operation="CREATE",
+                                    payload={
+                                        "id": str(pr_id),
+                                        "defect_id": str(new_id),
+                                        "pr_number": pr_no,
+                                        "pr_description": "Imported via Excel",
+                                        "created_by_id": str(current_user.id),
+                                        "is_deleted": False,
+                                    },
+                                    status="PENDING",
+                                    origin=(
+                                        "VESSEL"
+                                        if current_user.role == UserRole.VESSEL
+                                        else "SHORE"
+                                    ),
+                                    sync_scope="DEFECT",
+                                    version=1,
+                                )
+                            )
+ 
+                created_count += 1
+ 
             except Exception as row_error:
                 errors.append({"row": row_idx, "error": str(row_error)})
                 if not skip_errors:
-                    raise HTTPException(status_code=400, detail=f"Row {row_idx}: {str(row_error)}")
-
-        if not defects_to_insert:
+                    raise HTTPException(
+                        status_code=400, detail=f"Row {row_idx}: {str(row_error)}"
+                    )
+ 
+        # FIX: do NOT early-return if defects_to_insert is empty —
+        # there may still be updates (defects_to_update) and PRs (prs_to_insert) to commit.
+        total_success = created_count + updated_count
+        if total_success == 0 and not errors:
             return {
                 "status": "failure",
                 "message": "Import completed — no valid rows found",
                 "total_rows_processed": sheet.max_row - 1,
+                "created_count": 0,
+                "updated_count": 0,
                 "success_count": 0,
                 "error_count": len(errors),
                 "errors": errors,
             }
-
+ 
         try:
-            # ✅ FIX 3: Safe ORM commit instead of bulk raw insert
+            # Commit new defects, updated defects (already db.add()-ed above),
+            # new PR entries (for both create and update paths), and sync queue.
             if defects_to_insert:
                 db.add_all(defects_to_insert)
             if prs_to_insert:
                 db.add_all(prs_to_insert)
             if syncs_to_insert:
                 db.add_all(syncs_to_insert)
-                
+            # Note: defects_to_update objects were already added via db.add() in the loop.
+ 
             await db.commit()
-            logger.info(f"✅ Bulk import successful: {success_count} defects committed")
+            logger.info(
+                f"✅ Bulk import committed: {created_count} created, "
+                f"{updated_count} updated"
+            )
         except Exception as e:
             await db.rollback()
             logger.error(f"❌ Bulk import DB error: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail="Database error during bulk commit.")
-
-        # Send notifications per affected vessel — ✅ control_db for vessel lookup
-        affected_vessels = list(set(d.vessel_imo for d in defects_to_insert))
+            raise HTTPException(
+                status_code=500, detail="Database error during bulk commit."
+            )
+ 
+        # Notifications per affected vessel
+        affected_vessels = list(set(
+            d.vessel_imo for d in defects_to_insert + defects_to_update
+        ))
         for v_imo in affected_vessels:
             v_count = sum(1 for d in defects_to_insert if d.vessel_imo == v_imo)
             try:
-                vessel_obj = await control_db.get(Vessel, v_imo)  # ✅ control_db
+                vessel_obj = await control_db.get(Vessel, v_imo)
                 vessel_name = vessel_obj.name if vessel_obj else v_imo
                 background_tasks.add_task(
                     notify_vessel_users,
                     db=db,
-                    control_db=control_db,  # ✅ ADDED
+                    control_db=control_db,
                     vessel_imo=v_imo,
                     vessel_name=vessel_name,
                     title="Bulk Import Success",
-                    message=f"{v_count} defects imported via Excel by {current_user.full_name}.",
+                    message=(
+                        f"{v_count} defects imported via Excel "
+                        f"by {current_user.full_name}."
+                    ),
                     exclude_user_id=current_user.id,
                     defect_id=None,
                 )
             except Exception:
                 pass
-
+ 
+        # Determine overall status
+        if total_success == 0:
+            status_label = "failure"
+        elif errors:
+            status_label = "partial_success"
+        else:
+            status_label = "success"
+ 
+        parts = []
+        if created_count:
+            parts.append(f"{created_count} created")
+        if updated_count:
+            parts.append(f"{updated_count} updated")
+        summary = ", ".join(parts) if parts else "no changes"
+ 
         return {
-            "status": "partial_success" if errors else "success",
-            "message": "Import completed",
+            "status": status_label,
+            "message": f"Import completed — {summary}",
             "total_rows_processed": sheet.max_row - 1,
-            "success_count": success_count,
+            "created_count": created_count,
+            "updated_count": updated_count,
+            "success_count": total_success,        # backwards-compatible field
             "error_count": len(errors),
             "errors": errors,
         }
-
+ 
     except HTTPException:
         raise
     except Exception as e:
@@ -1218,13 +2150,17 @@ async def create_defect(
 ):
     """Create a new defect. SyncQueue + notifications handled by DefectService."""
     try:
-        logger.info(f"🆕 Creating defect for vessel: {defect_in.vessel_imo} | {defect_in.equipment}")
+        logger.info(
+            f"🆕 Creating defect for vessel: {defect_in.vessel_imo} | {defect_in.equipment}"
+        )
 
         vessel = await control_db.get(Vessel, defect_in.vessel_imo)
         if not vessel:
             raise HTTPException(status_code=404, detail="Vessel not found")
 
-        new_defect = await DefectService.create_defect(db, control_db, defect_in, current_user)
+        new_defect = await DefectService.create_defect(
+            db, control_db, defect_in, current_user
+        )
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1236,7 +2172,9 @@ async def create_defect(
 
     # Live feed (non-blocking, non-fatal — defect is already committed above)
     try:
-        await feed_defect_opened(db, control_db, defect=new_defect, actor_id=current_user.id)
+        await feed_defect_opened(
+            db, control_db, defect=new_defect, actor_id=current_user.id
+        )
         await db.commit()
     except Exception as e:
         logger.error(f"⚠️ Live feed error (non-fatal): {e}")
@@ -1276,6 +2214,7 @@ async def get_defect(defect_id: UUID, db: AsyncSession = Depends(get_db)):
 # REPLACE your existing @router.patch("/{defect_id}") with this entire block
 # =============================================================================
 
+
 @router.patch("/{defect_id}", response_model=DefectResponse)
 async def update_defect(
     defect_id: UUID,
@@ -1292,11 +2231,11 @@ async def update_defect(
         if not old_defect:
             raise HTTPException(status_code=404, detail="Defect not found")
 
-        old_priority       = old_defect.priority
-        old_status         = old_defect.status
-        old_before_req     = old_defect.before_image_required
-        old_after_req      = old_defect.after_image_required
-        update_data        = defect_update.model_dump(exclude_unset=True)
+        old_priority = old_defect.priority
+        old_status = old_defect.status
+        old_before_req = old_defect.before_image_required
+        old_after_req = old_defect.after_image_required
+        update_data = defect_update.model_dump(exclude_unset=True)
 
         # ── All DB writes, status machine, SyncQueue → service ───────────────
         updated_defect = await DefectService.update_defect(
@@ -1309,7 +2248,8 @@ async def update_defect(
         raise
     except Exception as e:
         import traceback
-        traceback.print_exc()   # ← ADD THIS LINE
+
+        traceback.print_exc()  # ← ADD THIS LINE
         logger.error(f"❌ Error updating defect: {str(e)}", exc_info=True)
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -1320,13 +2260,23 @@ async def update_defect(
     # ── Live feed calls (non-blocking, non-fatal) ────────────────────────────
     try:
         new_priority = updated_defect.priority
-        new_status   = updated_defect.status
+        new_status = updated_defect.status
 
         if old_priority != new_priority:
-            old_str = old_priority.value if hasattr(old_priority, "value") else str(old_priority)
-            new_str = new_priority.value if hasattr(new_priority, "value") else str(new_priority)
+            old_str = (
+                old_priority.value
+                if hasattr(old_priority, "value")
+                else str(old_priority)
+            )
+            new_str = (
+                new_priority.value
+                if hasattr(new_priority, "value")
+                else str(new_priority)
+            )
             await feed_priority_changed(
-                db, control_db, defect=updated_defect,
+                db,
+                control_db,
+                defect=updated_defect,
                 old_priority=old_str,
                 new_priority=new_str,
                 actor_id=current_user.id,
@@ -1334,22 +2284,34 @@ async def update_defect(
 
         if new_status == DefectStatus.CLOSED and old_status != DefectStatus.CLOSED:
             await feed_defect_closed(
-                db, control_db, defect=updated_defect,
+                db,
+                control_db,
+                defect=updated_defect,
                 actor_id=current_user.id,
                 remarks=updated_defect.closure_remarks,
             )
 
-        if "before_image_required" in update_data and update_data["before_image_required"] != old_before_req:
+        if (
+            "before_image_required" in update_data
+            and update_data["before_image_required"] != old_before_req
+        ):
             await feed_pic_mandatory_changed(
-                db, control_db, defect=updated_defect,
+                db,
+                control_db,
+                defect=updated_defect,
                 image_field="before_image_required",
                 is_now_required=update_data["before_image_required"],
                 actor_id=current_user.id,
             )
 
-        if "after_image_required" in update_data and update_data["after_image_required"] != old_after_req:
+        if (
+            "after_image_required" in update_data
+            and update_data["after_image_required"] != old_after_req
+        ):
             await feed_pic_mandatory_changed(
-                db, control_db, defect=updated_defect,
+                db,
+                control_db,
+                defect=updated_defect,
                 image_field="after_image_required",
                 is_now_required=update_data["after_image_required"],
                 actor_id=current_user.id,
@@ -1364,6 +2326,7 @@ async def update_defect(
     background_tasks.add_task(send_defect_email, email_data, "UPDATED")
 
     return updated_defect
+
 
 # =============================================================================
 # SHORE DIRECT CLOSURE — Closes immediately, SHORE/ADMIN only
@@ -1393,15 +2356,24 @@ async def shore_close_defect(
             raise HTTPException(status_code=400, detail="Defect is already closed")
 
         if current_user.role not in [UserRole.SHORE, UserRole.ADMIN]:
-            raise HTTPException(status_code=403, detail="Only shore users can directly close a defect")
+            raise HTTPException(
+                status_code=403, detail="Only shore users can directly close a defect"
+            )
 
-        if not close_data.closure_remarks or len(close_data.closure_remarks.strip()) < 50:
+        if (
+            not close_data.closure_remarks
+            or len(close_data.closure_remarks.strip()) < 50
+        ):
             raise HTTPException(
                 status_code=400,
                 detail="Closure remarks must be at least 50 characters",
             )
 
-        previous_status = defect.status.value if hasattr(defect.status, "value") else str(defect.status)
+        previous_status = (
+            defect.status.value
+            if hasattr(defect.status, "value")
+            else str(defect.status)
+        )
 
         defect.status = DefectStatus.CLOSED
         defect.closure_remarks = close_data.closure_remarks.strip()
@@ -1409,22 +2381,26 @@ async def shore_close_defect(
         defect.closed_by_id = current_user.id
 
         # System thread visible to all (is_internal=False)
-        db.add(Thread(
-            id=uuid.uuid4(),
-            defect_id=defect.id,
-            user_id=current_user.id,
-            author_role="SYSTEM",
-            is_system_message=True,
-            is_internal=False,
-            body=f" Defect CLOSED by {current_user.full_name} (Shore). Previous status: {previous_status}",
-        ))
+        db.add(
+            Thread(
+                id=uuid.uuid4(),
+                defect_id=defect.id,
+                user_id=current_user.id,
+                author_role="SYSTEM",
+                is_system_message=True,
+                is_internal=False,
+                body=f" Defect CLOSED by {current_user.full_name} (Shore). Previous status: {previous_status}",
+            )
+        )
 
         await db.commit()
 
         # Live feed (non-fatal)
         try:
             await feed_defect_closed(
-                db, control_db, defect=defect,
+                db,
+                control_db,
+                defect=defect,
                 actor_id=current_user.id,
                 remarks=defect.closure_remarks,
             )
@@ -1478,7 +2454,9 @@ async def close_defect(
 ):
     """Close a defect with closure remarks and evidence images (legacy endpoint)."""
     try:
-        closed_defect = await DefectService.close_defect(db, control_db, defect_id, close_data, current_user)
+        closed_defect = await DefectService.close_defect(
+            db, control_db, defect_id, close_data, current_user
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
@@ -1493,7 +2471,9 @@ async def close_defect(
 
     try:
         await feed_defect_closed(
-            db, control_db, defect=closed_defect,
+            db,
+            control_db,
+            defect=closed_defect,
             actor_id=current_user.id,
             remarks=closed_defect.closure_remarks,
         )
@@ -1573,7 +2553,10 @@ async def create_thread(
             )
             return res.scalars().first()
 
-        if thread_in.is_internal and current_user.role not in [UserRole.SHORE, UserRole.ADMIN]:
+        if thread_in.is_internal and current_user.role not in [
+            UserRole.SHORE,
+            UserRole.ADMIN,
+        ]:
             logger.warning(
                 f"⚠️ User {current_user.id} ({current_user.role}) tried to create internal message"
             )
@@ -1598,13 +2581,15 @@ async def create_thread(
             defect = await db.get(Defect, thread_in.defect_id)
             eligible_user_ids = []
             for user_id in thread_in.tagged_user_ids:
-                user_result = await control_db.execute(select(User).where(User.id == user_id))
+                user_result = await control_db.execute(
+                    select(User).where(User.id == user_id)
+                )
                 tagged_user = user_result.scalar_one_or_none()
                 if tagged_user:
-                    should_notify = (
-                        not thread_in.is_internal
-                        or tagged_user.role in [UserRole.SHORE, UserRole.ADMIN]
-                    )
+                    should_notify = not thread_in.is_internal or tagged_user.role in [
+                        UserRole.SHORE,
+                        UserRole.ADMIN,
+                    ]
                     if should_notify:
                         eligible_user_ids.append(user_id)
                     else:
@@ -1671,7 +2656,9 @@ async def get_defect_threads(
 
         if current_user.role not in [UserRole.SHORE, UserRole.ADMIN]:
             query = query.where(Thread.is_internal == False)
-            logger.info(f"🚢 Filtering internal messages for vessel user: {current_user.full_name}")
+            logger.info(
+                f"🚢 Filtering internal messages for vessel user: {current_user.full_name}"
+            )
         else:
             logger.info(f"👔 Shore user {current_user.full_name} can see all messages")
 
@@ -1686,7 +2673,9 @@ async def get_defect_threads(
                     select(User).where(User.id == thread.user_id)
                 )
                 user = user_result.scalars().first()
-                thread.author_role = user.full_name if user else (thread.author_role or "Unknown")
+                thread.author_role = (
+                    user.full_name if user else (thread.author_role or "Unknown")
+                )
 
         logger.info(f"✅ Returning {len(threads)} threads to {current_user.role} user")
         return threads
@@ -1713,7 +2702,9 @@ async def create_attachment(
     try:
         existing = await db.get(Attachment, attachment_in.id)
         if existing:
-            logger.info(f"⚠️ Attachment {attachment_in.id} already exists, returning existing")
+            logger.info(
+                f"⚠️ Attachment {attachment_in.id} already exists, returning existing"
+            )
             return existing
 
         MAX_FILE_SIZE = 1024 * 1024  # 1MB
@@ -1733,10 +2724,9 @@ async def create_attachment(
             file_size=attachment_in.file_size,
             content_type=attachment_in.content_type,
             blob_path=attachment_in.blob_path,
-            origin="SHORE",                # ← ADD THIS
-            version=1,                     # ← ADD THIS
+            origin="SHORE",  # ← ADD THIS
+            version=1,  # ← ADD THIS
             updated_at=datetime.utcnow(),  # ← ADD THIS
-
         )
         db.add(new_attachment)
         await db.commit()
@@ -1792,7 +2782,9 @@ async def save_defect_image(
     SyncQueue written by DefectService on vessel mode.
     """
     try:
-        logger.info(f"💾 Saving {image_data.image_type} image for defect {image_data.defect_id}")
+        logger.info(
+            f"💾 Saving {image_data.image_type} image for defect {image_data.defect_id}"
+        )
 
         # Idempotency check
         existing = await db.get(DefectImage, image_data.id)
@@ -1809,14 +2801,18 @@ async def save_defect_image(
                 image_url=generate_read_sas_url(existing.blob_path),
             )
 
-        new_image = await DefectService.save_defect_image(db, image_data.defect_id, image_data)
+        new_image = await DefectService.save_defect_image(
+            db, image_data.defect_id, image_data
+        )
 
         # Live feed (non-fatal)
         defect = await db.get(Defect, image_data.defect_id)
         if defect:
             try:
                 await feed_image_uploaded(
-                    db, control_db, defect=defect,
+                    db,
+                    control_db,
+                    defect=defect,
                     image_type=image_data.image_type,
                     file_name=image_data.file_name,
                     actor_id=current_user.id,
@@ -1843,7 +2839,9 @@ async def save_defect_image(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{defect_id}/images/{image_type}", response_model=list[DefectImageResponse])
+@router.get(
+    "/{defect_id}/images/{image_type}", response_model=list[DefectImageResponse]
+)
 async def get_defect_images(
     defect_id: UUID,
     image_type: str,
@@ -1853,7 +2851,9 @@ async def get_defect_images(
     try:
         logger.info(f"📷 Fetching {image_type} images for defect {defect_id}")
         if image_type not in ["before", "after"]:
-            raise HTTPException(status_code=400, detail="image_type must be 'before' or 'after'")
+            raise HTTPException(
+                status_code=400, detail="image_type must be 'before' or 'after'"
+            )
 
         result = await db.execute(
             select(DefectImage)
@@ -1920,17 +2920,27 @@ async def create_pr_entry(
 ):
     """Create a new PR entry for a defect. Fires feed_pr_added live feed event."""
     try:
-        logger.info(f"📝 Creating PR entry for defect {pr_in.defect_id}: {pr_in.pr_number}")
+        logger.info(
+            f"📝 Creating PR entry for defect {pr_in.defect_id}: {pr_in.pr_number}"
+        )
 
         defect = await db.get(Defect, pr_in.defect_id)
         if not defect:
             raise HTTPException(status_code=404, detail="Defect not found")
 
-        new_pr = await DefectService.create_pr_entry(db, pr_in.defect_id, pr_in, current_user)
+        new_pr = await DefectService.create_pr_entry(
+            db, pr_in.defect_id, pr_in, current_user
+        )
 
         # Live feed (non-fatal)
         try:
-            await feed_pr_added(db, control_db, defect=defect, pr_number=pr_in.pr_number, actor_id=current_user.id)
+            await feed_pr_added(
+                db,
+                control_db,
+                defect=defect,
+                pr_number=pr_in.pr_number,
+                actor_id=current_user.id,
+            )
             await db.commit()
         except Exception as e:
             logger.error(f"⚠️ Live feed error (non-fatal): {e}")
@@ -1959,7 +2969,9 @@ async def update_pr_entry(
         if not pr_entry or pr_entry.is_deleted:
             raise HTTPException(status_code=404, detail="PR entry not found")
 
-        result = await DefectService.update_pr_entry(db, pr_entry.defect_id, pr_id, pr_in)
+        result = await DefectService.update_pr_entry(
+            db, pr_entry.defect_id, pr_id, pr_in
+        )
         if not result:
             raise HTTPException(status_code=404, detail="PR entry not found")
 

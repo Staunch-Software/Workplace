@@ -644,7 +644,32 @@ export const PrManagerPopover = ({ defect, onClose, onRefresh }) => {
                 style={{ width: '100px' }}
               />
             ) : (
-              <span style={{ fontSize: '12px', fontWeight: '600' }}>{pr.pr_number}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                <span style={{ fontSize: '12px', fontWeight: '600' }}>{pr.pr_number}</span>
+                {pr.mariapps_pr_status && (
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: '600',
+                    padding: '1px 6px',
+                    borderRadius: '999px',
+                    display: 'inline-block',
+                    background: pr.mariapps_pr_status === 'Finally Approved' ? '#dcfce7' :
+                      pr.mariapps_pr_status === 'Approved' ? '#dbeafe' :
+                        pr.mariapps_pr_status === 'Rejected' ? '#fee2e2' :
+                          pr.mariapps_pr_status === 'Cancelled' ? '#f1f5f9' :
+                            pr.mariapps_pr_status === 'Draft' ? '#fef9c3' :
+                              '#f1f5f9',
+                    color: pr.mariapps_pr_status === 'Finally Approved' ? '#16a34a' :
+                      pr.mariapps_pr_status === 'Approved' ? '#1d4ed8' :
+                        pr.mariapps_pr_status === 'Rejected' ? '#dc2626' :
+                          pr.mariapps_pr_status === 'Cancelled' ? '#64748b' :
+                            pr.mariapps_pr_status === 'Draft' ? '#854d0e' :
+                              '#64748b',
+                  }}>
+                    {pr.mariapps_pr_status}
+                  </span>
+                )}
+              </div>
             )}
 
             <div style={{ display: 'flex', gap: '6px' }}>

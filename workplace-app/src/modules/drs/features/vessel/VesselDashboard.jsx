@@ -5,7 +5,7 @@ import {
   AlertTriangle, CheckCircle, Clock, Info, Filter, ChevronDown, ChevronUp,
   MessageSquare, AlertOctagon, Edit, Send, Paperclip, Trash2, UserCircle, Edit3,
   Image as ImageIcon, Eye, X, Upload, Lock, ArrowUpDown,
-  ArrowRight,
+  ArrowRight, Flag,
   ArrowRightLeft, Move, Download
 } from 'lucide-react';
 import { Flower2, Flower, RefreshCcw } from "lucide-react";
@@ -178,10 +178,42 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
   const canApprove = user?.role === 'SHORE' || user?.role === 'ADMIN';
 
 
-  const { data: threads = [] } = useQuery({
+  // ADD this useMemo after the useQuery for threads (Vessel ThreadSection)
+  // Replace: const { data: threads = [] } = useQuery(...)
+  // Keep the useQuery but rename its result, then add the useMemo:
+
+  const { data: allThreads = [] } = useQuery({
     queryKey: ['threads', defectId],
     queryFn: () => defectApi.getThreads(defectId),
   });
+
+  const threads = useMemo(() => {
+    const safeThreads = Array.isArray(allThreads) ? [...allThreads] : [];
+
+    let filtered = safeThreads.filter(t => t.is_internal !== true);
+
+    if (defectStatus === 'CLOSED') {
+      if (closureRemarks) {
+        filtered.push({
+          id: 'system-closure-marker',
+          is_system_message: true,
+          is_closure_remarks: true,
+          body: closureRemarks,
+          created_at: new Date().toISOString()
+        });
+      } else {
+        filtered.push({
+          id: 'system-closure-marker',
+          is_system_message: true,
+          is_closure_remarks: false,
+          body: 'Defect Closed via Import',
+          created_at: new Date().toISOString()
+        });
+      }
+    }
+
+    return filtered;
+  }, [allThreads, defectStatus, closureRemarks]);
 
   const { data: vesselUsers = [] } = useQuery({
     queryKey: ['vessel-users-thread', defectId],
@@ -367,11 +399,50 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
           <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '13px', padding: '20px' }}>No messages yet.</div>
         ) : (
           threads.map(t => {
+            // REPLACE WITH
             if (t.is_system_message) {
+              if (t.is_closure_remarks) {
+                return (
+                  <div key={t.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '25px 0' }}>
+                    <div style={{
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '12px',
+                      padding: '12px 20px',
+                      maxWidth: '85%',
+                      textAlign: 'center',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                    }}>
+                      <div style={{ color: '#15803d', fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.05em' }}>
+                        Closure Remark
+                      </div>
+                      <div style={{
+                        color: '#44403c',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        lineHeight: '1.5',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'anywhere'
+                      }}>
+                        {t.body}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div key={t.id} style={{ textAlign: 'center', margin: '15px 0' }}>
-                  <span style={{ background: '#f1f5f9', fontSize: '11px', padding: '4px 12px', borderRadius: '12px', color: '#64748b', fontWeight: '600' }}>
-                    {t.body}• {new Date(t.created_at).toLocaleString('en-GB', {
+                  <span style={{
+                    background: '#f1f5f9',
+                    fontSize: '11px',
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    color: '#64748b',
+                    fontWeight: '600'
+                  }}>
+                    {t.body} • {new Date(t.created_at).toLocaleString('en-GB', {
                       day: '2-digit',
                       month: 'short',
                       year: 'numeric',
@@ -1069,7 +1140,9 @@ const INITIAL_NEW_DEFECT = {
   description: '',
   priority: 'LOW',
   status: 'OPEN',
-  pr_number: ''
+  pr_number: '',
+  is_flagged: false,
+  is_dd: false,
 };
 
 const useColumnResize = (setColumnWidths) => {
@@ -1115,6 +1188,8 @@ const useColumnResize = (setColumnWidths) => {
 // ✅ Main Dashboard Component
 const VesselDashboard = () => {
   const { user } = useAuth();
+  const ALLOWED_DELETE_EMAILS = ['chief.tapi@drs.com'];
+  const canDelete = ALLOWED_DELETE_EMAILS.includes(user?.email);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1139,22 +1214,15 @@ const VesselDashboard = () => {
     'status',
     'deadline_icon',
     'chat',
+    'flag',
+    'dd',
     'pr_details'
   ]); // Default: all columns visible (icons split into separate columns)
 
 
-  const [newDefect, setNewDefect] = useState({
-    date_identified: new Date().toISOString().split('T')[0],
-    target_close_date: '',
-    defect_source: 'Internal Audit',
-    equipment_name: '',
-    description: '',
-    priority: 'LOW',   // Added
-    status: 'OPEN',     // Added
-    pr_number: ''      // Added (Initial PR)
-  });
+  const [newDefect, setNewDefect] = useState(INITIAL_NEW_DEFECT);
 
-  const [filters, setFilters] = useState({
+  const EMPTY_FILTERS = {
     date_identified_from: '',
     date_identified_to: '',
     date_identified_sort: '',
@@ -1162,15 +1230,72 @@ const VesselDashboard = () => {
     target_close_date_sort: '',
     equipment: [],
     description: '',
-    priority: '',
-    status: '',
+    priority: [],
+    status: [],
     pr_number: '',
     pr_status: '',
     defect_source: [],
-    deadline_status: '',
+    deadline_status: [],
+    is_flagged: [],
+    is_dd: [],
+    pending_closure: '',
     text_sort: { field: null, dir: 'asc' }
-  });
+  };
 
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+
+  const sf = {
+    ...EMPTY_FILTERS,
+    ...filters,
+    equipment: filters.equipment ?? [],
+    priority: filters.priority ?? [],
+    status: filters.status ?? [],
+    defect_source: filters.defect_source ?? [],
+    deadline_status: filters.deadline_status ?? [],
+    is_flagged: filters.is_flagged ?? [],
+    is_dd: filters.is_dd ?? [],
+    text_sort: filters.text_sort ?? { field: null, dir: 'asc' },
+  };
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      sf.date_identified_from ||
+      sf.date_identified_to ||
+      sf.target_close_date ||
+      sf.equipment.length > 0 ||
+      sf.description ||
+      sf.priority.length > 0 ||
+      sf.status.length > 0 ||
+      sf.pr_number ||
+      sf.defect_source.length > 0 ||
+      sf.deadline_status.length > 0 ||
+      sf.is_flagged.length > 0 ||
+      sf.is_dd.length > 0 ||
+      sf.pending_closure
+    );
+  }, [filters]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.date_identified_from || filters.date_identified_to) count++;
+    if (filters.target_close_date) count++;
+    if (sf.equipment.length > 0) count++;
+    if (sf.description?.trim()) count++;
+    if (sf.priority.length > 0) count++;
+    if (sf.status.length > 0) count++;
+    if (filters.pr_number) count++;
+    if (sf.defect_source.length > 0) count++;
+    if (sf.deadline_status.length > 0) count++;
+    if (sf.is_flagged.length > 0) count++;
+    if (sf.is_dd.length > 0) count++;
+    if (filters.pending_closure) count++;
+    return count;
+  }, [filters]);
+
+  const clearAllFilters = () => {
+    setFilters(EMPTY_FILTERS);
+    setCurrentPage(1);
+  };
 
   const [columnWidths, setColumnWidths] = useState({
     sno: 20,
@@ -1255,13 +1380,14 @@ const VesselDashboard = () => {
     if (isColumnVisible('source')) count++;
     if (isColumnVisible('equipment')) count++;
     if (isColumnVisible('description')) count++;
-    // Icon columns (each counted separately)
     if (isColumnVisible('priority')) count++;
     if (isColumnVisible('status')) count++;
     if (isColumnVisible('deadline_icon')) count++;
     if (isColumnVisible('chat')) count++;
+    if (isColumnVisible('flag')) count++;
+    if (isColumnVisible('dd')) count++;
     if (isColumnVisible('pr_details')) count++;
-    if (isEditMode) count++; // Delete column in edit mode
+    if (isEditMode) count++;
     return count;
   };
 
@@ -1307,22 +1433,7 @@ const VesselDashboard = () => {
     hasNavigatedRef.current = targetId; // ✅ Mark as handled
 
     // Clear all filters to ensure defect is visible
-    setFilters({
-      date_identified_from: '',
-      date_identified_to: '',
-      date_identified_sort: '',
-      target_close_date: '',
-      target_close_date_sort: '',
-      equipment: [],
-      description: '',
-      priority: '',
-      status: '',
-      pr_number: '',
-      pr_status: '',
-      defect_source: [],
-      deadline_status: '',
-      text_sort: { field: null, dir: 'asc' }
-    });
+    setFilters(EMPTY_FILTERS);
 
     // Calculate target page
     const targetPage = Math.ceil((defectIndex + 1) / pageSize);
@@ -1466,19 +1577,11 @@ const VesselDashboard = () => {
   const DeadlineIcon = ({ date }) => {
     const status = getDeadlineStatus(date);
 
+    // REPLACE WITH
     const config = {
-      NORMAL: {
-        color: '#00a115',
-        title: 'Deadline OK'
-      },
-      WARNING: {
-        color: '#f59e0b',
-        title: 'Deadline within 15 days'
-      },
-      OVERDUE: {
-        color: '#dc2626',
-        title: 'Deadline crossed'
-      }
+      NORMAL: { color: '#00a115', title: 'Due Date OK' },
+      WARNING: { color: '#f59e0b', title: 'Due Date within 15 days' },
+      OVERDUE: { color: '#dc2626', title: 'Due Date crossed' }
     };
 
     return (
@@ -1493,6 +1596,23 @@ const VesselDashboard = () => {
 
 
   const filteredData = useMemo(() => {
+    if (!Array.isArray(defects) || defects.length === 0) return [];
+
+    const safeFilters = {
+      ...EMPTY_FILTERS,
+      ...filters,
+      is_flagged: filters.is_flagged ?? [],
+      is_dd: filters.is_dd ?? [],
+      deadline_status: filters.deadline_status ?? [],
+      is_owner: filters.is_owner ?? [],
+      priority: filters.priority ?? [],
+      status: filters.status ?? [],
+      equipment: filters.equipment ?? [],
+      vessel: filters.vessel ?? [],
+      defect_source: filters.defect_source ?? [],
+      text_sort: filters.text_sort ?? { field: null, dir: 'asc' },
+    };
+
     let data = defects.filter(d => {
       const prString = d.pr_entries?.map(p => p.pr_number).join(', ') || '';
 
@@ -1507,6 +1627,13 @@ const VesselDashboard = () => {
       const toDate = filters.date_identified_to
         ? new Date(filters.date_identified_to)
         : null;
+      const matchFlagged =
+        safeFilters.is_flagged.length === 0 ||
+        safeFilters.is_flagged.includes(String(d.is_flagged));
+
+      const matchDD =
+        safeFilters.is_dd.length === 0 ||
+        safeFilters.is_dd.includes(String(d.is_dd));
 
       const matchReportDate =
         (!fromDate || (reportDate && reportDate >= fromDate)) &&
@@ -1524,25 +1651,26 @@ const VesselDashboard = () => {
 
 
       const matchSource =
-        filters.defect_source.length === 0 ||
-        filters.defect_source.includes(d.defect_source);
+        (safeFilters.defect_source?.length || 0) === 0 ||
+        safeFilters.defect_source.includes(d.defect_source);
 
 
       const matchEquip =
-        filters.equipment.length === 0 ||
-        filters.equipment.includes(d.equipment_name);
+        (safeFilters.equipment?.length || 0) === 0 ||
+        safeFilters.equipment.includes(d.equipment_name);
 
       const matchDesc =
         !filters.description ||
         d.description.toLowerCase().includes(filters.description.toLowerCase());
 
       const matchPrior =
-        !filters.priority || d.priority === filters.priority;
+        safeFilters.priority.length === 0 ||
+        safeFilters.priority.includes(d.priority);
 
       const matchStatus =
         isEditMode
           ? d.status === 'OPEN'
-          : !filters.status || d.status === filters.status;
+          : safeFilters.status.length === 0 || safeFilters.status.includes(d.status);
 
       const matchPrNo =
         !filters.pr_number ||
@@ -1552,8 +1680,17 @@ const VesselDashboard = () => {
         !filters.pr_status || d.pr_status === filters.pr_status;
 
       const matchDeadlineStatus =
-        !filters.deadline_status ||
-        getDeadlineStatus(d.target_close_date) === filters.deadline_status;
+        safeFilters.deadline_status.length === 0 ||
+        safeFilters.deadline_status.includes(getDeadlineStatus(d.target_close_date));
+
+      const matchPendingClosure =
+        !filters.pending_closure ||
+        d.status === 'PENDING_CLOSURE';
+
+      const matchVessel =
+        (safeFilters.vessel?.length || 0) === 0 ||
+        safeFilters.vessel.includes(d.vessel_name);
+
 
 
       return (
@@ -1566,84 +1703,118 @@ const VesselDashboard = () => {
         matchPrNo &&
         matchPrStatus &&
         matchSource &&
-        matchDeadlineStatus
+        matchDeadlineStatus &&
+        matchPendingClosure &&
+        matchVessel &&
+        matchFlagged &&  // ✅ NEW
+        matchDD
       );
     });
 
     /* 🔽 SORTING LOGIC (SINGLE COLUMN AT A TIME) */
-    if (filters.date_identified_sort) {
+    // ─── UNIFIED SORT (flag is permanent secondary on all non-flag columns) ───
+    const hasExplicitSort =
+      filters.text_sort?.field ||
+      filters.date_identified_sort ||
+      filters.target_close_date_sort;
+
+    if (!hasExplicitSort) {
+      // Default: flagged to top, then newest date
       data.sort((a, b) => {
-        const da = a.date_identified ? new Date(a.date_identified) : null;
-        const db = b.date_identified ? new Date(b.date_identified) : null;
-        if (!da || !db) return 0;
-        return filters.date_identified_sort === 'asc'
-          ? da - db
-          : db - da;
+        const flagDiff = (b.is_flagged ? 1 : 0) - (a.is_flagged ? 1 : 0);
+        if (flagDiff !== 0) return flagDiff;
+        const da = a.date_identified ? new Date(a.date_identified) : new Date(0);
+        const db = b.date_identified ? new Date(b.date_identified) : new Date(0);
+        return db - da;
       });
-    }
 
-
-    if (filters.target_close_date_sort) {
+    } else if (filters.text_sort?.field === 'flag') {
+      // Flag column: pure flag sort, date as tiebreaker
       data.sort((a, b) => {
-        const da = a.target_close_date ? new Date(a.target_close_date) : null;
-        const db = b.target_close_date ? new Date(b.target_close_date) : null;
-        if (!da || !db) return 0;
-        return filters.target_close_date_sort === 'asc'
-          ? da - db
-          : db - da;
+        const bA = a.is_flagged ? 1 : 0;
+        const bB = b.is_flagged ? 1 : 0;
+        if (bA !== bB) return filters.text_sort.dir === 'asc' ? bA - bB : bB - bA;
+        const da = a.date_identified ? new Date(a.date_identified) : new Date(0);
+        const db = b.date_identified ? new Date(b.date_identified) : new Date(0);
+        return db - da;
       });
-    }
 
-    if (filters.text_sort?.field) {
-      const { field, dir } = filters.text_sort;
-      const fieldMap = {
-        equipment: 'equipment_name',
-        source: 'defect_source',
-        description: 'description',
-        date_identified: 'date_identified',
-        target_close_date: 'target_close_date',
-        priority: 'priority',
-        status: 'status',
-        deadline_icon: 'target_close_date'
-      };
+    } else {
+      // All other columns: flag floats within each sorted group
+      const primarySort = (() => {
+        if (filters.date_identified_sort) {
+          return (a, b) => {
+            const da = a.date_identified ? new Date(a.date_identified) : null;
+            const db = b.date_identified ? new Date(b.date_identified) : null;
+            if (!da || !db) return 0;
+            return filters.date_identified_sort === 'asc' ? da - db : db - da;
+          };
+        }
+        if (filters.target_close_date_sort) {
+          return (a, b) => {
+            const da = a.target_close_date ? new Date(a.target_close_date) : null;
+            const db = b.target_close_date ? new Date(b.target_close_date) : null;
+            if (!da || !db) return 0;
+            return filters.target_close_date_sort === 'asc' ? da - db : db - da;
+          };
+        }
 
-      const key = fieldMap[field];
-      if (key) {
-        data.sort((a, b) => {
-          let valA = a[key];
-          let valB = b[key];
+        const { field, dir } = filters.text_sort;
+        const fieldMap = {
+          vessel: 'vessel_name',
+          equipment: 'equipment_name',
+          source: 'defect_source',
+          description: 'description',
+          date_identified: 'date_identified',
+          target_close_date: 'target_close_date',
+          priority: 'priority',
+          status: 'status',
+          deadline_icon: 'target_close_date',
+          dd: 'is_dd',
+        };
 
-          // 1. Priority (Logical: Critical -> High -> Medium -> Low)
+        return (a, b) => {
+          const key = fieldMap[field];
+          const valA = a[key];
+          const valB = b[key];
+
           if (field === 'priority') {
-            const weights = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-            const wA = weights[String(valA).toUpperCase()] ?? 99;
-            const wB = weights[String(valB).toUpperCase()] ?? 99;
+            const w = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+            const wA = w[String(valA).toUpperCase()] ?? 99;
+            const wB = w[String(valB).toUpperCase()] ?? 99;
             return dir === 'asc' ? wA - wB : wB - wA;
           }
-
-          // 2. Status (Logical: Open -> Pending -> Closed)
-          // ✅ ADDED THIS BLOCK
           if (field === 'status') {
-            const statusWeights = { 'OPEN': 0, 'PENDING_CLOSURE': 1, 'CLOSED': 2 };
-            const wA = statusWeights[String(valA).toUpperCase()] ?? 99;
-            const wB = statusWeights[String(valB).toUpperCase()] ?? 99;
-            return dir === 'asc' ? wA - wB : wB - wA;
+            const w = { OPEN: 0, PENDING_CLOSURE: 1, CLOSED: 2 };
+            return dir === 'asc'
+              ? (w[valA] ?? 99) - (w[valB] ?? 99)
+              : (w[valB] ?? 99) - (w[valA] ?? 99);
           }
-
-          // 3. Date Sort (Identify, Deadline, and Deadline Icon)
+          if (field === 'dd') {
+            return dir === 'asc'
+              ? (valA ? 1 : 0) - (valB ? 1 : 0)
+              : (valB ? 1 : 0) - (valA ? 1 : 0);
+          }
           if (['date_identified', 'target_close_date', 'deadline_icon'].includes(field)) {
             const dA = valA ? new Date(valA).getTime() : 0;
             const dB = valB ? new Date(valB).getTime() : 0;
             return dir === 'asc' ? dA - dB : dB - dA;
           }
-
-          // 4. Standard String Sort (Equipment, Source, Description)
+          // Default: string sort
           const strA = String(valA || '').toLowerCase();
           const strB = String(valB || '').toLowerCase();
           return dir === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
-        });
-      }
+        };
+      })();
+
+      data.sort((a, b) => {
+        const primaryResult = primarySort(a, b);
+        if (primaryResult !== 0) return primaryResult;
+        // 🚩 Flagged rows rise within same primary-sort group
+        return (b.is_flagged ? 1 : 0) - (a.is_flagged ? 1 : 0);
+      });
     }
+    // ─── END UNIFIED SORT ───
     return data;
   }, [defects, filters, isEditMode]);
 
@@ -1709,6 +1880,41 @@ const VesselDashboard = () => {
     return <Flower size={20} color="#3b82f6" title="Open" />;
   };
 
+
+  const getFlagIcon = (value) => (
+    <Flag
+      size={18}
+      color={value ? '#e8290b' : '#8e8d8d'}
+      fill={value ? '#e8290b' : 'none'}
+      strokeWidth={value ? 2 : 1.5}
+      style={{ transition: 'all 0.15s ease' }}
+      title={value ? 'Flagged' : 'Not Flagged'}
+    />
+  );
+
+  const getDDIcon = (value) => (
+    <div
+      style={{
+        width: '20px',
+        height: '20px',
+        borderRadius: '50%',
+        border: `${value ? '1.5px solid #0ea5e9' : '2px solid #9ca3af'}`,
+        background: value ? '#e0f2fe' : 'transparent',
+        color: value ? '#0ea5e9' : '#9ca3af',
+        fontSize: '9px',
+        fontWeight: 'bold',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        userSelect: 'none',
+        transition: 'all 0.2s'
+      }}
+      title={value ? 'Dry Dock — Active' : 'Not Dry Dock'}
+    >
+      DD
+    </div>
+  );
+
   const normalizeDate = (dateStr) => {
     if (!dateStr) return '';
     return dateStr.split('T')[0];
@@ -1725,12 +1931,11 @@ const VesselDashboard = () => {
   });
 
   const handleDelete = (id) => {
+    if (!canDelete) return;
     const confirmed = window.confirm(
       "⚠️ Are you sure you want to delete this defect?\n\nThis action cannot be undone."
     );
-
     if (!confirmed) return;
-
     deleteMutation.mutate(id);
   };
 
@@ -1757,7 +1962,9 @@ const VesselDashboard = () => {
         status: newDefect.status,
         responsibility: 'Engine Dept',
         defect_source: newDefect.defect_source,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        is_flagged: newDefect.is_flagged === true,
+        is_dd: newDefect.is_dd === true,
       };
 
       // -------------------------------------------------------------
@@ -1809,39 +2016,41 @@ const VesselDashboard = () => {
 
   const handleKpiFilter = (type) => {
     setCurrentPage(1);
-
     setFilters(prev => {
+      const currentStatus = Array.isArray(prev.status) ? prev.status : [];
+      const currentPriority = Array.isArray(prev.priority) ? prev.priority : [];
+      const currentDeadline = Array.isArray(prev.deadline_status) ? prev.deadline_status : [];
+
       switch (type) {
         case 'OPEN':
-          return prev.status === 'OPEN'
-            ? { ...prev, status: '' } // 🔁 toggle off
-            : { ...prev, status: 'OPEN', priority: '', deadline_status: '' };
+          return currentStatus.includes('OPEN') && currentStatus.length === 1
+            ? { ...prev, status: [] }
+            : { ...prev, status: ['OPEN'], priority: [], deadline_status: [], pending_closure: '' };
 
         case 'HIGH':
-          return prev.priority === 'HIGH'
-            ? { ...prev, priority: '' }
-            : { ...prev, priority: 'HIGH', status: '', deadline_status: '' };
+          return currentPriority.includes('HIGH') && currentPriority.length === 1
+            ? { ...prev, priority: [] }
+            : { ...prev, priority: ['HIGH'], status: [], deadline_status: [], pending_closure: '' };
 
         case 'CRITICAL':
-          return prev.priority === 'CRITICAL'
-            ? { ...prev, priority: '' }
-            : { ...prev, priority: 'CRITICAL', status: '', deadline_status: '' };
+          return currentPriority.includes('CRITICAL') && currentPriority.length === 1
+            ? { ...prev, priority: [] }
+            : { ...prev, priority: ['CRITICAL'], status: [], deadline_status: [], pending_closure: '' };
 
         case 'OVERDUE':
-          return prev.deadline_status === 'OVERDUE'
-            ? { ...prev, deadline_status: '', status: '' }
-            : {
-              ...prev,
-              deadline_status: 'OVERDUE',
-              status: 'OPEN',   // ← add this
-              priority: '',
-              pending_closure: ''
-            };
+          return currentDeadline.includes('OVERDUE') && currentDeadline.length === 1
+            ? { ...prev, deadline_status: [], status: [] }
+            : { ...prev, deadline_status: ['OVERDUE'], status: ['OPEN'], priority: [], pending_closure: '' };
+
+        case 'PENDING_CLOSURE':
+          return prev.pending_closure
+            ? { ...prev, pending_closure: '', status: [] }
+            : { ...prev, pending_closure: 'YES', status: ['PENDING_CLOSURE'], priority: [], deadline_status: [] };
 
         case 'CLOSED':
-          return prev.status === 'CLOSED'
-            ? { ...prev, status: '' }
-            : { ...prev, status: 'CLOSED', priority: '', deadline_status: '' };
+          return currentStatus.includes('CLOSED') && currentStatus.length === 1
+            ? { ...prev, status: [] }
+            : { ...prev, status: ['CLOSED'], priority: [], deadline_status: [], pending_closure: '' };
 
         default:
           return prev;
@@ -1917,6 +2126,7 @@ const VesselDashboard = () => {
       d.status !== 'CLOSED' &&
       d.status !== 'PENDING_CLOSURE'
   ).length;
+  const pendingClosureCount = defects.filter(d => d.status === 'PENDING_CLOSURE').length;
 
   const totalActiveColumns = useMemo(() => {
     let count = 1; // S.No (Always visible)
@@ -1980,7 +2190,7 @@ const VesselDashboard = () => {
 
       <div className="kpi-grid">
         <div
-          className={`kpi-card blue ${filters.status === 'OPEN' ? 'active' : ''}`}
+          className={`kpi-card blue ${sf.status.includes('OPEN') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('OPEN')}
 
@@ -1994,8 +2204,7 @@ const VesselDashboard = () => {
         </div>
 
         <div
-          className={`kpi-card orange ${filters.priority === 'HIGH' ? 'active' : ''
-            }`}
+          className={`kpi-card orange ${sf.priority.includes('HIGH') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('HIGH')}
         >
@@ -2009,7 +2218,7 @@ const VesselDashboard = () => {
         </div>
 
         <div
-          className={`kpi-card red ${filters.priority === 'CRITICAL' ? 'active' : ''}`}
+          className={`kpi-card red ${sf.priority.includes('CRITICAL') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('CRITICAL')}
         >
@@ -2025,8 +2234,7 @@ const VesselDashboard = () => {
 
         {/* ✅ NEW OVERDUE CARD */}
         <div
-          className={`kpi-card red ${filters.deadline_status === 'OVERDUE' ? 'active' : ''
-            }`}
+          className={`kpi-card red ${sf.deadline_status.includes('OVERDUE') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('OVERDUE')}
         >
@@ -2039,10 +2247,23 @@ const VesselDashboard = () => {
           </div>
         </div>
 
+        <div
+          className={`kpi-card orange ${filters.pending_closure ? 'active' : ''}`}
+          style={{ cursor: 'pointer' }}
+          onClick={() => handleKpiFilter('PENDING_CLOSURE')}
+        >
+          <div className="kpi-icon">
+            <Clock size={24} />
+          </div>
+          <div className="kpi-data">
+            <h2>{pendingClosureCount}</h2>
+            <p>Pending Closure</p>
+          </div>
+        </div>
+
 
         <div
-          className={`kpi-card green ${filters.status === 'CLOSED' ? 'active' : ''
-            }`}
+          className={`kpi-card green ${sf.status.includes('CLOSED') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('CLOSED')}
         >
@@ -2118,11 +2339,24 @@ const VesselDashboard = () => {
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <strong>Deadline:</strong>
+              <strong>Due Date:</strong>
               <span style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <Clock size={14} color="#16a34a" /> Normal
                 <Clock size={14} color="#f59e0b" /> ≤15 Days
                 <Clock size={14} color="#dc2626" /> Overdue
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <strong>Other:</strong>
+              <span style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <Flag size={14} color="#e8290b" fill="#e8290b" /> Flagged
+                <div style={{
+                  width: '17px', height: '17px', borderRadius: '50%',
+                  border: '2px solid #0ea5e9', background: '#e0f2fe',
+                  color: '#0ea5e9', fontSize: '9px', fontWeight: '900',
+                  display: 'inline-flex', alignItems: 'center',
+                  justifyContent: 'center', fontFamily: 'monospace'
+                }}>DD</div> Dry Dock
               </span>
             </div>
           </div>
@@ -2166,7 +2400,7 @@ const VesselDashboard = () => {
                   items={visibleColumns}
                   strategy={horizontalListSortingStrategy}
                 > <tr>
-                    <th style={{ width: 20 }}>S.No</th>
+                    <th style={{ width: 100 }}>Defect ID</th>
 
                     {visibleColumns.map((colId) => {
                       switch (colId) {
@@ -2203,7 +2437,7 @@ const VesselDashboard = () => {
                           return (
                             <DraggableTh key="deadline" id="deadline" disabled={!isEditMode} style={{ width: columnWidths.target_close_date }}>
                               <FilterHeader
-                                label="Deadline"
+                                label="Due Date"
                                 field="target_close_date"
                                 currentFilter={filters.target_close_date}
                                 // currentFilterSort={filters.target_close_date_sort} // REMOVED
@@ -2294,8 +2528,17 @@ const VesselDashboard = () => {
                                   field="priority"
                                   currentFilter={filters.priority}
                                   onFilterChange={handleFilterChange}
-                                  type="select"
-                                  options={PRIORITY_OPTIONS}
+                                  type="multi-select"
+                                  options={[
+                                    { label: 'Low', value: 'LOW' },
+                                    { label: 'Medium', value: 'MEDIUM' },
+                                    { label: 'High', value: 'HIGH' },
+                                    { label: 'Critical', value: 'CRITICAL' },
+                                  ]}
+                                  iconRenderer={(val) => {
+                                    const colorMap = { CRITICAL: '#dc2626', HIGH: '#f97316', MEDIUM: '#2563eb', LOW: '#16a34a' };
+                                    return <AlertTriangle size={13} color={colorMap[val]} />;
+                                  }}
                                 />
                               </div>
                             </DraggableTh>
@@ -2317,8 +2560,16 @@ const VesselDashboard = () => {
                                   field="status"
                                   currentFilter={filters.status}
                                   onFilterChange={handleFilterChange}
-                                  type="select"
-                                  options={FILTER_STATUS_OPTIONS}
+                                  type="multi-select"
+                                  options={[
+                                    { label: 'Open', value: 'OPEN' },
+                                    { label: 'Pending Closure', value: 'PENDING_CLOSURE' },
+                                    { label: 'Closed', value: 'CLOSED' },
+                                  ]}
+                                  iconRenderer={(val) => {
+                                    const colorMap = { OPEN: '#3b82f6', PENDING_CLOSURE: '#f59e0b', CLOSED: '#22c55e' };
+                                    return <Flower size={13} color={colorMap[val]} />;
+                                  }}
                                 />
                               </div>
                             </DraggableTh>
@@ -2340,8 +2591,16 @@ const VesselDashboard = () => {
                                   field="deadline_status"
                                   currentFilter={filters.deadline_status}
                                   onFilterChange={handleFilterChange}
-                                  type="select"
-                                  options={DEADLINE_STATUS_OPTIONS}
+                                  type="multi-select"
+                                  options={[
+                                    { label: 'Normal', value: 'NORMAL' },
+                                    { label: 'Warning (≤15 days)', value: 'WARNING' },
+                                    { label: 'Overdue', value: 'OVERDUE' },
+                                  ]}
+                                  iconRenderer={(val) => {
+                                    const colorMap = { NORMAL: '#16a34a', WARNING: '#f59e0b', OVERDUE: '#dc2626' };
+                                    return <Clock size={13} color={colorMap[val]} />;
+                                  }}
                                 />
                               </div>
                             </DraggableTh>
@@ -2352,6 +2611,119 @@ const VesselDashboard = () => {
                             <DraggableTh key="chat" id="chat" disabled={!isEditMode} style={{ width: 20, textAlign: 'center' }}>
                               <div className="filter-header">
                                 <span>💬</span>
+                              </div>
+                            </DraggableTh>
+                          );
+
+                        case 'flag':
+                          return (
+                            <DraggableTh key="flag" id="flag" disabled={!isEditMode}
+                              style={{ width: 24, textAlign: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0px' }}>
+                                <span
+                                  onClick={() => handleTextSort('flag')}
+                                  style={{ cursor: 'pointer', display: 'inline-flex' }}
+                                  title="Sort by Flag"
+                                >
+                                  <Flag
+                                    size={16}
+                                    color={
+                                      filters.text_sort.field === 'flag' && sf.is_flagged.length > 0 ? '#7c3aed'
+                                        : filters.text_sort.field === 'flag' ? '#2563eb'
+                                          : sf.is_flagged.length > 0 ? '#ea580c'
+                                            : '#64748b'
+                                    }
+                                    fill={filters.text_sort.field === 'flag' ? '#ef4444' : 'none'}
+                                  />
+                                </span>
+                                <FilterHeader
+                                  label=""
+                                  field="is_flagged"
+                                  currentFilter={filters.is_flagged}
+                                  onFilterChange={handleFilterChange}
+                                  type="multi-select"
+                                  options={[
+                                    { label: 'Flagged', value: 'true' },
+                                    { label: 'Not Flagged', value: 'false' },
+                                  ]}
+                                  iconRenderer={(val) => (
+                                    <Flag
+                                      size={13}
+                                      color={val === 'true' ? '#e8290b' : '#64748b'}
+                                      fill={val === 'true' ? '#e8290b' : 'none'}
+                                    />
+                                  )}
+                                />
+                              </div>
+                            </DraggableTh>
+                          );
+
+                        case 'dd':
+                          return (
+                            <DraggableTh key="dd" id="dd" disabled={!isEditMode}
+                              style={{ width: 24, textAlign: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0px' }}>
+                                <div
+                                  onClick={() => handleTextSort('dd')}
+                                  style={{
+                                    width: '18px',
+                                    height: '18px',
+                                    borderRadius: '50%',
+                                    border: `1.5px solid ${filters.text_sort.field === 'dd' && sf.is_dd.length > 0 ? '#7c3aed'
+                                      : filters.text_sort.field === 'dd' ? '#2563eb'
+                                        : sf.is_dd.length > 0 ? '#ea580c'
+                                          : '#64748b'
+                                      }`,
+                                    background:
+                                      filters.text_sort.field === 'dd' && sf.is_dd.length > 0 ? '#f5f3ff'
+                                        : filters.text_sort.field === 'dd' ? '#e0f2fe'
+                                          : sf.is_dd.length > 0 ? '#fff7ed'
+                                            : 'transparent',
+                                    color:
+                                      filters.text_sort.field === 'dd' && sf.is_dd.length > 0 ? '#7c3aed'
+                                        : filters.text_sort.field === 'dd' ? '#2563eb'
+                                          : sf.is_dd.length > 0 ? '#ea580c'
+                                            : '#64748b',
+                                    fontSize: '9px',
+                                    fontWeight: '900',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontFamily: 'monospace',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  title="Sort by Dry Dock"
+                                >
+                                  DD
+                                </div>
+                                <FilterHeader
+                                  label=""
+                                  field="is_dd"
+                                  currentFilter={filters.is_dd}
+                                  onFilterChange={handleFilterChange}
+                                  type="multi-select"
+                                  options={[
+                                    { label: 'Dry Dock', value: 'true' },
+                                    { label: 'Not Dry Dock', value: 'false' },
+                                  ]}
+                                  iconRenderer={(val) => (
+                                    <div style={{
+                                      width: '13px',
+                                      height: '13px',
+                                      borderRadius: '50%',
+                                      border: `1px solid ${val === 'true' ? '#0ea5e9' : '#a0aec0'}`,
+                                      background: val === 'true' ? '#e0f2fe' : 'transparent',
+                                      color: val === 'true' ? '#0ea5e9' : '#94a3b8',
+                                      fontSize: '6px',
+                                      fontWeight: '900',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontFamily: 'monospace'
+                                    }}>DD</div>
+                                  )}
+                                />
                               </div>
                             </DraggableTh>
                           );
@@ -2375,7 +2747,7 @@ const VesselDashboard = () => {
                       }
                     })}
 
-                    {isEditMode && <th style={{ width: 10 }}>Delete</th>}
+                    {isEditMode && canDelete && <th style={{ width: 10 }}>Delete</th>}
                   </tr>
                 </SortableContext>
               </thead>
@@ -2403,10 +2775,9 @@ const VesselDashboard = () => {
                       >
 
 
-                        <td className="s-no" style={{ textAlign: "center" }}>
-                          {/* ✅ SCROLL ANCHOR (IMPORTANT) */}
+                        <td style={{ textAlign: "center", fontWeight: 600, fontSize: '12px', color: '#1e293b', whiteSpace: 'nowrap' }}>
                           <div id={`row-${defect.id}`} className="row-anchor" />
-                          {(currentPage - 1) * pageSize + index + 1}
+                          {defect.defect_number || `#${(currentPage - 1) * pageSize + index + 1}`}
                         </td>
 
                         {visibleColumns.map(colId => {
@@ -2752,6 +3123,60 @@ const VesselDashboard = () => {
                                 </td>
                               )
 
+                            case 'flag':
+                              return (
+                                <td key="flag" style={{ width: 24 }}>
+                                  {isEditMode && !isClosed ? (
+                                    <div
+                                      onClick={() => handleInlineUpdate(defect.id, 'is_flagged', !defect.is_flagged)}
+                                      style={{
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                        transition: 'background 0.2s'
+                                      }}
+                                      onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                      title={defect.is_flagged ? 'Click to unflag' : 'Click to flag'}
+                                    >
+                                      {getFlagIcon(defect.is_flagged)}
+                                    </div>
+                                  ) : (
+                                    <span title={defect.is_flagged ? 'Flagged' : 'Not Flagged'}>
+                                      {getFlagIcon(defect.is_flagged)}
+                                    </span>
+                                  )}
+                                </td>
+                              );
+
+                            case 'dd':
+                              return (
+                                <td key="dd" style={{ width: 24 }}>
+                                  {isEditMode && !isClosed ? (
+                                    <div
+                                      onClick={() => handleInlineUpdate(defect.id, 'is_dd', !defect.is_dd)}
+                                      style={{
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                        transition: 'background 0.2s'
+                                      }}
+                                      onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                      title={defect.is_dd ? 'Click to remove Dry Dock' : 'Click to mark as Dry Dock'}
+                                    >
+                                      {getDDIcon(defect.is_dd)}
+                                    </div>
+                                  ) : (
+                                    <span title={defect.is_dd ? 'Dry Dock' : 'Not Dry Dock'}>
+                                      {getDDIcon(defect.is_dd)}
+                                    </span>
+                                  )}
+                                </td>
+                              );
+
                             case "pr_details":
                               return (
                                 <td key="pr_details" style={{ width: 20, position: 'relative', textAlign: 'center' }}>
@@ -2798,7 +3223,7 @@ const VesselDashboard = () => {
                           }
                         })}
 
-                        {isEditMode && (
+                        {isEditMode && canDelete && (
                           <td style={{ textAlign: 'center' }}>
                             <button
                               className="action-btn"
@@ -2874,8 +3299,8 @@ const VesselDashboard = () => {
                     }}
                   >
                     {/* 1. S.No Column */}
-                    <td style={{ width: 20, textAlign: 'center', color: '#ea580c', fontWeight: 700, fontSize: '16px' }}>
-                      *
+                    <td style={{ width: 100, textAlign: 'center', color: '#ea580c', fontWeight: 700, fontSize: '13px' }}>
+                      NEW
                     </td>
 
                     {/* 3. Visible Columns Mapping */}
@@ -3073,6 +3498,42 @@ const VesselDashboard = () => {
                           return (
                             <td key="chat" style={{ width: 20, textAlign: 'center' }}>
                               <MessageCircle size={20} color="#94a3b8" />
+                            </td>
+                          );
+
+                        case 'flag':
+                          return (
+                            <td key="flag" style={{ width: 24, textAlign: 'center' }}>
+                              <div
+                                onClick={() => setNewDefect(prev => ({ ...prev, is_flagged: !prev.is_flagged }))}
+                                style={{
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  padding: '4px',
+                                  borderRadius: '4px'
+                                }}
+                                title="Toggle Flag"
+                              >
+                                {getFlagIcon(newDefect.is_flagged)}
+                              </div>
+                            </td>
+                          );
+
+                        case 'dd':
+                          return (
+                            <td key="dd" style={{ width: 24, textAlign: 'center' }}>
+                              <div
+                                onClick={() => setNewDefect(prev => ({ ...prev, is_dd: !prev.is_dd }))}
+                                style={{
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  padding: '4px',
+                                  borderRadius: '4px'
+                                }}
+                                title="Toggle Dry Dock"
+                              >
+                                {getDDIcon(newDefect.is_dd)}
+                              </div>
                             </td>
                           );
 

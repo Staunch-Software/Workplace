@@ -241,3 +241,19 @@ def verify_blob_exists(blob_name: str) -> bool:
     except Exception as e:
         logger.error(f"❌ Error checking blob existence for '{blob_name}': {str(e)}")
         return False
+    
+def download_blob_bytes(blob_path: str) -> bytes:
+    """
+    Downloads a blob from Azure Storage and returns raw bytes.
+    Used for attaching files to Graph API email drafts.
+    """
+    try:
+        container_client = get_container_client()
+        blob_client = container_client.get_blob_client(blob_path)
+        download_stream = blob_client.download_blob()
+        data = download_stream.readall()
+        logger.info(f"✅ Downloaded blob: {blob_path} ({len(data)} bytes)")
+        return data
+    except Exception as e:
+        logger.error(f"❌ Failed to download blob '{blob_path}': {str(e)}")
+        raise

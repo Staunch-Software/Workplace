@@ -529,6 +529,9 @@ export const defectApi = {
   getEmailRecipients: (defectId) =>
     api.get(`/defects/${defectId}/email-recipients`).then(r => r.data),
 
+  createEmailDraft: (defectId) =>
+    api.post(`/defects/${defectId}/draft-email`).then(r => r.data),
+
   // ============================================
   // TASKS & NOTIFICATIONS
   // ============================================
@@ -592,10 +595,25 @@ export const defectApi = {
             "deadline_icon",
             "chat",
             "pr_details",
+            "flag", // ✅ Add this
+            "dd",   // ✅ Add this
           ],
         },
       };
     }
+  },
+
+  // ============================================
+  // MARIAPPS PR SYNC
+  // ============================================
+  triggerPrSync: async () => {
+    const response = await api.post('/scraper/pr-sync');
+    return response.data;
+  },
+
+  getPrSyncStatus: async () => {
+    const response = await api.get('/scraper/pr-status');
+    return response.data;
   },
 
   /**
