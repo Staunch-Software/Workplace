@@ -12,7 +12,9 @@ import {
   AlertCircle,
   CheckCircle,
   AlertTriangle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Clock,
+  Flower
 } from 'lucide-react';
 
 import {
@@ -37,29 +39,29 @@ const VesselReports = () => {
   const vesselImo = user?.assignedVessels?.[0] || '';
 
   // ==================== STATE ====================
+  // REPLACE WITH
   const [filters, setFilters] = useState({
+    vessel: [],
     date_identified_from: '',
     date_identified_to: '',
     target_close_date: '',
     defect_source: [],
     equipment: [],
     description: '',
-    priority: '',
-    status: '',
-    deadline_status: '',
+    priority: [],
+    status: [],
+    deadline_status: [],
     pr_number: '',
+    is_flagged: [],
+    is_dd: [],
+    pending_closure: '',
     text_sort: { field: null, dir: 'asc' }
   });
 
   const [visibleColumns, setVisibleColumns] = useState([
-    'date',
-    'deadline',
-    'source',
-    'equipment',
-    'description',
-    'priority',
-    'status',
-    'pr_details',
+    'date', 'deadline', 'source', 'equipment',
+    'description', 'priority', 'status',
+    'flag', 'dd', 'pr_details',
   ]);
 
   const [showColumnModal, setShowColumnModal] = useState(false);
@@ -129,17 +131,29 @@ const VesselReports = () => {
         const matchesResponsibility = defect.responsibility?.toLowerCase().includes(searchText);
         if (!matchesEquipment && !matchesDescription && !matchesResponsibility) return false;
       }
-      if (filters.priority && defect.priority !== filters.priority) return false;
-      if (filters.status && defect.status !== filters.status) return false;
-      if (filters.deadline_status) {
+      if (filters.priority.length > 0 && !filters.priority.includes(defect.priority)) return false;
+      if (filters.status.length > 0 && !filters.status.includes(defect.status)) return false;
+      if (filters.deadline_status.length > 0) {
         const deadlineStatus = getDeadlineStatus(defect.target_close_date);
-        if (deadlineStatus !== filters.deadline_status) return false;
+        if (!filters.deadline_status.includes(deadlineStatus)) return false;
       }
       if (filters.pr_number) {
         const prMatch = defect.pr_entries?.some(pr =>
           pr.pr_number?.toLowerCase().includes(filters.pr_number.toLowerCase())
         );
         if (!prMatch) return false;
+      }
+
+      if (filters.is_flagged.length > 0) {
+        if (!filters.is_flagged.includes(String(defect.is_flagged))) return false;
+      }
+
+      if (filters.is_dd.length > 0) {
+        if (!filters.is_dd.includes(String(defect.is_dd))) return false;
+      }
+
+      if (filters.pending_closure) {
+        if (defect.status !== 'PENDING_CLOSURE') return false;
       }
       return true;
     });
@@ -148,14 +162,18 @@ const VesselReports = () => {
     // ✅ Updated Sort Logic
     if (filters.text_sort?.field) {
       const { field, dir } = filters.text_sort;
+      // REPLACE WITH
       const fieldMap = {
+        vessel: 'vessel_name',
         equipment: 'equipment_name',
         source: 'defect_source',
         description: 'description',
         date: 'date_identified',
         deadline: 'target_close_date',
         priority: 'priority',
-        status: 'status'
+        status: 'status',
+        flag: 'is_flagged',
+        dd: 'is_dd'
       };
 
       const key = fieldMap[field];
@@ -181,6 +199,19 @@ const VesselReports = () => {
             const order = { 'OPEN': 0, 'PENDING_CLOSURE': 1, 'CLOSED': 2 };
             const valA = order[a[key]] ?? 99;
             const valB = order[b[key]] ?? 99;
+            return dir === 'asc' ? valA - valB : valB - valA;
+          }
+
+          // ADD after the 'owner' sort case
+          if (field === 'flag') {
+            const valA = a[key] ? 1 : 0;
+            const valB = b[key] ? 1 : 0;
+            return dir === 'asc' ? valA - valB : valB - valA;
+          }
+
+          if (field === 'dd') {
+            const valA = a[key] ? 1 : 0;
+            const valB = b[key] ? 1 : 0;
             return dir === 'asc' ? valA - valB : valB - valA;
           }
 
@@ -216,35 +247,44 @@ const VesselReports = () => {
     setFilters(prev => ({ ...prev, [field]: value }));
   };
 
+  // REPLACE WITH
   const clearAllFilters = () => {
     setFilters({
+      vessel: [],
       date_identified_from: '',
       date_identified_to: '',
       target_close_date: '',
       defect_source: [],
       equipment: [],
       description: '',
-      priority: '',
-      status: '',
-      deadline_status: '',
+      priority: [],
+      status: [],
+      deadline_status: [],
       pr_number: '',
+      is_flagged: [],
+      is_dd: [],
+      pending_closure: '',
       text_sort: { field: null, dir: 'asc' }
     });
   };
 
+  // REPLACE WITH
   const activeFilterCount = useMemo(() => {
     let count = 0;
+    if (filters.vessel.length > 0) count++;
     if (filters.date_identified_from) count++;
     if (filters.date_identified_to) count++;
     if (filters.target_close_date) count++;
     if (filters.defect_source.length > 0) count++;
     if (filters.equipment.length > 0) count++;
     if (filters.description) count++;
-    if (filters.priority) count++;
-    if (filters.status) count++;
-    if (filters.deadline_status) count++;
+    if (filters.priority.length > 0) count++;
+    if (filters.status.length > 0) count++;
+    if (filters.deadline_status.length > 0) count++;
     if (filters.pr_number) count++;
-    if (filters.text_sort?.field) count++;
+    if (filters.is_flagged.length > 0) count++;
+    if (filters.is_dd.length > 0) count++;
+    if (filters.pending_closure) count++;
     return count;
   }, [filters]);
 
@@ -272,11 +312,25 @@ const VesselReports = () => {
     }
 
     // Single Select Filters
-    if (filters.status) {
-      activeFilters['status'] = [filters.status];
+    // REPLACE WITH (both files)
+    if (filters.status.length > 0) {
+      activeFilters['status'] = filters.status;
     }
-    if (filters.priority) {
-      activeFilters['priority'] = [filters.priority];
+    if (filters.priority.length > 0) {
+      activeFilters['priority'] = filters.priority;
+    }
+    if (filters.deadline_status.length > 0) {
+      activeFilters['deadline_status'] = filters.deadline_status;
+    }
+    // ADD inside handleExport after is_owner block
+    if (filters.is_flagged.length > 0) {
+      activeFilters['is_flagged'] = filters.is_flagged;
+    }
+    if (filters.is_dd.length > 0) {
+      activeFilters['is_dd'] = filters.is_dd;
+    }
+    if (filters.pending_closure) {
+      activeFilters['pending_closure'] = filters.pending_closure;
     }
 
     // Multi-Select Array Filters
@@ -350,14 +404,17 @@ const VesselReports = () => {
   };
 
   // ==================== COLUMN OPTIONS ====================
+  // REPLACE WITH
   const ALL_COLUMNS = [
     { id: 'date', label: 'Report Date' },
-    { id: 'deadline', label: 'Target Deadline' },
+    { id: 'deadline', label: 'Due Date' },
     { id: 'source', label: 'Defect Source' },
     { id: 'equipment', label: 'Area of Concern' },
     { id: 'description', label: 'Description' },
     { id: 'priority', label: 'Priority' },
     { id: 'status', label: 'Status' },
+    { id: 'flag', label: 'Flagged' },
+    { id: 'dd', label: 'Dry Dock' },
     { id: 'pr_details', label: 'PR Details' },
   ];
 
@@ -578,18 +635,18 @@ const VesselReports = () => {
 
       {/* ✅ TABLE WITH PURPLE GRADIENT HEADERS */}
       <div className="table-scroll-wrapper">
-        <table className="data-table">
+        <table className="data-table" style={{ tableLayout: 'fixed', minWidth: '1400px' }}>
           <thead>
             <tr>
               <th style={{
-                width: 60,
+                width: 90,
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 color: 'white',
                 fontWeight: '600',
                 textAlign: 'center',
                 top: "65px"
               }}>
-                S.No
+                Defect ID
               </th>
 
               {visibleColumns.map((colId) => {
@@ -601,7 +658,7 @@ const VesselReports = () => {
                 switch (colId) {
                   case 'date':
                     return (
-                      <th key="date-header" style={{ width: 150, ...headerStyle, top: "65px" }}>
+                      <th key="date-header" style={{ width: 120, ...headerStyle, top: "65px" }}>
                         <FilterHeader
                           label="Report Date"
                           field="date_identified"
@@ -630,9 +687,9 @@ const VesselReports = () => {
 
                   case 'deadline':
                     return (
-                      <th key="deadline-header" style={{ width: 150, ...headerStyle, top: "65px" }}>
+                      <th key="deadline-header" style={{ width: 100, ...headerStyle, top: "65px" }}>
                         <FilterHeader
-                          label="Target Deadline"
+                          label="Due Date"
                           field="target_close_date"
                           currentFilter={filters.target_close_date}
                           onFilterChange={handleFilterChange}
@@ -646,9 +703,9 @@ const VesselReports = () => {
 
                   case 'source':
                     return (
-                      <th key="source-header" style={{ width: 180, ...headerStyle, top: "65px" }}>
+                      <th key="source-header" style={{ width: 130, ...headerStyle, top: "65px" }}>
                         <DefectSourceFilter
-                          label="Defect Source"
+                          label="Source"
                           options={DEFECT_SOURCE_OPTIONS}
                           selectedValues={filters.defect_source}
                           onChange={(vals) => setFilters(prev => ({ ...prev, defect_source: vals }))}
@@ -677,7 +734,7 @@ const VesselReports = () => {
 
                   case 'description':
                     return (
-                      <th key="description-header" style={{ width: 300, ...headerStyle, top: "65px" }}>
+                      <th key="description-header" style={{ width: 250, ...headerStyle, top: "65px" }}>
                         <FilterHeader
                           label="Description"
                           field="description"
@@ -693,14 +750,23 @@ const VesselReports = () => {
 
                   case 'priority':
                     return (
-                      <th key="priority-header" style={{ width: 100, textAlign: 'center', ...headerStyle, top: "65px" }}>
+                      <th key="priority-header" style={{ width: 80, textAlign: 'center', ...headerStyle, top: "65px" }}>
                         <FilterHeader
                           label="Priority"
                           field="priority"
                           currentFilter={filters.priority}
                           onFilterChange={handleFilterChange}
-                          type="select"
-                          options={PRIORITY_OPTIONS}
+                          type="multi-select"
+                          options={[
+                            { label: 'Low', value: 'LOW' },
+                            { label: 'Medium', value: 'MEDIUM' },
+                            { label: 'High', value: 'HIGH' },
+                            { label: 'Critical', value: 'CRITICAL' },
+                          ]}
+                          iconRenderer={(val) => {
+                            const colorMap = { CRITICAL: '#dc2626', HIGH: '#f97316', MEDIUM: '#2563eb', LOW: '#16a34a' };
+                            return <AlertTriangle size={13} color={colorMap[val]} />;
+                          }}
                           // ✅ Add these two lines
                           onSort={() => handleTextSort('priority')}
                           sortState={filters.text_sort.field === 'priority' ? filters.text_sort.dir : null}
@@ -710,17 +776,62 @@ const VesselReports = () => {
 
                   case 'status':
                     return (
-                      <th key="status-header" style={{ width: 100, textAlign: 'center', ...headerStyle, top: "65px" }}>
+                      <th key="status-header" style={{ width: 80, textAlign: 'center', ...headerStyle, top: "65px" }}>
                         <FilterHeader
                           label="Status"
                           field="status"
                           currentFilter={filters.status}
                           onFilterChange={handleFilterChange}
-                          type="select"
-                          options={FILTER_STATUS_OPTIONS}
+                          type="multi-select"
+                          options={[
+                            { label: 'Open', value: 'OPEN' },
+                            { label: 'Pending Closure', value: 'PENDING_CLOSURE' },
+                            { label: 'Closed', value: 'CLOSED' },
+                          ]}
+                          iconRenderer={(val) => {
+                            const colorMap = { OPEN: '#3b82f6', PENDING_CLOSURE: '#f59e0b', CLOSED: '#22c55e' };
+                            return <Flower size={13} color={colorMap[val]} />;
+                          }}
                           // ✅ Add these two lines
                           onSort={() => handleTextSort('status')}
                           sortState={filters.text_sort.field === 'status' ? filters.text_sort.dir : null}
+                        />
+                      </th>
+                    );
+                  case 'flag':
+                    return (
+                      <th key="flag-header" style={{ width: 80, textAlign: 'center', ...headerStyle, top: '65px' }}>
+                        <FilterHeader
+                          label="Flagged"
+                          field="is_flagged"
+                          currentFilter={filters.is_flagged}
+                          onFilterChange={handleFilterChange}
+                          type="multi-select"
+                          options={[
+                            { label: 'Flagged', value: 'true' },
+                            { label: 'Not Flagged', value: 'false' },
+                          ]}
+                          onSort={() => handleTextSort('flag')}
+                          sortState={filters.text_sort.field === 'flag' ? filters.text_sort.dir : null}
+                        />
+                      </th>
+                    );
+
+                  case 'dd':
+                    return (
+                      <th key="dd-header" style={{ width: 90, textAlign: 'center', ...headerStyle, top: '65px' }}>
+                        <FilterHeader
+                          label="Dry Dock"
+                          field="is_dd"
+                          currentFilter={filters.is_dd}
+                          onFilterChange={handleFilterChange}
+                          type="multi-select"
+                          options={[
+                            { label: 'Dry Dock', value: 'true' },
+                            { label: 'Not Dry Dock', value: 'false' },
+                          ]}
+                          onSort={() => handleTextSort('dd')}
+                          sortState={filters.text_sort.field === 'dd' ? filters.text_sort.dir : null}
                         />
                       </th>
                     );
@@ -757,7 +868,9 @@ const VesselReports = () => {
 
                 return (
                   <tr key={`defect-row-${defect.id}`} style={{ background: index % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                    <td style={{ textAlign: 'center', fontWeight: '500' }}>{index + 1}</td>
+                    <td style={{ textAlign: 'center', fontWeight: '600', fontSize: '12px', color: '#1e293b', whiteSpace: 'nowrap' }}>
+                      {defect.defect_number || `#${index + 1}`}
+                    </td>
 
                     {visibleColumns.map(colId => {
                       switch (colId) {
@@ -769,14 +882,17 @@ const VesselReports = () => {
 
                         case 'source':
                           return (
-                            <td key={`${defect.id}-source`}>
+                            <td key={`${defect.id}-source`} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {DEFECT_SOURCE_MAP[defect.defect_source] || defect.defect_source}
                             </td>
                           );
 
                         case 'equipment':
-                          return <td key={`${defect.id}-equipment`}>{defect.equipment_name}</td>;
-
+                          return (
+                            <td key={`${defect.id}-equipment`} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {defect.equipment_name}
+                            </td>
+                          );
                         case 'description':
                           return (
                             <td key={`${defect.id}-description`} style={{ maxWidth: 300 }}>
@@ -841,6 +957,38 @@ const VesselReports = () => {
 
                               }}>
                                 {defect.status}
+                              </span>
+                            </td>
+                          );
+
+                        case 'flag':
+                          return (
+                            <td key={`${defect.id}-flag`} style={{ textAlign: 'center' }}>
+                              <span style={{
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                background: defect.is_flagged ? '#fee2e2' : '#f3f4f6',
+                                color: defect.is_flagged ? '#991b1b' : '#6b7280'
+                              }}>
+                                {defect.is_flagged ? '🚩 Flagged' : '—'}
+                              </span>
+                            </td>
+                          );
+
+                        case 'dd':
+                          return (
+                            <td key={`${defect.id}-dd`} style={{ textAlign: 'center' }}>
+                              <span style={{
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                background: defect.is_dd ? '#e0f2fe' : '#f3f4f6',
+                                color: defect.is_dd ? '#0369a1' : '#6b7280'
+                              }}>
+                                {defect.is_dd ? 'DD' : '—'}
                               </span>
                             </td>
                           );
@@ -1194,6 +1342,13 @@ const VesselReports = () => {
                     ✅ Successfully Saved:
                     <strong> {uploadResult.success_count}</strong>
                   </p>
+
+                  {uploadResult.created_count !== undefined && (
+                    <p style={{ margin: "4px 0 4px 16px", fontSize: "12px", color: "#15803d" }}>
+                      ↳ Created: <strong>{uploadResult.created_count}</strong>
+                      &nbsp;&nbsp;Updated: <strong>{uploadResult.updated_count}</strong>
+                    </p>
+                  )}
 
                   <p style={{ margin: "4px 0", fontSize: "13px", color: "#dc2626" }}>
                     ❌ Failed Rows:

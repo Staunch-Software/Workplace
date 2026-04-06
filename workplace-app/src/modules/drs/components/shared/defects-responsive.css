@@ -1,0 +1,857 @@
+/* ============================================================
+   SECTION 0: GLOBAL NAVBAR RESPONSIVENESS
+   ============================================================ */
+
+/* --- 1. BIG SCREEN SCALING (2560px+) --- */
+@media (min-width: 2500px) {
+  .defect-top-navbar {
+    height: 90px !important; /* Taller navbar */
+    padding: 0 40px !important;
+  }
+
+  .defect-nav-title { font-size: 22px !important; }
+  .defect-nav-badge { font-size: 14px !important; padding: 4px 10px !important; }
+  
+  .defect-nav-pill {
+    padding: 12px 24px !important;
+    font-size: 18px !important; /* Larger nav links */
+    gap: 12px !important;
+  }
+
+  .defect-nav-pill svg { width: 22px !important; height: 22px !important; }
+  
+  .avatar-circle {
+    width: 50px !important;
+    height: 50px !important;
+    font-size: 18px !important;
+  }
+
+  .user-text .name { font-size: 16px !important; }
+  .user-text .role { font-size: 13px !important; }
+}
+
+/* --- 2. TABLET LAYOUT (Under 1024px) --- */
+@media (max-width: 1150px) {
+  /* Hide the IMO badge/Subtitle to save space for nav items */
+  .defect-nav-badge, .defect-nav-divider {
+    display: none !important;
+  }
+  
+  .defect-nav-pill {
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+  }
+}
+
+/* --- 3. MOBILE PHONES (Under 600px) --- */
+@media (max-width: 600px) {
+  .defect-top-navbar {
+    padding: 0 10px !important;
+    height: 60px !important;
+  }
+
+  /* Hide Brand text on mobile, keep only Logo */
+  .defect-nav-vessel-info {
+    display: none !important;
+  }
+
+  /* Hide labels in Nav Pills - show only Icons */
+  .defect-nav-pill .pill-label {
+    display: none !important;
+  }
+  
+  .defect-nav-pill {
+    padding: 10px !important;
+    border-radius: 50% !important; /* Make them round icon buttons */
+  }
+
+  /* Hide User Name/Role text */
+  .user-text {
+    display: none !important;
+  }
+
+  .nav-right {
+    gap: 2px !important;
+  }
+}
+
+/* ============================================================
+   MOBILE NAVBAR FIX (Under 600px)
+   ============================================================ */
+
+@media (max-width: 600px) {
+  /* 1. Simplify the Navbar structure */
+  .defect-top-navbar {
+    padding: 0 8px !important;
+    height: 56px !important;
+    justify-content: space-between !important;
+  }
+
+  /* 2. Hide the Brand Text (Ozellar Marine) - Leave only the icon */
+  .vessel-info, 
+  .nav-divider-v,
+  .imo-badge {
+    display: none !important;
+  }
+
+  /* 3. Navbar Pills: Hide the labels (Dashboard, Defect List, etc) */
+  .nav-pill span.pill-label,
+  .nav-pill span:not(.lucide) { 
+    display: none !important; 
+  }
+
+  /* 4. Navbar Pills: Make buttons smaller and centered */
+  .nav-pill {
+    padding: 8px !important;
+    min-width: 40px !important;
+    justify-content: center !important;
+  }
+
+  /* 5. Space out the Nav group */
+  .nav-pill-group {
+    gap: 2px !important;
+    margin-left: 5px !important;
+  }
+
+  /* 6. Right Side: Hide User Name/Role */
+  .user-text {
+    display: none !important;
+  }
+
+  /* 7. Ensure Nav Left and Right don't overlap */
+  .nav-left {
+    flex: 1 !important;
+    overflow: hidden !important;
+  }
+
+  .nav-right {
+    flex-shrink: 0 !important;
+    gap: 4px !important;
+  }
+}
+
+/* --- FIX FOR REFRESH BUTTON OVERLAP SEEN IN SCREENSHOT --- */
+@media (max-width: 600px) {
+  /* This targets the page title row "Fleet Defect Overview" */
+  div[style*="display: flex"][style*="justifyContent: space-between"] {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+}
+
+/* ============================================================
+   MOBILE SIDEBAR DRAWER (Three-line Menu Logic)
+   ============================================================ */
+
+/* 1. Hide Hamburger and Sidebar on Desktop */
+.defect-hamburger-btn,
+.defect-mobile-sidebar,
+.defect-mobile-overlay {
+  display: none;
+}
+
+/* --- MOBILE LOGIC (Under 950px) --- */
+@media (max-width: 950px) {
+  /* Show Hamburger Button */
+  .defect-hamburger-btn {
+    display: flex !important;
+    background: transparent;
+    border: none;
+    color: white;
+    margin-right: 12px;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+  }
+  .defect-hamburger-btn:hover { background: rgba(255,255,255,0.1); }
+
+  /* Hide Desktop Nav Pills */
+  .defect-desktop-nav {
+    display: none !important;
+  }
+
+  /* Sidebar Container */
+  .defect-mobile-sidebar {
+    display: flex !important;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: -280px; /* Start off-screen */
+    width: 280px;
+    height: 100vh;
+    background: #0f172a; /* Same as Top Bar */
+    z-index: 2000;
+    transition: transform 0.3s ease-in-out;
+    box-shadow: 10px 0 25px rgba(0,0,0,0.5);
+    padding: 20px;
+  }
+
+  /* Slide sidebar in */
+  .defect-mobile-sidebar.open {
+    transform: translateX(280px);
+  }
+
+  /* Dark Overlay when menu is open */
+  .defect-mobile-overlay {
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    z-index: 1999;
+  }
+
+  /* Sidebar Header */
+  .sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    border-bottom: 1px solid #1e293b;
+    padding-bottom: 15px;
+  }
+  .sidebar-header button { background: none; border: none; color: #94a3b8; }
+
+  /* Sidebar Navigation Items */
+  .sidebar-links {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .side-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: transparent;
+    border: none;
+    color: #cbd5e1;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 8px;
+    text-align: left;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  .side-nav-item:hover { background: rgba(255,255,255,0.05); color: white; }
+  .side-nav-item.active { 
+    background: rgba(45, 212, 191, 0.1) !important; 
+    color: #2dd4bf !important; 
+  }
+}
+
+/* ============================================================
+   NOTIFICATION RESPONSIVE OVERRIDES
+   ============================================================ */
+
+/* --- 1. BIG SCREEN (2560px+) --- */
+@media (min-width: 2500px) {
+  .notif-panel-scaling {
+    width: 520px !important; /* Wider on 4K */
+    top: 80px !important;    /* Adjust for taller navbar */
+  }
+
+  .notif-title-main-scaling { font-size: 22px !important; }
+  .notif-clear-btn-scaling { font-size: 16px !important; padding: 10px 20px !important; }
+  
+  .notif-list-height-scaling { max-height: 600px !important; }
+  
+  .notif-item-scaling { padding: 25px 20px !important; gap: 20px !important; }
+  .notif-item-title-scaling { font-size: 18px !important; }
+  .notif-item-msg-scaling { font-size: 15px !important; -webkit-line-clamp: 3 !important; }
+  .notif-badge-scaling { font-size: 13px !important; padding: 4px 10px !important; }
+
+  /* Icon Scaling */
+  .notif-icon-box-scaling { width: 30px !important; height: 30px !important; }
+  .notif-icon-box-scaling svg { width: 18px !important; height: 18px !important; }
+  .notif-x-btn-scaling svg { width: 22px !important; height: 22px !important; }
+}
+
+/* --- 2. MOBILE PHONES (Under 600px) --- */
+@media (max-width: 600px) {
+  .notif-panel-scaling {
+    position: fixed !important;
+    top: 60px !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    max-height: 80vh !important;
+    z-index: 5000 !important;
+  }
+
+  .notif-item-scaling { padding: 12px 10px !important; }
+  
+  /* Show more text on mobile so users don't have to click to read everything */
+  .notif-item-msg-scaling { 
+    font-size: 13px !important; 
+    -webkit-line-clamp: 4 !important; 
+  }
+
+  /* Make the 'X' button easier to hit with a thumb */
+  .notif-x-btn-scaling {
+    width: 35px !important;
+    height: 35px !important;
+  }
+}
+
+/* ============================================================
+   NOTIFICATION RESPONSIVE OVERRIDES
+   ============================================================ */
+
+/* --- 1. BASE SETTINGS (Laptop & Tablet - Matching your original) --- */
+.notif-panel-scaling {
+  width: 340px !important; /* Original Desktop width */
+}
+
+.notif-title-main-scaling { 
+  font-size: 16px !important; /* Original size */
+}
+
+.notif-item-title-scaling { 
+  font-size: 13px !important; /* Original size */
+}
+
+.notif-item-msg-scaling { 
+  font-size: 12px !important; /* Original size */
+}
+
+.notif-badge-scaling {
+  font-size: 10px !important;
+}
+
+.notif-list-height-scaling {
+  max-height: 400px !important;
+}
+
+.notif-icon-box-scaling {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 4px !important;
+  flex-shrink: 0 !important;
+}
+
+/* --- 2. ULTRA-WIDE / BIG SCREEN (2560px+) --- */
+@media (min-width: 2500px) {
+  .notif-panel-scaling {
+    width: 520px !important; /* Scale up for 4K */
+    top: 75px !important;    
+  }
+
+  .notif-title-main-scaling { font-size: 22px !important; }
+  .notif-clear-btn-scaling { font-size: 16px !important; padding: 10px 20px !important; }
+  
+  .notif-list-height-scaling { max-height: 650px !important; }
+  
+  .notif-item-scaling { padding: 25px 20px !important; gap: 20px !important; }
+  .notif-item-title-scaling { font-size: 18px !important; }
+  .notif-item-msg-scaling { font-size: 15px !important; -webkit-line-clamp: 3 !important; }
+  .notif-badge-scaling { font-size: 13px !important; padding: 4px 10px !important; }
+
+  /* Scale Icons for Big Screen */
+  .notif-icon-box-scaling { 
+    width: 32px !important; 
+    height: 32px !important; 
+    background-color: #f1f5f9; /* Ensure bg shows if not handled by type logic */
+  }
+  .notif-icon-box-scaling svg { width: 18px !important; height: 18px !important; }
+}
+
+/* --- 3. MOBILE PHONES (Under 600px) --- */
+@media (max-width: 600px) {
+  .notif-panel-scaling {
+    position: fixed !important;
+    top: 60px !important;
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important; /* Fill phone width */
+    max-height: 80vh !important;
+    z-index: 5000 !important;
+  }
+
+  .notif-item-scaling { padding: 12px 10px !important; }
+  
+  .notif-item-msg-scaling { 
+    font-size: 13px !important; 
+    -webkit-line-clamp: 4 !important; /* Show more context on mobile */
+  }
+
+  /* hit area for thumb dismiss */
+  button[style*="color: #cbd5e1"] {
+    width: 35px !important;
+    height: 35px !important;
+  }
+}
+
+/* ============================================================
+   USER PROFILE MENU RESPONSIVE OVERRIDES
+   ============================================================ */
+
+/* --- 1. BASE SETTINGS (Laptop & Tablet) --- */
+.defect-user-menu-scaling {
+  width: 240px !important; /* Original width */
+  top: 50px !important;
+}
+
+.defect-avatar-scaling {
+  width: 50px !important;
+  height: 50px !important;
+  font-size: 20px !important;
+}
+
+.defect-user-name-scaling { font-size: 15px !important; }
+.defect-user-email-scaling { font-size: 12px !important; }
+
+.defect-item-scaling {
+  padding: 12px 16px !important;
+  font-size: 14px !important;
+  gap: 10px !important;
+}
+
+/* --- 2. ULTRA-WIDE / BIG SCREEN (2560px+) --- */
+@media (min-width: 2500px) {
+  .defect-user-menu-scaling {
+    width: 380px !important; /* Larger menu for 4K */
+    top: 75px !important;
+  }
+
+  .defect-user-header-scaling {
+    padding: 30px 25px !important;
+    gap: 20px !important;
+  }
+
+  .defect-avatar-scaling {
+    width: 80px !important;
+    height: 80px !important;
+    font-size: 32px !important;
+  }
+
+  .defect-user-name-scaling { font-size: 22px !important; }
+  .defect-user-email-scaling { font-size: 16px !important; }
+
+  .defect-item-scaling {
+    padding: 20px 25px !important;
+    font-size: 1.1rem !important; /* Larger text for readability */
+    gap: 15px !important;
+  }
+
+  .defect-icon-scaling {
+    width: 22px !important;
+    height: 22px !important;
+  }
+}
+
+/* --- 3. MOBILE PHONES (Under 600px) --- */
+@media (max-width: 600px) {
+  .defect-user-menu-scaling {
+    position: fixed !important;
+    top: 60px !important;
+    right: 10px !important;
+    left: 10px !important;
+    width: auto !important; /* Full width floating menu on mobile */
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4) !important;
+  }
+
+  .defect-item-scaling {
+    padding: 16px 20px !important; /* Larger tap target */
+    font-size: 15px !important;
+  }
+}
+
+/* ============================================================
+   ANALYTICS DASHBOARD RESPONSIVE PROPERTIES
+   ============================================================ */
+
+/* --- 1. BIG SCREEN SCALING (2560px+) --- */
+@media (min-width: 2500px) {
+    .analytics-main-wrapper { padding: 40px 60px !important; }
+    
+    .analytics-page-title { font-size: 3rem !important; font-weight: 800 !important; }
+    
+    .analytics-refresh-btn { 
+        height: 54px !important; 
+        padding: 0 30px !important; 
+        font-size: 1.1rem !important; 
+    }
+
+    /* Scaling Section Cards */
+    div[style*="fontSize: 15"][style*="fontWeight: 800"] { font-size: 1.6rem !important; }
+    div[style*="fontSize: 11"][style*="color: #64748b"] { font-size: 1rem !important; }
+
+    /* Scaling Donut Charts & Legends */
+    .stats-donut-grid { gap: 30px !important; }
+    .stats-donut-grid svg { transform: scale(1.4) !important; } /* Enlarge Donuts */
+    .stats-donut-grid [style*="fontSize: 12"] { font-size: 1rem !important; } /* Legend labels */
+    .stats-donut-grid [style*="fontSize: 16"] { font-size: 1.5rem !important; } /* Center text */
+
+    /* Scaling Bar Charts */
+    .activity-chart-wrapper, .trend-chart-wrapper { padding: 20px !important; }
+}
+
+/* --- 2. TABLET LAYOUT (Under 1100px) --- */
+@media (max-width: 1100px) {
+    /* Change 3-column donuts to 2-column or 1-column */
+    .stats-donut-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    /* Breakdown grid (Areas vs Sources) */
+    .breakdown-grid-row {
+        grid-template-columns: 1fr !important; /* Stack vertically */
+    }
+}
+
+/* --- 3. MOBILE VIEW (Under 600px) --- */
+@media (max-width: 600px) {
+    .analytics-page-title { font-size: 1.5rem !important; }
+
+    .stats-donut-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Adjust the Flagged Defects Nested Table */
+    /* This is critical because your GRID_TEMPLATE is fixed width */
+    div[style*="display: grid"][style*="gridTemplateColumns: 40px 90px"] {
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+        padding: 15px !important;
+        gap: 5px !important;
+        align-items: flex-start !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+    }
+
+    /* Labels inside the mobile flagged list */
+    div[style*="fontSize: 10"][style*="textTransform: uppercase"] {
+        display: none !important; /* Hide the fixed header row on mobile */
+    }
+
+    /* Vessel Multi-Selector width */
+    button[style*="minWidth: 160"] {
+        width: 100% !important;
+    }
+
+    /* Spacing between sections */
+    .dashboard-container { padding: 12px !important; }
+}
+
+/* --- 4. CHART OVERFLOW FIX --- */
+.activity-chart-wrapper div, 
+.trend-chart-wrapper div {
+    overflow-x: auto !important; /* Allow charts to scroll if screen is tiny */
+}
+
+/* ============================================================
+   SECTION: FLEET ANALYTICS (SCALING & GRIDS ONLY)
+   ============================================================ */
+
+/* --- 1. BASE SETTINGS (Standard Desktop) --- */
+.defect-donut-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+}
+
+.defect-card-title {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: #334155 !important;
+}
+
+.defect-stat-badge {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    padding: 2px 10px !important;
+    border-radius: 10px !important;
+}
+
+/* --- 2. BIG SCREEN SCALING (2560px+) --- */
+@media (min-width: 2500px) {
+    /* Donut Grid scaling */
+    .defect-donut-grid { gap: 30px !important; }
+    
+    .defect-donut-body { padding: 25px !important; gap: 30px !important; }
+    
+    /* Center text inside DonutChart */
+    .defect-donut-body [style*="fontSize: 16"] { font-size: 1.5rem !important; }
+    .defect-donut-body [style*="fontSize: 9"] { font-size: 11px !important; }
+    
+    /* Scale the SVG Donuts */
+    .defect-donut-body svg { transform: scale(1.4) !important; margin: 20px !important; }
+
+    /* Legend scaling */
+    .defect-donut-body [style*="fontSize: 12"] { font-size: 1rem !important; }
+    .defect-donut-body [style*="fontSize: 11"] { font-size: 0.9rem !important; }
+
+    /* Trend Card scaling */
+    .defect-trend-card { margin-top: 40px !important; }
+    .defect-card-title { font-size: 1.2rem !important; }
+    .defect-stat-badge { font-size: 1rem !important; padding: 6px 15px !important; }
+    
+    .defect-chart-canvas-area { height: 350px !important; } /* Taller chart for 4K */
+
+    /* Timeline Labels Scaling */
+    .defect-slider-container span { font-size: 11px !important; }
+}
+
+/* --- 3. TABLET LAYOUT (Under 1100px) --- */
+@media (max-width: 1100px) {
+    /* Switch from 3-columns to 1-column stack */
+    .defect-donut-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .defect-trend-header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+    }
+}
+
+/* --- 4. MOBILE VIEW (Under 600px) --- */
+@media (max-width: 600px) {
+    .defect-donut-body {
+        flex-direction: column !important; /* Stack donut on top of legend */
+        text-align: center !important;
+    }
+
+    /* Hide smaller timeline snap labels to prevent overlap on phone screens */
+    .defect-slider-container [style*="days: 7"],
+    .defect-slider-container [style*="days: 90"] {
+        display: none !important;
+    }
+
+    .defect-stat-badge {
+        font-size: 10px !important;
+        padding: 2px 6px !important;
+    }
+}
+
+/* ============================================================
+   STATS DONUT GRID RESPONSIVENESS
+   ============================================================ */
+
+/* --- 1. BASE SETTINGS (Laptop, Tablet, Desktop) --- */
+.stats-donut-grid {
+    /* This ensures 3 columns stay fixed across wide and medium screens */
+    grid-template-columns: repeat(3, 1fr) !important; 
+    gap: 16px !important;
+    display: grid !important;
+}
+
+/* Base text sizes */
+.defect-card-title {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+}
+
+/* --- 2. BIG SCREEN SCALING (2560px+) --- */
+@media (min-width: 2500px) {
+    .stats-donut-grid {
+        gap: 32px !important; /* More breathing room on 4K */
+    }
+
+    /* Scaling the text inside the charts */
+    .stats-donut-grid [style*="fontSize: 16"] { 
+        font-size: 1.5rem !important; 
+    }
+    
+    .defect-card-title {
+        font-size: 1.2rem !important;
+    }
+
+    /* Scale the actual Donut SVG */
+    .stats-donut-grid svg {
+        transform: scale(1.3) !important;
+        margin-right: 20px !important;
+    }
+
+    /* Scale Legend text */
+    .stats-donut-grid [style*="fontSize: 12"] { 
+        font-size: 1.1rem !important; 
+    }
+}
+
+/* --- 3. MOBILE ONLY (Under 650px) --- */
+@media (max-width: 650px) {
+    .stats-donut-grid {
+        /* Only switch to 1 column on small phone screens */
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    /* On mobile, stack the donut and its legend vertically to save width */
+    .stats-donut-grid div[style*="display: flex"][style*="alignItems: center"] {
+        flex-direction: column !important;
+        text-align: center !important;
+        gap: 10px !important;
+    }
+}
+
+/* ============================================================
+   SECTION: VESSEL ANALYTICS RESPONSIVE PROPERTIES
+   ============================================================ */
+
+/* --- 1. BASE SETTINGS --- */
+.breakdown-grid-row {
+    /* Keep 2 columns for Desktop/Laptop/Tablet */
+    grid-template-columns: 1fr 1fr !important;
+}
+
+.vessel-card-title {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: #334155 !important;
+}
+
+/* --- 2. BIG SCREEN SCALING (2560px+) --- */
+@media (min-width: 2500px) {
+    .vessel-card-header { padding: 15px 25px !important; }
+    .vessel-card-title { font-size: 1.25rem !important; }
+    
+    /* Scale Chart Heights */
+    .vessel-chart-body { min-height: 400px !important; padding: 30px !important; }
+
+    /* Scale Legends */
+    .vessel-header-actions span, 
+    .vessel-activity-legend span {
+        font-size: 1rem !important;
+    }
+    
+    .vessel-activity-legend [style*="width: 8"] {
+        width: 12px !important; height: 12px !important;
+    }
+
+    /* Scaling Toggle Buttons */
+    .vessel-header-actions button {
+        padding: 8px 20px !important;
+        font-size: 14px !important;
+    }
+
+    .breakdown-grid-row { gap: 30px !important; }
+}
+
+/* --- 3. TABLET OPTIMIZATION (Under 1100px) --- */
+@media (max-width: 1100px) {
+    /* Move legends underneath the titles in the chart headers */
+    .vessel-card-header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+        padding: 15px !important;
+    }
+
+    .vessel-header-actions,
+    .vessel-activity-legend {
+        width: 100% !important;
+        justify-content: flex-start !important;
+        flex-wrap: wrap !important;
+    }
+}
+
+/* --- 4. MOBILE VIEW (Under 768px) --- */
+@media (max-width: 768px) {
+    /* Stack the bottom breakdown cards (Areas vs Sources) */
+    .breakdown-grid-row {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Scale down titles slightly */
+    .vessel-card-title { font-size: 12px !important; }
+
+    /* Allow horizontal scroll for the Vessel Activity Chart if it gets too thin */
+    .vessel-chart-body {
+        overflow-x: auto !important;
+    }
+    
+    .vessel-chart-body canvas {
+        min-width: 500px !important; /* Forces scroll on small phones */
+    }
+}
+
+/* ============================================================
+   SHORE DASHBOARD RESPONSIVE PROPERTIES
+   ============================================================ */
+
+/* --- 1. BIG SCREEN SCALING (2560px+) --- */
+@media (min-width: 2500px) {
+  .defect-dashboard-container { padding: 40px 60px !important; }
+
+  /* Scale KPI Grid to one long row */
+  .defect-kpi-grid { grid-template-columns: repeat(6, 1fr) !important; gap: 30px !important; }
+  .defect-kpi-data h2 { font-size: 3.5rem !important; }
+  .defect-kpi-data p { font-size: 1.1rem !important; }
+
+  /* Scale Action Bar */
+  .defect-action-bar { padding: 25px 30px !important; }
+  .defect-create-btn { height: 56px !important; font-size: 1.15rem !important; padding: 0 30px !important; }
+  .defect-legend-container { font-size: 1rem !important; gap: 40px !important; }
+
+  /* Scale Table */
+  .defect-table-scroll-area { max-height: 800px !important; }
+  .defect-main-data-table th, 
+  .defect-main-data-table td { font-size: 1.1rem !important; padding: 15px 10px !important; }
+  
+  /* Scale Expanded Section */
+  .defect-expanded-grid { height: 650px !important; gap: 40px !important; }
+  
+  /* Scale Pagination */
+  .defect-pagination-footer { padding: 25px 35px !important; font-size: 1.1rem !important; }
+  .defect-pagination-footer select { height: 45px !important; font-size: 1.1rem !important; }
+}
+
+/* --- 2. TABLET LAYOUT (Under 1200px) --- */
+@media (max-width: 1200px) {
+  /* Stack the Create Button and the Legend Legend */
+  .defect-action-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 15px !important;
+  }
+
+  .defect-legend-container {
+    overflow-x: auto !important; /* Allow legend to scroll if too many icons */
+    padding-bottom: 10px !important;
+    justify-content: flex-start !important;
+  }
+}
+
+/* --- 3. MOBILE VIEW (Under 768px) --- */
+@media (max-width: 768px) {
+  /* KPI Cards stack into 1 or 2 columns */
+  .defect-kpi-grid { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+  
+  /* Table: Prevent squishing, enable horizontal scroll */
+  .defect-table-scroll-area { overflow-x: auto !important; }
+  .defect-main-data-table { min-width: 1200px !important; }
+
+  /* Sticky First Column Shadow */
+  .defect-sticky-col {
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 20 !important;
+    background: white !important;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1) !important;
+  }
+
+  /* Expanded Area: Stack Thread and Images vertically */
+  .defect-expanded-grid {
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+  }
+
+  .thread-container { height: 450px !important; }
+
+  /* Pagination Stacking */
+  .defect-pagination-footer {
+    flex-direction: column !important;
+    gap: 20px !important;
+    align-items: center !important;
+  }
+}

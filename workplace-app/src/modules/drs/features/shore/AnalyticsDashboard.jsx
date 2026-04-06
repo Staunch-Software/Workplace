@@ -830,15 +830,15 @@ const AnalyticsDashboard = () => {
 
         const datasets = mode === 'status'
             ? [
-                { label: 'Open', data: top8.map(v => v.open), backgroundColor: '#3b82f6', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8,maxBarThickness: barMax },
-                { label: 'Pend. Appr.', data: top8.map(v => v.pending), backgroundColor: '#f59e0b', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8,maxBarThickness: barMax },
-                { label: 'Closed', data: top8.map(v => v.closed), backgroundColor: '#22c55e55', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8,maxBarThickness: barMax },
+                { label: 'Open', data: top8.map(v => v.open), backgroundColor: '#3b82f6', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8, maxBarThickness: barMax },
+                { label: 'Pend. Appr.', data: top8.map(v => v.pending), backgroundColor: '#f59e0b', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8, maxBarThickness: barMax },
+                { label: 'Closed', data: top8.map(v => v.closed), backgroundColor: '#22c55e55', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8, maxBarThickness: barMax },
             ]
             : [
-                { label: 'Critical', data: top8.map(v => v.critical), backgroundColor: '#dc2626', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8,maxBarThickness: barMax },
-                { label: 'High', data: top8.map(v => v.high), backgroundColor: '#f97316', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8,maxBarThickness: barMax },
-                { label: 'Medium', data: top8.map(v => v.medium), backgroundColor: '#2563eb', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8,maxBarThickness: barMax },
-                { label: 'Low', data: top8.map(v => v.low), backgroundColor: '#16a34a', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8,maxBarThickness: barMax },
+                { label: 'Critical', data: top8.map(v => v.critical), backgroundColor: '#dc2626', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8, maxBarThickness: barMax },
+                { label: 'High', data: top8.map(v => v.high), backgroundColor: '#f97316', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8, maxBarThickness: barMax },
+                { label: 'Medium', data: top8.map(v => v.medium), backgroundColor: '#2563eb', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8, maxBarThickness: barMax },
+                { label: 'Low', data: top8.map(v => v.low), backgroundColor: '#16a34a', borderRadius: 3, barPercentage: 0.55, categoryPercentage: 0.8, maxBarThickness: barMax },
             ];
 
         chartRefs.current.vessel = new window.Chart(vesselCanvas, {
@@ -928,7 +928,7 @@ const AnalyticsDashboard = () => {
         chartRefs.current.vesselActivity?.destroy();
         const wrapper = canvas.parentElement;
         if (wrapper) wrapper.style.height = Math.max(vesselActivityData.length * 72 + 80, 200) + 'px';
-        
+
         // Plugin to draw "Reported" / "Closed" labels beside each bar group
         const stackLabelPlugin = {
             id: 'stackLabels',
@@ -1112,7 +1112,7 @@ const AnalyticsDashboard = () => {
     if (isLoading) return <div className="dashboard-container">Loading Analytics...</div>;
 
     return (
-        <div className="dashboard-container">
+        <div className="dashboard-container analytics-main-wrapper">
 
             <style>{`
                 .drs-slider::-webkit-slider-thumb {
@@ -1131,10 +1131,10 @@ const AnalyticsDashboard = () => {
             `}</style>
 
             {/* ── Page Header ── */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 10 }}>
-                <h1 className="page-title" style={{ margin: 0 }}>Fleet Defect Overview</h1>
-                <button onClick={() => refetch()}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', color: '#334155', border: '1px solid #cbd5e1', padding: '8px 16px', borderRadius: '6px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            <div className="analytics-header-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 10 }}>
+                <h1 className="page-title analytics-page-title" style={{ margin: 0 }}>Fleet Defect Overview</h1>
+                <button className="analytics-refresh-btn" onClick={() => refetch()}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', color: '#334155', border: '1px solid #cbd5e1', padding: '8px 16px', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>
                     <RefreshCcw size={13} /> Refresh
                 </button>
             </div>
@@ -1147,6 +1147,7 @@ const AnalyticsDashboard = () => {
                 subtitle={`Overall fleet health · ${fleetStats.total} total defects across all vessels`}
                 icon={<Globe size={18} color="#fff" />}
                 accentColor="#2563eb"
+                className="defect-section-card"
                 bgColor="#f0f7ff"
                 borderColor="#bfdbfe"
                 defaultOpen={true}
@@ -1158,12 +1159,12 @@ const AnalyticsDashboard = () => {
             // onOpen={() => setTimeout(buildTrendChart, 0)}
             >
                 {/* Donut row */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-                    <div className="table-card" style={{ padding: 0 }}>
-                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Status Distribution</span>
+                <div className="stats-donut-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                    <div className="table-card " style={{ padding: 0 }}>
+                        <div className="defect-card-header" style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            <span className="defect-card-title">Status Distribution</span>
                         </div>
-                        <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
+                        <div  style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
                             <DonutChart size={100} label="total" data={[
                                 { label: 'Open', value: fleetStats.open, color: STATUS_COLORS.OPEN },
                                 { label: 'Pending', value: fleetStats.pending, color: STATUS_COLORS.PENDING_CLOSURE },
@@ -1179,7 +1180,7 @@ const AnalyticsDashboard = () => {
 
                     <div className="table-card" style={{ padding: 0 }}>
                         <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Priority Distribution</span>
+                            <span className="defect-card-title">Priority Distribution</span>
                         </div>
                         <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
                             <DonutChart size={100} label="total" data={[
@@ -1199,7 +1200,7 @@ const AnalyticsDashboard = () => {
 
                     <div className="table-card" style={{ padding: 0 }}>
                         <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Deadline Status</span>
+                            <span className="defect-card-title">Deadline Status</span>
                         </div>
                         <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
                             <DonutChart size={100} label="active" data={[
@@ -1217,14 +1218,14 @@ const AnalyticsDashboard = () => {
                 </div>
 
                 {/* Trend chart */}
-                <div className="table-card" style={{ padding: 0 }}>
-                    <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <div className="table-card defect-trend-card" style={{ padding: 0 }}>
+                    <div className="defect-trend-header" style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <TrendingUp size={14} color="#ea580c" />
-                            <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Defect Trend</span>
+                            <span className="defect-card-title" >Defect Trend</span>
                             <span style={{ fontSize: 11, color: '#94a3b8' }}>· last {rangeLabel(selectedDays)}</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div className="defect-trend-stats" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                             <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 10, background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', display: 'flex', alignItems: 'center', gap: 5 }}>
                                 <span style={{ width: 7, height: 7, borderRadius: 2, background: '#ea580c', display: 'inline-block' }} />
                                 {totalCreated} reported
@@ -1300,6 +1301,7 @@ const AnalyticsDashboard = () => {
             ════════════════════════════════════════════════════════════════ */}
             <SectionCard
                 title="Vessel Analytics"
+                className="vessel-analytics-container"
                 subtitle={
                     selectedVessels.length === 0
                         ? `Detailed breakdown across all ${vesselNames.length} vessels`
@@ -1352,7 +1354,7 @@ const AnalyticsDashboard = () => {
                 )}
 
                 {/* Vessel Defect Breakdown */}
-                <div className="table-card" style={{ padding: 0, marginBottom: 16 }}>
+                <div className="table-card activity-chart-wrapper" style={{ padding: 0, marginBottom: 16 }}>
                     <div style={{ padding: '6px 10px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Vessel Defect Breakdown</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1594,10 +1596,12 @@ const AnalyticsDashboard = () => {
                 </div>
 
                 {/* Flagged Defects */}
-                <FlaggedDefectsPanel defects={vesselFilteredDefects} />
+                <div className="flagged-panel-container">
+                    <FlaggedDefectsPanel defects={vesselFilteredDefects} />
+                </div>
 
                 {/* Equipment + Overdue row */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div className="breakdown-grid-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
                     {/* Top Areas of Concern */}
                     <div className="table-card" style={{ padding: 0 }}>
                         <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>

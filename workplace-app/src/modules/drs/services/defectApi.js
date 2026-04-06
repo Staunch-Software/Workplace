@@ -595,6 +595,8 @@ export const defectApi = {
             "deadline_icon",
             "chat",
             "pr_details",
+            "flag", // ✅ Add this
+            "dd",   // ✅ Add this
           ],
         },
       };
