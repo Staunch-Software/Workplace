@@ -286,10 +286,10 @@ async def _do_login(page, email: str, password: str, base_url: str) -> bool:
         raise Exception(f"Password field error: {e}")
 
     try:
-        await page.wait_for_navigation(wait_until="networkidle", timeout=30000)
+        await page.wait_for_navigation(wait_until="networkidle", timeout=45000)
     except Exception:
         pass
-    await page.wait_for_timeout(3000)
+    await page.wait_for_timeout(8000)
 
     post_url = page.url
     print(f"[Jira] Post-login URL: {post_url}")
