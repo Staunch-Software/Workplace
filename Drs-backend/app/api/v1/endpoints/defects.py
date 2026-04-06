@@ -104,6 +104,7 @@ from app.services.live_feed_service import (
     feed_image_uploaded,
     feed_pic_mandatory_changed,
     feed_pr_added,
+    feed_pr_invalid_format,
     feed_mention
 )
 from app.services.defect_service import DefectService, _should_sync
@@ -2234,6 +2235,9 @@ async def delete_defect_image(
 # =============================================================================
 # PR ENTRIES — Flat URLs matching original production routes
 # =============================================================================
+import re
+PR_FORMAT_REGEX = re.compile(r'^[A-Z]{2,5}\/(V|O)-\d{4}\/REQ\d{2}$')
+
 @router.post("/pr-entries", response_model=PrEntryResponse)
 async def create_pr_entry(
     pr_in: PrEntryCreate,
@@ -2254,6 +2258,8 @@ async def create_pr_entry(
         # Live feed (non-fatal)
         try:
             await feed_pr_added(db, control_db, defect=defect, pr_number=pr_in.pr_number, actor_id=current_user.id)
+            if not PR_FORMAT_REGEX.match(pr_in.pr_number):
+                await feed_pr_invalid_format(db, control_db, defect=defect, pr_number=pr_in.pr_number, actor_id=current_user.id)
             await db.commit()
         except Exception as e:
             logger.error(f"⚠️ Live feed error (non-fatal): {e}")
