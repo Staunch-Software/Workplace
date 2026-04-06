@@ -17,7 +17,10 @@ FIRST TIME SETUP:
 
 from fastapi import APIRouter, Depends, BackgroundTasks, Query
 from fastapi.responses import Response
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from core.deps import require_role, get_current_user
+from db.database import get_db
 from datetime import datetime
 import traceback
 import asyncio
@@ -103,6 +106,42 @@ async def retry_failed(
 @router.get("/status")
 async def get_status(user=Depends(require_role("SHORE", "ADMIN"))):
     return sync_status
+
+
+# ─── Vessel sync status ───────────────────────────────────────────────────────
+
+@router.get("/vessel-sync-status")
+async def get_vessel_sync_status(
+    user=Depends(get_current_user),
+    jira_db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns the last push/pull sync timestamps for all vessels assigned
+    to the current user. Used by the Shore Dashboard Sync Log panel.
+    """
+    from models.sync import SyncState
+
+    if not user.vessels:
+        return []
+
+    imos = [v.imo for v in user.vessels]
+
+    result = await jira_db.execute(
+        select(SyncState)
+        .where(SyncState.vessel_imo.in_(imos))
+        .where(SyncState.sync_scope == "TICKET")
+    )
+    sync_map = {row.vessel_imo: row for row in result.scalars().all()}
+
+    return [
+        {
+            "imo": v.imo,
+            "name": v.name,
+            "last_push_at": sync_map[v.imo].last_push_at.isoformat() if v.imo in sync_map and sync_map[v.imo].last_push_at else None,
+            "last_pull_at": sync_map[v.imo].last_pull_at.isoformat() if v.imo in sync_map and sync_map[v.imo].last_pull_at else None,
+        }
+        for v in user.vessels
+    ]
 
 
 # ─── Image proxy ─────────────────────────────────────────────────────────────
