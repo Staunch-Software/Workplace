@@ -1,9 +1,16 @@
 import { useState, useEffect } from 'react'
 import axiosJira from '../api/axiosJira'
 
+function toUtcDate(isoStr) {
+  if (!isoStr) return null
+  // If no timezone info, treat as UTC (backend returns naive UTC strings)
+  const s = /[Z+\-]\d*$/.test(isoStr.trim()) ? isoStr : isoStr + 'Z'
+  return new Date(s)
+}
+
 function formatRelative(isoStr) {
   if (!isoStr) return '—'
-  const diff = Date.now() - new Date(isoStr).getTime()
+  const diff = Date.now() - toUtcDate(isoStr).getTime()
   const mins = Math.floor(diff / 60000)
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
@@ -15,7 +22,7 @@ function formatRelative(isoStr) {
 
 function formatAbsolute(isoStr) {
   if (!isoStr) return '—'
-  const d = new Date(isoStr)
+  const d = toUtcDate(isoStr)
   if (isNaN(d.getTime())) return '—'
   return d.toLocaleString('en-GB', {
     day: '2-digit', month: 'short', year: '2-digit',
