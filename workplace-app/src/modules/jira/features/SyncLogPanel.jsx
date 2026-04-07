@@ -3,9 +3,9 @@ import axiosJira from '../api/axiosJira'
 
 function toUtcDate(isoStr) {
   if (!isoStr) return null
-  // If no timezone info, treat as UTC (backend returns naive UTC strings)
-  const s = /[Z+\-]\d*$/.test(isoStr.trim()) ? isoStr : isoStr + 'Z'
-  return new Date(s)
+  const s = isoStr.trim()
+  const hasTimezone = s.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(s)
+  return new Date(hasTimezone ? s : s + 'Z')
 }
 
 function formatRelative(isoStr) {
