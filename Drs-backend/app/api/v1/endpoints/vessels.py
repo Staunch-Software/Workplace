@@ -1,3 +1,4 @@
+import json
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -88,3 +89,84 @@ async def create_vessel(
     except Exception as e:
         print(f"❌ Error creating vessel: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+    
+# In your vessels router file (e.g. app/api/v1/vessels.py)
+
+from app.models.sync import SyncState
+from app.core.database_control import get_control_db
+from app.core.database import get_db
+
+# ⚠️ MUST be before /{imo}/sync-log to avoid "all" being caught as {imo}
+@router.get("/sync-status/all")
+async def get_all_vessel_sync_status(
+    db: AsyncSession = Depends(get_db),
+    control_db: AsyncSession = Depends(get_control_db),
+):
+    vessels_res = await control_db.execute(select(Vessel))
+    vessels = vessels_res.scalars().all()
+
+    result = {}
+    for vessel in vessels:
+        try:
+            error_history = json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
+            if not isinstance(error_history, list):
+                error_history = []
+        except Exception:
+            error_history = []
+
+        failed_items_count = sum(
+            1 for e in error_history if e.get("type") == "vessel_error"
+        )
+
+        result[vessel.imo] = {
+            "last_sync_success":  vessel.last_sync_success,
+            "failed_items_count": failed_items_count,
+            "latest_error": error_history[0] if error_history else None,
+        }
+
+    return result
+
+@router.get("/{imo}/sync-log")
+async def get_vessel_sync_log(
+    imo: str,
+    db: AsyncSession = Depends(get_db),
+    control_db: AsyncSession = Depends(get_control_db),
+):
+    res = await control_db.execute(select(Vessel).where(Vessel.imo == imo))
+    vessel = res.scalar_one_or_none()
+    if not vessel:
+        raise HTTPException(status_code=404, detail=f"Vessel {imo} not found")
+
+    try:
+        error_history = json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
+        if not isinstance(error_history, list):
+            error_history = []
+    except Exception:
+        error_history = []
+
+    # Fetch SyncState rows
+    sync_states_res = await db.execute(
+        select(SyncState).where(SyncState.vessel_imo == imo)
+    )
+    sync_states = {row.sync_scope: row for row in sync_states_res.scalars().all()}
+
+    defect_scope = sync_states.get("DEFECT")
+
+    failed_items_count = sum(
+        1 for e in error_history if e.get("type") == "vessel_error"
+    )
+
+    return {
+        "imo": imo,
+        # Flat fields matching VesselSyncDetail exactly
+        "vessel_reported_push": defect_scope.last_pull_at if defect_scope else None,  # vessel → shore
+        "vessel_reported_pull": defect_scope.last_push_at if defect_scope else None,  # shore → vessel
+        # Status fields
+        "last_sync_success":  vessel.last_sync_success,
+        "failed_items_count": failed_items_count,
+        "last_sync_error":    vessel.last_sync_error,  # raw JSON string — frontend parses it
+        # Vessel-level timestamps (for reference)
+        "last_pull_at": vessel.last_pull_at,
+        "last_push_at": vessel.last_push_at,
+    }
