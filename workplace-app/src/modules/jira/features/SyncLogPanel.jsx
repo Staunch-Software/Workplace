@@ -115,8 +115,8 @@ export default function SyncLogPanel({ onClose }) {
           <div className="slp-vessel-table">
             <div className="slp-vessel-header-row">
               <span>Vessel</span>
-              <span>Sent to Vessel</span>
-              <span>Received from Vessel</span>
+              <span style={{ textAlign: 'right' }}>Sent to Vessel</span>
+              <span style={{ textAlign: 'right' }}>Received from Vessel</span>
             </div>
             {vessels.map(v => (
               <div key={v.imo} className="slp-vessel-row">
