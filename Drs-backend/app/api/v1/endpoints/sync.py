@@ -15,6 +15,7 @@ from app.core.database import get_db                  # ✅ vessel/main DB sessi
 from app.core.config import settings
 from app.schemas.sync import SyncPayload
 from app.services.sync_service import SyncService
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 # ✅ This Vessel model uses ControlBase → bound to engine_control → correct DB
 from app.models.vessel import Vessel
@@ -22,7 +23,7 @@ from app.models.vessel import Vessel
 from app.models.user import User
 from app.models.defect import Defect, Thread, Attachment, PrEntry, DefectImage
 from app.models.tasks import Task, Notification, LiveFeed
-
+from app.models.sync import SyncState
 # ---------------------------------------------------------------------------
 # Router & API Key Auth
 # ---------------------------------------------------------------------------
@@ -47,37 +48,87 @@ async def record_vessel_sync_time(
     is_vessel_pushing: bool,
     error_msg: str = None,
     telemetry: dict = None,
+    db: AsyncSession = None,  # main DB — needed for SyncState
 ):
     if not imo: return
 
-    # 1. Fetch current vessel
     res = await control_db.execute(select(Vessel).where(Vessel.imo == imo))
     vessel = res.scalar_one_or_none()
     if not vessel: return
 
     now = datetime.now(timezone.utc)
     update_data = {"updated_at": now}
-    
-    # --- SHORE PERSPECTIVE MAPPING ---
-    # is_vessel_pushing = True  -> Vessel to Shore -> Shore is Pulling
-    # is_vessel_pushing = False -> Shore to Vessel -> Shore is Pushing
-    
-    if is_vessel_pushing:
-        # Check if telemetry has a more accurate "reported at" time
-        vessel_time_str = telemetry.get("vessel_reported_push") if telemetry else None
-        if vessel_time_str:
-            try:
-                update_data["last_pull_at"] = parser.isoparse(vessel_time_str)
-            except:
-                update_data["last_pull_at"] = now
-        else:
-            update_data["last_pull_at"] = now
-    else:
-        # For Shore to Vessel (GET /changes), we use the server's 'now' 
-        # as the last time we successfully distributed data.
-        update_data["last_push_at"] = now
 
-    # 2. Manage the Error History (Stored as a JSON list in last_sync_error)
+    if is_vessel_pushing:
+        # Use vessel's own reported push timestamp if available
+        vessel_time_str = telemetry.get("vessel_reported_push") if telemetry else None
+        try:
+            push_at = parser.isoparse(vessel_time_str) if vessel_time_str else now
+        except:
+            push_at = now
+        update_data["last_pull_at"] = push_at
+
+        # Write vessel's SyncState timestamps into shore's main DB
+        if db:
+            try:
+                for scope, push_key, pull_key in [
+                    ("DEFECT", "vessel_reported_push", "vessel_reported_pull"),
+                    ("CONFIG", "vessel_config_push",   "vessel_config_pull"),
+                ]:
+                    raw_push = telemetry.get(push_key) if telemetry else None
+                    raw_pull = telemetry.get(pull_key) if telemetry else None
+
+                    try:
+                        scope_push_at = parser.isoparse(raw_push) if raw_push else None
+                    except:
+                        scope_push_at = None
+                    try:
+                        scope_pull_at = parser.isoparse(raw_pull) if raw_pull else None
+                    except:
+                        scope_pull_at = None
+
+                    insert_values = {
+                        "vessel_imo": imo,
+                        "sync_scope": scope,
+                        "last_push_at": scope_push_at,
+                        "last_pull_at": scope_pull_at,
+                    }
+
+                    update_set = {}
+                    if scope_push_at:
+                        update_set["last_push_at"] = scope_push_at
+                    if scope_pull_at:
+                        update_set["last_pull_at"] = scope_pull_at
+
+                    # Always run — creates row even with null timestamps
+                    await db.execute(
+                        pg_insert(SyncState)
+                        .values(**insert_values)
+                        .on_conflict_do_update(
+                            index_elements=["vessel_imo", "sync_scope"],
+                            set_=update_set if update_set else {"vessel_imo": imo}
+                        )
+                    )
+                await db.commit()
+            except Exception as e:
+                print(f"❌ SyncState upsert failed for imo={imo}: {e}")
+                traceback.print_exc()
+
+    else:
+        # Vessel pulled from shore — stamp shore's push time in SyncState
+        update_data["last_push_at"] = now
+        if db:
+            await db.execute(
+                pg_insert(SyncState)
+                .values(vessel_imo=imo, sync_scope="DEFECT", last_push_at=now)
+                .on_conflict_do_update(
+                    index_elements=["vessel_imo", "sync_scope"],
+                    set_={"last_push_at": now}
+                )
+            )
+            await db.commit()
+
+    # --- Error history ---
     try:
         current_errors = json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
         if not isinstance(current_errors, list): current_errors = []
@@ -94,7 +145,6 @@ async def record_vessel_sync_time(
         new_err_content = telemetry.get("last_local_error")
         err_type = "vessel_error"
 
-    # 3. Append New Error (Duplicate check)
     if new_err_content:
         is_duplicate = len(current_errors) > 0 and current_errors[0]['msg'] == new_err_content
         if not is_duplicate:
@@ -106,20 +156,16 @@ async def record_vessel_sync_time(
             })
         update_data["last_sync_success"] = False
     else:
-        # Clear success state ONLY if telemetry specifically reports 0 failures
         if telemetry and telemetry.get("failed_items_count") == 0:
             update_data["last_sync_success"] = True
 
-    # 4. Prune: Only keep errors from the last 7 days
     one_week_ago = now - timedelta(days=7)
     pruned_errors = [
-        e for e in current_errors 
+        e for e in current_errors
         if datetime.fromisoformat(e['ts']) > one_week_ago
     ]
-
     update_data["last_sync_error"] = json.dumps(pruned_errors[:50])
 
-    # 5. Save
     await control_db.execute(update(Vessel).where(Vessel.imo == imo).values(update_data))
     await control_db.commit()
            
@@ -130,13 +176,14 @@ async def record_vessel_sync_time(
 @router.post("/heartbeat", dependencies=[Depends(verify_sync_key)])
 async def receive_heartbeat(
     payload: Dict[str, Any],
+    db: AsyncSession = Depends(get_db), 
     control_db: AsyncSession = Depends(get_control_db),
 ):
     imo = payload.get("vessel_imo")
     if not imo:
         raise HTTPException(status_code=400, detail="vessel_imo missing from payload")
     telemetry = payload.get("vessel_telemetry") or payload
-    await record_vessel_sync_time(control_db, imo, is_vessel_pushing=True, telemetry=telemetry)
+    await record_vessel_sync_time(control_db, imo, is_vessel_pushing=True, telemetry=telemetry,db=db )
     return {"status": "heartbeat_received"}
 
 
@@ -158,13 +205,13 @@ async def sync_defect(
             db, Defect, payload.entity_id, payload.version, payload.data, control_db=control_db
         )
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry
+            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry,db=db
         )
         return {"status": "processed", "id": payload.entity_id}
     except Exception as e:
         print(f"❌ DEFECT SYNC ERROR:\n{traceback.format_exc()}")
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e)
+            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e),db=db
         )
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -181,13 +228,13 @@ async def sync_thread(
             db, Thread, payload.entity_id, payload.version, payload.data
         )
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry
+            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry,db=db
         )
         return {"status": "processed", "id": payload.entity_id}
     except Exception as e:
         print(f"❌ THREAD SYNC ERROR:\n{traceback.format_exc()}")
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e)
+            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e),db=db
         )
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -204,13 +251,13 @@ async def sync_attachment(
             db, Attachment, payload.entity_id, payload.version, payload.data
         )
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry
+            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry,db=db
         )
         return {"status": "processed", "id": payload.entity_id}
     except Exception as e:
         print(f"❌ ATTACHMENT SYNC ERROR:\n{traceback.format_exc()}")
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e)
+            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e),db=db
         )
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -227,13 +274,13 @@ async def sync_pr_entry(
             db, PrEntry, payload.entity_id, payload.version, payload.data
         )
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry
+            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry,db=db
         )
         return {"status": "processed", "id": payload.entity_id}
     except Exception as e:
         print(f"❌ PR-ENTRY SYNC ERROR:\n{traceback.format_exc()}")
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e)
+            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e),db=db
         )
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -250,13 +297,13 @@ async def sync_defect_image(
             db, DefectImage, payload.entity_id, payload.version, payload.data
         )
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry
+            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry,db=db
         )
         return {"status": "processed", "id": payload.entity_id}
     except Exception as e:
         print(f"❌ DEFECT-IMAGE SYNC ERROR:\n{traceback.format_exc()}")
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e)
+            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e),db=db
         )
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -273,13 +320,13 @@ async def sync_task(
             db, Task, payload.entity_id, payload.version, payload.data
         )
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry
+            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry,db=db
         )
         return {"status": "processed", "id": payload.entity_id}
     except Exception as e:
         print(f"❌ TASK SYNC ERROR:\n{traceback.format_exc()}")
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e)
+            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e),db=db
         )
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -296,13 +343,13 @@ async def sync_notification(
             db, Notification, payload.entity_id, payload.version, payload.data
         )
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry
+            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry,db=db
         )
         return {"status": "processed", "id": payload.entity_id}
     except Exception as e:
         print(f"❌ NOTIFICATION SYNC ERROR:\n{traceback.format_exc()}")
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e)
+            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e),db=db
         )
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -319,13 +366,13 @@ async def sync_live_feed(
             db, LiveFeed, payload.entity_id, payload.version, payload.data
         )
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry
+            control_db, payload.vessel_imo, is_vessel_pushing=True, telemetry=payload.vessel_telemetry,db=db
         )
         return {"status": "processed", "id": payload.entity_id}
     except Exception as e:
         print(f"❌ LIVE_FEED SYNC ERROR:\n{traceback.format_exc()}")
         await record_vessel_sync_time(
-            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e)
+            control_db, payload.vessel_imo, is_vessel_pushing=True, error_msg=str(e),db=db
         )
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -351,7 +398,7 @@ async def get_changes(
 
     # Record that the vessel pulled from shore — only if IMO provided
     if vessel_imo:
-        await record_vessel_sync_time(control_db, vessel_imo, is_vessel_pushing=False)
+        await record_vessel_sync_time(control_db, vessel_imo, is_vessel_pushing=False,db=db)
 
     models = {
         "defects":       Defect,
