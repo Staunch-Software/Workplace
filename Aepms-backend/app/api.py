@@ -721,6 +721,9 @@ async def upload_monthly_report(
             error_str = str(processing_error).lower()
             if "duplicate key" in error_str and "uq_vessel_report_date" in error_str:
                 logger.info(f"Duplicate report detected, finding existing...")
+
+                # ✅ FIX: Rollback broken transaction before any new query
+                await db.rollback()
                
                 imo_match = re.search(r'imo_number.*?(\d+)', error_str)
                 date_match = re.search(r'report_date.*?([\d-]+)', error_str)
@@ -738,7 +741,46 @@ async def upload_monthly_report(
                     if existing_report:
                         report_id = existing_report.report_id
                         is_new_report = False
+                        missing_params_list = []  # ✅ FIX: prevent NameError below
+                        save_result = {}           # ✅ FIX: prevent NameError below
                         logger.info(f"Found existing report ID: {report_id}")
+
+                        # 2. UPLOAD RAW PDF TO AZURE (same as new report)
+                        try:
+                            result = await db.execute(select(MonthlyReportHeader).where(MonthlyReportHeader.report_id == report_id))
+                            report = result.scalar_one_or_none()
+                            if report:
+                                folder_path = f"main_engine/raw/{report.imo_number}/{report.report_month}"
+                                
+                                blob_url = upload_file_to_azure(
+                                    file_data=contents, 
+                                    filename=file.filename, 
+                                    folder_path=folder_path
+                                )
+                                
+                                if blob_url:
+                                    report.raw_report_url = blob_url
+                                    await db.commit()
+                                    logger.info(f"☁️ Uploaded Raw ME Report to Azure: {blob_url}")
+                        except Exception as blob_err:
+                            logger.error(f"❌ Failed to upload ME report to Blob: {blob_err}")
+
+                        # =========================================================
+                        # 🔥 3. TRIGGER ISO CORRECTION (same as new report)
+                        # =========================================================
+                        try:
+                            logger.info(f"⚙️ Starting ISO Calculation for Report {report_id}...")
+                            iso_corrector = MEISOCorrector(db)
+                            iso_record = await iso_corrector.process_and_save_iso_correction(report_id)
+                            if iso_record:
+                                logger.info(f"✅ ISO Correction successful for Report {report_id}")
+                            else:
+                                logger.warning(f"⚠️ ISO Correction returned None for Report {report_id}")
+                        except Exception as iso_e:
+                            logger.error(f"❌ ISO Correction Failed: {iso_e}", exc_info=True)
+                        # =========================================================
+
+                        logger.info(f"Successfully processed existing report, ID: {report_id}")
                     else:
                         raise Exception(f"Could not find existing report")
                 else:
@@ -811,26 +853,46 @@ async def upload_auxiliary_report(
         contents = await file.read()
         pdf_stream = io.BytesIO(contents)
 
-        # 1. Process the report using the fixed processor logic
-        result = await save_ae_monthly_report_from_pdf(
-            pdf_file_stream=pdf_stream,
-            filename=file.filename,
-            session=db
-        )
+        missing_params_list = []  # ✅ FIX 1: Initialize early to prevent NameError
 
-        missing_params_list = result.get("missing_parameters", [])
-       
-        if not result:
-            raise HTTPException(status_code=500, detail="Failed to process the PDF report.")
-       
-        report_id = result.get("report_id")
-        generator_id = result.get("generator_id")
-        is_duplicate = result.get("is_duplicate", False)
-        report_month = result.get("report_month")
-       
-        # Validation Block
-        if not report_id or not generator_id:
-            raise HTTPException(status_code=400, detail="Report processing succeeded but could not identify Generator or IMO from PDF.")
+        try:
+            # 1. Process the report using the fixed processor logic
+            result = await save_ae_monthly_report_from_pdf(
+                pdf_file_stream=pdf_stream,
+                filename=file.filename,
+                session=db
+            )
+
+            # ✅ FIX 2: Check result BEFORE accessing it (prevents crash if result is None)
+            if not result:
+                raise HTTPException(status_code=500, detail="Failed to process the PDF report.")
+
+            missing_params_list = result.get("missing_parameters", [])
+           
+            report_id = result.get("report_id")
+            generator_id = result.get("generator_id")
+            is_duplicate = result.get("is_duplicate", False)
+            report_month = result.get("report_month")
+           
+            # Validation Block
+            if not report_id or not generator_id:
+                raise HTTPException(status_code=400, detail="Report processing succeeded but could not identify Generator or IMO from PDF.")
+
+        except ValueError as ve:
+            logger.error(f"Validation error during AE upload: {ve}")
+            raise HTTPException(status_code=400, detail=str(ve))
+
+        except Exception as processing_error:
+            error_str = str(processing_error).lower()
+            if "duplicate key" in error_str:
+                logger.info(f"Duplicate report detected, finding existing...")
+
+                # ✅ FIX 3: Rollback broken transaction before any new query
+                await db.rollback()
+
+                raise HTTPException(status_code=409, detail="Duplicate report detected. Please check existing data.")
+            else:
+                raise processing_error
 
         # 🔥 NEW: Upload RAW PDF to Azure Blob (CORRECTLY PLACED & INDENTED)
         try:
@@ -2717,7 +2779,7 @@ async def get_ae_deviation_history_table(
 async def get_me_alert_details_api(
     report_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: Any = Depends(auth.get_current_user)  # ADD
+    current_user: Any = Depends(auth.get_current_user)
 ):
     """
     Get detailed ME parameters for a specific report.
@@ -2725,24 +2787,29 @@ async def get_me_alert_details_api(
     - 'pmax' & 'pcomp': ACTUAL values (ISO Corrected or Observed).
     - 'pmax_dev' & 'pcomp_dev': DEVIATION values from 'me_deviation_history' table.
     """
-    result = await db.execute(select(MonthlyReportHeader).where(MonthlyReportHeader.report_id == report_id))
+    result = await db.execute(
+        select(MonthlyReportHeader)
+        .options(selectinload(MonthlyReportHeader.vessel))
+        .where(MonthlyReportHeader.report_id == report_id)
+    )
     raw_report = result.scalar_one_or_none()
+
     if raw_report:
         allowed_imos, _ = await get_allowed_vessel_imos(current_user)
         if str(raw_report.imo_number) not in [str(x) for x in allowed_imos]:
             raise HTTPException(status_code=403, detail="Access Denied")
+
     try:
         # 1. Fetch Data
-        # raw_report = db.query(MonthlyReportHeader).filter(MonthlyReportHeader.report_id == report_id).first()
         result = await db.execute(select(MonthlyISOPerformanceData).where(MonthlyISOPerformanceData.report_id == report_id))
         iso_data = result.scalar_one_or_none()
-        
+
         # --- Fetch Deviation History Table ---
         result = await db.execute(select(MEDeviationHistory).where(MEDeviationHistory.report_id == report_id))
         dev_history = result.scalar_one_or_none()
         if dev_history:
             print("🔍 MEDeviationHistory columns for report:", report_id)
-            print(list(dev_history.__dict__.keys()))   # Shows real DB column names
+            print(list(dev_history.__dict__.keys()))
             print("👉 pmax_actual =", getattr(dev_history, "pmax_actual", None))
             print("👉 pmax_dev =", getattr(dev_history, "pmax_dev", None))
             print("👉 pmax_avg_dev =", getattr(dev_history, "pmax_avg_dev", None))
@@ -2751,14 +2818,13 @@ async def get_me_alert_details_api(
         else:
             print("⚠ No MEDeviationHistory record for this report")
 
-        # Debugging: Print to console to verify data existence
         if not dev_history:
             print(f"WARNING: No MEDeviationHistory found for report_id {report_id}")
-        
+
         if not raw_report:
             raise HTTPException(status_code=404, detail="Report data not found")
 
-        vessel = raw_report.vessel 
+        vessel = raw_report.vessel  # safe now — loaded via selectinload above
 
         # 2. Helper to safely get float
         def get_val(val):
@@ -2767,47 +2833,36 @@ async def get_me_alert_details_api(
             except:
                 return None
 
-        # 3. Helpers to extract Deviation values safely (Handles potential model naming mismatches)
+        # 3. Helpers to extract Deviation values safely
         def get_dev_val(obj, attr_name):
             if not obj:
                 return None
-            # Try to get attribute, return None if it doesn't exist on the model
             val = getattr(obj, attr_name, None)
             return get_val(val)
 
         # 4. Create the Formatted Actuals Object
-        
+
         # --- FOC Logic ---
         foc_actual = None
         if iso_data and iso_data.fuel_consumption_total_graph_kg_h is not None:
             foc_actual = get_val(iso_data.fuel_consumption_total_graph_kg_h)
         elif raw_report.fo_consumption_mt_hr is not None:
-            foc_actual = get_val(raw_report.fo_consumption_mt_hr) * 1000 
+            foc_actual = get_val(raw_report.fo_consumption_mt_hr) * 1000
 
         # --- Turbo Speed Logic ---
-        # turbo_actual = None
-        # if iso_data and iso_data.turbocharger_speed_graph_x1000_rpm_scaled is not None:
-        #     turbo_actual = get_val(iso_data.turbocharger_speed_graph_x1000_rpm_scaled)
-        # elif raw_report.turbocharger_rpm_avg is not None:
-        #     turbo_actual = get_val(raw_report.turbocharger_rpm_avg) / 1000 
         turbo_actual = get_val(raw_report.turbocharger_rpm_avg)
 
         formatted_actuals = {
-            # -----------------------------------------------------------
-            # REQUESTED MAPPING
-            # -----------------------------------------------------------
-            
             # 1. EXISTING KEYS -> ACTUAL VALUES (ISO or Observed)
             "pmax": get_val(iso_data.max_combustion_pressure_iso_bar) if iso_data else get_val(raw_report.max_comb_pr_avg_bar),
             "pcomp": get_val(iso_data.compression_pressure_iso_bar) if iso_data else get_val(raw_report.comp_pr_avg_bar),
 
             # 2. NEW KEYS -> DEVIATION VALUES (from me_deviation_history)
-            # We try 'pmax_avg_dev' first. If your model uses 'pmax_dev', checking getattr prevents a crash.
             "pmax_dev": get_dev_val(dev_history, "pmax_avg_dev"),
             "pcomp_dev": get_dev_val(dev_history, "pcomp_avg_dev"),
             "cylinder_readings": raw_report.cylinder_readings,
-            # -----------------------------------------------------------
-            "scavair": get_val(iso_data.scav_air_pressure_graph_kg_cm2) if iso_data else get_val(raw_report.scavenge_pr_bar), 
+
+            "scavair": get_val(iso_data.scav_air_pressure_graph_kg_cm2) if iso_data else get_val(raw_report.scavenge_pr_bar),
             "engspeed": get_val(iso_data.engine_speed_graph_rpm) if iso_data else get_val(raw_report.rpm),
             "exh_t/c_inlet": get_val(iso_data.exh_temp_tc_inlet_iso_c) if iso_data else get_val(raw_report.tc_exhaust_gas_temp_in_c),
             "exh_t/c_outlet": get_val(iso_data.exh_temp_tc_outlet_iso_c) if iso_data else get_val(raw_report.tc_exhaust_gas_temp_out_c),
@@ -2830,7 +2885,7 @@ async def get_me_alert_details_api(
 
         result = await db.execute(select(MECriticalAlert).where(MECriticalAlert.report_id == report_id))
         critical_alerts = result.scalars().all()
-       
+
         def map_alert(a):
             return {
                 "parameter": a.metric_name,
@@ -2840,8 +2895,7 @@ async def get_me_alert_details_api(
                 "deviation_pct": float(a.deviation_pct) if a.deviation_pct is not None else None,
                 "unit": a.unit if hasattr(a, 'unit') else ""
             }
-        # secure_raw_url = generate_sas_url(raw_report.raw_report_url)
-        # secure_gen_url = generate_sas_url(raw_report.generated_report_url)
+
         vessel_name_safe = raw_report.vessel.vessel_name.replace(" ", "_") if raw_report.vessel else "Unknown"
         month_safe = raw_report.report_month.replace(" ", "_") if raw_report.report_month else "Unknown"
         raw_filename = f"{vessel_name_safe}_Monthly_Log_{month_safe}.pdf"
@@ -2849,33 +2903,35 @@ async def get_me_alert_details_api(
         secure_raw_view_url = generate_sas_url(raw_report.raw_report_url)
         secure_gen_view_url = generate_sas_url(raw_report.generated_report_url)
         secure_raw_download_url = generate_sas_url(
-            raw_report.raw_report_url, 
+            raw_report.raw_report_url,
             download_name=raw_filename
         )
         secure_gen_download_url = generate_sas_url(
-            raw_report.generated_report_url, 
+            raw_report.generated_report_url,
             download_name=gen_filename
         )
-
 
         return {
             "report_id": report_id,
             "mcr_limit_kw": float(vessel.mcr_limit_kw) if vessel and vessel.mcr_limit_kw is not None else None,
             "mcr_limit_percentage": float(vessel.mcr_limit_percentage) if vessel and vessel.mcr_limit_percentage is not None else None,
             "formatted_actuals": formatted_actuals,
-            "raw_report_view_url": secure_raw_view_url,  
-            "raw_report_download_url": secure_raw_download_url,  
-            "generated_report_view_url": secure_gen_view_url, 
-            "generated_report_download_url": secure_gen_download_url, 
+            "raw_report_view_url": secure_raw_view_url,
+            "raw_report_download_url": secure_raw_download_url,
+            "generated_report_view_url": secure_gen_view_url,
+            "generated_report_download_url": secure_gen_download_url,
             "critical": [map_alert(a) for a in critical_alerts],
             "warning": [map_alert(a) for a in warning_alerts],
             "normal": [map_alert(a) for a in normal_alerts]
         }
-       
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching ME alert details: {e}", exc_info=True)
-        # Return 500 but verify logs to see if it's an attribute error
         raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================
 # ME DEVIATION HISTORY ENDPOINT (FIXED UNIT CONVERSION)
 # ============================================
@@ -3142,137 +3198,137 @@ async def get_me_baseline_reference(
 
 
 
-@app.get("/api/me-engine/alert-details/{report_id}")
-async def get_me_alert_details_api(
-    report_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: Any = Depends(auth.get_current_user)  # ADD
-):
-    """
-    Get detailed ME parameters for a specific report.
-    UPDATED MAPPING:
-    - 'pmax' & 'pcomp': ACTUAL values (ISO Corrected or Observed).
-    - 'pmax_dev' & 'pcomp_dev': DEVIATION values from 'me_deviation_history' table.
-    """
-    raw_report = db.query(MonthlyReportHeader).filter(
-        MonthlyReportHeader.report_id == report_id
-    ).first()
-    if raw_report:
-        allowed_imos, _ = await get_allowed_vessel_imos(current_user)
-        if str(raw_report.imo_number) not in [str(x) for x in allowed_imos]:
-            raise HTTPException(status_code=403, detail="Access Denied")
-    try:
-        # 1. Fetch Data
-        # raw_report = db.query(MonthlyReportHeader).filter(MonthlyReportHeader.report_id == report_id).first()
-        iso_data = db.query(MonthlyISOPerformanceData).filter(MonthlyISOPerformanceData.report_id == report_id).first()
+# @app.get("/api/me-engine/alert-details/{report_id}")
+# async def get_me_alert_details_api(
+#     report_id: int,
+#     db: AsyncSession = Depends(get_db),
+#     current_user: Any = Depends(auth.get_current_user)  # ADD
+# ):
+    # """
+    # Get detailed ME parameters for a specific report.
+    # UPDATED MAPPING:
+    # - 'pmax' & 'pcomp': ACTUAL values (ISO Corrected or Observed).
+    # - 'pmax_dev' & 'pcomp_dev': DEVIATION values from 'me_deviation_history' table.
+    # """
+    # raw_report = db.query(MonthlyReportHeader).filter(
+    #     MonthlyReportHeader.report_id == report_id
+    # ).first()
+    # if raw_report:
+    #     allowed_imos, _ = await get_allowed_vessel_imos(current_user)
+    #     if str(raw_report.imo_number) not in [str(x) for x in allowed_imos]:
+    #         raise HTTPException(status_code=403, detail="Access Denied")
+    # try:
+    #     # 1. Fetch Data
+    #     # raw_report = db.query(MonthlyReportHeader).filter(MonthlyReportHeader.report_id == report_id).first()
+    #     iso_data = db.query(MonthlyISOPerformanceData).filter(MonthlyISOPerformanceData.report_id == report_id).first()
         
-        # --- Fetch Deviation History Table ---
-        dev_history = db.query(MEDeviationHistory).filter(MEDeviationHistory.report_id == report_id).first()
-        if dev_history:
-            print("🔍 MEDeviationHistory columns for report:", report_id)
-            print(list(dev_history.__dict__.keys()))   # Shows real DB column names
-            print("👉 pmax_actual =", getattr(dev_history, "pmax_actual", None))
-            print("👉 pmax_dev =", getattr(dev_history, "pmax_dev", None))
-            print("👉 pmax_avg_dev =", getattr(dev_history, "pmax_avg_dev", None))
-            print("👉 pcomp_dev =", getattr(dev_history, "pcomp_dev", None))
-            print("👉 pcomp_avg_dev =", getattr(dev_history, "pcomp_avg_dev", None))
-        else:
-            print("⚠ No MEDeviationHistory record for this report")
+    #     # --- Fetch Deviation History Table ---
+    #     dev_history = db.query(MEDeviationHistory).filter(MEDeviationHistory.report_id == report_id).first()
+    #     if dev_history:
+    #         print("🔍 MEDeviationHistory columns for report:", report_id)
+    #         print(list(dev_history.__dict__.keys()))   # Shows real DB column names
+    #         print("👉 pmax_actual =", getattr(dev_history, "pmax_actual", None))
+    #         print("👉 pmax_dev =", getattr(dev_history, "pmax_dev", None))
+    #         print("👉 pmax_avg_dev =", getattr(dev_history, "pmax_avg_dev", None))
+    #         print("👉 pcomp_dev =", getattr(dev_history, "pcomp_dev", None))
+    #         print("👉 pcomp_avg_dev =", getattr(dev_history, "pcomp_avg_dev", None))
+    #     else:
+    #         print("⚠ No MEDeviationHistory record for this report")
 
-        # Debugging: Print to console to verify data existence
-        if not dev_history:
-            print(f"WARNING: No MEDeviationHistory found for report_id {report_id}")
+    #     # Debugging: Print to console to verify data existence
+    #     if not dev_history:
+    #         print(f"WARNING: No MEDeviationHistory found for report_id {report_id}")
         
-        if not raw_report:
-            raise HTTPException(status_code=404, detail="Report data not found")
+    #     if not raw_report:
+    #         raise HTTPException(status_code=404, detail="Report data not found")
 
-        # 2. Helper to safely get float
-        def get_val(val):
-            try:
-                return float(val) if val is not None else None
-            except:
-                return None
+    #     # 2. Helper to safely get float
+    #     def get_val(val):
+    #         try:
+    #             return float(val) if val is not None else None
+    #         except:
+    #             return None
 
-        # 3. Helpers to extract Deviation values safely (Handles potential model naming mismatches)
-        def get_dev_val(obj, attr_name):
-            if not obj:
-                return None
-            # Try to get attribute, return None if it doesn't exist on the model
-            val = getattr(obj, attr_name, None)
-            return get_val(val)
+    #     # 3. Helpers to extract Deviation values safely (Handles potential model naming mismatches)
+    #     def get_dev_val(obj, attr_name):
+    #         if not obj:
+    #             return None
+    #         # Try to get attribute, return None if it doesn't exist on the model
+    #         val = getattr(obj, attr_name, None)
+    #         return get_val(val)
 
-        # 4. Create the Formatted Actuals Object
+    #     # 4. Create the Formatted Actuals Object
         
-        # --- FOC Logic ---
-        foc_actual = None
-        if iso_data and iso_data.fuel_consumption_total_graph_kg_h is not None:
-            foc_actual = get_val(iso_data.fuel_consumption_total_graph_kg_h)
-        elif raw_report.fo_consumption_mt_hr is not None:
-            foc_actual = get_val(raw_report.fo_consumption_mt_hr) * 1000 
+    #     # --- FOC Logic ---
+    #     foc_actual = None
+    #     if iso_data and iso_data.fuel_consumption_total_graph_kg_h is not None:
+    #         foc_actual = get_val(iso_data.fuel_consumption_total_graph_kg_h)
+    #     elif raw_report.fo_consumption_mt_hr is not None:
+    #         foc_actual = get_val(raw_report.fo_consumption_mt_hr) * 1000 
 
-        # --- Turbo Speed Logic ---
-        # turbo_actual = None
-        # if iso_data and iso_data.turbocharger_speed_graph_x1000_rpm_scaled is not None:
-        #     turbo_actual = get_val(iso_data.turbocharger_speed_graph_x1000_rpm_scaled)
-        # elif raw_report.turbocharger_rpm_avg is not None:
-        #     turbo_actual = get_val(raw_report.turbocharger_rpm_avg) / 1000 
-        turbo_actual = get_val(raw_report.turbocharger_rpm_avg)
+    #     # --- Turbo Speed Logic ---
+    #     # turbo_actual = None
+    #     # if iso_data and iso_data.turbocharger_speed_graph_x1000_rpm_scaled is not None:
+    #     #     turbo_actual = get_val(iso_data.turbocharger_speed_graph_x1000_rpm_scaled)
+    #     # elif raw_report.turbocharger_rpm_avg is not None:
+    #     #     turbo_actual = get_val(raw_report.turbocharger_rpm_avg) / 1000 
+    #     turbo_actual = get_val(raw_report.turbocharger_rpm_avg)
 
-        formatted_actuals = {
-            # -----------------------------------------------------------
-            # REQUESTED MAPPING
-            # -----------------------------------------------------------
+    #     formatted_actuals = {
+    #         # -----------------------------------------------------------
+    #         # REQUESTED MAPPING
+    #         # -----------------------------------------------------------
             
-            # 1. EXISTING KEYS -> ACTUAL VALUES (ISO or Observed)
-            "pmax": get_val(iso_data.max_combustion_pressure_iso_bar) if iso_data else get_val(raw_report.max_comb_pr_avg_bar),
-            "pcomp": get_val(iso_data.compression_pressure_iso_bar) if iso_data else get_val(raw_report.comp_pr_avg_bar),
+    #         # 1. EXISTING KEYS -> ACTUAL VALUES (ISO or Observed)
+    #         "pmax": get_val(iso_data.max_combustion_pressure_iso_bar) if iso_data else get_val(raw_report.max_comb_pr_avg_bar),
+    #         "pcomp": get_val(iso_data.compression_pressure_iso_bar) if iso_data else get_val(raw_report.comp_pr_avg_bar),
 
-            # 2. NEW KEYS -> DEVIATION VALUES (from me_deviation_history)
-            # We try 'pmax_avg_dev' first. If your model uses 'pmax_dev', checking getattr prevents a crash.
-            "pmax_dev": get_dev_val(dev_history, "pmax_avg_dev"),
-            "pcomp_dev": get_dev_val(dev_history, "pcomp_avg_dev"),
+    #         # 2. NEW KEYS -> DEVIATION VALUES (from me_deviation_history)
+    #         # We try 'pmax_avg_dev' first. If your model uses 'pmax_dev', checking getattr prevents a crash.
+    #         "pmax_dev": get_dev_val(dev_history, "pmax_avg_dev"),
+    #         "pcomp_dev": get_dev_val(dev_history, "pcomp_avg_dev"),
 
-            # -----------------------------------------------------------
-            "scavair": get_val(iso_data.scav_air_pressure_graph_kg_cm2) if iso_data else get_val(raw_report.scavenge_pr_bar), 
-            "engspeed": get_val(iso_data.engine_speed_graph_rpm) if iso_data else get_val(raw_report.rpm),
-            "exh_t/c_inlet": get_val(iso_data.exh_temp_tc_inlet_iso_c) if iso_data else get_val(raw_report.tc_exhaust_gas_temp_in_c),
-            "exh_t/c_outlet": get_val(iso_data.exh_temp_tc_outlet_iso_c) if iso_data else get_val(raw_report.tc_exhaust_gas_temp_out_c),
-            "exh_cylinder_outlet": get_val(iso_data.cyl_exhaust_gas_temp_outlet_graph_c) if iso_data else get_val(raw_report.exh_temp_cylinder_outlet_ave_c),
-            "fipi": get_val(iso_data.fuel_inj_pump_index_graph_mm) if iso_data else get_val(raw_report.fuel_injection_pump_index_mm),
-            "sfoc": get_val(iso_data.sfoc_graph_g_kwh) if iso_data else get_val(raw_report.sfoc_calculated_g_kwh),
-            "turbospeed": turbo_actual,
-            "foc": foc_actual,
-            "propeller": get_val(iso_data.propeller_margin_percent) if iso_data else None,
-            "load_percentage": get_val(iso_data.load_percentage) if iso_data else get_val(raw_report.load_percent),
-            "power": get_val(raw_report.shaft_power_kw) or get_val(raw_report.effective_power_kw)
-        }
+    #         # -----------------------------------------------------------
+    #         "scavair": get_val(iso_data.scav_air_pressure_graph_kg_cm2) if iso_data else get_val(raw_report.scavenge_pr_bar), 
+    #         "engspeed": get_val(iso_data.engine_speed_graph_rpm) if iso_data else get_val(raw_report.rpm),
+    #         "exh_t/c_inlet": get_val(iso_data.exh_temp_tc_inlet_iso_c) if iso_data else get_val(raw_report.tc_exhaust_gas_temp_in_c),
+    #         "exh_t/c_outlet": get_val(iso_data.exh_temp_tc_outlet_iso_c) if iso_data else get_val(raw_report.tc_exhaust_gas_temp_out_c),
+    #         "exh_cylinder_outlet": get_val(iso_data.cyl_exhaust_gas_temp_outlet_graph_c) if iso_data else get_val(raw_report.exh_temp_cylinder_outlet_ave_c),
+    #         "fipi": get_val(iso_data.fuel_inj_pump_index_graph_mm) if iso_data else get_val(raw_report.fuel_injection_pump_index_mm),
+    #         "sfoc": get_val(iso_data.sfoc_graph_g_kwh) if iso_data else get_val(raw_report.sfoc_calculated_g_kwh),
+    #         "turbospeed": turbo_actual,
+    #         "foc": foc_actual,
+    #         "propeller": get_val(iso_data.propeller_margin_percent) if iso_data else None,
+    #         "load_percentage": get_val(iso_data.load_percentage) if iso_data else get_val(raw_report.load_percent),
+    #         "power": get_val(raw_report.shaft_power_kw) or get_val(raw_report.effective_power_kw)
+    #     }
 
-        # 5. Fetch the Alert Statuses
-        normal_alerts = db.query(MENormalStatus).filter_by(report_id=report_id).all()
-        warning_alerts = db.query(MEWarningAlert).filter_by(report_id=report_id).all()
-        critical_alerts = db.query(MECriticalAlert).filter_by(report_id=report_id).all()
+    #     # 5. Fetch the Alert Statuses
+    #     normal_alerts = db.query(MENormalStatus).filter_by(report_id=report_id).all()
+    #     warning_alerts = db.query(MEWarningAlert).filter_by(report_id=report_id).all()
+    #     critical_alerts = db.query(MECriticalAlert).filter_by(report_id=report_id).all()
         
-        def map_alert(a):
-            return {
-                "parameter": a.metric_name,
-                "baseline": float(a.baseline_value) if a.baseline_value is not None else None,
-                "actual": float(a.actual_value) if a.actual_value is not None else None,
-                "deviation": float(a.deviation) if a.deviation is not None else None,
-                "deviation_pct": float(a.deviation_pct) if a.deviation_pct is not None else None,
-                "unit": a.unit if hasattr(a, 'unit') else ""
-            }
+    #     def map_alert(a):
+    #         return {
+    #             "parameter": a.metric_name,
+    #             "baseline": float(a.baseline_value) if a.baseline_value is not None else None,
+    #             "actual": float(a.actual_value) if a.actual_value is not None else None,
+    #             "deviation": float(a.deviation) if a.deviation is not None else None,
+    #             "deviation_pct": float(a.deviation_pct) if a.deviation_pct is not None else None,
+    #             "unit": a.unit if hasattr(a, 'unit') else ""
+    #         }
 
-        return {
-            "report_id": report_id,
-            "formatted_actuals": formatted_actuals,
-            "critical": [map_alert(a) for a in critical_alerts],
-            "warning": [map_alert(a) for a in warning_alerts],
-            "normal": [map_alert(a) for a in normal_alerts]
-        }
+    #     return {
+    #         "report_id": report_id,
+    #         "formatted_actuals": formatted_actuals,
+    #         "critical": [map_alert(a) for a in critical_alerts],
+    #         "warning": [map_alert(a) for a in warning_alerts],
+    #         "normal": [map_alert(a) for a in normal_alerts]
+    #     }
         
-    except Exception as e:
-        logger.error(f"Error fetching ME alert details: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    # except Exception as e:
+    #     logger.error(f"Error fetching ME alert details: {e}", exc_info=True)
+    #     raise HTTPException(status_code=500, detail=str(e))
 # --- ADD THIS TO app/api.py ---
 
 

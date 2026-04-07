@@ -11520,13 +11520,17 @@ export default function Performance({
             const sourceReports =
               baselineSource === "upload"
                 ? monthlyReports
-                : (availableReports.length > 0
-                    ? availableReports
-                    : allMonthlyReports
-                  ).filter(
-                    (r) =>
-                      !r.report_date || new Date(r.report_date) >= oneYearAgo,
-                  );
+                : displayedReportIds.length > 1
+                  ? availableReports.filter((r) =>
+                      displayedReportIds.includes(r.report_id || r.value)
+                    )
+                  : (availableReports.length > 0
+                      ? availableReports
+                      : allMonthlyReports
+                    ).filter(
+                      (r) =>
+                        !r.report_date || new Date(r.report_date) >= oneYearAgo,
+                    );
 
             // ── Helpers ───────────────────────────────────────────────────────
             const drawDashedSeg = (
@@ -14857,12 +14861,18 @@ export default function Performance({
 
                 const scatterPoints = (
                   baselineSource === "upload"
-                    ? monthlyReports // upload mode: only the single uploaded report
-                    : availableReports.filter((report) => {
-                        if (!report.report_date) return true;
-                        const reportDate = new Date(report.report_date);
-                        return reportDate >= oneYearAgo;
-                      })
+                    ? monthlyReports
+                    : displayedReportIds.length > 1
+                      // Multiple selected → show ONLY selected reports
+                      ? availableReports.filter((r) =>
+                          displayedReportIds.includes(r.report_id || r.value)
+                        )
+                      // Single selected → show selected + last 1 year
+                      : availableReports.filter((report) => {
+                          if (!report.report_date) return true;
+                          const reportDate = new Date(report.report_date);
+                          return reportDate >= oneYearAgo;
+                        })
                 )
                   .map((report) => ({
                     load: isAuxMode ? report.load_percentage : report.load,
