@@ -70,42 +70,49 @@ async def record_vessel_sync_time(
 
         # Write vessel's SyncState timestamps into shore's main DB
         if db:
-            for scope, push_key, pull_key in [
-                ("DEFECT", "vessel_reported_push", "vessel_reported_pull"),
-                ("CONFIG", "vessel_config_push",   "vessel_config_pull"),
-            ]:
-                raw_push = telemetry.get(push_key) if telemetry else None
-                raw_pull = telemetry.get(pull_key) if telemetry else None
+            try:
+                for scope, push_key, pull_key in [
+                    ("DEFECT", "vessel_reported_push", "vessel_reported_pull"),
+                    ("CONFIG", "vessel_config_push",   "vessel_config_pull"),
+                ]:
+                    raw_push = telemetry.get(push_key) if telemetry else None
+                    raw_pull = telemetry.get(pull_key) if telemetry else None
 
-                try:
-                    scope_push_at = parser.isoparse(raw_push) if raw_push else None
-                except:
-                    scope_push_at = None
-                try:
-                    scope_pull_at = parser.isoparse(raw_pull) if raw_pull else None
-                except:
-                    scope_pull_at = None
+                    try:
+                        scope_push_at = parser.isoparse(raw_push) if raw_push else None
+                    except:
+                        scope_push_at = None
+                    try:
+                        scope_pull_at = parser.isoparse(raw_pull) if raw_pull else None
+                    except:
+                        scope_pull_at = None
 
-                update_set = {}
-                values = {"vessel_imo": imo, "sync_scope": scope}
+                    insert_values = {
+                        "vessel_imo": imo,
+                        "sync_scope": scope,
+                        "last_push_at": scope_push_at,
+                        "last_pull_at": scope_pull_at,
+                    }
 
-                if scope_push_at:
-                    values["last_push_at"] = scope_push_at
-                    update_set["last_push_at"] = scope_push_at
-                if scope_pull_at:
-                    values["last_pull_at"] = scope_pull_at
-                    update_set["last_pull_at"] = scope_pull_at
+                    update_set = {}
+                    if scope_push_at:
+                        update_set["last_push_at"] = scope_push_at
+                    if scope_pull_at:
+                        update_set["last_pull_at"] = scope_pull_at
 
-                if update_set:
+                    # Always run — creates row even with null timestamps
                     await db.execute(
                         pg_insert(SyncState)
-                        .values(**values)
+                        .values(**insert_values)
                         .on_conflict_do_update(
                             index_elements=["vessel_imo", "sync_scope"],
-                            set_=update_set
+                            set_=update_set if update_set else {"vessel_imo": imo}
                         )
                     )
-            await db.commit()
+                await db.commit()
+            except Exception as e:
+                print(f"❌ SyncState upsert failed for imo={imo}: {e}")
+                traceback.print_exc()
 
     else:
         # Vessel pulled from shore — stamp shore's push time in SyncState
@@ -169,6 +176,7 @@ async def record_vessel_sync_time(
 @router.post("/heartbeat", dependencies=[Depends(verify_sync_key)])
 async def receive_heartbeat(
     payload: Dict[str, Any],
+    db: AsyncSession = Depends(get_db), 
     control_db: AsyncSession = Depends(get_control_db),
 ):
     imo = payload.get("vessel_imo")
