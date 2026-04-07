@@ -27,7 +27,7 @@ async def sync_ticket(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
     try:
         await SyncService.apply_snapshot(db, Ticket, payload.entity_id, payload.version, payload.data)
         # Track last_push_at per vessel (vessel pushed a ticket to shore)
-        vessel_imo = payload.data.get("vessel_imo") or payload.data.get("vesselImo")
+        vessel_imo = payload.vessel_imo or payload.data.get("vessel_imo") or payload.data.get("vesselImo")
         if vessel_imo:
             from models.sync import SyncState
             state = (await db.execute(
