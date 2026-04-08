@@ -2141,14 +2141,17 @@ async def vessel_overdue_workflow(
             r.overdue_remarks = f"{existing}\n[{timestamp}] {request.remarks}".strip()
             r.is_overdue_accepted = None  # NULL means Pending → new approval required
             r.updated_at = datetime.utcnow()
+            r.version = (r.version or 1) + 1
         elif request.action == "ACCEPT":
             r.is_overdue_accepted = True  # True means Accepted
             justification_text = r.overdue_remarks or justification_text
             r.updated_at = datetime.utcnow()
+            r.version = (r.version or 1) + 1
         elif request.action == "DECLINE":
             r.is_overdue_accepted = False  # False means Declined
             justification_text = r.overdue_remarks or justification_text
             r.updated_at = datetime.utcnow()
+            r.version = (r.version or 1) + 1
 
     # 5. 🔥 UPDATED: Trigger FLEET FEED + MY FEED with proper routing
     control_db = SessionControl()
