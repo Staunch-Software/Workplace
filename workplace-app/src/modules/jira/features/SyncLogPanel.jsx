@@ -1,9 +1,16 @@
 import { useState, useEffect } from 'react'
 import axiosJira from '../api/axiosJira'
 
+function toUtcDate(isoStr) {
+  if (!isoStr) return null
+  const s = isoStr.trim()
+  const hasTimezone = s.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(s)
+  return new Date(hasTimezone ? s : s + 'Z')
+}
+
 function formatRelative(isoStr) {
   if (!isoStr) return '—'
-  const diff = Date.now() - new Date(isoStr).getTime()
+  const diff = Date.now() - toUtcDate(isoStr).getTime()
   const mins = Math.floor(diff / 60000)
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
@@ -15,7 +22,7 @@ function formatRelative(isoStr) {
 
 function formatAbsolute(isoStr) {
   if (!isoStr) return '—'
-  const d = new Date(isoStr)
+  const d = toUtcDate(isoStr)
   if (isNaN(d.getTime())) return '—'
   return d.toLocaleString('en-GB', {
     day: '2-digit', month: 'short', year: '2-digit',
@@ -115,8 +122,8 @@ export default function SyncLogPanel({ onClose }) {
           <div className="slp-vessel-table">
             <div className="slp-vessel-header-row">
               <span>Vessel</span>
-              <span>Sent to Vessel</span>
-              <span>Received from Vessel</span>
+              <span style={{ textAlign: 'right' }}>Sent to Vessel</span>
+              <span style={{ textAlign: 'right' }}>Received from Vessel</span>
             </div>
             {vessels.map(v => (
               <div key={v.imo} className="slp-vessel-row">

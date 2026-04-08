@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Integer, DateTime, Text, Boolean
+from sqlalchemy import Column, String, Integer, DateTime, Text, Boolean, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -46,6 +46,10 @@ class SyncState(Base):
     last_pull_at = Column(DateTime(timezone=True), nullable=True)
 
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    __table_args__ = (
+        UniqueConstraint("vessel_imo", "sync_scope", name="uq_vessel_sync_scope"),
+    )
 
 class SyncConflict(Base):
     __tablename__ = "sync_conflicts"
