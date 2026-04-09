@@ -266,7 +266,7 @@ const MultiSelectDropdown = ({
               backgroundColor: "white",
               scrollbarWidth: "thin",
               scrollbarColor: "#6b7280 #f1f1f1",
-              maxHeight: "230px",
+              maxHeight: "200px",
             }}
           >
             {activeYear && groupedOptions[activeYear] ? (
@@ -816,7 +816,7 @@ const RawDownloadDropdown = ({ options, onDownload, label }) => {
               flexDirection: "column",
               scrollbarWidth: "thin",
               scrollbarColor: "#94a3b8 #f1f5f9",
-              maxHeight: "230px",
+              maxHeight: "200px",
             }}
           >
             {sortedYears.map((year) => (
