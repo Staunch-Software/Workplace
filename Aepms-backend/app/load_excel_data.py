@@ -302,16 +302,22 @@ async def load_excel_to_database(excel_path: Optional[str] = None, ae_excel_path
         
         print("="*80)
         
+        # REPLACE WITH
         if total_processed > 0:
             logger.info(f"Data loading pipeline completed successfully! Processed {total_processed:,} records")
-            return True
+            result = True
         else:
             logger.error("No data was successfully loaded")
-            return False
+            result = False
+        return result
     
     except Exception as e:
         logger.error(f"Unexpected error in data loading pipeline: {e}", exc_info=True)
         return False
+    
+    finally:
+        from .database import engine
+        await engine.dispose()
 
 def main():
     """Main function with command line interface."""
@@ -447,6 +453,7 @@ ENVIRONMENT VARIABLES:
             logger.info(f"Processing Auxiliary Engine Excel file: {ae_excel_path}")
         
         # Main processing
+        # REPLACE WITH
         success = asyncio.run(load_excel_to_database(
             excel_path=excel_path,
             ae_excel_path=ae_excel_path,
@@ -454,17 +461,9 @@ ENVIRONMENT VARIABLES:
             dry_run=args.dry_run
         ))
 
-        
         if success:
             if not args.dry_run:
                 print("\n✅ Data loading completed successfully!")
-                
-                table_info = asyncio.run(get_table_info())
-                if table_info:
-                    print("\nFinal Database State:")
-                    print("-" * 30)
-                    for table_name, row_count in table_info.items():
-                        print(f"{table_name}: {row_count:,} rows")
             return 0
         else:
             print("\n❌ Data loading failed!")
