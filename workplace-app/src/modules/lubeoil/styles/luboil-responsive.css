@@ -529,7 +529,7 @@ div.section-header-enhanced {
 
 /* --- 1. BASE TABLE SETTINGS --- */
 .matrix-scroll-container {
-  max-height: 514px ;
+  max-height: 520px ;
   overflow: auto !important;
   /* This creates the scrollbars */
   scrollbar-width: thin !important;
