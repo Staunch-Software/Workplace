@@ -412,7 +412,7 @@ async def upload_luboil_report(
             clean_filename = file.filename.replace(" ", "_").replace("(", "").replace(")", "")
             
             # Create path: lube_oil/raw/YYYY-MM
-            folder_path = f"lube_oil/raw/{datetime.now().strftime('%Y-%m')}"
+            folder_path = f"lube_oil/raw/{datetime.now(timezone.utc).strftime('%Y-%m')}"
             
             logger.info(f"Uploading to Azure: {folder_path}/{clean_filename}")
             
@@ -479,7 +479,7 @@ async def upload_luboil_report(
                 event_type="NEW_REPORT",
                 priority=event_priority,
                 message=full_structured_message,
-                created_at=datetime.utcnow() 
+                created_at=datetime.now(timezone.utc)
             )
             db.add(new_event)
             await db.commit()
@@ -694,7 +694,7 @@ async def update_luboil_remarks(
                     sample.is_approval_pending = False
                 
                 # Auto-append decline note to chat
-                timestamp_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+                timestamp_str = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M")
                 decline_note = f"\n[{timestamp_str}] System: Shore declined resolution request. Issue remains OPEN."
                 sample.office_remarks = (sample.office_remarks or "") + decline_note
                 
@@ -741,7 +741,7 @@ async def update_luboil_remarks(
                 sample.is_approval_pending = False
             
             # Prepare Reopen message for Chat History
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             timestamp = now.strftime("%d/%m/%Y %H:%M")
             sender_name = userData.get('full_name', 'User') if isinstance(userData, dict) else getattr(userData, 'full_name', 'User')
             
@@ -854,13 +854,13 @@ async def update_luboil_remarks(
                         if matched_user:
                             break
                     if matched_user and matched_user.id != sender_id and matched_user.id not in processed_uids:
-                        db.add(Notification(recipient_id=matched_user.id, sender_name=sender_name, message=f"{sender_name} mentioned you in {request.machinery_name} ({vessel.name})", notification_type="mention", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
+                        db.add(Notification(recipient_id=matched_user.id, sender_name=sender_name, message=f"{sender_name} mentioned you in {request.machinery_name} ({vessel.name})", notification_type="mention", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.now(timezone.utc)))
                         try:
                             line_1 = f"YOU WERE MENTIONED BY {sender_name.upper()}"
                             msg_snippet = entry['text'].split(': ')[1] if ': ' in entry['text'] else entry['text']
                             line_2 = f"{sender_name} tagged you in a comment for {request.machinery_name}."
                             line_3 = f"Comment: \"{msg_snippet[:100]}...\" | Vessel: {vessel.name}"
-                            db.add(LuboilEvent(vessel_name=vessel.name, imo=str(vessel.imo), machinery_name=sample.machinery_name, equipment_code=request.machinery_name, event_type="MENTION", recipient_id=matched_user.id, priority="INFO", message=f"{line_1}\n{line_2}\n{line_3}", sample_id=sample.sample_id, created_at=datetime.utcnow()))
+                            db.add(LuboilEvent(vessel_name=vessel.name, imo=str(vessel.imo), machinery_name=sample.machinery_name, equipment_code=request.machinery_name, event_type="MENTION", recipient_id=matched_user.id, priority="INFO", message=f"{line_1}\n{line_2}\n{line_3}", sample_id=sample.sample_id, created_at=datetime.now(timezone.utc)))
                         except Exception: pass
                         processed_uids.add(matched_user.id)
 
@@ -878,14 +878,14 @@ async def update_luboil_remarks(
                         User.vessels.any(Vessel.imo == str(vessel.imo))
                     ).all()
                     for staff in assigned_shore:
-                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=approval_notif_msg, notification_type="status_change", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
+                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=approval_notif_msg, notification_type="status_change", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.now(timezone.utc)))
                 else:
                     assigned_vessel = _notif_ctrl.query(User).filter(
                         User.role == "VESSEL",
                         User.vessels.any(Vessel.imo == str(vessel.imo))
                     ).all()
                     for staff in assigned_vessel:
-                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=approval_notif_msg, notification_type="status_change", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
+                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=approval_notif_msg, notification_type="status_change", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.now(timezone.utc)))
 
             if request.is_image_required is True:
                 vessel_staff = _notif_ctrl.query(User).filter(
@@ -894,7 +894,7 @@ async def update_luboil_remarks(
                 ).all()
                 for staff in vessel_staff:
                     if str(staff.id) != str(sender_id):
-                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=f"Mandatory Image requested: {request.machinery_name} ({vessel.name})", notification_type="mandatory", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
+                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=f"Mandatory Image requested: {request.machinery_name} ({vessel.name})", notification_type="mandatory", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.now(timezone.utc)))
 
             if request.is_resampling_required is True:
                 vessel_staff = _notif_ctrl.query(User).filter(
@@ -903,7 +903,7 @@ async def update_luboil_remarks(
                 ).all()
                 for staff in vessel_staff:
                     if str(staff.id) != str(sender_id):
-                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=f"Mandatory Resample requested: {request.machinery_name} ({vessel.name})", notification_type="mandatory", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
+                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=f"Mandatory Resample requested: {request.machinery_name} ({vessel.name})", notification_type="mandatory", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.now(timezone.utc)))
         except Exception as notif_err:
             logger.error(f"Notification dispatch failed (non-fatal): {notif_err}", exc_info=True)
         finally:
@@ -921,12 +921,12 @@ async def update_luboil_remarks(
                     priority=feed_priority,
                     message=feed_msg,
                     sample_id=sample.sample_id,
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(timezone.utc)
                 ))
             except Exception as feed_err:
                 logger.error(f"Live feed commit failed (non-fatal): {feed_err}", exc_info=True)
         sample.version = (sample.version or 1) + 1
-        sample.updated_at = datetime.utcnow()
+        sample.updated_at = datetime.now(timezone.utc)
 
         await db.commit()
 
@@ -1229,7 +1229,7 @@ async def get_luboil_fleet_overview(
 
                     if target_priority:
                         # CHANGE: Set cooldown to 15 days
-                        cooldown_overdue = datetime.utcnow() - timedelta(days=15)
+                        cooldown_overdue = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=15)
                         
                         res = await db.execute(
                             sa_select(LuboilEvent)
@@ -1256,14 +1256,14 @@ async def get_luboil_fleet_overview(
                                 priority=target_priority,
                                 message=f"{line_1}\n{line_2}\n{line_3}",
                                 sample_id=latest_sample.sample_id,
-                                created_at=datetime.utcnow()
+                                created_at=datetime.now(timezone.utc)
                             ))
                             await db.commit()
 
                     # --- 2. RESAMPLING MANDATORY REMINDER (Every 15 Days until Resolved) ---
                     if latest_sample.is_resampling_required and not latest_sample.is_resolved:
                         # Set cooldown to 15 days
-                        cooldown_resample = datetime.utcnow() - timedelta(days=15)
+                        cooldown_resample = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=15)
                         
                         res = await db.execute(
                             sa_select(LuboilEvent)
@@ -1289,7 +1289,7 @@ async def get_luboil_fleet_overview(
                                 priority="WARNING",
                                 message=f"{line_1}\n{line_2}\n{line_3}",
                                 sample_id=latest_sample.sample_id,
-                                created_at=datetime.utcnow()
+                                created_at=datetime.now(timezone.utc)
                             ))
                             await db.commit()
                     # =========================================================
@@ -1695,13 +1695,13 @@ async def upload_luboil_attachment(
                     priority="SUCCESS",
                     message=full_feed_msg, # Restructured message
                     sample_id=sample.sample_id,
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(timezone.utc)
                 ))
                 logger.info(f"Live Feed triggered for evidence upload by {sender_name}")
             except Exception as feed_err:
                 logger.error(f"Failed to add evidence event to Live Feed: {feed_err}")
             sample.version = (sample.version or 1) + 1
-            sample.updated_at = datetime.utcnow()
+            sample.updated_at = datetime.now(timezone.utc)
             await db.commit()
             
             # 4. Generate a signed SAS URL for the file just uploaded
@@ -2009,11 +2009,11 @@ async def mark_event_read(
     )
     read_state = res.scalars().first()
     if not read_state:
-        read_state = LuboilEventReadState(event_id=event_id, user_id=user_id, is_read=True, read_at=datetime.utcnow())
+        read_state = LuboilEventReadState(event_id=event_id, user_id=user_id, is_read=True, read_at=datetime.now(timezone.utc))
         db.add(read_state)
     else:
         read_state.is_read = True
-        read_state.read_at = datetime.utcnow()
+        read_state.read_at = datetime.now(timezone.utc)
 
     await db.commit()
     return {"status": "success"}
@@ -2136,21 +2136,21 @@ async def vessel_overdue_workflow(
 
     for r in reports_to_update:
         if request.action == "SUBMIT":
-            timestamp = datetime.utcnow().strftime("%d/%m/%Y %H:%M")
+            timestamp = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M")
             existing = r.overdue_remarks or ""
             r.overdue_remarks = f"{existing}\n[{timestamp}] {request.remarks}".strip()
             r.is_overdue_accepted = None  # NULL means Pending → new approval required
-            r.updated_at = datetime.utcnow()
+            r.updated_at = datetime.now(timezone.utc)
             r.version = (r.version or 1) + 1
         elif request.action == "ACCEPT":
             r.is_overdue_accepted = True  # True means Accepted
             justification_text = r.overdue_remarks or justification_text
-            r.updated_at = datetime.utcnow()
+            r.updated_at = datetime.now(timezone.utc)
             r.version = (r.version or 1) + 1
         elif request.action == "DECLINE":
             r.is_overdue_accepted = False  # False means Declined
             justification_text = r.overdue_remarks or justification_text
-            r.updated_at = datetime.utcnow()
+            r.updated_at = datetime.now(timezone.utc)
             r.version = (r.version or 1) + 1
 
     # 5. 🔥 UPDATED: Trigger FLEET FEED + MY FEED with proper routing
@@ -2208,7 +2208,7 @@ async def vessel_overdue_workflow(
                 priority="WARNING",
                 message=fleet_msg,
                 recipient_id=None,  # 🔥 Fleet Feed — visible to all assigned users
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             ))
 
             # -------------------------------------------------------
@@ -2229,7 +2229,7 @@ async def vessel_overdue_workflow(
                     priority="WARNING",
                     message=my_feed_msg,
                     recipient_id=str(approver.id),  # 🔥 MY FEED — only to approver
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(timezone.utc)
                 ))
 
         elif request.action in ["ACCEPT", "DECLINE"]:
@@ -2253,7 +2253,7 @@ async def vessel_overdue_workflow(
                 priority=priority,
                 message=fleet_msg,
                 recipient_id=None,  # 🔥 Fleet Feed — visible to all assigned users
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             ))
 
             # -------------------------------------------------------
@@ -2274,7 +2274,7 @@ async def vessel_overdue_workflow(
                     priority=priority,
                     message=my_feed_msg,
                     recipient_id=str(vessel_user.id),  # ← CORRECT: vessel submitter
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(timezone.utc)
                 ))
 
     finally:

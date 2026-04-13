@@ -1,6 +1,6 @@
 import logging
 import httpx
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,7 +32,7 @@ class SyncProcessor:
             .where(SyncQueue.sync_scope == "LUBOIL")
             .where(
                 (SyncQueue.next_retry_at == None) |
-                (SyncQueue.next_retry_at <= datetime.utcnow())
+                (SyncQueue.next_retry_at <= datetime.now(timezone.utc))
             )
             .order_by(SyncQueue.created_at.asc())
             .limit(settings.SYNC_BATCH_SIZE)
@@ -65,7 +65,7 @@ class SyncProcessor:
             SyncState.sync_scope == "LUBOIL"
         )
         state = (await self.db.execute(state_stmt)).scalars().first()
-        last_pull = state.last_pull_at if state else datetime(2000, 1, 1)
+        last_pull = state.last_pull_at if state else datetime(2000, 1, 1, tzinfo=timezone.utc)
 
         headers = {"X-Sync-API-Key": settings.SYNC_API_KEY}
         async with httpx.AsyncClient() as client:
@@ -114,7 +114,7 @@ class SyncProcessor:
 
         await self.db.commit()
 
-        pull_completed_at = datetime.utcnow()
+        pull_completed_at = datetime.now(timezone.utc)
         if not state:
             state = SyncState(
                 vessel_imo=settings.VESSEL_IMO,
@@ -134,7 +134,7 @@ class SyncProcessor:
             SyncState.sync_scope == "CONFIG"
         )
         state = (await self.db.execute(state_stmt)).scalars().first()
-        last_pull = state.last_pull_at if state else datetime(2000, 1, 1)
+        last_pull = state.last_pull_at if state else datetime(2000, 1, 1, tzinfo=timezone.utc)
 
         headers = {"X-Sync-API-Key": settings.SYNC_API_KEY}
         async with httpx.AsyncClient() as client:
@@ -173,7 +173,7 @@ class SyncProcessor:
 
         await target_db.commit()
 
-        pull_completed_at = datetime.utcnow()
+        pull_completed_at = datetime.now(timezone.utc)
         # SyncState lives in luboil DB
         if not state:
             state = SyncState(
@@ -201,7 +201,7 @@ class SyncProcessor:
         success, error_msg = await self._push_to_cloud(record)
         if success:
             record.status = "COMPLETED"
-            record.processed_at = datetime.utcnow()
+            record.processed_at = datetime.now(timezone.utc)
             logger.info(f"Sync: Pushed {record.entity_type} ({record.entity_id})")
         else:
             await self._handle_failure(record, error_msg)
@@ -269,5 +269,5 @@ class SyncProcessor:
         else:
             record.status = "PENDING"
             backoff_seconds = min(60 * (2 ** record.retry_count), 3600)
-            record.next_retry_at = datetime.utcnow() + timedelta(seconds=backoff_seconds)
+            record.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=backoff_seconds)
             logger.warning(f"Sync: Record {record.id} retry {record.retry_count}/{self.max_retries} in {backoff_seconds}s.")

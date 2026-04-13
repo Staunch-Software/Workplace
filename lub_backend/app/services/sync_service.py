@@ -36,7 +36,7 @@ class SyncService:
                 pass
 
         # Coerce string date/datetime values to proper Python types
-        from datetime import date as _date, datetime as _datetime
+        from datetime import date as _date
         valid_cols_map = {c.key: c for c in mapper.columns}
         coerced = {}
         for k, v in data.items():
@@ -51,7 +51,10 @@ class SyncService:
                         pass
                 elif col_type.upper() in ("DATETIME", "TIMESTAMP", "DATETIME_"):
                     try:
-                        v = _datetime.fromisoformat(v)
+                        v = datetime.fromisoformat(v)
+                        # If parsed datetime has no timezone, attach UTC
+                        if v.tzinfo is None:
+                            v = v.replace(tzinfo=timezone.utc)
                     except ValueError:
                         pass
             coerced[k] = v

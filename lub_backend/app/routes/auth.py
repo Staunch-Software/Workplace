@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from app.core.database_control import get_control_db as get_db
 from app.models.control.user import User
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 import bcrypt
 import logging
@@ -117,7 +117,7 @@ async def microsoft_sso_login(
                 }
             )
 
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now(timezone.utc)
         await db.commit()
 
         logger.info(f"[SSO LOGIN] user: {user.email}, role from DB: '{user.role}'")
@@ -207,7 +207,7 @@ async def local_login(
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account not activated")
 
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(timezone.utc)
     await db.commit()
 
     # ✅ Removed auth_type and organization_id — not in new model

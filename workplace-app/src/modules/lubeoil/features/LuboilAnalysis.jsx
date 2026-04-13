@@ -986,7 +986,7 @@ const LuboilAnalysis = () => {
 
     try {
       const now = new Date();
-      const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+      const timestamp = `${now.toLocaleDateString("en-GB", { timeZone: "UTC" })} ${now.toLocaleTimeString("en-GB", { timeZone: "UTC", hour: "2-digit", minute: "2-digit" })}`;
 
       /**
        * ðŸ”¥ WORKFLOW LOGIC:
@@ -1161,7 +1161,7 @@ const LuboilAnalysis = () => {
 
     try {
       const now = new Date();
-      const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+      const timestamp = `${now.toLocaleDateString("en-GB", { timeZone: "UTC" })} ${now.toLocaleTimeString("en-GB", { timeZone: "UTC", hour: "2-digit", minute: "2-digit" })}`;
 
       // This is the formatted string for the Chat History
       const resolutionMsg = `[${timestamp}]  ISSUE CLOSED BY ${user.full_name}: ${closeRemarksText}`;
@@ -1285,7 +1285,7 @@ const LuboilAnalysis = () => {
     const targetState = !isCurrentlyRequired;
 
     const now = new Date();
-    const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+    const timestamp = `${now.toLocaleDateString("en-GB", { timeZone: "UTC" })} ${now.toLocaleTimeString("en-GB", { timeZone: "UTC", hour: "2-digit", minute: "2-digit" })}`;
 
     // This message triggers the Live Feed
     const systemMsg = targetState
@@ -1790,7 +1790,7 @@ const LuboilAnalysis = () => {
       return;
 
     const now = new Date();
-    const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+    const timestamp = `${now.toLocaleDateString("en-GB", { timeZone: "UTC" })} ${now.toLocaleTimeString("en-GB", { timeZone: "UTC", hour: "2-digit", minute: "2-digit" })}`;
 
     // ðŸ”¥ CRITICAL: Backend uses this message to trigger the Live Feed "Evidence Deleted" event
     const deleteSysMsg = `[${timestamp}] <b>${user.full_name}</b> has deleted ${selectedGalleryItems.length} piece(s) of evidence.`;
@@ -1926,7 +1926,7 @@ const LuboilAnalysis = () => {
     const targetState = !isCurrentlyRequired;
 
     const now = new Date();
-    const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+    const timestamp = `${now.toLocaleDateString("en-GB", { timeZone: "UTC" })} ${now.toLocaleTimeString("en-GB", { timeZone: "UTC", hour: "2-digit", minute: "2-digit" })}`;
 
     // 2. Dynamic message based on whether we are enabling or disabling
     const systemMsg = targetState
@@ -2015,7 +2015,7 @@ const LuboilAnalysis = () => {
       ).data;
 
       const now = new Date();
-      const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+      const timestamp = `${now.toLocaleDateString("en-GB", { timeZone: "UTC" })} ${now.toLocaleTimeString("en-GB", { timeZone: "UTC", hour: "2-digit", minute: "2-digit" })}`;
 
       // This remains to show in the system log WHO uploaded the image
       const systemUploadMsg = `[${timestamp}] <b>${user.full_name}</b> has successfully uploaded the Image/File.`;
@@ -2115,7 +2115,7 @@ const LuboilAnalysis = () => {
     try {
       // 3. Generate standard timestamp [DD/MM/YYYY HH:MM]
       const now = new Date();
-      const timestamp = `${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+      const timestamp = `${now.toLocaleDateString("en-GB", { timeZone: "UTC" })} ${now.toLocaleTimeString("en-GB", { timeZone: "UTC", hour: "2-digit", minute: "2-digit" })}`;
 
       // 4. Prepare updated remark strings
       // Using existingRemarks ensures we append to the history of the SPECIFIC dot selected

@@ -4,7 +4,7 @@ import re
 import difflib  # Standard library for comparison
 from typing import BinaryIO, Dict, Any, Optional, Set
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import select
 from datetime import date as date_type
 # Import extractor
