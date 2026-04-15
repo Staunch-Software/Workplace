@@ -20,7 +20,74 @@ IST = pytz.timezone('Asia/Kolkata')
 logger = logging.getLogger(__name__)
 SOFT_DELETE_MODELS = (Defect, Thread, Attachment, PrEntry, DefectImage)
 
+
 class SyncService:
+    @staticmethod
+    def _is_temp_number(defect_number: str | None) -> bool:
+        return bool(defect_number and defect_number.startswith("T-"))
+
+    @staticmethod
+    async def _finalize_defect_numbers(db: AsyncSession, vessel_imo: str, control_db: AsyncSession):
+        from sqlalchemy import text as sa_text
+    
+        # 1. Fetch vessel name
+        vessel_res = await control_db.execute(
+            sa_text("SELECT name FROM vessels WHERE imo = :imo AND is_active = TRUE"),
+            {"imo": vessel_imo}
+        )
+        row = vessel_res.fetchone()
+        if not row:
+            logger.warning(f"[SyncService] Vessel {vessel_imo} not found — skipping finalization")
+            return
+    
+        prefix = row.name.replace(" ", "").upper()[:6]
+    
+        # 2. Fetch all defects for this vessel
+        result = await db.execute(sa_text("""
+            SELECT id, defect_number, version
+            FROM defects
+            WHERE vessel_imo = :imo AND is_deleted = FALSE
+            ORDER BY created_at ASC
+        """), {"imo": vessel_imo})
+        defects = result.fetchall()
+    
+        seq = 0
+        # Using UTC as requested
+        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        for defect in defects:
+            seq += 1
+            final_number = f"{prefix}#{str(seq).zfill(4)}"
+    
+            if defect.defect_number == final_number:
+                continue 
+    
+            # Update number AND bump version so Vessel pulls the change
+            await db.execute(
+                sa_text("""
+                    UPDATE defects 
+                    SET defect_number = :dn, 
+                        version = version + 1,
+                        updated_at = :now
+                    WHERE id = :id
+                """),
+                {
+                    "dn": final_number, 
+                    "id": defect.id, 
+                    "now": now_utc
+                }
+            )
+    
+        # 3. Update sequence
+        await db.execute(sa_text("""
+            INSERT INTO vessel_defect_sequences (vessel_imo, next_seq)
+            VALUES (:imo, :next_seq)
+            ON CONFLICT (vessel_imo)
+            DO UPDATE SET next_seq = EXCLUDED.next_seq
+        """), {"imo": vessel_imo, "next_seq": seq + 1})
+    
+        await db.commit()
+        logger.info(f"[SyncService] Finalized {seq} defect numbers for vessel {vessel_imo}")
     @staticmethod
     async def apply_snapshot(
         db: AsyncSession, 
@@ -401,6 +468,16 @@ class SyncService:
             # Flush to ensure the instance has an ID and is attached to session
             await db.flush()
 
+            
+            # --- NEW LOGIC: SHORE SIDE DEFECT FINALIZATION ---
+            # This handles re-assigning numbers and bumping versions for the vessel
+            if model_class == Defect and control_db is not None:
+                vessel_imo = data.get("vessel_imo")
+                if vessel_imo:
+                    # _finalize_defect_numbers will fix the numbers and COMMIT
+                    await SyncService._finalize_defect_numbers(db, vessel_imo, control_db)
+                    return  # Early return because finalizer already committed
+            # --- END NEW LOGIC ---
             
             # --- END FIX ---
 

@@ -220,7 +220,6 @@ COLUMN_MAP = {
         lambda d, idx: d.status.value if hasattr(d.status, "value") else str(d.status),
     ),
     "owner": ("Owner", lambda d, idx: "Owner" if d.is_owner else "Not Owner"),
-    "flag": ("Flagged", lambda d, idx: "Yes" if d.is_flagged else "No"),  # ✅ Added
     "dd": ("Dry Dock", lambda d, idx: "Yes" if d.is_dd else "No"),  # ✅ Added
     "pr_details": (
         "PR Number",
@@ -711,8 +710,6 @@ async def get_defects(
         query = query.where(Defect.equipment_name.ilike(f"%{equipment_name}%"))
     if is_owner is not None:
         query = query.where(Defect.is_owner == is_owner)
-    if is_flagged is not None:
-        query = query.where(Defect.is_flagged == is_flagged)
     if is_dd is not None:
         query = query.where(Defect.is_dd == is_dd)
 
@@ -761,7 +758,6 @@ async def export_defects(
     target_close_date: str | None = None,
     # OTHER FILTERS
     is_owner: bool | None = None,
-    is_flagged: list[str] | None = Query(None),
     is_dd: list[str] | None = Query(None),
     # COLUMN CUSTOMIZATION
     visible_columns: str | None = None,
@@ -871,25 +867,6 @@ async def export_defects(
         if is_owner is not None:
             query = query.where(Defect.is_owner == is_owner)
 
-        # REPLACE with:
-        if is_flagged and len(is_flagged) > 0:
-            if "true" in is_flagged and "false" not in is_flagged:
-                flagged_defect_ids = await db.execute(
-                    select(UserDefectFlag.defect_id).where(
-                        UserDefectFlag.user_id == current_user.id
-                    )
-                )
-                flagged_defect_ids = {row[0] for row in flagged_defect_ids.all()}
-                query = query.where(Defect.id.in_(flagged_defect_ids))
-            elif "false" in is_flagged and "true" not in is_flagged:
-                flagged_defect_ids = await db.execute(
-                    select(UserDefectFlag.defect_id).where(
-                        UserDefectFlag.user_id == current_user.id
-                    )
-                )
-                flagged_defect_ids = {row[0] for row in flagged_defect_ids.all()}
-                query = query.where(Defect.id.notin_(flagged_defect_ids))
-                    # if both selected → no filter needed
 
         if is_dd and len(is_dd) > 0:
             if "true" in is_dd and "false" not in is_dd:
@@ -900,15 +877,6 @@ async def export_defects(
         # Execute query
         result = await db.execute(query)
         defects = result.scalars().all()
-        export_flag_result = await db.execute(
-            select(UserDefectFlag.defect_id).where(
-                UserDefectFlag.user_id == current_user.id,
-                UserDefectFlag.defect_id.in_([d.id for d in defects])
-            )
-        )
-        export_flagged_ids = {row[0] for row in export_flag_result.all()}
-        for d in defects:
-            d.is_flagged = d.id in export_flagged_ids
         vessel_imos = list(set(d.vessel_imo for d in defects))
         if vessel_imos:
             vessel_result = await control_db.execute(
@@ -1108,7 +1076,7 @@ async def export_defects(
                 "source": f"=_Lists!$D$1:$D${len(status_options)}",
             })
 
-        for flag_key in ["flag", "dd"]:
+        for flag_key in ["dd"]:
             if flag_key in key_to_col:
                 c = key_to_col[flag_key]
                 ws1.data_validation(1, c, len(defects) + 100, c, {
@@ -1411,7 +1379,6 @@ async def download_import_template(
         "Priority",
         "Status",
         "PR Number",
-        "Flagged",
         "Dry Dock",
     ]
     for col, text in enumerate(headers):
@@ -1479,7 +1446,7 @@ async def download_import_template(
                 "error_message": "Please use the format: 2023-12-31",
             },
         )
-    start_col = 9 if "Vessel Name" in headers else 8
+    start_col = 8 if "Vessel Name" in headers else 7
     for col_idx in [start_col, start_col + 1]:
         ws.data_validation(
             1,
@@ -1493,6 +1460,12 @@ async def download_import_template(
                 "input_message": "Please select Yes or No",
             },
         )
+        ws.data_validation(1, 9, 1000, 9, {
+        "validate": "list",
+        "source": ["Yes", "No"],
+        "input_title": "Select Option",
+        "input_message": "Please select Yes or No",
+        })
 
     workbook.close()
     output.seek(0)
@@ -1556,7 +1529,6 @@ async def download_import_template_vessel(
         "Priority",
         "Status",
         "PR Number",
-        "Flagged",  # ✅ Added
         "Dry Dock",  # ✅ Added
     ]
     for col, text in enumerate(headers):
@@ -1608,7 +1580,7 @@ async def download_import_template_vessel(
                 "input_message": "Format: YYYY-MM-DD",
             },
         )
-    for col_idx in [8, 9]:
+    for col_idx in [8]:
         ws.data_validation(
             1,
             col_idx,
@@ -1788,10 +1760,6 @@ async def import_defects(
                 is_owner_val = (
                     str(row_data.get("Owner", "")).strip().lower() == "owner"
                 )
-                is_flagged_val = (
-                    str(row_data.get("Flagged", "")).strip().lower()
-                    in ["yes", "true", "1"]
-                )
                 is_dd_val = (
                     str(row_data.get("Dry Dock", "")).strip().lower()
                     in ["yes", "true", "1"]
@@ -1823,25 +1791,6 @@ async def import_defects(
                     existing_defect.date_identified = date_id
                     existing_defect.target_close_date = date_dl
                     existing_defect.is_owner = is_owner_val
-                    if is_flagged_val:
-                        existing_flag = await db.execute(
-                            select(UserDefectFlag).where(
-                                UserDefectFlag.user_id == current_user.id,
-                                UserDefectFlag.defect_id == existing_defect.id,
-                            )
-                        )
-                        if not existing_flag.scalar_one_or_none():
-                            db.add(UserDefectFlag(user_id=current_user.id, defect_id=existing_defect.id))
-                    else:
-                        existing_flag = await db.execute(
-                            select(UserDefectFlag).where(
-                                UserDefectFlag.user_id == current_user.id,
-                                UserDefectFlag.defect_id == existing_defect.id,
-                            )
-                        )
-                        flag_row = existing_flag.scalar_one_or_none()
-                        if flag_row:
-                            await db.delete(flag_row)
                     existing_defect.is_dd = is_dd_val
                     existing_defect.updated_at = datetime.utcnow()
                     # FIX: (or 0) + 1 so None → 1, not None → 2
@@ -1917,10 +1866,10 @@ async def import_defects(
 
                 seq_result = await db.execute(sa_text("""
                     INSERT INTO vessel_defect_sequences (vessel_imo, next_seq)
-                    VALUES (:imo, 1)
+                    VALUES (:imo, 2)
                     ON CONFLICT (vessel_imo)
                     DO UPDATE SET next_seq = vessel_defect_sequences.next_seq + 1
-                    RETURNING next_seq
+                    RETURNING vessel_defect_sequences.next_seq - 1
                 """), {"imo": vessel.imo})
                 next_seq = seq_result.scalar()
                 defect_number = f"{prefix}#{str(next_seq).zfill(4)}"
@@ -1960,8 +1909,6 @@ async def import_defects(
                     ),
                 )
                 defects_to_insert.append(new_defect)
-                if is_flagged_val:
-                    db.add(UserDefectFlag(user_id=current_user.id, defect_id=new_id))
                 if _should_sync():
                     syncs_to_insert.append(
                         SyncQueue(
@@ -1987,7 +1934,6 @@ async def import_defects(
                                 "responsibility": "Engine Dept",
                                 "pr_status": "Not Set",
                                 "is_owner": is_owner_val,
-                                "is_flagged": is_flagged_val,
                                 "is_dd": is_dd_val,
                                 "is_deleted": False,
                                 "before_image_required": False,
