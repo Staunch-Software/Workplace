@@ -2,6 +2,8 @@ from sqlalchemy import (
     Column, Integer, String, DECIMAL, DATE, TIME, TIMESTAMP, TEXT,
     Boolean, ForeignKey, CheckConstraint, UniqueConstraint, func, Index, DateTime, Float
 )
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.dialects.postgresql import JSONB # <--- Crucial for the full_json_data column
 from app.database import Base
@@ -308,8 +310,8 @@ class LuboilEventReadState(Base):
     event_id = Column(Integer, ForeignKey('luboil_event.event_id', ondelete='CASCADE'))
     user_id = Column(UUID(as_uuid=True), nullable=True)  # FK dropped — cross-DB
     is_read = Column(Boolean, default=False)
-    read_at = Column(DateTime, nullable=True)
-    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=True)
+    read_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     version = Column(Integer, default=1, nullable=False)
     origin = Column(String(20), default="CLOUD", nullable=True)

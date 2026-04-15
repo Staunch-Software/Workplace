@@ -529,7 +529,7 @@ div.section-header-enhanced {
 
 /* --- 1. BASE TABLE SETTINGS --- */
 .matrix-scroll-container {
-  max-height: 520px ;
+  max-height: 512px ;
   overflow: auto !important;
   /* This creates the scrollbars */
   scrollbar-width: thin !important;
@@ -1349,7 +1349,7 @@ div.section-header-enhanced {
   width: 98vw !important;
   max-width: 1850px !important;
   height: 87vh !important;
-  margin-top: 50px !important;
+  /* margin-top: 50px !important; */
 }
 
 .lub-modal-header {
@@ -1443,7 +1443,7 @@ div.section-header-enhanced {
 @media (max-width: 1100px) {
   .lub-modal-shell {
     height: 95vh !important;
-    margin-top: 20px !important;
+    /* margin-top: 20px !important; */
   }
 
   /* Change Row to Column */
@@ -1592,6 +1592,7 @@ div.section-header-enhanced {
   transition: background 0.2s, color 0.2s;
   background: none;
   border: none;
+  cursor: pointer !important;
 }
 
 /* --- BIG SCREEN (2560px+) --- */
@@ -3808,16 +3809,17 @@ div.section-header-enhanced {
 /* --- 1. BASE SETTINGS (Laptop & Desktop) --- */
 .matrix-footer-sticky {
   position: sticky !important;
-  bottom: 0 !important;
+  bottom: -1px !important;              
   z-index: 100 !important;
+  background-color: #ffffff !important; 
 }
 
 /* The "PDF Reports" Left Label */
 .lub-matrix-footer-label {
   position: sticky !important;
   left: 0 !important;
-  bottom: 0 !important;
-  z-index: 10 !important;
+  bottom: -1px !important;              /* 🔥 Match the row bottom */
+  z-index: 110 !important;              /* 🔥 Keep higher than the cells */
   background-color: #f1f5f9 !important;
   border-right: 1px solid #e2e8f0 !important;
   border-top: 2px solid #cbd5e1 !important;
@@ -3832,13 +3834,13 @@ div.section-header-enhanced {
 
 .lub-matrix-footer-cell {
   position: sticky !important;
-  bottom: 0 !important;
+  bottom: -1px !important;              
   background-color: #ffffff !important;
   border-top: 2px solid #cbd5e1 !important;
   border-right: 1px solid #f1f5f9 !important;
   text-align: center !important;
   padding: 8px !important;
-  z-index: 5 !important;
+  z-index: 105 !important;             
 }
 
 .footer-popover-wrapper {
@@ -3874,7 +3876,7 @@ div.section-header-enhanced {
   bottom: 120% !important;
   left: 50% !important;
   transform: translateX(-50%) !important;
-  width: 280px !important;
+  width: 200px !important;
   background-color: white !important;
   border-radius: 12px !important;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2) !important;
@@ -4609,7 +4611,7 @@ div.section-header-enhanced {
   width: 98vw !important;
   max-width: 1850px !important;
   height: 87vh !important;
-  margin-top: 50px !important;
+  /* margin-top: 50px !important; */
   display: flex !important;
   flex-direction: column !important;
   border-radius: 12px !important;
@@ -4751,7 +4753,7 @@ div.section-header-enhanced {
 @media (max-width: 1100px) {
   .lub-modal-shell {
     height: 95vh !important;
-    margin-top: 20px !important;
+    /* margin-top: 20px !important; */
     overflow-y: auto !important;
     /* Allow the whole modal to scroll */
   }
@@ -5362,7 +5364,7 @@ div.section-header-enhanced {
 @media (max-width: 767px) {
   .lub-modal-shell {
     height: 95vh !important;
-    margin-top: 10px !important;
+    /* margin-top: 10px !important; */
     overflow-y: auto !important;
   }
 
@@ -6876,21 +6878,49 @@ div.section-header-enhanced {
 /* System Logs (Centered) */
 .lub-system-log {
   text-align: center !important;
-  margin: 10px 0 !important;
+  margin: 12px 0 !important;
+  width: 100% !important;
 }
 
 .log-pill {
-  background-color: #f1f5f9 !important;
-  font-size: 0.68rem !important;
-  padding: 3px 10px !important;
-  border-radius: 10px !important;
+  display: inline-block !important;      /* 🔥 FIX 1: Allows proper wrapping without overlap */
+  background-color: #f8fafc !important;
+  font-size: 0.68rem !important;         /* 🔥 FIX 2: Much smaller, crisp font */
+  line-height: 1.5 !important;           /* 🔥 FIX 3: Forces space between line 1 and line 2 */
+  padding: 6px 14px !important;          /* Better breathing room inside the pill */
+  border-radius: 12px !important;
   color: #64748b !important;
-  border: 1px solid #e2e8f0 !important;
+  border: 1px dashed #cbd5e1 !important; /* Dashed border looks more like a 'system' note */
+  max-width: 85% !important;             /* Prevents text from touching the very edges of the chat */
+  word-break: break-word !important;
 }
 
-@media (min-width: 1600px) {
+@media (min-width: 1600px) and (max-width: 2000px) {
+ .log-pill {
+    font-size: 0.72rem !important;
+    padding: 6px 16px !important;
+    line-height: 1.5 !important;
+    border-radius: 14px !important;
+  }
+}
+
+@media (min-width: 2000px) {
+  .lub-chat-meta {
+    font-size: 1rem !important;
+    margin-top: 15px !important;
+  }
+
+  /* Add this missing 4K scale for the system logs! */
   .log-pill {
-    font-size: 1.2rem !important;
+    font-size: 1.05rem !important;
+    padding: 10px 20px !important;
+    line-height: 1.6 !important;
+    border-radius: 16px !important;
+  }
+
+  .lub-locked-ui {
+    padding: 40px !important;
+    border-radius: 20px !important;
   }
 }
 
@@ -7713,7 +7743,7 @@ div.section-header-enhanced {
   /* 5. Analysis Modal Panel scaling */
   .lub-modal-shell {
     height: 92vh !important;
-    margin-top: 20px !important;
+    /* margin-top: 20px !important; */
   }
 
   .lub-modal-header {
@@ -7906,7 +7936,7 @@ div.section-header-enhanced {
   /* --- 5. ANALYSIS MODAL --- */
   .lub-modal-shell {
     height: 95vh !important;
-    margin-top: 10px !important;
+    /* margin-top: 10px !important; */
   }
 
   .lub-modal-header {
@@ -8788,7 +8818,7 @@ div.section-header-enhanced {
   .lub-modal-shell {
     max-width: 1950px !important;
     height: 88vh !important;
-    margin-top: 30px !important;
+    /* margin-top: 30px !important; */
   }
 
   .lub-modal-header {
@@ -9097,10 +9127,7 @@ div.section-header-enhanced {
     font-size: 0.62rem !important;
   }
 
-  .log-pill {
-    font-size: 0.72rem !important;
-    padding: 4px 12px !important;
-  }
+
 
   /* Approval card */
   .lub-approval-card {
@@ -9582,5 +9609,191 @@ div.section-header-enhanced {
     font-size: 0.68rem !important;
   }
 
+}
+
+/* ============================================================
+   LIVE FEED: NEW ACTION BUTTONS (VIEW & MARK AS READ)
+   ============================================================ */
+
+/* --- 1. BASE SETTINGS (Perfect for Laptops) --- */
+.lub-feed-item-btns {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.lub-feed-mark-read-btn,
+.lub-feed-view-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  height: 26px !important;            /* Nice and compact for laptops */
+  padding: 0 10px !important;
+  font-size: 0.6rem !important;       /* Small crisp text */
+  border-radius: 4px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+.feed-btn-icon {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* Visual Theme: Both Buttons (Prominent Blue) */
+.lub-feed-mark-read-btn,
+.lub-feed-view-btn {
+  color: #2563eb !important;
+  background-color: #ffffff !important;
+  border: 1px solid #2563eb !important;
+}
+
+.lub-feed-mark-read-btn:hover,
+.lub-feed-view-btn:hover {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+}
+
+/* Click Animation */
+.lub-feed-mark-read-btn:active,
+.lub-feed-view-btn:active {
+  transform: scale(0.95) !important;
+}
+
+/* --- 2. MID-LARGE SCREEN (1600px - 1999px) --- */
+@media (min-width: 1600px) and (max-width: 1999px) {
+  .lub-feed-mark-read-btn,
+  .lub-feed-view-btn {
+    height: 28px !important;
+    padding: 0 12px !important;
+    font-size: 0.62rem !important;
+    border-radius: 5px !important;
+  }
+}
+
+/* --- 3. BIG SCREEN (4K / 2000px+) --- */
+@media (min-width: 2000px) {
+  .lub-feed-mark-read-btn,
+  .lub-feed-view-btn {
+    height: 52px !important;
+    padding: 0 35px !important;
+    font-size: 1.1rem !important;
+    border-radius: 10px !important;
+    gap: 12px !important;
+  }
+  .feed-btn-icon {
+    width: 22px !important;
+    height: 22px !important;
+  }
+}
+
+/* --- 4. MOBILE (Under 600px) --- */
+@media (max-width: 600px) {
+  .lub-feed-mark-read-btn,
+  .lub-feed-view-btn {
+    height: 40px !important;         /* Taller for fat fingers */
+    font-size: 0.8rem !important;
+    flex: 1 !important;              /* Take up 50/50 space */
+    justify-content: center !important;
+    padding: 0 15px !important;
+  }
+}
+
+/* ============================================================
+   SYSTEM LOG FIX (WHATSAPP-STYLE CENTERED PILL)
+   ============================================================ */
+
+.lub-system-log {
+  text-align: center !important;
+  margin: 12px 0 !important;
+  width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+/* Base Settings (Tablets & Small Laptops) */
+.log-pill {
+  display: inline-block !important;      /* 🔥 Makes the background HUG the text */
+  background-color: #f1f5f9 !important;  /* Soft grey/blue WhatsApp-style background */
+  color: #475569 !important;             /* Darker text for readability */
+  border: 1px solid #e2e8f0 !important;  /* Very subtle border */
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; /* Tiny shadow to lift it slightly */
+  max-width: 85% !important;             /* Keeps it from touching chat edges */
+  word-break: break-word !important;
+  line-height: 1.5 !important;           /* 🔥 Prevents line 1 and line 2 from overlapping */
+  padding: 6px 14px !important;          /* Perfect pill padding */
+  border-radius: 12px !important;        /* Rounded pill shape */
+  font-size: 0.68rem !important;         /* Small, crisp text */
+  font-weight: 600 !important;
+}
+
+/* Standard Laptops (1200px - 1599px) */
+@media (min-width: 1200px) and (max-width: 1599px) {
+  .log-pill {
+    font-size: 0.7rem !important;
+  }
+}
+
+/* Mid-Large Screens (1600px - 1999px) */
+@media (min-width: 1600px) and (max-width: 1999px) {
+  .log-pill {
+    font-size: 0.72rem !important;
+    padding: 8px 16px !important;
+  }
+}
+
+/* Big Screens / 4K (2000px+) */
+@media (min-width: 2000px) {
+  .log-pill {
+    font-size: 1.05rem !important;
+    padding: 10px 24px !important;
+    line-height: 1.6 !important;
+    border-radius: 16px !important;
+  }
+}
+
+/* ============================================================
+   LIVE FEED: FULL WIDTH & HEIGHT UTILIZATION OVERRIDES
+   ============================================================ */
+
+/* 1. Force the wrapper to allow full width */
+.dashboard-container-enhanced {
+  max-width: 100% !important;
+  /* If you want less left/right gap, reduce these paddings */
+  padding-left: 20px !important; 
+  padding-right: 20px !important;
+}
+
+/* 2. Force the Feed Container to stretch edge-to-edge and fill vertical space */
+.lub-feed-container {
+  width: 100% !important;
+  max-width: none !important;
+  height: calc(100vh - 110px) !important; /* 🔥 Reduced height ensures NO page scroll */
+  margin-top: 4px !important;            
+  margin-bottom: 8px !important;         
+  box-shadow: none !important;            /* 🔥 Forces shadow removal globally */
+}
+
+/* 3. Ensure the internal content area stretches horizontally */
+.lub-feed-content {
+  width: 100% !important;
+  /* Make sure the scrollable area fills the new dynamic height */
+  flex: 1 !important; 
+  height: auto !important;
+}
+
+/* 4. Let the individual feed items stretch fully across the screen */
+.lub-feed-item-card {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* 5. Header stretching */
+.lub-feed-header-spacing {
+  width: 100% !important;
 }
 /* End @media (min-width: 1600px) and (max-width: 2000px) */

@@ -57,7 +57,7 @@ const OverdueVesselRow = ({
   canApprove,
   isOverdueModal,
   onVesselAction,
-  canAddJustification  // 🔥 Newly added prop for workflow
+  canAddJustification, // 🔥 Newly added prop for workflow
 }) => {
   const [isExpanded, setIsExpanded] = React.useState(false);
 
@@ -69,19 +69,25 @@ const OverdueVesselRow = ({
   const isConfiguredView = modalType === "Configured";
 
   // 🔥 MAKER-CHECKER LOGIC: Map the 2 Columns to the 3 States
-  const activeItem = v.overdueItems?.find(i => i.report_overdue_remarks);
+  const activeItem = v.overdueItems?.find((i) => i.report_overdue_remarks);
   const hasRemarks = !!activeItem?.report_overdue_remarks;
   const isAccepted = activeItem?.report_is_overdue_accepted === true;
   const isDeclined = activeItem?.report_is_overdue_accepted === false;
   // Pending means it has remarks, but hasn't been accepted or declined yet (it is null)
-  const isPending = hasRemarks && activeItem?.report_is_overdue_accepted === null;
+  const isPending =
+    hasRemarks && activeItem?.report_is_overdue_accepted === null;
 
   const allRemarks = activeItem?.report_overdue_remarks || "";
-  const displayRemark = allRemarks.split('\n').filter(r => r.trim()).pop() || "";
+  const displayRemark =
+    allRemarks
+      .split("\n")
+      .filter((r) => r.trim())
+      .pop() || "";
 
   const handleSubmitRemark = (e) => {
     e.stopPropagation(); // prevent row expansion
-    if (vesselRemark.length < 5) return alert("Please enter a valid justification.");
+    if (vesselRemark.length < 5)
+      return alert("Please enter a valid justification.");
     onVesselAction(v.imo, "SUBMIT", vesselRemark);
     setIsChatOpen(false);
     setVesselRemark("");
@@ -126,11 +132,11 @@ const OverdueVesselRow = ({
               borderRadius: "50%",
               backgroundColor: (() => {
                 if (modalType.includes("Over30")) return "#ef4444";
-                if (modalType.includes("Under30")) return "#f59e0b";
+                if (modalType.includes("Under30")) return "#ef4444";
                 if (v.overdueItems?.some((i) => i.state === "danger"))
                   return "#ef4444";
                 if (v.overdueItems?.some((i) => i.state === "warning"))
-                  return "#f59e0b";
+                  return "#ef4444";
                 if (v.overdueItems?.some((i) => i.state === "info"))
                   return "#3b82f6";
                 return "#22c55e";
@@ -145,44 +151,66 @@ const OverdueVesselRow = ({
                 color: "#1e293b",
                 display: "flex",
                 alignItems: "center",
-                gap: "8px"
+                gap: "8px",
               }}
             >
               <span>{v.name}</span>
 
               {/* 🔥 NEW: "+" BUTTON TO ADD REMARK (Hidden if pending or accepted) */}
-              {!isConfiguredView && !isPending && isOverdueModal && canAddJustification &&
-                (!isAccepted || v.overdueItems?.some(i => !i.report_overdue_remarks)) && (
+              {!isConfiguredView &&
+                !isPending &&
+                isOverdueModal &&
+                canAddJustification &&
+                (!isAccepted ||
+                  v.overdueItems?.some((i) => !i.report_overdue_remarks)) && (
                   <button
                     className="lub-vessel-just-btn"
                     onClick={(e) => {
                       e.stopPropagation(); // prevent row expansion
                       setIsChatOpen(!isChatOpen);
                     }}
-                    title={isDeclined ? "Resubmit Overdue Justification" : "Add Vessel Overdue Justification"}
+                    title={
+                      isDeclined
+                        ? "Resubmit Overdue Justification"
+                        : "Add Vessel Overdue Justification"
+                    }
                     style={{
-                      backgroundColor: "#eff6ff", color: "#2563eb", border: "1px dashed #2563eb",
-                      borderRadius: "50%", display: "flex",
-                      alignItems: "center", justifyContent: "center", cursor: "pointer"
+                      backgroundColor: "#eff6ff",
+                      color: "#2563eb",
+                      border: "1px dashed #2563eb",
+                      borderRadius: "50%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
                     }}
                   >
-                    <span className="plus-icon" >+</span>
+                    <span className="plus-icon">+</span>
                   </button>
                 )}
 
               {/* 🔥 NEW: STATUS INDICATORS */}
               {isPending && (
-                <span className="lub-vessel-status-badge badge-pending">⏳ PENDING APPROVAL</span>
+                <span className="lub-vessel-status-badge badge-pending">
+                  ⏳ PENDING APPROVAL
+                </span>
               )}
               {isAccepted && (
-                <span className="lub-vessel-status-badge badge-accepted">✅ JUSTIFICATION ACCEPTED</span>
+                <span className="lub-vessel-status-badge badge-accepted">
+                  ✅ JUSTIFICATION ACCEPTED
+                </span>
               )}
               {isDeclined && (
-                <span className="lub-vessel-status-badge badge-declined">❌ DECLINED - RESUBMIT</span>
+                <span className="lub-vessel-status-badge badge-declined">
+                  ❌ DECLINED - RESUBMIT
+                </span>
               )}
             </div>
 
-            <div className="lub-list-imo-text" style={{ color: "#64748b", fontFamily: "monospace" }}>
+            <div
+              className="lub-list-imo-text"
+              style={{ color: "#64748b", fontFamily: "monospace" }}
+            >
               IMO: {v.imo}
             </div>
           </div>
@@ -190,7 +218,10 @@ const OverdueVesselRow = ({
 
         {/* ðŸ”¥ ONLY FOR CONFIGURED MODAL - UPLOAD & VIEW ICONS */}
         {isConfiguredView && (
-          <div className="lub-list-icon-actions" style={{ display: "flex", alignItems: "center" }}>
+          <div
+            className="lub-list-icon-actions"
+            style={{ display: "flex", alignItems: "center" }}
+          >
             {/* 1. VIEW FILE ICON (Updated with await) */}
             {v.reportUrl ? (
               <button
@@ -210,7 +241,13 @@ const OverdueVesselRow = ({
                   }
                 }}
                 className="lub-list-file-btn"
-                style={{ background: "none", border: "none", color: "#10b981", cursor: "pointer", padding: 0 }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#10b981",
+                  cursor: "pointer",
+                  padding: 0,
+                }}
                 title="View Vessel Config Report"
               >
                 <FileText size={20} />
@@ -273,7 +310,10 @@ const OverdueVesselRow = ({
           }}
         >
           {v.overdueItems?.length > 0 && (
-            <span className="lub-list-count-badge" style={{ fontWeight: "600", backgroundColor: "#f1f5f9" }}>
+            <span
+              className="lub-list-count-badge"
+              style={{ fontWeight: "600", backgroundColor: "#f1f5f9" }}
+            >
               {v.overdueItems.length}{" "}
               {v.overdueItems.length === 1 ? "Item" : "Items"}
             </span>
@@ -285,7 +325,9 @@ const OverdueVesselRow = ({
       {/* 🔥 NEW: CHAT INPUT BOX FOR VESSEL JUSTIFICATION */}
       {isChatOpen && !isPending && !isAccepted && isOverdueModal && (
         <div className="lub-vessel-remark-box">
-          <label className="lub-vessel-remark-label">Vessel Overdue Remarks:</label>
+          <label className="lub-vessel-remark-label">
+            Vessel Overdue Remarks:
+          </label>
           <div className="lub-vessel-remark-input-row">
             <input
               type="text"
@@ -307,10 +349,10 @@ const OverdueVesselRow = ({
 
       {/* 🔥 NEW: MAKER-CHECKER SHORE APPROVAL UI */}
       {(isPending || isAccepted || isDeclined) && (
-        <div className={`lub-vessel-status-box ${isAccepted ? 'status-accepted' : isDeclined ? 'status-declined' : 'status-pending'}`}>
-          <p className="lub-vessel-status-quote">
-            "{displayRemark}"
-          </p>
+        <div
+          className={`lub-vessel-status-box ${isAccepted ? "status-accepted" : isDeclined ? "status-declined" : "status-pending"}`}
+        >
+          <p className="lub-vessel-status-quote">"{displayRemark}"</p>
           {isPending && canApprove && (
             <div className="lub-vessel-approval-actions">
               <button
@@ -336,10 +378,7 @@ const OverdueVesselRow = ({
           <p className="lub-list-detail-label">Equipment Detail:</p>
           <div className="lub-list-equip-stack">
             {v.overdueItems.map((item, i) => (
-              <div
-                key={i}
-                className="lub-list-equip-card"
-              >
+              <div key={i} className="lub-list-equip-card">
                 {/* Text Content Area */}
                 <div className="lub-list-equip-info">
                   <span className="lub-list-equip-name">
@@ -352,9 +391,9 @@ const OverdueVesselRow = ({
                       Report Date:{" "}
                       {item.reportDate
                         ? new Date(item.reportDate).toLocaleDateString(
-                          "en-GB",
-                          { day: "2-digit", month: "short", year: "numeric" },
-                        )
+                            "en-GB",
+                            { day: "2-digit", month: "short", year: "numeric" },
+                          )
                         : "N/A"}
                     </span>
                   )}
@@ -364,9 +403,7 @@ const OverdueVesselRow = ({
                 <div className="lub-list-equip-actions">
                   {isConfiguredView ? (
                     /* ðŸ”¥ REVERTED LOOK FOR CONFIGURED: JUST THE ORIGINAL LABEL */
-                    <span className="lub-list-shortcode">
-                      {item.shortCode}
-                    </span>
+                    <span className="lub-list-shortcode">{item.shortCode}</span>
                   ) : (
                     /* ðŸ”¥ NEW LOOK FOR OVERDUE/UNRESOLVED: ICON + VIEW BUTTON */
                     <>
@@ -500,7 +537,7 @@ const LuboilAnalysis = () => {
   const [uploadProgress, setUploadProgress] = useState({
     current: 0,
     total: 0,
-    currentFile: ""
+    currentFile: "",
   });
 
   const [machineryStats, setMachineryStats] = useState({
@@ -529,26 +566,45 @@ const LuboilAnalysis = () => {
   const [isCommCollapsed, setIsCommCollapsed] = useState(false);
   const [tableColumns, setTableColumns] = useState([]);
   const [feedReadFilter, setFeedReadFilter] = useState("ALL"); // ALL, READ, UNREAD
-  const [feedVesselFilter, setFeedVesselFilter] = useState("ALL");
+  
+  // 🔥 CHANGED: Feed filters are now arrays (empty array [] means "ALL selected")
+  const [feedVesselFilter, setFeedVesselFilter] = useState([]);
+  const [feedFilter, setFeedFilter] = useState([]); 
+  
+  // 🔥 NEW: States and Refs for the custom feed dropdowns
+  const [isFeedVesselOpen, setIsFeedVesselOpen] = useState(false);
+  const [isFeedActionOpen, setIsFeedActionOpen] = useState(false);
+  const feedVesselRef = useRef(null);
+  const feedActionRef = useRef(null);
+
+  // 🔥 NEW: Constant array for action options
+  const FEED_ACTIONS = [
+    { id: "NEW_REPORT", label: "UPLOADED REPORT" },
+    { id: "EVIDENCE_UPLOAD", label: "UPLOADED EVIDENCE" },
+    { id: "RESAMPLE_REMINDER", label: "RESAMPLE PENDING" },
+    { id: "EVIDENCE_DELETE", label: "DELETED EVIDENCE" },
+    { id: "SCHEDULE_ALERT", label: "OVERDUE" },
+    { id: "MANDATORY", label: "IMAGE MANDATORY" }
+  ];
+
   const [feedFromDate, setFeedFromDate] = useState("");
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [closeRemarksText, setCloseRemarksText] = useState("");
   const [selectedCloseFile, setSelectedCloseFile] = useState(null);
   const [isSubmittingClose, setIsSubmittingClose] = useState(false);
   const [feedToDate, setFeedToDate] = useState("");
-  // const [hiddenNotifIds, setHiddenNotifIds] = useState([]);
   const [columnLabels, setColumnLabels] = useState({});
-  const [activeTab, setActiveTab] = useState("dashboard"); // or 'feed'
+  const [activeTab, setActiveTab] = useState("dashboard"); 
   const [isMachineryStatsOpen, setIsMachineryStatsOpen] = useState(false);
   const [isTableOpen, setIsTableOpen] = useState(true);
-  const [selectedCell, setSelectedCell] = useState(null); // Tracks { vessel, machinery, data }
+  const [selectedCell, setSelectedCell] = useState(null); 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDiagExpanded, setIsDiagExpanded] = useState(false);
   const [selectedGalleryItems, setSelectedGalleryItems] = useState([]);
   const [isDownloading, setIsDownloading] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
-  const [viewMode, setViewMode] = useState("matrix"); // 'matrix' or 'liveFeed'
+  const [viewMode, setViewMode] = useState("matrix"); 
   const [feedMode, setFeedMode] = useState("FLEET");
   const [feedData, setFeedData] = useState([]);
   const [feedLoading, setFeedLoading] = useState(false);
@@ -560,7 +616,6 @@ const LuboilAnalysis = () => {
   const footerRef = useRef(null);
   const chatInputRef = useRef(null);
   const [feedSearch, setFeedSearch] = useState("");
-  const [feedFilter, setFeedFilter] = useState("ALL");
   const [isResamplingActive, setIsResamplingActive] = useState(false);
   const [compareIds, setCompareIds] = useState([]); // Will store exactly 2 IDs
   const [selectedLubReports, setSelectedLubReports] = useState([]);
@@ -599,14 +654,16 @@ const LuboilAnalysis = () => {
   const [selectedVesselsFilter, setSelectedVesselsFilter] = useState([]);
   const [isVesselDropdownOpen, setIsVesselDropdownOpen] = useState(false);
   const vesselDropdownRef = useRef(null);
-  const rawJobTitle = (
-    user?.job_title ||
-    user?.user?.job_title ||
-    ""
-  ).toLowerCase().replace(/\s+/g, "");
+  const rawJobTitle = (user?.job_title || user?.user?.job_title || "")
+    .toLowerCase()
+    .replace(/\s+/g, "");
 
-  const isTechManager = rawJobTitle.includes("techmanager") || rawJobTitle.includes("technicalmanager");
-  const isTechDirector = rawJobTitle.includes("techdirector") || rawJobTitle.includes("technicaldirector");
+  const isTechManager =
+    rawJobTitle.includes("techmanager") ||
+    rawJobTitle.includes("technicalmanager");
+  const isTechDirector =
+    rawJobTitle.includes("techdirector") ||
+    rawJobTitle.includes("technicaldirector");
   const canApprove = isTechManager || isTechDirector;
   const canAddJustification =
     isTechManager ||
@@ -622,7 +679,11 @@ const LuboilAnalysis = () => {
       const data = (
         await axiosLub.get(`/api/luboil/live-feed?feed_mode=${feedMode}`)
       ).data;
-      setFeedData(Array.isArray(data) ? data : data?.items || data?.feed || data?.results || []);
+      setFeedData(
+        Array.isArray(data)
+          ? data
+          : data?.items || data?.feed || data?.results || [],
+      );
     } catch (err) {
       console.error(err);
     } finally {
@@ -651,6 +712,18 @@ const LuboilAnalysis = () => {
       document.removeEventListener("mousedown", handleClickOutsideFooter);
     };
   }, [footerReportVessel]);
+  useEffect(() => {
+    const handleClickOutsideFeedFilters = (event) => {
+      if (feedVesselRef.current && !feedVesselRef.current.contains(event.target)) {
+        setIsFeedVesselOpen(false);
+      }
+      if (feedActionRef.current && !feedActionRef.current.contains(event.target)) {
+        setIsFeedActionOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutsideFeedFilters);
+    return () => document.removeEventListener("mousedown", handleClickOutsideFeedFilters);
+  }, []);
 
   useEffect(() => {
     if (viewMode === "liveFeed") {
@@ -706,14 +779,21 @@ const LuboilAnalysis = () => {
       await axiosLub.post("/api/luboil/vessel/overdue-workflow", {
         imo: imo,
         action: action,
-        remarks: remark
+        remarks: remark,
       });
-      alert(action === "SUBMIT" ? "Vessel justification submitted for approval." : `Justification ${action.toLowerCase()} successfully.`);
+      alert(
+        action === "SUBMIT"
+          ? "Vessel justification submitted for approval."
+          : `Justification ${action.toLowerCase()} successfully.`,
+      );
 
       await loadData(); // Reload matrix to update states visually
       setListModal((prev) => ({ ...prev, isOpen: false })); // Close modal on success
     } catch (err) {
-      alert("Failed to process action: " + (err.response?.data?.detail || err.message));
+      alert(
+        "Failed to process action: " +
+          (err.response?.data?.detail || err.message),
+      );
     }
   };
 
@@ -979,7 +1059,7 @@ const LuboilAnalysis = () => {
       const matchesType =
         feedMode === "MY_FEED"
           ? true
-          : feedFilter === "ALL" || item.event_type === feedFilter;
+          : feedFilter.length === 0 || feedFilter.includes(item.event_type);
 
       // --- EXISTING: READ/UNREAD STATUS ---
       const matchesReadStatus =
@@ -987,9 +1067,9 @@ const LuboilAnalysis = () => {
         (feedReadFilter === "READ" && item.is_read === true) ||
         (feedReadFilter === "UNREAD" && item.is_read === false);
 
-      // --- EXISTING: VESSEL FILTER ---
+      // --- EXISTING: VESSEL FILTER (Multi-Select Array Check) ---
       const matchesVessel =
-        feedVesselFilter === "ALL" || item.vessel_name === feedVesselFilter;
+        feedVesselFilter.length === 0 || feedVesselFilter.includes(item.vessel_name);
 
       // --- EXISTING: DATE RANGE ---
       // Normalizing to midnight for accurate day comparison
@@ -1018,7 +1098,10 @@ const LuboilAnalysis = () => {
 
     filtered.forEach((item) => {
       // We use UTC conversion 'Z' to match the backend ISO format if necessary
-      const itemDateOnly = new Date(item.created_at).setHours(0, 0, 0, 0);
+      const raw = item.created_at || "";
+      const safeDateStr = raw.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(raw) ? raw : raw + "Z";
+      
+      const itemDateOnly = new Date(safeDateStr).setHours(0, 0, 0, 0);
 
       if (item.is_read) {
         groups.read.push(item);
@@ -1064,6 +1147,9 @@ const LuboilAnalysis = () => {
       // This is the formatted string for the Chat History
       const resolutionMsg = `[${timestamp}]  ISSUE CLOSED BY ${user.full_name}: ${closeRemarksText}`;
 
+      // 🔥 FIX: Track new URL to instantly update the UI (View Button)
+      let newAttachmentRawUrl = null;
+
       // 2. Upload file if one was selected
       if (selectedCloseFile) {
         const formData = new FormData();
@@ -1072,11 +1158,17 @@ const LuboilAnalysis = () => {
         formData.append("equipment_code", selectedCell.data.code);
         formData.append("sample_date", selectedCell.data.last_sample);
         formData.append("sample_id", selectedCell.data.sample_id);
-        (
+        
+        const uploadData = (
           await axiosLub.post("/api/luboil/upload-attachment", formData, {
             headers: { "Content-Type": "multipart/form-data" },
           })
         ).data;
+
+        // Extract raw URL to append to local state immediately
+        if (uploadData && uploadData.url) {
+          newAttachmentRawUrl = uploadData.url.split("?")[0];
+        }
       }
 
       // 3. Prepare Payload
@@ -1107,18 +1199,52 @@ const LuboilAnalysis = () => {
       ).data;
 
       // 4. Update Local UI State immediately
-      setSelectedCell((prev) => ({
-        ...prev,
-        data: {
-          ...prev.data,
-          // If user is Shore, it's CLOSED. If user is Vessel, it's PENDING APPROVAL.
-          is_resolved: amIShore ? true : false,
-          is_approval_pending: !amIShore ? true : false,
+      setSelectedCell((prev) => {
+        // 🔥 FIX: Calculate the new attachment string so the 'View' button updates instantly
+        const existingUrls = prev.data.attachment_url ? prev.data.attachment_url.split("|").filter(Boolean) : [];
+        const updatedAttachmentUrl = newAttachmentRawUrl 
+          ? [...existingUrls, newAttachmentRawUrl].join("|") 
+          : prev.data.attachment_url;
 
-          resolution_remarks: closeRemarksText,
-          conversation: response.updated_conversation,
-        },
-      }));
+        return {
+          ...prev,
+          data: {
+            ...prev.data,
+            // If user is Shore, it's CLOSED. If user is Vessel, it's PENDING APPROVAL.
+            is_resolved: amIShore ? true : false,
+            is_approval_pending: !amIShore ? true : false,
+
+            resolution_remarks: closeRemarksText,
+            attachment_url: updatedAttachmentUrl, // Forces the UI button to increment instantly!
+            conversation: response.updated_conversation,
+          },
+        };
+      });
+
+      // 🔥 FIX: Also update the background matrix so the file doesn't disappear if you click another cell and return
+      setNormalizedTable((prev) => {
+        const updatedRows = { ...prev.rows };
+        const vName = selectedCell.vessel;
+        const mCode = selectedCell.data.code;
+
+        if (updatedRows[vName] && updatedRows[vName][mCode]) {
+          const targetCell = updatedRows[vName][mCode];
+          const existingUrls = targetCell.attachment_url ? targetCell.attachment_url.split("|").filter(Boolean) : [];
+          const updatedAttachmentUrl = newAttachmentRawUrl 
+            ? [...existingUrls, newAttachmentRawUrl].join("|") 
+            : targetCell.attachment_url;
+
+          updatedRows[vName][mCode] = {
+            ...targetCell,
+            is_resolved: amIShore ? true : false,
+            is_approval_pending: !amIShore ? true : false,
+            resolution_remarks: closeRemarksText,
+            attachment_url: updatedAttachmentUrl,
+            conversation: response.updated_conversation,
+          };
+        }
+        return { ...prev, rows: updatedRows };
+      });
 
       // 5. UI Cleanup
       setIsCloseModalOpen(false);
@@ -1245,7 +1371,7 @@ const LuboilAnalysis = () => {
       // Just open the overdue modal for this vessel instead
       if (matrixData?.data) {
         const vesselEntry = Object.entries(matrixData.data).find(
-          ([, vData]) => String(vData.imo) === String(event.imo)
+          ([, vData]) => String(vData.imo) === String(event.imo),
         );
         if (vesselEntry) {
           handleCardClick("CriticalOver30"); // or "WarningUnder30" based on priority
@@ -1284,7 +1410,9 @@ const LuboilAnalysis = () => {
     setIsReportCollapsed(false);
     setIsCommCollapsed(false);
     setIsActionsCollapsed(false);
-
+    setIsResamplingActive(false);
+    setCompareIds([]);
+    setIsLinkGenerated(false);
     /**
      * ðŸ”¥ SYNC INPUT BOXES
      * This is the fix for the "Empty Box" issue. We must update the "memory"
@@ -1354,7 +1482,7 @@ const LuboilAnalysis = () => {
 
       // 2. ðŸ”¥ ISOLATE ATTACHMENTS (Images/PDFs) specifically for this dot
       if (s.attachment_url) {
-        const files = s.attachment_url.split("|").filter(f => f && f.trim());
+        const files = s.attachment_url.split("|").filter((f) => f && f.trim());
         files.forEach((fileUrl) => {
           if (!fileUrl) return;
 
@@ -1940,11 +2068,11 @@ const LuboilAnalysis = () => {
       // 3. UPDATE MODAL STATE IMMEDIATELY
       setSelectedCell((prev) => {
         const existingUrls = prev.data.attachment_url
-          ? prev.data.attachment_url.split('|').filter(Boolean)
+          ? prev.data.attachment_url.split("|").filter(Boolean)
           : [];
-        const rawNewUrl = uploadData.url ? uploadData.url.split('?')[0] : '';
+        const rawNewUrl = uploadData.url ? uploadData.url.split("?")[0] : "";
         const updatedAttachmentUrl = rawNewUrl
-          ? [...existingUrls, rawNewUrl].join('|')
+          ? [...existingUrls, rawNewUrl].join("|")
           : prev.data.attachment_url;
 
         return {
@@ -1952,7 +2080,8 @@ const LuboilAnalysis = () => {
           data: {
             ...prev.data,
             attachment_url: updatedAttachmentUrl,
-            conversation: response.updated_conversation || prev.data.conversation,
+            conversation:
+              response.updated_conversation || prev.data.conversation,
           },
         };
       });
@@ -2275,7 +2404,7 @@ const LuboilAnalysis = () => {
     let mNormal = 0,
       mWarning = 0,
       mCritical = 0;
-    let totalConfigured = 0;  // 🔥 RENAME THIS
+    let totalConfigured = 0; // 🔥 RENAME THIS
     let configuredVesselCount = 0;
     // --- COUNTERS ---
     // let totalConfigured = Object.keys(data.data).length;
@@ -2290,7 +2419,9 @@ const LuboilAnalysis = () => {
       let vesselIsOverdueOver30 = false;
       let vesselHasActiveIssue = false; // Flag to see if vessel has pending actions
 
-      const hasConfiguredMachinery = Object.values(vessel.machineries || {}).some(m => m.is_configured === true);
+      const hasConfiguredMachinery = Object.values(
+        vessel.machineries || {},
+      ).some((m) => m.is_configured === true);
       if (hasConfiguredMachinery) {
         configuredVesselCount++; // Only increment if configured
       }
@@ -2325,7 +2456,9 @@ const LuboilAnalysis = () => {
         const sampleDate = new Date(m.last_sample);
         const dueDate = new Date(sampleDate);
         dueDate.setMonth(dueDate.getMonth() + intervalMonths);
-        const daysOverdue = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
+        const daysOverdue = Math.ceil(
+          (today - dueDate) / (1000 * 60 * 60 * 24),
+        );
 
         // Health Logic
         if (daysOverdue > 30) {
@@ -2371,7 +2504,7 @@ const LuboilAnalysis = () => {
       configured: configuredVesselCount,
       pendingUnresolved: pendingUnresolvedCount, // Updated for new UI card
       overdueUnder30: ovUnder30Count,
-      overdueOver30: ovOver30Count
+      overdueOver30: ovOver30Count,
     });
   };
 
@@ -2698,7 +2831,9 @@ const LuboilAnalysis = () => {
         const sampleDate = new Date(m.last_sample);
         const dueDate = new Date(sampleDate);
         dueDate.setMonth(dueDate.getMonth() + interval);
-        const daysOverdue = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
+        const daysOverdue = Math.ceil(
+          (today - dueDate) / (1000 * 60 * 60 * 24),
+        );
 
         // 1. Health Status Logic
         if (daysOverdue > 30) {
@@ -2718,12 +2853,15 @@ const LuboilAnalysis = () => {
           state: daysOverdue > 30 ? "danger" : "warning",
           // 🔥 ADDED THESE TWO LINES
           report_overdue_remarks: m.report_overdue_remarks,
-          report_is_overdue_accepted: m.report_is_overdue_accepted
+          report_is_overdue_accepted: m.report_is_overdue_accepted,
         };
 
         if (daysOverdue > 30) {
           vesselIsOverdueOver30 = true;
-          if (statusType === "CriticalOver30" || statusType === "WarningUnder30") {
+          if (
+            statusType === "CriticalOver30" ||
+            statusType === "WarningUnder30"
+          ) {
             vesselMatchedOverdueItems.push(itemData);
           }
         } else if (daysOverdue > 0) {
@@ -2742,13 +2880,20 @@ const LuboilAnalysis = () => {
             imo: vesselData.imo || "N/A",
             overdueItems: vesselMatchedOverdueItems,
           });
-        } else if (statusType === "WarningUnder30" && vesselIsOverdueUnder30 && !vesselIsOverdueOver30) {
+        } else if (
+          statusType === "WarningUnder30" &&
+          vesselIsOverdueUnder30 &&
+          !vesselIsOverdueOver30
+        ) {
           matchingVessels.push({
             name: vesselName,
             imo: vesselData.imo || "N/A",
             overdueItems: vesselMatchedOverdueItems,
           });
-        } else if (vesselWorstHealthStatus === statusType && !["WarningUnder30", "CriticalOver30"].includes(statusType)) {
+        } else if (
+          vesselWorstHealthStatus === statusType &&
+          !["WarningUnder30", "CriticalOver30"].includes(statusType)
+        ) {
           matchingVessels.push({
             name: vesselName,
             imo: vesselData.imo || "N/A",
@@ -2853,7 +2998,6 @@ const LuboilAnalysis = () => {
             summary: res.alert_summary,
             count: res.sample_count,
           });
-
         } catch (fileError) {
           errorCount++;
           detailedSummary.push({
@@ -2881,12 +3025,15 @@ const LuboilAnalysis = () => {
         if (items.length === 0) return "";
         return (
           `\n${icon} ${label} (${items.length})\n` +
-          "─".repeat(40) + "\n" +
-          items.map((d) =>
-            d.status === "error"
-              ? `  • ${d.filename}\n    ❗ ${d.error}`
-              : `  • ${d.vessel} — ${d.date}\n    ${d.summary} | ${d.count} machineries\n    File: ${d.filename}`
-          ).join("\n\n")
+          "─".repeat(40) +
+          "\n" +
+          items
+            .map((d) =>
+              d.status === "error"
+                ? `  • ${d.filename}\n    ❗ ${d.error}`
+                : `  • ${d.vessel} — ${d.date}\n    ${d.summary} | ${d.count} machineries\n    File: ${d.filename}`,
+            )
+            .join("\n\n")
         );
       };
 
@@ -2907,7 +3054,6 @@ const LuboilAnalysis = () => {
 
       // 7. Refresh the Matrix
       loadData();
-
     } catch (globalError) {
       console.error("Bulk Upload Error:", globalError);
       alert("❌ A critical error occurred during bulk processing.");
@@ -3145,14 +3291,16 @@ const LuboilAnalysis = () => {
                     e.stopPropagation();
                     setShowHistoryDropdown(!showHistoryDropdown);
                   }}
-                  className={`lub-status-action-btn ${showHistoryDropdown ? 'btn-active' : ''}`}
+                  className={`lub-status-action-btn ${showHistoryDropdown ? "btn-active" : ""}`}
                   title="View Historical Report List"
                 >
                   <FileText size={14} />
                 </button>
 
                 {showHistoryDropdown && (
-                  <div className={`lub-status-history-popover ${openUpward ? 'pop-up' : 'pop-down'}`}>
+                  <div
+                    className={`lub-status-history-popover ${openUpward ? "pop-up" : "pop-down"}`}
+                  >
                     <div className="popover-header">AVAILABLE REPORTS</div>
                     {sortedHistory
                       .filter((h) => (h.date || h.sample_date) !== latestDate)
@@ -3173,9 +3321,7 @@ const LuboilAnalysis = () => {
                           }
                         >
                           <ShellStatusIcon status={h.status} size={16} />
-                          <span
-                            className="popover-date-text"
-                          >
+                          <span className="popover-date-text">
                             {new Date(
                               h.date || h.sample_date,
                             ).toLocaleDateString("en-GB", {
@@ -3190,10 +3336,10 @@ const LuboilAnalysis = () => {
                     {sortedHistory.filter(
                       (h) => (h.date || h.sample_date) !== latestDate,
                     ).length === 0 && (
-                        <div className="lub-status-history-empty">
-                          No previous reports found
-                        </div>
-                      )}
+                      <div className="lub-status-history-empty">
+                        No previous reports found
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -3202,9 +3348,12 @@ const LuboilAnalysis = () => {
         </div>
 
         {/* --- LINE 2: DUE DATE BADGE (ISOLATED BOTTOM) --- */}
-        <span className={`lub-status-due-badge ${daysOverdue > 30 ? 'overdue-critical' : daysOverdue > 0 ? 'overdue-warning' : 'overdue-normal'}`}>
-          {daysOverdue > 30 ? "⚠ " : daysOverdue > 0 ? "⚠ " : ""}Due: {dueText}
-        </span>
+        <span
+  className={`lub-status-due-badge ${daysOverdue > 30 ? "overdue-critical" : daysOverdue > 0 ? "overdue-critical" : "overdue-normal"}`} 
+>
+  {daysOverdue > 30 ? "⚠ " : daysOverdue > 0 ? "⚠ " : ""}Due: {dueText}
+</span>
+
       </div>
     );
   };
@@ -3264,7 +3413,7 @@ const LuboilAnalysis = () => {
   return (
     <div
       className="dashboard-container-enhanced"
-      style={{ paddingTop: "72px" }}
+      style={{ paddingTop: "70px" }}
     >
       {/* <PerformanceNav /> */}
       <OzellarHeader
@@ -3836,9 +3985,7 @@ const LuboilAnalysis = () => {
                 (e.currentTarget.style.transform = "translateY(0)")
               }
             >
-              <div
-                className="stat-icon-wrapper icon-bg-slate"
-              >
+              <div className="stat-icon-wrapper icon-bg-slate">
                 <Activity size={20} /> {/* Reduced from 24 */}
               </div>
               <div className="stat-text-column">
@@ -3856,14 +4003,16 @@ const LuboilAnalysis = () => {
                 <AlertCircle size={20} />
               </div>
               <div className="stat-text-column">
-                <div className="lub-stat-value">{overdueStats.pendingUnresolved || 0}</div>
+                <div className="lub-stat-value">
+                  {overdueStats.pendingUnresolved || 0}
+                </div>
                 <div className="lub-stat-label">Pending / Unresolved</div>
               </div>
             </div>
 
             {/* Card 2: Warning Overdue > 30 Days */}
             <div
-              className="stat-card stat-card-warning"
+              className="stat-card stat-card-critical"
               onClick={() => handleCardClick("WarningUnder30")}
               onMouseEnter={(e) =>
                 (e.currentTarget.style.transform = "translateY(-2px)")
@@ -3872,20 +4021,14 @@ const LuboilAnalysis = () => {
                 (e.currentTarget.style.transform = "translateY(0)")
               }
             >
-              <div className="stat-icon-wrapper icon-bg-orange">
+              <div className="stat-icon-wrapper icon-bg-red">
                 <Clock size={20} />
               </div>
               <div className="stat-text-column">
-                <div
-                  className="lub-stat-value"
-                >
+                <div className="lub-stat-value">
                   {overdueStats.overdueUnder30}
                 </div>
-                <div
-                  className="lub-stat-label"
-                >
-                  Overdue &lt; 30 Days
-                </div>
+                <div className="lub-stat-label">Overdue &lt; 30 Days</div>
               </div>
             </div>
 
@@ -3904,14 +4047,10 @@ const LuboilAnalysis = () => {
                 <AlertOctagon size={20} />
               </div>
               <div className="stat-text-column">
-                <div
-                  className="lub-stat-value"
-                >
+                <div className="lub-stat-value">
                   {overdueStats.overdueOver30}
                 </div>
-                <div
-                  className="lub-stat-label"
-                >
+                <div className="lub-stat-label">
                   Overdue &gt; 30 Days With Concern
                 </div>
               </div>
@@ -3928,7 +4067,11 @@ const LuboilAnalysis = () => {
                 {/* Title & Icon Section */}
                 <div className="lub-matrix-title-group">
                   <div className="lub-matrix-icon-box">
-                    <Droplet size={18} color="white" className="matrix-droplet-icon" />
+                    <Droplet
+                      size={18}
+                      color="white"
+                      className="matrix-droplet-icon"
+                    />
                   </div>
                   <div className="lub-matrix-text-box">
                     <CardTitle className="lub-matrix-card-title">
@@ -3941,7 +4084,10 @@ const LuboilAnalysis = () => {
                 </div>
 
                 {/* --- VESSEL DROPDOWN (Positioned on the Left) --- */}
-                <div ref={vesselDropdownRef} className="lub-vessel-dropdown-wrapper">
+                <div
+                  ref={vesselDropdownRef}
+                  className="lub-vessel-dropdown-wrapper"
+                >
                   <button
                     className={`lub-vessel-select-btn ${isVesselDropdownOpen ? "active" : ""}`}
                     onClick={(e) => {
@@ -3954,7 +4100,7 @@ const LuboilAnalysis = () => {
                       {selectedVesselsFilter.length === 0
                         ? "Select the vessel"
                         : selectedVesselsFilter.length ===
-                          availableVessels.length
+                            availableVessels.length
                           ? " All Vessels"
                           : ` ${selectedVesselsFilter.length} Selected`}
                     </span>
@@ -3962,13 +4108,9 @@ const LuboilAnalysis = () => {
                   </button>
 
                   {isVesselDropdownOpen && (
-                    <div
-                      className=" lub-vessel-select-menu"
-                    >
+                    <div className=" lub-vessel-select-menu">
                       {/* Sticky Select All at top */}
-                      <div
-                        className="vessel-menu-header"
-                      >
+                      <div className="vessel-menu-header">
                         <label className="vessel-checkbox-label">
                           <input
                             type="checkbox"
@@ -3985,14 +4127,9 @@ const LuboilAnalysis = () => {
                       </div>
 
                       {/* SCROLLABLE LIST AREA */}
-                      <div
-                        className="vessel-dropdown-scroll"
-                      >
+                      <div className="vessel-dropdown-scroll">
                         {availableVessels.map((v) => (
-                          <div
-                            key={v.vessel_name}
-                            className="vessel-menu-item"
-                          >
+                          <div key={v.vessel_name} className="vessel-menu-item">
                             <label className="vessel-checkbox-label">
                               <input
                                 type="checkbox"
@@ -4084,21 +4221,23 @@ const LuboilAnalysis = () => {
                               ...new Set(
                                 Object.values(vesselData?.machineries || {})
                                   .map((m) => m.oil_source) // 🟢 Look at the new oil_source from backend
-                                  .filter((source) => source && source.trim() !== "") // Remove nulls/blanks
-                              )
+                                  .filter(
+                                    (source) => source && source.trim() !== "",
+                                  ), // Remove nulls/blanks
+                              ),
                             ];
 
                             // 2. Condition: If same, it shows one. If different, it joins them. Fallback if empty.
-                            const labNameDisplay = uniqueSources.length > 0
-                              ? uniqueSources.join(" / ")
-                              : "Unknown Source";
+                            const labNameDisplay =
+                              uniqueSources.length > 0
+                                ? uniqueSources.join(" / ")
+                                : "Unknown Source";
 
                             return (
                               <th
                                 key={vesselName}
                                 // onClick={() => handleVesselClick(vesselName, vesselImo)}
                                 className="vessel-header-cell"
-
                                 style={{
                                   position: "sticky",
                                   top: 0,
@@ -4111,33 +4250,27 @@ const LuboilAnalysis = () => {
                                   backgroundColor: "#f8fafc",
                                   borderBottom: "2px solid #cbd5e1",
                                   borderRight: "1px solid #e2e8f0",
-                                  cursor: "pointer",
+                                  // cursor: "pointer",
                                   color: "#1e293b",
                                   transition: "background 0.2s",
                                 }}
-                                onMouseEnter={(e) =>
-                                (e.currentTarget.style.backgroundColor =
-                                  "#eff6ff")
-                                }
-                                onMouseLeave={(e) =>
-                                (e.currentTarget.style.backgroundColor =
-                                  "#f8fafc")
-                                }
+                                // onMouseEnter={(e) =>
+                                //   (e.currentTarget.style.backgroundColor =
+                                //     "#eff6ff")
+                                // }
+                                // onMouseLeave={(e) =>
+                                //   (e.currentTarget.style.backgroundColor =
+                                //     "#f8fafc")
+                                // }
                               >
-                                <div
-                                  className="vessel-header-container"
-                                >
+                                <div className="vessel-header-container">
                                   {/* Vessel Name */}
-                                  <span
-                                    className="vessel-name-txt"
-                                  >
+                                  <span className="vessel-name-txt">
                                     {vesselName}
                                   </span>
 
                                   {/* Lab Source Name */}
-                                  <span
-                                    className="vessel-lab-txt"
-                                  >
+                                  <span className="vessel-lab-txt">
                                     {labNameDisplay}
                                   </span>
                                 </div>
@@ -4177,7 +4310,7 @@ const LuboilAnalysis = () => {
                             );
                             const fullName = vesselWithInfo
                               ? normalizedTable.rows[vesselWithInfo][colCode]
-                                .description
+                                  .description
                               : columnLabels[colCode] || colCode;
 
                             return (
@@ -4235,7 +4368,10 @@ const LuboilAnalysis = () => {
                                   // --- CONDITION 1: N/A ---
                                   if (!cell || !cell.is_configured) {
                                     return (
-                                      <td key={vesselName} className="lub-data-cell empty-cell">
+                                      <td
+                                        key={vesselName}
+                                        className="lub-data-cell empty-cell"
+                                      >
                                         <span className="na-text">N/A</span>
                                       </td>
                                     );
@@ -4244,17 +4380,21 @@ const LuboilAnalysis = () => {
                                   // --- CONDITION 2: MISSING ---
                                   if (!cell.has_report) {
                                     return (
-                                      <td key={vesselName} className="lub-data-cell missing-cell">
-                                        <div className="missing-label">MISSING</div>
+                                      <td
+                                        key={vesselName}
+                                        className="lub-data-cell missing-cell"
+                                      >
+                                        <div className="missing-label">
+                                          MISSING
+                                        </div>
                                       </td>
-
                                     );
                                   }
 
                                   // --- CONDITION 3: DATA AVAILABLE ---
                                   const interval =
                                     typeof cell.interval === "number" &&
-                                      cell.interval > 0
+                                    cell.interval > 0
                                       ? cell.interval
                                       : 3;
                                   const sampleDate = new Date(cell.last_sample);
@@ -4268,7 +4408,9 @@ const LuboilAnalysis = () => {
                                       month: "short",
                                       year: "2-digit",
                                     });
-                                  const daysOverdue = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
+                                  const daysOverdue = Math.ceil(
+                                    (today - dueDate) / (1000 * 60 * 60 * 24),
+                                  );
                                   const hasRemarks =
                                     cell.officer_remarks || cell.office_remarks;
                                   const isNormal =
@@ -4295,16 +4437,23 @@ const LuboilAnalysis = () => {
                                       className={`lub-data-cell data-available ${isNormal ? "" : "hover-cell"}`}
                                     >
                                       {daysOverdue > 0 && (
-                                        <div
-                                          title={`Overdue by ${daysOverdue} days`}
-                                          className={`overdue-indicator ${daysOverdue > 30 ? "critical" : "warning"}`}
-                                        >
-                                          <Clock size={12} color="white" className="indicator-icon" />
-                                        </div>
-                                      )}
+  <div
+    title={`Overdue by ${daysOverdue} days`}
+    className="overdue-indicator critical" 
+  >
+    <Clock size={12} color="white" className="indicator-icon" />
+  </div>
+)}
                                       {showVerifiedTick && (
-                                        <div className="verified-tick-dogear" title="Resolution Documented & Verified">
-                                          <CheckCircle size={12} color="white" className="indicator-icon" />
+                                        <div
+                                          className="verified-tick-dogear"
+                                          title="Resolution Documented & Verified"
+                                        >
+                                          <CheckCircle
+                                            size={12}
+                                            color="white"
+                                            className="indicator-icon"
+                                          />
                                         </div>
                                       )}
                                       <div className="cell-content-wrapper">
@@ -4372,7 +4521,10 @@ const LuboilAnalysis = () => {
                             const isOpen = footerReportVessel === vesselName;
 
                             return (
-                              <td key={`foot-${vesselName}`} className="lub-matrix-footer-cell">
+                              <td
+                                key={`foot-${vesselName}`}
+                                className="lub-matrix-footer-cell"
+                              >
                                 <div
                                   ref={
                                     footerReportVessel === vesselName
@@ -4404,10 +4556,13 @@ const LuboilAnalysis = () => {
                                     <div className="lub-footer-popover">
                                       {/* Popover Header */}
                                       <div className="lub-footer-popover-header">
-                                        <span className="popover-title">SELECT REPORTS</span>
+                                        <span className="popover-title">
+                                          SELECT REPORTS
+                                        </span>
                                         {selectedFooterReports.length > 0 && (
                                           <span className="popover-count-badge">
-                                            {selectedFooterReports.length} Selected
+                                            {selectedFooterReports.length}{" "}
+                                            Selected
                                           </span>
                                         )}
                                       </div>
@@ -4420,7 +4575,10 @@ const LuboilAnalysis = () => {
                                           </div>
                                         ) : (
                                           footerReports.map((report, idx) => (
-                                            <label key={idx} className="lub-footer-popover-item">
+                                            <label
+                                              key={idx}
+                                              className="lub-footer-popover-item"
+                                            >
                                               <input
                                                 type="checkbox"
                                                 className="popover-checkbox"
@@ -4434,14 +4592,14 @@ const LuboilAnalysis = () => {
                                                         report.report_id,
                                                       )
                                                         ? prev.filter(
-                                                          (id) =>
-                                                            id !==
-                                                            report.report_id,
-                                                        )
+                                                            (id) =>
+                                                              id !==
+                                                              report.report_id,
+                                                          )
                                                         : [
-                                                          ...prev,
-                                                          report.report_id,
-                                                        ],
+                                                            ...prev,
+                                                            report.report_id,
+                                                          ],
                                                   );
                                                 }}
                                                 style={{
@@ -4450,20 +4608,18 @@ const LuboilAnalysis = () => {
                                                   cursor: "pointer",
                                                 }}
                                               />
-                                              <span
-                                                className="popover-item-date"
-                                              >
+                                              <span className="popover-item-date">
                                                 {report.report_date
                                                   ? new Date(
-                                                    report.report_date,
-                                                  ).toLocaleDateString(
-                                                    "en-GB",
-                                                    {
-                                                      day: "2-digit",
-                                                      month: "short",
-                                                      year: "numeric",
-                                                    },
-                                                  )
+                                                      report.report_date,
+                                                    ).toLocaleDateString(
+                                                      "en-GB",
+                                                      {
+                                                        day: "2-digit",
+                                                        month: "short",
+                                                        year: "numeric",
+                                                      },
+                                                    )
                                                   : "Unknown Date"}
                                               </span>
                                             </label>
@@ -4476,7 +4632,7 @@ const LuboilAnalysis = () => {
                                         <button
                                           disabled={
                                             selectedFooterReports.length ===
-                                            0 || isFooterDownloading
+                                              0 || isFooterDownloading
                                           }
                                           onClick={() =>
                                             handleFooterBatchDownload(
@@ -4485,8 +4641,14 @@ const LuboilAnalysis = () => {
                                           }
                                           className="lub-footer-download-btn"
                                           style={{
-                                            backgroundColor: selectedFooterReports.length > 0 ? "#10b981" : "#cbd5e1",
-                                            cursor: selectedFooterReports.length > 0 ? "pointer" : "not-allowed",
+                                            backgroundColor:
+                                              selectedFooterReports.length > 0
+                                                ? "#10b981"
+                                                : "#cbd5e1",
+                                            cursor:
+                                              selectedFooterReports.length > 0
+                                                ? "pointer"
+                                                : "not-allowed",
                                           }}
                                         >
                                           {isFooterDownloading ? (
@@ -4512,7 +4674,8 @@ const LuboilAnalysis = () => {
                 ) : (
                   <div className="lub-matrix-empty-state">
                     <p className="lub-matrix-empty-text">
-                      Select one or more vessels above to view Fleet Analysis Matrix
+                      Select one or more vessels above to view Fleet Analysis
+                      Matrix
                     </p>
                   </div>
                 )}
@@ -4524,18 +4687,22 @@ const LuboilAnalysis = () => {
         <div style={{ animation: "fadeIn 0.4s ease-out" }}>
           {/* 1. Main Card: Set to Flexbox and Hide global overflow */}
           <Card
-            className="enhanced-card lub-feed-container"
-            style={{
-              padding: "0",
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-              border: "1px solid #e2e8f0",
-              scrollbarWidth: "thin",
-              scrollbarColor: "#cbd5e1 transparent",
-              height: "600px", // Base height
-            }}
-          >
+  className="enhanced-card lub-feed-container"
+  style={{
+    padding: "0",
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+    border: "1px solid #e2e8f0",
+    scrollbarWidth: "thin",
+    scrollbarColor: "#cbd5e1 transparent",
+    width: "100%",                    
+    height: "calc(100vh - 110px)",   // 🔥 Reduced height prevents the overall page scroll
+    marginTop: "4px",             
+    marginBottom: "8px",
+    boxShadow: "none"                // 🔥 Removes the background shadow completely
+  }}
+>
             {/* 2. Sticky Header: Positioned at the top with a higher Z-index */}
             <CardHeader
               className="lub-feed-header-spacing"
@@ -4553,7 +4720,14 @@ const LuboilAnalysis = () => {
                 }}
               >
                 {/* TOP ROW: Title and Horizontal Toggles */}
-                <div className="lub-feed-top-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div
+                  className="lub-feed-top-row"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
                   <div
                     style={{
                       display: "flex",
@@ -4571,12 +4745,22 @@ const LuboilAnalysis = () => {
                     >
                       <Activity size={18} />
                     </div>
-                    <CardTitle className="lub-feed-title-text" style={{ fontWeight: "700" }}>
+                    <CardTitle
+                      className="lub-feed-title-text"
+                      style={{ fontWeight: "700" }}
+                    >
                       LIVE FEED
                     </CardTitle>
                   </div>
 
-                  <div className="lub-feed-toggles" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div
+                    className="lub-feed-toggles"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
                     {/* NEW: FLEET / MY FEED TOGGLE SWITCH */}
                     <div
                       className="lub-feed-toggle-group"
@@ -4601,17 +4785,17 @@ const LuboilAnalysis = () => {
                             /* Dynamic Styles - MUST STAY INLINE */
                             backgroundColor:
                               (feedMode === "MY_FEED" && mode === "MY FEED") ||
-                                (feedMode === "FLEET" && mode === "FLEET")
+                              (feedMode === "FLEET" && mode === "FLEET")
                                 ? "white"
                                 : "transparent",
                             color:
                               (feedMode === "MY_FEED" && mode === "MY FEED") ||
-                                (feedMode === "FLEET" && mode === "FLEET")
+                              (feedMode === "FLEET" && mode === "FLEET")
                                 ? "#2563eb"
                                 : "#64748b",
                             boxShadow:
                               (feedMode === "MY_FEED" && mode === "MY FEED") ||
-                                (feedMode === "FLEET" && mode === "FLEET")
+                              (feedMode === "FLEET" && mode === "FLEET")
                                 ? "0 2px 4px rgba(0,0,0,0.1)"
                                 : "none",
                             /* Static Visual Styles */
@@ -4643,9 +4827,14 @@ const LuboilAnalysis = () => {
                           onClick={() => setFeedReadFilter(mode)}
                           style={{
                             /* Dynamic logic must stay inline */
-                            backgroundColor: feedReadFilter === mode ? "white" : "transparent",
-                            color: feedReadFilter === mode ? "#2563eb" : "#64748b",
-                            boxShadow: feedReadFilter === mode ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+                            backgroundColor:
+                              feedReadFilter === mode ? "white" : "transparent",
+                            color:
+                              feedReadFilter === mode ? "#2563eb" : "#64748b",
+                            boxShadow:
+                              feedReadFilter === mode
+                                ? "0 2px 4px rgba(0,0,0,0.1)"
+                                : "none",
                             /* Static styles */
                             border: "none",
                             cursor: "pointer",
@@ -4666,7 +4855,7 @@ const LuboilAnalysis = () => {
                         border: "1px solid #cbd5e1",
                         display: "flex",
                         alignItems: "center",
-                        cursor: "pointer"
+                        cursor: "pointer",
                       }}
                     >
                       <Clock size={14} style={{ marginRight: "5px" }} /> Refresh
@@ -4675,9 +4864,15 @@ const LuboilAnalysis = () => {
                 </div>
 
                 {/* BOTTOM ROW: Filters and Search */}
-                <div className="lub-feed-filter-bar" style={{ display: "flex", alignItems: "center" }}>
+                <div
+                  className="lub-feed-filter-bar"
+                  style={{ display: "flex", alignItems: "center" }}
+                >
                   {/* Keyword Search */}
-                  <div className="lub-feed-search-box" style={{ position: "relative" }}>
+                  <div
+                    className="lub-feed-search-box"
+                    style={{ position: "relative" }}
+                  >
                     <Filter
                       size={16}
                       style={{
@@ -4694,46 +4889,123 @@ const LuboilAnalysis = () => {
                       placeholder="Search feed..."
                       value={feedSearch}
                       onChange={(e) => setFeedSearch(e.target.value)}
-                      style={{ borderRadius: "6px", border: "1px solid #e2e8f0", backgroundColor: "white", color: "black" }}
+                      style={{
+                        borderRadius: "6px",
+                        border: "1px solid #e2e8f0",
+                        backgroundColor: "white",
+                        color: "black",
+                      }}
                     />
                   </div>
 
                   {/* Vessel Dropdown */}
-                  <select
-                    className="lub-feed-vessel-select"
-                    value={feedVesselFilter}
-                    onChange={(e) => setFeedVesselFilter(e.target.value)}
-                    style={{ borderRadius: "6px", border: "1px solid #e2e8f0", backgroundColor: "white", color: "black", cursor: "pointer" }}
-                  >
-                    {uniqueFeedVessels.map((v) => (
-                      <option key={v} value={v}>
-                        {v === "ALL" ? "ALL VESSEL" : v}
-                      </option>
-                    ))}
-                  </select>
-
-                  {/* Event Type Dropdown - CONDITIONALLY RENDERED */}
-                  {feedMode === "FLEET" && (
-                    <select
-                      className="lub-feed-action-select"
-                      value={feedFilter}
-                      onChange={(e) => setFeedFilter(e.target.value)}
-                      style={{ borderRadius: "6px", border: "1px solid #e2e8f0", backgroundColor: "white", color: "black", cursor: "pointer" }}
+                  <div ref={feedVesselRef} style={{ position: "relative", flex: 1, minWidth: "180px" }}>
+                    <div
+                      className="lub-feed-vessel-select"
+                      onClick={() => setIsFeedVesselOpen(!isFeedVesselOpen)}
+                      style={{
+                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                        borderRadius: "6px", border: "1px solid #e2e8f0", backgroundColor: "white",
+                        cursor: "pointer", padding: "0 10px", color: "#1e293b", fontWeight: "500",
+                        height: "100%" // Inherits height from css classes
+                      }}
                     >
-                      <option value="ALL">ALL ACTIONS</option>
-                      <option value="NEW_REPORT">UPLOADED REPORT</option>
-                      <option value="EVIDENCE_UPLOAD">UPLOADED EVIDENCE</option>
-                      <option value="RESAMPLE_REMINDER">
-                        RESAMPLE PENDING
-                      </option>
-                      <option value="EVIDENCE_DELETE">DELETED EVIDENCE</option>
-                      <option value="SCHEDULE_ALERT">OVERDUE</option>
-                      <option value="MANDATORY">IMAGE MANDATORY</option>
-                    </select>
+                      <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {feedVesselFilter.length === 0 ? "ALL VESSELS" : `${feedVesselFilter.length} Selected`}
+                      </span>
+                      <ChevronDown size={14} color="#64748b" />
+                    </div>
+                    {isFeedVesselOpen && (
+                      <div style={{
+                        position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+                        backgroundColor: "white", border: "1px solid #e2e8f0", borderRadius: "8px",
+                        boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)", zIndex: 1000, 
+                        maxHeight: "300px", overflowY: "auto", display: "flex", flexDirection: "column"
+                      }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", borderBottom: "1px solid #f1f5f9", cursor: "pointer", fontSize: "0.8rem", fontWeight: "800", backgroundColor: "#f8fafc", color: "#0f172a" }}>
+                          <input type="checkbox" style={{ cursor: "pointer" }}
+                            checked={feedVesselFilter.length === 0} 
+                            onChange={() => setFeedVesselFilter([])} 
+                          />
+                          SELECT ALL
+                        </label>
+                        {/* Remove 'ALL' from uniqueFeedVessels array since we handled it above */}
+                        {uniqueFeedVessels.filter(v => v !== "ALL").map(vessel => (
+                          <label key={vessel} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px", cursor: "pointer", fontSize: "0.8rem", borderBottom: "1px solid #f8fafc", transition: "background 0.2s" }} onMouseEnter={e => e.currentTarget.style.backgroundColor="#f1f5f9"} onMouseLeave={e => e.currentTarget.style.backgroundColor="transparent"}>
+                            <input type="checkbox" style={{ cursor: "pointer" }}
+                              checked={feedVesselFilter.includes(vessel)}
+                              onChange={(e) => {
+                                if (e.target.checked) setFeedVesselFilter(prev => [...prev, vessel]);
+                                else setFeedVesselFilter(prev => prev.filter(v => v !== vessel));
+                              }}
+                            />
+                            {vessel}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 🔥 NEW: EVENT TYPE MULTI-SELECT DROPDOWN */}
+                  {feedMode === "FLEET" && (
+                    <div ref={feedActionRef} style={{ position: "relative", flex: 1, minWidth: "180px" }}>
+                      <div
+                        className="lub-feed-action-select"
+                        onClick={() => setIsFeedActionOpen(!isFeedActionOpen)}
+                        style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          borderRadius: "6px", border: "1px solid #e2e8f0", backgroundColor: "white",
+                          cursor: "pointer", padding: "0 10px", color: "#1e293b", fontWeight: "500",
+                          height: "100%"
+                        }}
+                      >
+                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {feedFilter.length === 0 ? "ALL ACTIONS" : `${feedFilter.length} Selected`}
+                        </span>
+                        <ChevronDown size={14} color="#64748b" />
+                      </div>
+                      {isFeedActionOpen && (
+                        <div style={{
+                          position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+                          backgroundColor: "white", border: "1px solid #e2e8f0", borderRadius: "8px",
+                          boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)", zIndex: 1000, 
+                          maxHeight: "300px", overflowY: "auto", display: "flex", flexDirection: "column"
+                        }}>
+                          <label style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", borderBottom: "1px solid #f1f5f9", cursor: "pointer", fontSize: "0.8rem", fontWeight: "800", backgroundColor: "#f8fafc", color: "#0f172a" }}>
+                            <input type="checkbox" style={{ cursor: "pointer" }}
+                              checked={feedFilter.length === 0} 
+                              onChange={() => setFeedFilter([])} 
+                            />
+                            SELECT ALL
+                          </label>
+                          {FEED_ACTIONS.map(action => (
+                            <label key={action.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px", cursor: "pointer", fontSize: "0.8rem", borderBottom: "1px solid #f8fafc", transition: "background 0.2s" }} onMouseEnter={e => e.currentTarget.style.backgroundColor="#f1f5f9"} onMouseLeave={e => e.currentTarget.style.backgroundColor="transparent"}>
+                              <input type="checkbox" style={{ cursor: "pointer" }}
+                                checked={feedFilter.includes(action.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) setFeedFilter(prev => [...prev, action.id]);
+                                  else setFeedFilter(prev => prev.filter(a => a !== action.id));
+                                }}
+                              />
+                              {action.label}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {/* Date Pickers */}
-                  <div className="lub-feed-date-container" style={{ display: "flex", alignItems: "center", backgroundColor: "white", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
+                  <div
+                    className="lub-feed-date-container"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      backgroundColor: "white",
+                      borderRadius: "6px",
+                      border: "1px solid #e2e8f0",
+                    }}
+                  >
                     <div
                       style={{
                         display: "flex",
@@ -4741,13 +5013,23 @@ const LuboilAnalysis = () => {
                         gap: "6px",
                       }}
                     >
-                      <span className="lub-feed-date-label" style={{ color: "#64748b", fontWeight: "800" }}>FROM:</span>
+                      <span
+                        className="lub-feed-date-label"
+                        style={{ color: "#64748b", fontWeight: "800" }}
+                      >
+                        FROM:
+                      </span>
                       <input
                         type="date"
                         className="lub-feed-date-field"
                         value={feedFromDate}
                         onChange={(e) => setFeedFromDate(e.target.value)}
-                        style={{ border: "none", outline: "none", backgroundColor: "white", color: "black" }}
+                        style={{
+                          border: "none",
+                          outline: "none",
+                          backgroundColor: "white",
+                          color: "black",
+                        }}
                       />
                     </div>
 
@@ -4766,13 +5048,23 @@ const LuboilAnalysis = () => {
                         gap: "6px",
                       }}
                     >
-                      <span className="lub-feed-date-label" style={{ color: "#64748b", fontWeight: "800" }}>TO:</span>
+                      <span
+                        className="lub-feed-date-label"
+                        style={{ color: "#64748b", fontWeight: "800" }}
+                      >
+                        TO:
+                      </span>
                       <input
                         type="date"
                         className="lub-feed-date-field"
                         value={feedToDate}
                         onChange={(e) => setFeedToDate(e.target.value)}
-                        style={{ border: "none", outline: "none", backgroundColor: "white", color: "black" }}
+                        style={{
+                          border: "none",
+                          outline: "none",
+                          backgroundColor: "white",
+                          color: "black",
+                        }}
                       />
                     </div>
 
@@ -4831,7 +5123,7 @@ const LuboilAnalysis = () => {
                     const renderFeedItem = (item) => (
                       <div
                         key={item.id}
-                        className={`lub-feed-item-card ${item.is_read ? 'read' : 'unread'}`}
+                        className={`lub-feed-item-card ${item.is_read ? "read" : "unread"}`}
                         style={{
                           display: "flex",
                           alignItems: "center",
@@ -4841,7 +5133,9 @@ const LuboilAnalysis = () => {
                           transition: "all 0.2s",
                           /* Logic-based colors remain inline */
                           backgroundColor: item.is_read ? "#ffffff" : "#f0f9ff",
-                          borderLeft: item.is_read ? "6px solid #cbd5e1" : "6px solid #2563eb",
+                          borderLeft: item.is_read
+                            ? "6px solid #cbd5e1"
+                            : "6px solid #2563eb",
                           position: "relative",
                           marginBottom: "4px",
                         }}
@@ -4862,7 +5156,15 @@ const LuboilAnalysis = () => {
                         {/* Event Icon */}
                         <div
                           className="lub-feed-item-icon-box"
-                          style={{ width: "32px", height: "32px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", marginRight: "12px" }}
+                          style={{
+                            width: "32px",
+                            height: "32px",
+                            borderRadius: "8px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            marginRight: "12px",
+                          }}
                         >
                           {item.event_type === "MENTION" ? (
                             <MessageSquareText size={16} />
@@ -4899,14 +5201,23 @@ const LuboilAnalysis = () => {
                                 <div style={{ marginBottom: "4px" }}>
                                   <span
                                     className="lub-feed-item-title"
-                                    style={{ fontWeight: "700", color: item.is_read ? "#64748b" : "#0f172a" }}
+                                    style={{
+                                      fontWeight: "700",
+                                      color: item.is_read
+                                        ? "#64748b"
+                                        : "#0f172a",
+                                    }}
                                   >
                                     {headerText}
                                   </span>
                                 </div>
                                 <div
                                   className="lub-feed-item-desc"
-                                  style={{ color: item.is_read ? "#94a3b8" : "#334155", whiteSpace: "pre-wrap", lineHeight: "1.4" }}
+                                  style={{
+                                    color: item.is_read ? "#94a3b8" : "#334155",
+                                    whiteSpace: "pre-wrap",
+                                    lineHeight: "1.4",
+                                  }}
                                 >
                                   {bodyContent}
                                 </div>
@@ -4916,77 +5227,63 @@ const LuboilAnalysis = () => {
                         </div>
 
                         {/* Action Area: Timestamp + Buttons */}
-                        <div className="lub-feed-item-actions" style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "10px" }}>
-                          <div className="lub-feed-timestamp" style={{ color: "#94a3b8", fontWeight: "600" }}>
-                            {new Date(item.created_at + "Z").toLocaleDateString(
-                              "en-GB",
-                            )}{" "}
-                            {new Date(item.created_at + "Z").toLocaleTimeString(
-                              "en-GB",
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                hour12: true,
-                              },
-                            )}
-                          </div>
+                        {/* Action Area: Timestamp + Buttons */}
+<div
+  className="lub-feed-item-actions"
+  style={{
+    textAlign: "right",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: "10px",
+  }}
+>
+  {/* FIX 1: Robust Date Parsing from your old file */}
+  <div className="lub-feed-timestamp" style={{ color: "#94a3b8", fontWeight: "600", fontSize: "0.65rem" }}>
+  {(() => {
+    // Safely check if backend already applied a timezone (Z or +00:00)
+    const raw = item.created_at || "";
+    const normalized = raw.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(raw)
+      ? raw                    
+      : raw + "Z";             
+    const d = new Date(normalized);
+    if (isNaN(d.getTime())) return "—";  
+    
+    // Automatically converts the backend UTC time to the user's Local Time (e.g. IST)
+    return d.toLocaleDateString("en-GB") + " " + d.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  })()}
+</div>
 
-                          <div className="lub-feed-item-btns" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            {!item.is_read && (
-                              <button
-                                className="lub-action-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleMarkSingleRead(item.id);
-                                }}
-                                style={{
-                                  backgroundColor: "white",
-                                  border: "1px solid #2563eb",
-                                  color: "#2563eb",
-                                  borderRadius: "4px",
-                                  fontWeight: "700",
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                }}
-                              >
-                                <CheckCircle size={12} /> MARK AS READ
-                              </button>
-                            )}
+  <div className="lub-feed-item-btns">
+  {!item.is_read && (
+    <button
+      className="lub-feed-mark-read-btn"
+      onClick={(e) => {
+        e.stopPropagation();
+        handleMarkSingleRead(item.id);
+      }}
+    >
+      <CheckCircle size={12} className="feed-btn-icon" strokeWidth={2.5} /> MARK AS READ
+    </button>
+  )}
 
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleFeedItemClick(item);
-                              }}
-                              className="lub-action-btn"
-                              style={{
-                                backgroundColor: "white",
-                                color: "#2563eb",
-                                border: "1px solid #2563eb",
-                                borderRadius: "4px",
-                                fontWeight: "700",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                                transition: "all 0.2s",
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor =
-                                  "#2563eb";
-                                e.currentTarget.style.color = "white";
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = "white";
-                                e.currentTarget.style.color = "#2563eb";
-                              }}
-                            >
-                              <Eye size={14} /> VIEW
-                            </button>
-                          </div>
-                        </div>
+  {item.event_type !== "NEW_REPORT" && (
+    <button
+      className="lub-feed-view-btn"
+      onClick={(e) => {
+        e.stopPropagation();
+        handleFeedItemClick(item);
+      }}
+    >
+      <Eye size={14} className="feed-btn-icon" strokeWidth={2.5} /> VIEW
+    </button>
+  )}
+</div>
+</div>
                       </div>
                     );
 
@@ -5444,12 +5741,10 @@ const LuboilAnalysis = () => {
           <CardHeader className="lub-report-header">
             <div className="lub-report-header-left">
               <div className="lub-report-icon-box">
-                <FileText size={24} color="white"className="lub-header-icon" />
+                <FileText size={24} color="white" className="lub-header-icon" />
               </div>
               <div className="lub-report-title-info">
-                <CardTitle
-                  className="lub-report-title"
-                >
+                <CardTitle className="lub-report-title">
                   {selectedVesselName} - Report History
                 </CardTitle>
                 <p className="lub-report-subtitle">
@@ -5463,7 +5758,7 @@ const LuboilAnalysis = () => {
                 <Button
                   onClick={handleLubBatchDownload}
                   disabled={isDownloading} // Prevents double-clicking
-                  className={`lub-batch-download-btn ${isDownloading ? 'is-loading' : ''}`}
+                  className={`lub-batch-download-btn ${isDownloading ? "is-loading" : ""}`}
                 >
                   {isDownloading ? (
                     <>
@@ -5492,9 +5787,7 @@ const LuboilAnalysis = () => {
             </div>
           </CardHeader>
 
-          <CardContent
-            className="lub-report-table-area"
-          >
+          <CardContent className="lub-report-table-area">
             {loadingReports ? (
               <div className="loading-state-enhanced">
                 <div className="loading-spinner"></div>
@@ -5531,7 +5824,6 @@ const LuboilAnalysis = () => {
                     </th>
                     <th className="col-date">Report Date</th>
                     <th className="col-action">Lube Oil Report</th>
-
                   </tr>
                 </thead>
                 <tbody>
@@ -5556,13 +5848,13 @@ const LuboilAnalysis = () => {
                       <td className="col-date-text">
                         {report.report_date
                           ? new Date(report.report_date).toLocaleDateString(
-                            "en-GB",
-                            {
-                              day: "2-digit",
-                              month: "short",
-                              year: "2-digit",
-                            },
-                          )
+                              "en-GB",
+                              {
+                                day: "2-digit",
+                                month: "short",
+                                year: "2-digit",
+                              },
+                            )
                           : "N/A"}
                       </td>
                       <td className="col-action">
@@ -5598,14 +5890,16 @@ const LuboilAnalysis = () => {
             <div className="lub-modal-header">
               <div className="lub-modal-header-info">
                 <h3 className="modal-vessel-title">{selectedCell.vessel}</h3>
-                <span className="modal-machinery-subtitle">{selectedCell.machinery}</span>
+                <span className="modal-machinery-subtitle">
+                  {selectedCell.machinery}
+                </span>
                 <div className="modal-date-pill">
                   Report Date:
                   <span className="modal-date-text">
                     {new Date(
                       selectedCell.data.report_date ||
-                      selectedCell.data.date ||
-                      selectedCell.data.sample_date,
+                        selectedCell.data.date ||
+                        selectedCell.data.sample_date,
                     ).toLocaleDateString("en-GB", {
                       day: "2-digit",
                       month: "short",
@@ -5672,13 +5966,24 @@ const LuboilAnalysis = () => {
             - Upload + View Evidence on one row
             - Collapsible ACTIONS section
         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-              <div className={`lub-diag-panel ${isDiagCollapsed ? "collapsed" : ""}`}>
+              <div
+                className={`lub-diag-panel ${isDiagCollapsed ? "collapsed" : ""}`}
+              >
                 {/* â”€â”€ Panel Header (sticky, click to collapse whole panel) â”€â”€ */}
-                <div className="lub-diag-header" onClick={() => setIsDiagCollapsed(!isDiagCollapsed)}>
+                <div
+                  className="lub-diag-header"
+                  onClick={() => setIsDiagCollapsed(!isDiagCollapsed)}
+                >
                   <div className="lub-header-left">
-                    <Activity size={14} color="#2563eb" className="lub-header-icon" />
+                    <Activity
+                      size={14}
+                      color="#2563eb"
+                      className="lub-header-icon"
+                    />
                     {!isDiagCollapsed && (
-                      <span className="lub-header-title">Lab Diagnosis & Evidence</span>
+                      <span className="lub-header-title">
+                        Lab Diagnosis & Evidence
+                      </span>
                     )}
                   </div>
                   <div className="lub-header-right">
@@ -5705,8 +6010,14 @@ const LuboilAnalysis = () => {
                     {selectedCell.data.summary_error && (
                       <div className="lub-anomaly-box">
                         <div className="lub-anomaly-header">
-                          <AlertTriangle size={13} color="#c2410c" className="lub-anomaly-icon" />
-                          <h5 className="lub-anomaly-title">Detected Anomalies</h5>
+                          <AlertTriangle
+                            size={13}
+                            color="#c2410c"
+                            className="lub-anomaly-icon"
+                          />
+                          <h5 className="lub-anomaly-title">
+                            Detected Anomalies
+                          </h5>
                         </div>
                         <ul className="lub-anomaly-list">
                           {selectedCell.data.summary_error
@@ -5734,15 +6045,27 @@ const LuboilAnalysis = () => {
                           }
                         >
                           <div className="lub-accordion-label-box">
-                            <FileText size={13} color="#64748b" className="lub-accordion-icon" />
+                            <FileText
+                              size={13}
+                              color="#64748b"
+                              className="lub-accordion-icon"
+                            />
                             <span className="lub-accordion-label">
                               Technical Analysis & Recommendations
                             </span>
                           </div>
                           {isDiagExpanded ? (
-                            <ChevronUp size={14} color="#94a3b8" className="lub-arrow-icon" />
+                            <ChevronUp
+                              size={14}
+                              color="#94a3b8"
+                              className="lub-arrow-icon"
+                            />
                           ) : (
-                            <ChevronDown size={14} color="#94a3b8" className="lub-arrow-icon" />
+                            <ChevronDown
+                              size={14}
+                              color="#94a3b8"
+                              className="lub-arrow-icon"
+                            />
                           )}
                         </button>
 
@@ -5757,7 +6080,9 @@ const LuboilAnalysis = () => {
                               </div>
                             </div>
                             <div className="lub-source-tag">
-                              SOURCE: {selectedCell.data.lab_name || "SHELL LUBEANALYST"}
+                              SOURCE:{" "}
+                              {selectedCell.data.lab_name ||
+                                "SHELL LUBEANALYST"}
                             </div>
                           </div>
                         )}
@@ -5771,7 +6096,6 @@ const LuboilAnalysis = () => {
 
                     {/* 3 â”€â”€ ACTIONS (collapsible section) */}
                     <div className="lub-evidence-section">
-
                       {/* Actions header â€” click to collapse/expand */}
                       <div
                         onClick={() =>
@@ -5781,9 +6105,17 @@ const LuboilAnalysis = () => {
                       >
                         <span className="lub-section-label">Evidence</span>
                         {isActionsCollapsed ? (
-                          <ChevronDown size={13} color="#94a3b8" className="lub-arrow-icon" />
+                          <ChevronDown
+                            size={13}
+                            color="#94a3b8"
+                            className="lub-arrow-icon"
+                          />
                         ) : (
-                          <ChevronUp size={13} color="#94a3b8" className="lub-arrow-icon" />
+                          <ChevronUp
+                            size={13}
+                            color="#94a3b8"
+                            className="lub-arrow-icon"
+                          />
                         )}
                       </div>
 
@@ -5823,9 +6155,21 @@ const LuboilAnalysis = () => {
                                     className={`lub-mandatory-btn ${isImageRequired ? "active-red" : "inactive-dashed"}`}
                                   >
                                     {isImageRequired ? (
-                                      <><AlertTriangle size={12} className="lub-mandatory-icon animate-pulse" /> IMAGE MANDATORY</>
+                                      <>
+                                        <AlertTriangle
+                                          size={12}
+                                          className="lub-mandatory-icon animate-pulse"
+                                        />{" "}
+                                        IMAGE MANDATORY
+                                      </>
                                     ) : (
-                                      <><ImageIcon size={12} className="lub-mandatory-icon" /> IMAGE MANDATORY</>
+                                      <>
+                                        <ImageIcon
+                                          size={12}
+                                          className="lub-mandatory-icon"
+                                        />{" "}
+                                        IMAGE MANDATORY
+                                      </>
                                     )}
                                   </button>
 
@@ -5836,11 +6180,22 @@ const LuboilAnalysis = () => {
                                     className={`lub-mandatory-btn ${isResamplingRequired ? "active-red" : "inactive-dashed"}`}
                                   >
                                     {isResamplingRequired ? (
-                                      <><History size={12} className="lub-mandatory-icon animate-pulse" /> RESAMPLING MANDATORY</>
+                                      <>
+                                        <History
+                                          size={12}
+                                          className="lub-mandatory-icon animate-pulse"
+                                        />{" "}
+                                        RESAMPLING MANDATORY
+                                      </>
                                     ) : (
-                                      <><History size={12} className="lub-mandatory-icon" /> RESAMPLING MANDATORY</>
+                                      <>
+                                        <History
+                                          size={12}
+                                          className="lub-mandatory-icon"
+                                        />{" "}
+                                        RESAMPLING MANDATORY
+                                      </>
                                     )}
-
                                   </button>
                                 </div>
                               );
@@ -5855,14 +6210,22 @@ const LuboilAnalysis = () => {
                                   {/* --- EXISTING IMAGE BANNER (UNCHANGED) --- */}
                                   {isImageRequired && (
                                     <div className="lub-mandatory-banner">
-                                      <AlertTriangle size={12} className="lub-mandatory-icon animate-pulse" /> IMAGE UPLOAD MANDATORY
+                                      <AlertTriangle
+                                        size={12}
+                                        className="lub-mandatory-icon animate-pulse"
+                                      />{" "}
+                                      IMAGE UPLOAD MANDATORY
                                     </div>
                                   )}
 
                                   {/* --- NEW RESAMPLING BANNER (MATCHING STYLE) --- */}
                                   {isResamplingRequired && (
                                     <div className="lub-mandatory-banner">
-                                      <History size={12} className="lub-mandatory-icon animate-pulse" /> RESAMPLING REQUIRED
+                                      <History
+                                        size={12}
+                                        className="lub-mandatory-icon animate-pulse"
+                                      />{" "}
+                                      RESAMPLING REQUIRED
                                     </div>
                                   )}
                                 </div>
@@ -5892,7 +6255,11 @@ const LuboilAnalysis = () => {
                                 }
                                 className="lub-action-btn btn-primary"
                               >
-                                <Upload size={11} className="lub-btn-icon" /> Upload
+                                <Upload
+                                  size={11}
+                                  className="lub-btn-icon"
+                                />{" "}
+                                Upload
                               </button>
                             )}
 
@@ -5915,11 +6282,8 @@ const LuboilAnalysis = () => {
                     </div>
 
                     {/* 4 â”€â”€ RESAMPLING WITH LINK (shore-only) */}
-                    {(user?.access_type === "SHORE" ||
-                      user?.role === "admin" ||
-                      user?.role === "superuser" ||
-                      user?.role === "shore") && (
-                        <div className="lub-resample-section">
+                    {amIShore && (
+                        <div style={{ flexShrink: 0 }}>
                           <button
                             onClick={() => {
                               if (isResamplingActive) {
@@ -5933,20 +6297,64 @@ const LuboilAnalysis = () => {
                                 setIsResamplingActive(true);
                               }
                             }}
-                            className={`lub-resample-toggle-btn ${isResamplingActive ? "active-cancel" : ""}`}
+                            style={{
+                              width: "100%",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              padding: "8px",
+                              borderRadius: "7px",
+                              cursor: "pointer",
+                              fontSize: "0.65rem",
+                              fontWeight: "800",
+                              backgroundColor: isResamplingActive
+                                ? "#fff1f2"
+                                : "#f8fafc",
+                              color: isResamplingActive ? "#ef4444" : "#1e293b",
+                              border: isResamplingActive
+                                ? "1px solid #fecaca"
+                                : "1px solid #e2e8f0",
+                              transition: "all 0.2s",
+                            }}
                           >
-                            <History size={13} className="lub-resample-icon" />
+                            <History size={13} />
                             {isResamplingActive
                               ? "CANCEL"
                               : "LINK WITH RESAMPLING"}
                           </button>
 
                           {isResamplingActive && (
-                            <div className="lub-resample-config-box">
+                            <div
+                              style={{
+                                marginTop: "8px",
+                                padding: "10px",
+                                backgroundColor: "white",
+                                borderRadius: "8px",
+                                border: "1px solid #e2e8f0",
+                                animation: "fadeIn 0.2s ease",
+                              }}
+                            >
                               {!isLinkGenerated ? (
                                 <>
-                                  <p className="lub-resample-label">Select Report:</p>
-                                  <div className="lub-resample-list">
+                                  <p
+                                    style={{
+                                      margin: "0 0 6px 0",
+                                      fontSize: "0.6rem",
+                                      fontWeight: "800",
+                                      color: "#64748b",
+                                      textTransform: "uppercase",
+                                    }}
+                                  >
+                                    Select Report:
+                                  </p>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: "5px",
+                                    }}
+                                  >
                                     {(() => {
                                       // 1. Get the date of the current selected report
                                       const currentReportDate = new Date(
@@ -5973,7 +6381,25 @@ const LuboilAnalysis = () => {
                                         futureReports.length > 0
                                       ) {
                                         return futureReports.map((item) => (
-                                          <label key={item.sample_id} className={`lub-resample-item ${compareIds.includes(item.sample_id) ? "selected" : ""}`}>
+                                          <label
+                                            key={item.sample_id}
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: "8px",
+                                              padding: "6px 8px",
+                                              borderRadius: "5px",
+                                              border: "1px solid #f1f5f9",
+                                              cursor: "pointer",
+                                              fontSize: "0.68rem",
+                                              backgroundColor:
+                                                compareIds.includes(
+                                                  item.sample_id,
+                                                )
+                                                  ? "#eff6ff"
+                                                  : "transparent",
+                                            }}
+                                          >
                                             <input
                                               type="checkbox"
                                               checked={compareIds.includes(
@@ -5997,22 +6423,60 @@ const LuboilAnalysis = () => {
                                                   ]);
                                                 }
                                               }}
-                                            // style={{
-                                            //   width: "13px",
-                                            //   height: "13px",
-                                            // }}
+                                              style={{
+                                                width: "13px",
+                                                height: "13px",
+                                              }}
                                             />
-                                            <div className="lub-item-info">
-                                              <span className="date-txt">{item.date}</span>
-                                              <span className="status-txt" style={{ color: getStatusColor(item.status) }}>{item.status}</span>
+                                            <div
+                                              style={{
+                                                display: "flex",
+                                                flexDirection: "column",
+                                              }}
+                                            >
+                                              <span
+                                                style={{
+                                                  fontWeight: "700",
+                                                  fontSize: "0.68rem",
+                                                }}
+                                              >
+                                                {item.date}
+                                              </span>
+                                              <span
+                                                style={{
+                                                  fontSize: "0.58rem",
+                                                  color: getStatusColor(
+                                                    item.status,
+                                                  ),
+                                                }}
+                                              >
+                                                {item.status}
+                                              </span>
                                             </div>
                                           </label>
                                         ));
                                       } else {
                                         // If no reports are newer than the currently selected one
                                         return (
-                                          <div className="lub-resample-empty">
-                                            <p>No Subsequent Reports Available.</p>
+                                          <div
+                                            style={{
+                                              padding: "12px",
+                                              textAlign: "center",
+                                              border: "1px dashed #cbd5e1",
+                                              borderRadius: "6px",
+                                              backgroundColor: "#f8fafc",
+                                            }}
+                                          >
+                                            <p
+                                              style={{
+                                                margin: 0,
+                                                fontSize: "0.7rem",
+                                                color: "#94a3b8",
+                                                fontWeight: "600",
+                                              }}
+                                            >
+                                              No Subsequent Reports Available.
+                                            </p>
                                           </div>
                                         );
                                       }
@@ -6022,15 +6486,50 @@ const LuboilAnalysis = () => {
                                   <button
                                     disabled={compareIds.length !== 2}
                                     onClick={() => setIsLinkGenerated(true)}
-                                    className="lub-resample-generate-btn"
+                                    style={{
+                                      width: "100%",
+                                      marginTop: "8px",
+                                      padding: "7px",
+                                      borderRadius: "5px",
+                                      border: "none",
+                                      backgroundColor:
+                                        compareIds.length === 2
+                                          ? "#2563eb"
+                                          : "#cbd5e1",
+                                      color: "white",
+                                      fontSize: "0.65rem",
+                                      fontWeight: "800",
+                                      cursor:
+                                        compareIds.length === 2
+                                          ? "pointer"
+                                          : "not-allowed",
+                                    }}
                                   >
                                     GENERATE LINK
                                   </button>
                                 </>
                               ) : (
-                                <div className="lub-generated-link-area">
-                                  <p className="lub-resample-label">Resampling Comparison:</p>
-                                  <div className="lub-link-display-box">
+                                <div style={{ textAlign: "left" }}>
+                                  <p
+                                    style={{
+                                      fontSize: "0.58rem",
+                                      color: "#64748b",
+                                      fontWeight: "800",
+                                      marginBottom: "6px",
+                                      textTransform: "uppercase",
+                                    }}
+                                  >
+                                    Resampling Comparison:
+                                  </p>
+                                  <div
+                                    style={{
+                                      padding: "10px",
+                                      backgroundColor: "#f0f9ff",
+                                      border: "1px solid #bae6fd",
+                                      borderRadius: "8px",
+                                      marginBottom: "8px",
+                                    }}
+                                  >
                                     {(() => {
                                       // 1. Get the date of the primary opened report
                                       const firstDate =
@@ -6060,7 +6559,15 @@ const LuboilAnalysis = () => {
                                             setRightPanelMode("resampling_view");
                                             setIsDiagExpanded(false);
                                           }}
-                                          className="lub-resample-link"
+                                          style={{
+                                            color: "#0369a1",
+                                            fontSize: "0.7rem",
+                                            textDecoration: "underline",
+                                            fontWeight: "800",
+                                            lineHeight: "1.4",
+                                            display: "block",
+                                            wordBreak: "break-word",
+                                          }}
                                         >
                                           {mixedLinkDisplay}
                                         </a>
@@ -6074,7 +6581,14 @@ const LuboilAnalysis = () => {
                                         selectedCell.data.sample_id,
                                       ]);
                                     }}
-                                    className="lub-resample-change-btn"
+                                    style={{
+                                      fontSize: "0.58rem",
+                                      color: "#ef4444",
+                                      background: "none",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      fontWeight: "700",
+                                    }}
                                   >
                                     Change Selected Reports
                                   </button>
@@ -6113,8 +6627,16 @@ const LuboilAnalysis = () => {
                           : selectedCell.data.is_approval_pending
                             ? "#f59e0b"
                             : "#059669",
-                        cursor: (selectedCell.data.is_resolved || selectedCell.data.is_approval_pending) ? "not-allowed" : "pointer",
-                        opacity: (selectedCell.data.is_resolved || selectedCell.data.is_approval_pending) ? 0.8 : 1,
+                        cursor:
+                          selectedCell.data.is_resolved ||
+                          selectedCell.data.is_approval_pending
+                            ? "not-allowed"
+                            : "pointer",
+                        opacity:
+                          selectedCell.data.is_resolved ||
+                          selectedCell.data.is_approval_pending
+                            ? 0.8
+                            : 1,
                       }}
                     >
                       {/* 6. Dynamic Icon & Text Logic (Preserved) */}
@@ -6155,19 +6677,36 @@ const LuboilAnalysis = () => {
               {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
             PANEL 2 â€” PDF REPORT  (flex: 1.8)
         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-              <div className={`lub-pdf-panel ${isReportCollapsed ? "collapsed" : ""}`}>
+              <div
+                className={`lub-pdf-panel ${isReportCollapsed ? "collapsed" : ""}`}
+              >
                 {/* Panel Header */}
-                <div className="lub-pdf-header" onClick={() => setIsReportCollapsed(!isReportCollapsed)}>
+                <div
+                  className="lub-pdf-header"
+                  onClick={() => setIsReportCollapsed(!isReportCollapsed)}
+                >
                   <div className="lub-header-left">
-                    <FileText size={16} color="#2563eb" className="lub-header-icon" />
+                    <FileText
+                      size={16}
+                      color="#2563eb"
+                      className="lub-header-icon"
+                    />
                     {!isReportCollapsed && (
                       <span className="lub-header-title">Analysis Report</span>
                     )}
                   </div>
                   {isReportCollapsed ? (
-                    <ChevronDown size={16} color="#64748b" className="lub-arrow-icon" />
+                    <ChevronDown
+                      size={16}
+                      color="#64748b"
+                      className="lub-arrow-icon"
+                    />
                   ) : (
-                    <ChevronUp size={16} color="#64748b" className="lub-arrow-icon" />
+                    <ChevronUp
+                      size={16}
+                      color="#64748b"
+                      className="lub-arrow-icon"
+                    />
                   )}
                 </div>
 
@@ -6180,7 +6719,11 @@ const LuboilAnalysis = () => {
                         {/* Left: The report originally opened in the modal (September in your example) */}
                         <div className="lub-pdf-sub-panel">
                           <div className="lub-pdf-sub-header header-blue">
-                            <span className="date-label">OPENED: {selectedCell.data.date || selectedCell.data.sample_date}</span>
+                            <span className="date-label">
+                              OPENED:{" "}
+                              {selectedCell.data.date ||
+                                selectedCell.data.sample_date}
+                            </span>
                             <span className="type-label">Extracted Page</span>
                           </div>
                           <iframe
@@ -6206,8 +6749,12 @@ const LuboilAnalysis = () => {
                           return (
                             <div className="lub-pdf-sub-panel">
                               <div className="lub-pdf-sub-header header-gray">
-                                <span className="date-label">SUBSEQUENT: {targetDate}</span>
-                                <span className="type-label">Extracted Page</span>
+                                <span className="date-label">
+                                  SUBSEQUENT: {targetDate}
+                                </span>
+                                <span className="type-label">
+                                  Extracted Page
+                                </span>
                               </div>
                               <iframe
                                 src={`/lub/api/luboil/view-specific-page/${targetId}`}
@@ -6233,7 +6780,9 @@ const LuboilAnalysis = () => {
                     ) : (
                       <div className="lub-pdf-empty">
                         <FileText size={40} className="empty-icon" />
-                        <p className="empty-text">No PDF report available for this sample.</p>
+                        <p className="empty-text">
+                          No PDF report available for this sample.
+                        </p>
                       </div>
                     )}
                   </div>
@@ -6254,19 +6803,32 @@ const LuboilAnalysis = () => {
                 }}
               >
                 {/* Panel Header */}
-                <div className="lub-chat-header"
+                <div
+                  className="lub-chat-header"
                   onClick={() => setIsCommCollapsed(!isCommCollapsed)}
                 >
                   <div className="lub-header-left">
-                    <MessageSquareText size={16} color="#2563eb" className="lub-header-icon" />
+                    <MessageSquareText
+                      size={16}
+                      color="#2563eb"
+                      className="lub-header-icon"
+                    />
                     {!isCommCollapsed && (
                       <span className="lub-header-title">Communication</span>
                     )}
                   </div>
                   {isCommCollapsed ? (
-                    <ChevronDown size={16} color="#64748b" className="lub-arrow-icon" />
+                    <ChevronDown
+                      size={16}
+                      color="#64748b"
+                      className="lub-arrow-icon"
+                    />
                   ) : (
-                    <ChevronUp size={16} color="#64748b" className="lub-arrow-icon" />
+                    <ChevronUp
+                      size={16}
+                      color="#64748b"
+                      className="lub-arrow-icon"
+                    />
                   )}
                 </div>
 
@@ -6538,8 +7100,13 @@ const LuboilAnalysis = () => {
                                 );
                               };
                               return (
-                                <div key={idx} className={`lub-msg-row ${isMe ? 'row-me' : 'row-them'}`}>
-                                  <div className={`lub-msg-bubble ${isMe ? 'bubble-me' : 'bubble-them'}`}>
+                                <div
+                                  key={idx}
+                                  className={`lub-msg-row ${isMe ? "row-me" : "row-them"}`}
+                                >
+                                  <div
+                                    className={`lub-msg-bubble ${isMe ? "bubble-me" : "bubble-them"}`}
+                                  >
                                     {/* Header: name | role */}
                                     <div className="bubble-header">
                                       <span className="sender-name">
@@ -6553,10 +7120,14 @@ const LuboilAnalysis = () => {
                                     </div>
 
                                     {/* Body */}
-                                    <div className="bubble-text">{renderVerifiedMessage(cleanBody)}</div>
+                                    <div className="bubble-text">
+                                      {renderVerifiedMessage(cleanBody)}
+                                    </div>
 
                                     {/* Footer: timestamp */}
-                                    <div className="bubble-footer">{msg.date}</div>
+                                    <div className="bubble-footer">
+                                      {msg.date}
+                                    </div>
                                   </div>
                                 </div>
                               );
@@ -6584,7 +7155,9 @@ const LuboilAnalysis = () => {
                                   Resolution Awaiting Approval
                                 </div>
 
-                                <div className="card-quote">"{selectedCell.data.resolution_remarks}"</div>
+                                <div className="card-quote">
+                                  "{selectedCell.data.resolution_remarks}"
+                                </div>
 
                                 <div className="card-actions">
                                   <button
@@ -6613,7 +7186,9 @@ const LuboilAnalysis = () => {
                           {selectedCell.data.is_resolved ? (
                             <div className="lub-locked-ui">
                               <X size={18} style={{ opacity: 0.5 }} />
-                              <span className="lock-title">COMMUNICATION LOCKED</span>
+                              <span className="lock-title">
+                                COMMUNICATION LOCKED
+                              </span>
                               <span className="lock-desc">
                                 This issue is closed.{" "}
                                 {amIShore
@@ -6664,7 +7239,9 @@ const LuboilAnalysis = () => {
                               )}
 
                               {/* Input row - Original preserved */}
-                              <div className={`lub-chat-input-box ${chatMode === 'internal' ? 'box-internal' : ''}`}>
+                              <div
+                                className={`lub-chat-input-box ${chatMode === "internal" ? "box-internal" : ""}`}
+                              >
                                 <textarea
                                   ref={chatInputRef}
                                   value={
@@ -6683,11 +7260,12 @@ const LuboilAnalysis = () => {
                                         showMentionDropdown &&
                                         mentionList.length > 0
                                       ) {
-                                        const filtered = (mentionList || []).filter(
-                                          (u) =>
-                                            u.full_name
-                                              .toLowerCase()
-                                              .includes(mentionFilter),
+                                        const filtered = (
+                                          mentionList || []
+                                        ).filter((u) =>
+                                          u.full_name
+                                            .toLowerCase()
+                                            .includes(mentionFilter),
                                         );
                                         if (filtered.length > 0) {
                                           e.preventDefault();
@@ -6722,9 +7300,7 @@ const LuboilAnalysis = () => {
                               </div>
 
                               {/* Footer meta row - Original preserved */}
-                              <div
-                                className="lub-chat-meta"
-                              >
+                              <div className="lub-chat-meta">
                                 <span>
                                   ACCESSIBLE:{" "}
                                   <strong
@@ -6792,9 +7368,7 @@ const LuboilAnalysis = () => {
             </div>
 
             {/* List Body Area - Optimized for Scrolling 10+ items */}
-            <div
-              className="vessel-modal-scroll-area lub-list-modal-body"
-            >
+            <div className="vessel-modal-scroll-area lub-list-modal-body">
               {listModal.vessels.length > 0 ? (
                 listModal.vessels.map((v, idx) => (
                   <OverdueVesselRow
@@ -6806,7 +7380,10 @@ const LuboilAnalysis = () => {
                     onUpload={handleVesselManualReportUpload}
                     canAddJustification={canAddJustification}
                     onVesselAction={handleVesselOverdueAction}
-                    isOverdueModal={listModal.type === "Overdue < 30 Days" || listModal.type === "Overdue > 30 Days"}  // 🔥 ADD THIS
+                    isOverdueModal={
+                      listModal.type === "Overdue < 30 Days" ||
+                      listModal.type === "Overdue > 30 Days"
+                    } // 🔥 ADD THIS
                     canApprove={canApprove}
                     /* ðŸ”¥ THIS ADDITION HANDLES THE REDIRECT */
                     onViewClick={(vesselName, item) => {
@@ -6872,8 +7449,11 @@ const LuboilAnalysis = () => {
           className="lub-trend-modal-overlay"
           style={{
             position: "fixed",
-            marginTop: "60px",
-            top: 0, left: 0, right: 0, bottom: 0,
+            // marginTop: "60px",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             backgroundColor: "rgba(15, 23, 42, 0.8)",
             backdropFilter: "blur(6px)",
             display: "flex",
@@ -6882,45 +7462,177 @@ const LuboilAnalysis = () => {
             zIndex: 99999,
           }}
         >
-          <div className="modal-main-shell lub-trend-modal-shell" style={{ backgroundColor: "white", borderRadius: "12px", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
-
+          <div
+            className="modal-main-shell lub-trend-modal-shell"
+            style={{
+              backgroundColor: "white",
+              borderRadius: "12px",
+              display: "flex",
+              flexDirection: "column",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
             {/* Header */}
-            <div className="lub-trend-header" style={{ borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: "#f8fafc" }}>
+            <div
+              className="lub-trend-header"
+              style={{
+                borderBottom: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                backgroundColor: "#f8fafc",
+              }}
+            >
               <div>
-                <h3 className="lub-trend-title" style={{ margin: 0, color: "#0f172a", fontWeight: "700" }}>{trendModal.title}</h3>
-                <p className="lub-trend-subtitle" style={{ margin: "2px 0 0 0", color: "#64748b" }}>Historical Trend Analysis</p>
+                <h3
+                  className="lub-trend-title"
+                  style={{ margin: 0, color: "#0f172a", fontWeight: "700" }}
+                >
+                  {trendModal.title}
+                </h3>
+                <p
+                  className="lub-trend-subtitle"
+                  style={{ margin: "2px 0 0 0", color: "#64748b" }}
+                >
+                  Historical Trend Analysis
+                </p>
               </div>
-              <button onClick={() => setTrendModal({ ...trendModal, isOpen: false })} className="modal-close-btn" style={{ cursor: "pointer", border: "none", background: "none", color: "#94a3b8", transition: "color 0.2s" }}
+              <button
+                onClick={() => setTrendModal({ ...trendModal, isOpen: false })}
+                className="modal-close-btn"
+                style={{
+                  cursor: "pointer",
+                  border: "none",
+                  background: "none",
+                  color: "#94a3b8",
+                  transition: "color 0.2s",
+                }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
                 onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
               >
-
                 <X size={20} />
               </button>
             </div>
 
             {/* Body */}
-            <div className="lub-trend-body" style={{ flex: 1, backgroundColor: "#fff", display: "flex", flexDirection: "column" }}>
+            <div
+              className="lub-trend-body"
+              style={{
+                flex: 1,
+                backgroundColor: "#fff",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
               {loadingTrend ? (
-                <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center" }}><div className="loading-spinner"></div></div>
+                <div
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <div className="loading-spinner"></div>
+                </div>
               ) : trendModal.data && trendModal.data.length > 0 ? (
-                <div className="lub-trend-grid" style={{ display: "grid", flex: 1 }}>
-
+                <div
+                  className="lub-trend-grid"
+                  style={{ display: "grid", flex: 1 }}
+                >
                   {/* 1. PHYSICAL CHARACTERISTICS */}
                   <div className="lub-trend-chart-card">
-                    <h4 className="lub-trend-chart-title" style={{ fontWeight: "600", color: "#475569", borderLeft: "3px solid #2563eb" }}>Physical Characteristics</h4>
+                    <h4
+                      className="lub-trend-chart-title"
+                      style={{
+                        fontWeight: "600",
+                        color: "#475569",
+                        borderLeft: "3px solid #2563eb",
+                      }}
+                    >
+                      Physical Characteristics
+                    </h4>
                     <div className="lub-chart-wrapper">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={trendModal.data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                          <XAxis dataKey="timestamp" type="number" domain={["dataMin", "dataMax"]} tickFormatter={(t) => new Date(t).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} fontSize={9} tick={{ fill: "#94a3b8" }} />
-                          <YAxis yAxisId="left" fontSize={9} tick={{ fill: "#2563eb" }} />
-                          <YAxis yAxisId="right" orientation="right" fontSize={9} tick={{ fill: "#7c3aed" }} />
-                          <Tooltip labelFormatter={(val, payload) => payload?.[0]?.payload?.dateLabel || val} contentStyle={{ fontSize: "11px", borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
-                          <Legend verticalAlign="top" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "10px" }} />
-                          <Line yAxisId="left" type="monotone" dataKey="viscosity_40c" stroke="#2563eb" name="Visc 40C" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line yAxisId="right" type="monotone" dataKey="tan" stroke="#7c3aed" name="TAN" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line yAxisId="right" type="monotone" dataKey="tbn" stroke="#db2777" name="TBN" strokeWidth={2} dot={{ r: 3 }} />
+                        <LineChart
+                          data={trendModal.data}
+                          margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
+                        >
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            vertical={false}
+                            stroke="#f1f5f9"
+                          />
+                          <XAxis
+                            dataKey="timestamp"
+                            // type="number"
+                            // domain={["dataMin", "dataMax"]}
+                            tickFormatter={(t) =>
+                              new Date(t).toLocaleDateString("en-GB", {
+                                day: "2-digit",
+                                month: "short",
+                              })
+                            }
+                            fontSize={9}
+                            tick={{ fill: "#94a3b8" }}
+                          />
+                          <YAxis
+                            yAxisId="left"
+                            fontSize={9}
+                            tick={{ fill: "#2563eb" }}
+                          />
+                          <YAxis
+                            yAxisId="right"
+                            orientation="right"
+                            fontSize={9}
+                            tick={{ fill: "#7c3aed" }}
+                          />
+                          <Tooltip
+                            labelFormatter={(val, payload) =>
+                              payload?.[0]?.payload?.dateLabel || val
+                            }
+                            contentStyle={{
+                              fontSize: "11px",
+                              borderRadius: "8px",
+                              border: "none",
+                              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                            }}
+                          />
+                          <Legend
+                            verticalAlign="top"
+                            height={36}
+                            iconType="circle"
+                            iconSize={8}
+                            wrapperStyle={{ fontSize: "10px" }}
+                          />
+                          <Line
+                            yAxisId="left"
+                            type="monotone"
+                            dataKey="viscosity_40c"
+                            stroke="#2563eb"
+                            name="Visc 40C"
+                            strokeWidth={2}
+                            dot={{ r: 3 }}
+                          />
+                          <Line
+                            yAxisId="right"
+                            type="monotone"
+                            dataKey="tan"
+                            stroke="#7c3aed"
+                            name="TAN"
+                            strokeWidth={2}
+                            dot={{ r: 3 }}
+                          />
+                          <Line
+                            yAxisId="right"
+                            type="monotone"
+                            dataKey="tbn"
+                            stroke="#db2777"
+                            name="TBN"
+                            strokeWidth={2}
+                            dot={{ r: 3 }}
+                          />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
@@ -6928,18 +7640,81 @@ const LuboilAnalysis = () => {
 
                   {/* 2. WEAR METALS */}
                   <div className="lub-trend-chart-card">
-                    <h4 className="lub-trend-chart-title" style={{ fontWeight: "600", color: "#475569", borderLeft: "3px solid #ef4444" }}>Wear Metals (ppm)</h4>
+                    <h4
+                      className="lub-trend-chart-title"
+                      style={{
+                        fontWeight: "600",
+                        color: "#475569",
+                        borderLeft: "3px solid #ef4444",
+                      }}
+                    >
+                      Wear Metals (ppm)
+                    </h4>
                     <div className="lub-chart-wrapper">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={trendModal.data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                          <XAxis dataKey="timestamp" type="number" domain={["dataMin", "dataMax"]} tickFormatter={(t) => new Date(t).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} fontSize={9} tick={{ fill: "#94a3b8" }} />
+                        <LineChart
+                          data={trendModal.data}
+                          margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
+                        >
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            vertical={false}
+                            stroke="#f1f5f9"
+                          />
+                          <XAxis
+                            dataKey="timestamp"
+                            // type="number"
+                            // domain={["dataMin", "dataMax"]}
+                            tickFormatter={(t) =>
+                              new Date(t).toLocaleDateString("en-GB", {
+                                day: "2-digit",
+                                month: "short",
+                              })
+                            }
+                            fontSize={9}
+                            tick={{ fill: "#94a3b8" }}
+                          />
                           <YAxis fontSize={9} tick={{ fill: "#64748b" }} />
-                          <Tooltip labelFormatter={(val, payload) => payload?.[0]?.payload?.dateLabel || val} contentStyle={{ fontSize: "11px", borderRadius: "8px" }} />
-                          <Legend verticalAlign="top" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "10px" }} />
-                          <Line type="monotone" dataKey="iron" stroke="#ef4444" name="Iron (Fe)" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="copper" stroke="#f59e0b" name="Copper (Cu)" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="aluminium" stroke="#94a3b8" name="Aluminium" strokeWidth={2} dot={{ r: 3 }} />
+                          <Tooltip
+                            labelFormatter={(val, payload) =>
+                              payload?.[0]?.payload?.dateLabel || val
+                            }
+                            contentStyle={{
+                              fontSize: "11px",
+                              borderRadius: "8px",
+                            }}
+                          />
+                          <Legend
+                            verticalAlign="top"
+                            height={36}
+                            iconType="circle"
+                            iconSize={8}
+                            wrapperStyle={{ fontSize: "10px" }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="iron"
+                            stroke="#ef4444"
+                            name="Iron (Fe)"
+                            strokeWidth={2}
+                            dot={{ r: 3 }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="copper"
+                            stroke="#f59e0b"
+                            name="Copper (Cu)"
+                            strokeWidth={2}
+                            dot={{ r: 3 }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="aluminium"
+                            stroke="#94a3b8"
+                            name="Aluminium"
+                            strokeWidth={2}
+                            dot={{ r: 3 }}
+                          />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
@@ -6947,19 +7722,94 @@ const LuboilAnalysis = () => {
 
                   {/* 3. CONTAMINATION */}
                   <div className="lub-trend-chart-card">
-                    <h4 className="lub-trend-chart-title" style={{ fontWeight: "600", color: "#475569", borderLeft: "3px solid #0891b2" }}>Contamination</h4>
+                    <h4
+                      className="lub-trend-chart-title"
+                      style={{
+                        fontWeight: "600",
+                        color: "#475569",
+                        borderLeft: "3px solid #0891b2",
+                      }}
+                    >
+                      Contamination
+                    </h4>
                     <div className="lub-chart-wrapper">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={trendModal.data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                          <XAxis dataKey="timestamp" type="number" domain={["dataMin", "dataMax"]} tickFormatter={(t) => new Date(t).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} fontSize={9} tick={{ fill: "#94a3b8" }} />
-                          <YAxis yAxisId="left" fontSize={9} tick={{ fill: "#0891b2" }} />
-                          <YAxis yAxisId="right" orientation="right" fontSize={9} tick={{ fill: "#0ea5e9" }} />
-                          <Tooltip labelFormatter={(val, payload) => payload?.[0]?.payload?.dateLabel || val} contentStyle={{ fontSize: "11px", borderRadius: "8px" }} />
-                          <Legend verticalAlign="top" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "10px" }} />
-                          <Line yAxisId="left" type="monotone" dataKey="sodium" stroke="#0891b2" name="Sodium" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line yAxisId="left" type="monotone" dataKey="silicon" stroke="#4b5563" name="Silicon" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line yAxisId="right" type="monotone" dataKey="water" stroke="#0ea5e9" name="Water %" strokeWidth={2} dot={{ r: 3 }} />
+                        <LineChart
+                          data={trendModal.data}
+                          margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
+                        >
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            vertical={false}
+                            stroke="#f1f5f9"
+                          />
+                          <XAxis
+                            dataKey="timestamp"
+                            // type="number"
+                            // domain={["dataMin", "dataMax"]}
+                            tickFormatter={(t) =>
+                              new Date(t).toLocaleDateString("en-GB", {
+                                day: "2-digit",
+                                month: "short",
+                              })
+                            }
+                            fontSize={9}
+                            tick={{ fill: "#94a3b8" }}
+                          />
+                          <YAxis
+                            yAxisId="left"
+                            fontSize={9}
+                            tick={{ fill: "#0891b2" }}
+                          />
+                          <YAxis
+                            yAxisId="right"
+                            orientation="right"
+                            fontSize={9}
+                            tick={{ fill: "#0ea5e9" }}
+                          />
+                          <Tooltip
+                            labelFormatter={(val, payload) =>
+                              payload?.[0]?.payload?.dateLabel || val
+                            }
+                            contentStyle={{
+                              fontSize: "11px",
+                              borderRadius: "8px",
+                            }}
+                          />
+                          <Legend
+                            verticalAlign="top"
+                            height={36}
+                            iconType="circle"
+                            iconSize={8}
+                            wrapperStyle={{ fontSize: "10px" }}
+                          />
+                          <Line
+                            yAxisId="left"
+                            type="monotone"
+                            dataKey="sodium"
+                            stroke="#0891b2"
+                            name="Sodium"
+                            strokeWidth={2}
+                            dot={{ r: 3 }}
+                          />
+                          <Line
+                            yAxisId="left"
+                            type="monotone"
+                            dataKey="silicon"
+                            stroke="#4b5563"
+                            name="Silicon"
+                            strokeWidth={2}
+                            dot={{ r: 3 }}
+                          />
+                          <Line
+                            yAxisId="right"
+                            type="monotone"
+                            dataKey="water"
+                            stroke="#0ea5e9"
+                            name="Water %"
+                            strokeWidth={2}
+                            dot={{ r: 3 }}
+                          />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
@@ -6967,33 +7817,102 @@ const LuboilAnalysis = () => {
 
                   {/* 4. ADDITIVES */}
                   <div className="lub-trend-chart-card">
-                    <h4 className="lub-trend-chart-title" style={{ fontWeight: "600", color: "#475569", borderLeft: "3px solid #10b981" }}>Additives</h4>
+                    <h4
+                      className="lub-trend-chart-title"
+                      style={{
+                        fontWeight: "600",
+                        color: "#475569",
+                        borderLeft: "3px solid #10b981",
+                      }}
+                    >
+                      Additives
+                    </h4>
                     <div className="lub-chart-wrapper">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={trendModal.data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                          <XAxis dataKey="timestamp" type="number" domain={["dataMin", "dataMax"]} tickFormatter={(t) => new Date(t).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} fontSize={9} tick={{ fill: "#94a3b8" }} />
+                        <LineChart
+                          data={trendModal.data}
+                          margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
+                        >
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            vertical={false}
+                            stroke="#f1f5f9"
+                          />
+                          <XAxis
+                            dataKey="timestamp"
+                            // type="number"
+                            // domain={["dataMin", "dataMax"]}
+                            tickFormatter={(t) =>
+                              new Date(t).toLocaleDateString("en-GB", {
+                                day: "2-digit",
+                                month: "short",
+                              })
+                            }
+                            fontSize={9}
+                            tick={{ fill: "#94a3b8" }}
+                          />
                           <YAxis fontSize={9} tick={{ fill: "#64748b" }} />
-                          <Tooltip labelFormatter={(val, payload) => payload?.[0]?.payload?.dateLabel || val} contentStyle={{ fontSize: "11px", borderRadius: "8px" }} />
-                          <Legend verticalAlign="top" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "10px" }} />
-                          <Line type="monotone" dataKey="calcium" stroke="#10b981" name="Calcium %" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="magnesium" stroke="#f97316" name="Magnesium" strokeWidth={2} dot={{ r: 3 }} />
-                          <Line type="monotone" dataKey="zinc" stroke="#6366f1" name="Zinc" strokeWidth={2} dot={{ r: 3 }} />
+                          <Tooltip
+                            labelFormatter={(val, payload) =>
+                              payload?.[0]?.payload?.dateLabel || val
+                            }
+                            contentStyle={{
+                              fontSize: "11px",
+                              borderRadius: "8px",
+                            }}
+                          />
+                          <Legend
+                            verticalAlign="top"
+                            height={36}
+                            iconType="circle"
+                            iconSize={8}
+                            wrapperStyle={{ fontSize: "10px" }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="calcium"
+                            stroke="#10b981"
+                            name="Calcium %"
+                            strokeWidth={2}
+                            dot={{ r: 3 }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="magnesium"
+                            stroke="#f97316"
+                            name="Magnesium"
+                            strokeWidth={2}
+                            dot={{ r: 3 }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="zinc"
+                            stroke="#6366f1"
+                            name="Zinc"
+                            strokeWidth={2}
+                            dot={{ r: 3 }}
+                          />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
-
                 </div>
               ) : (
-                <div className="lub-trend-empty-state"><TrendingUp size={40} style={{ opacity: 0.3, marginBottom: "12px" }} /><p>No historical analysis data found.</p></div>
+                <div className="lub-trend-empty-state">
+                  <TrendingUp
+                    size={40}
+                    style={{ opacity: 0.3, marginBottom: "12px" }}
+                  />
+                  <p>No historical analysis data found.</p>
+                </div>
               )}
             </div>
           </div>
         </div>
       )}
       {isCloseModalOpen && (
-        <div className="lub-res-modal-overlay"
+        <div
+          className="lub-res-modal-overlay"
           style={{
             position: "fixed",
             top: 0,
@@ -7042,14 +7961,30 @@ const LuboilAnalysis = () => {
             return (
               <div
                 className="modal-content-shell lub-res-modal-shell"
-                style={{ backgroundColor: "white", borderRadius: "16px", overflow: "hidden", display: "flex", flexDirection: "column", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)" }}
+                style={{
+                  backgroundColor: "white",
+                  borderRadius: "16px",
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                  overflowY: "auto",
+                  boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)",
+                }}
               >
                 {/* Header */}
                 <div
                   className="lub-res-modal-header"
-                  style={{ borderBottom: "1px solid #e2e8f0", backgroundColor: "#f8fafc", display: "flex", justifyContent: "space-between" }}
+                  style={{
+                    borderBottom: "1px solid #e2e8f0",
+                    backgroundColor: "#f8fafc",
+                    display: "flex",
+                    justifyContent: "space-between",
+                  }}
                 >
-                  <h3 className="lub-res-title" style={{ margin: 0, fontWeight: "800" }}>
+                  <h3
+                    className="lub-res-title"
+                    style={{ margin: 0, fontWeight: "800" }}
+                  >
                     Equipment Resolution Detail
                   </h3>
                   <X
@@ -7061,19 +7996,44 @@ const LuboilAnalysis = () => {
                 </div>
 
                 <div className="lub-res-modal-body" style={{ padding: "24px" }}>
-                  <p className="lub-res-p" style={{ margin: "0 0 16px 0", color: "#475569", lineHeight: "1.5" }}>
+                  <p
+                    className="lub-res-p"
+                    style={{
+                      margin: "0 0 16px 0",
+                      color: "#475569",
+                      lineHeight: "1.5",
+                    }}
+                  >
                     Documenting resolution for{" "}
                     <b>
                       {selectedCell.vessel} - {selectedCell.machinery}
                     </b>
                     .
                     <br />
-                    <span className="lub-res-status-text">Current Status: <b style={{ color: getStatusColor(selectedCell.data.status) }}>{selectedCell.data.status}</b></span>
+                    <span className="lub-res-status-text">
+                      Current Status:{" "}
+                      <b
+                        style={{
+                          color: getStatusColor(selectedCell.data.status),
+                        }}
+                      >
+                        {selectedCell.data.status}
+                      </b>
+                    </span>
                   </p>
 
                   {/* Text Area with Character Counter */}
                   <div style={{ marginBottom: "20px" }}>
-                    <label className="lub-res-label" style={{ display: "block", fontWeight: "800", color: "#64748b", marginBottom: "8px", textTransform: "uppercase" }}>
+                    <label
+                      className="lub-res-label"
+                      style={{
+                        display: "block",
+                        fontWeight: "800",
+                        color: "#64748b",
+                        marginBottom: "8px",
+                        textTransform: "uppercase",
+                      }}
+                    >
                       Correction / Action Remarks (Min 50 Chars)
                     </label>
                     <textarea
@@ -7081,30 +8041,54 @@ const LuboilAnalysis = () => {
                       onChange={(e) => setCloseRemarksText(e.target.value)}
                       placeholder="Describe the corrective maintenance or investigation performed..."
                       className="lub-res-textarea"
-                      style={{ width: "100%", borderRadius: "10px", border: `2px solid ${closeRemarksText.length >= 50 ? "#10b981" : "#e2e8f0"}`, resize: "none" }}
+                      style={{
+                        width: "100%",
+                        borderRadius: "10px",
+                        border: `2px solid ${closeRemarksText.length >= 50 ? "#10b981" : "#e2e8f0"}`,
+                        resize: "none",
+                      }}
                     />
                     <div
                       className="lub-res-counter"
-                      style={{ color: closeRemarksText.length >= 50 ? "#10b981" : "#ef4444" }}
+                      style={{
+                        color:
+                          closeRemarksText.length >= 50 ? "#10b981" : "#ef4444",
+                      }}
                     >
                       {closeRemarksText.length} / 50 characters
                     </div>
                   </div>
 
                   {/* --- IMAGE MANDATORY STATUS BANNER (BUG FIX: Checks gallery) --- */}
-                  <div className={`lub-res-banner ${imageRequirementMet ? 'banner-success' : 'banner-danger'}`}>
+                  <div
+                    className={`lub-res-banner ${imageRequirementMet ? "banner-success" : "banner-danger"}`}
+                  >
                     <div className="lub-res-banner-icon-box">
-                      {imageRequirementMet ? <CheckCircle className="lub-res-icon" /> : <AlertCircle className="lub-res-icon" />}
+                      {imageRequirementMet ? (
+                        <CheckCircle className="lub-res-icon" />
+                      ) : (
+                        <AlertCircle className="lub-res-icon" />
+                      )}
                     </div>
                     <div>
-                      <div className="lub-res-banner-title" style={{ color: imageRequirementMet ? "#166534" : "#991b1b" }}>
+                      <div
+                        className="lub-res-banner-title"
+                        style={{
+                          color: imageRequirementMet ? "#166534" : "#991b1b",
+                        }}
+                      >
                         {selectedCell.data.is_image_required
                           ? imageRequirementMet
                             ? "EVIDENCE VERIFIED"
                             : "EVIDENCE UPLOAD MANDATORY"
                           : "EVIDENCE UPLOAD OPTIONAL"}
                       </div>
-                      <p className="lub-res-banner-desc" style={{ color: imageRequirementMet ? "#15803d" : "#b91c1c" }}>
+                      <p
+                        className="lub-res-banner-desc"
+                        style={{
+                          color: imageRequirementMet ? "#15803d" : "#b91c1c",
+                        }}
+                      >
                         {evidenceExistsInGallery
                           ? "Requirement satisfied via existing gallery evidence."
                           : selectedCell.data.is_image_required
@@ -7118,22 +8102,40 @@ const LuboilAnalysis = () => {
 
                   {/* --- NEW: RESAMPLING MANDATORY STATUS BANNER --- */}
                   {selectedCell.data.is_resampling_required && (
-                    <div className={`lub-res-banner ${resamplingRequirementMet ? 'banner-success' : 'banner-danger'}`}>
-
+                    <div
+                      className={`lub-res-banner ${resamplingRequirementMet ? "banner-success" : "banner-danger"}`}
+                    >
                       <div className="lub-res-banner-icon-box">
                         {resamplingRequirementMet ? (
-                          <CheckCircle className="lub-res-icon" color="#16a34a" />
+                          <CheckCircle
+                            className="lub-res-icon"
+                            color="#16a34a"
+                          />
                         ) : (
                           <History className="lub-res-icon" color="#dc2626" />
                         )}
                       </div>
                       <div>
-                        <div className="lub-res-banner-title" style={{ color: resamplingRequirementMet ? "#166534" : "#991b1b" }}>
+                        <div
+                          className="lub-res-banner-title"
+                          style={{
+                            color: resamplingRequirementMet
+                              ? "#166534"
+                              : "#991b1b",
+                          }}
+                        >
                           {resamplingRequirementMet
                             ? "RESAMPLE REPORT DETECTED"
                             : "RESAMPLING REQUIRED"}
                         </div>
-                        <p className="lub-res-banner-desc" style={{ color: resamplingRequirementMet ? "#15803d" : "#b91c1c" }}>
+                        <p
+                          className="lub-res-banner-desc"
+                          style={{
+                            color: resamplingRequirementMet
+                              ? "#15803d"
+                              : "#b91c1c",
+                          }}
+                        >
                           {resamplingRequirementMet
                             ? "A newer report was found in history (Resampling Done)."
                             : "Cannot close until a follow-up report is uploaded."}
@@ -7174,8 +8176,12 @@ const LuboilAnalysis = () => {
                       disabled={isCloseSubmitDisabled}
                       className="lub-res-submit-btn"
                       style={{
-                        backgroundColor: isCloseSubmitDisabled ? "#cbd5e1" : "#059669",
-                        cursor: isCloseSubmitDisabled ? "not-allowed" : "pointer",
+                        backgroundColor: isCloseSubmitDisabled
+                          ? "#cbd5e1"
+                          : "#059669",
+                        cursor: isCloseSubmitDisabled
+                          ? "not-allowed"
+                          : "pointer",
                       }}
                     >
                       {isVesselUser && !resamplingRequirementMet
@@ -7236,14 +8242,30 @@ const LuboilAnalysis = () => {
           {/* LEFT SIDEBAR: GALLERY LIST */}
           <div
             className="lub-gallery-sidebar"
-            style={{ backgroundColor: "white", boxShadow: "4px 0 15px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column" }}
+            style={{
+              backgroundColor: "white",
+              boxShadow: "4px 0 15px rgba(0,0,0,0.2)",
+              display: "flex",
+              flexDirection: "column",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <div
               className="lub-gallery-header"
-              style={{ padding: "20px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+              style={{
+                padding: "20px",
+                borderBottom: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
             >
-              <h4 className="lub-gallery-title" style={{ margin: 0, fontWeight: "800", color: "#1e293b" }}>Evidence Gallery</h4>
+              <h4
+                className="lub-gallery-title"
+                style={{ margin: 0, fontWeight: "800", color: "#1e293b" }}
+              >
+                Evidence Gallery
+              </h4>
               <X
                 size={20}
                 className="modal-close-icon"
@@ -7258,7 +8280,13 @@ const LuboilAnalysis = () => {
 
             <div
               className="lub-gallery-list"
-              style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column" }}
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "16px",
+                display: "flex",
+                flexDirection: "column",
+              }}
             >
               {/* ðŸ”¥ UPDATED FILTER: Now looks for both prefixes */}
               {selectedCell.data.conversation?.filter(
@@ -7300,7 +8328,12 @@ const LuboilAnalysis = () => {
                             : setPreviewImage(url)
                         }
                         className="lub-gallery-item-card"
-                        style={{ padding: "12px", cursor: "pointer", borderRadius: "12px", position: "relative" }}
+                        style={{
+                          padding: "12px",
+                          cursor: "pointer",
+                          borderRadius: "12px",
+                          position: "relative",
+                        }}
                       >
                         {/* Selection Checkbox */}
                         <div
@@ -7357,8 +8390,8 @@ const LuboilAnalysis = () => {
 
                         {/* UI Branch: PDF Icon vs Image Thumbnail */}
                         {isPdf ||
-                          url.toLowerCase().includes(".xls") ||
-                          url.toLowerCase().includes(".doc") ? (
+                        url.toLowerCase().includes(".xls") ||
+                        url.toLowerCase().includes(".doc") ? (
                           <div
                             style={{
                               width: "100%",
@@ -7419,25 +8452,43 @@ const LuboilAnalysis = () => {
             </div>
 
             {/* SIDEBAR FOOTER */}
-            <div className="lub-gallery-footer" style={{ padding: "16px", borderTop: "1px solid #e2e8f0", display: "flex", flexDirection: "column" }}>
+            <div
+              className="lub-gallery-footer"
+              style={{
+                padding: "16px",
+                borderTop: "1px solid #e2e8f0",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
               {selectedGalleryItems.length > 0 && (
                 <button
                   className="lub-gallery-delete-btn"
                   onClick={handleBulkDelete}
-                  style={{ width: "100%", backgroundColor: "#ef4444", color: "white", border: "none", borderRadius: "8px", fontWeight: "800" }}
+                  style={{
+                    width: "100%",
+                    backgroundColor: "#ef4444",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "8px",
+                    fontWeight: "800",
+                  }}
                 >
                   DELETE SELECTED ({selectedGalleryItems.length})
                 </button>
               )}
               <Button
-
                 onClick={() => {
                   setIsEvidenceModalOpen(false);
                   setPreviewImage(null);
                   setSelectedGalleryItems([]);
                 }}
                 className="lub-gallery-close-btn"
-                style={{ width: "100%", backgroundColor: "#0f172a", color: "white" }}
+                style={{
+                  width: "100%",
+                  backgroundColor: "#0f172a",
+                  color: "white",
+                }}
               >
                 Close Gallery
               </Button>
@@ -7447,13 +8498,25 @@ const LuboilAnalysis = () => {
           {/* RIGHT SIDE: FULL PREVIEW AREA */}
           <div
             className="lub-gallery-preview-pane"
-            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", backgroundColor: "#0f172a" }}
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
+              backgroundColor: "#0f172a",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {previewImage ? (
               <div
                 className="lub-gallery-frame-container"
-                style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}
+                style={{
+                  position: "relative",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                }}
               >
                 <button
                   onClick={() => setPreviewImage(null)}
