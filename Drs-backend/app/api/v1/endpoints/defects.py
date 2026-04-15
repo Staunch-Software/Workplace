@@ -897,7 +897,7 @@ async def export_defects(
                     if not pr.is_deleted
                 )
             ]
-
+        
         logger.info(f"✅ Found {len(defects)} defects matching filters")
 
         # ===== 2. COLUMN SELECTION =====
@@ -1866,10 +1866,10 @@ async def import_defects(
 
                 seq_result = await db.execute(sa_text("""
                     INSERT INTO vessel_defect_sequences (vessel_imo, next_seq)
-                    VALUES (:imo, 2)
+                    VALUES (:imo, 1)
                     ON CONFLICT (vessel_imo)
                     DO UPDATE SET next_seq = vessel_defect_sequences.next_seq + 1
-                    RETURNING vessel_defect_sequences.next_seq - 1
+                    RETURNING next_seq
                 """), {"imo": vessel.imo})
                 next_seq = seq_result.scalar()
                 defect_number = f"{prefix}#{str(next_seq).zfill(4)}"

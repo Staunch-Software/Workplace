@@ -425,7 +425,7 @@ class SyncService:
                         VALUES (:imo, 2)
                         ON CONFLICT (vessel_imo)
                         DO UPDATE SET next_seq = vessel_defect_sequences.next_seq + 1
-                        RETURNING vessel_defect_sequences.next_seq - 1
+                        RETURNING vessel_defect_sequences.next_seq
                     """)
                     seq_result = await db.execute(seq_stmt, {"imo": vessel_imo})
                     assigned_seq = seq_result.scalar()
