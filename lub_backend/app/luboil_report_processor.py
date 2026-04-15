@@ -251,48 +251,83 @@ async def save_luboil_report(
     result = await session.execute(select(LuboilEquipmentType))
     all_equipment = result.scalars().all()
     equipment_candidates = {eq.ui_label: eq.code for eq in all_equipment}
+    oil_source_extracted = meta.get('oil_source', 'UNKNOWN')
     machineries = extracted_data.get('machineries', [])
-    pdf_sample_numbers = [
-        str(m.get('sample_info', {}).get('number')) 
-        for m in machineries if m.get('sample_info', {}).get('number')
-    ]
-    oil_source_extracted = meta.get('oil_source', 'UNKNOWN') 
-    # 4. HANDLE REPORT HEADER (Update without deleting children)
     report_date_parsed = date_type.fromisoformat(report_date_str)
 
-    result = await session.execute(
-        select(LuboilReport).filter(
-            LuboilReport.imo_number == vessel_imo,
-            LuboilReport.report_date == report_date_parsed,
-            LuboilReport.file_name == filename,
-            LuboilSample.sample_number.in_(pdf_sample_numbers)
-        )
-    )
-    existing_report = result.scalars().first()
+    # 4. DUPLICATE DETECTION — sample numbers + same date + same status
+    pdf_sample_numbers = [
+        str(m.get('sample_info', {}).get('number'))
+        for m in machineries if m.get('sample_info', {}).get('number')
+    ]
 
     is_duplicate = False
-    if existing_report:
-        logger.info(f"Report exists for {report_date_str}. Performing Smart Merge (preserving remarks).")
-        report = existing_report
-        report.file_name = filename
-        report.full_json_data = extracted_data
-        report.oil_source = oil_source_extracted 
-        is_duplicate = True
-    else:
+    report = None
+
+    if pdf_sample_numbers:
+        existing_samples_result = await session.execute(
+            select(LuboilSample)
+            .join(LuboilReport, LuboilSample.report_id == LuboilReport.report_id)
+            .where(LuboilReport.imo_number == vessel_imo)
+            .where(LuboilSample.sample_number.in_(pdf_sample_numbers))
+        )
+        existing_samples = existing_samples_result.scalars().all()
+        existing_map = {s.sample_number: s for s in existing_samples}
+
+        def normalize_status(status: str) -> str:
+            if not status:
+                return 'Unknown'
+            s = status.strip().lower()
+            if s in ('action', 'critical'):
+                return 'Critical'
+            if s in ('attention', 'warning', 'caution'):
+                return 'Warning'
+            if s == 'normal':
+                return 'Normal'
+            return status.strip()
+
+        def get_pdf_status(sample_number):
+            for m in machineries:
+                if str(m.get('sample_info', {}).get('number')) == sample_number:
+                    return normalize_status(m.get('status', 'Unknown'))
+            return None
+
+        all_match = (
+            len(pdf_sample_numbers) > 0 and
+            all(
+                sn in existing_map and
+                (report_date_str is None or str(existing_map[sn].sample_date) == report_date_str) and
+                normalize_status(existing_map[sn].status) == get_pdf_status(sn)
+                for sn in pdf_sample_numbers
+            )
+        )
+
+        if all_match:
+            is_duplicate = True
+            existing_report_result = await session.execute(
+                select(LuboilReport).where(
+                    LuboilReport.report_id == existing_samples[0].report_id
+                )
+            )
+            report = existing_report_result.scalars().first()
+            report.file_name = filename
+            report.full_json_data = extracted_data
+            report.oil_source = oil_source_extracted
+            logger.info(f"DUPLICATE: reusing report_id={report.report_id}")
+
+    if not is_duplicate:
         report = LuboilReport(
             imo_number=vessel_imo,
             file_name=filename,
             lab_name=meta.get('lab_name', 'Shell LubeAnalyst'),
             report_date=report_date_parsed,
             full_json_data=extracted_data,
-            oil_source=oil_source_extracted 
+            oil_source=oil_source_extracted
         )
         session.add(report)
-    
-    await session.flush() # Ensure report.report_id is available
+        logger.info(f"NEW report created for {vessel_display_name} date={report_date_str}")
 
-    # 5. PROCESS SAMPLES (Upsert Logic)
-    machineries = extracted_data.get('machineries', [])
+    await session.flush()
     
     for machine in machineries:
         raw_name = machine.get("name", "").strip()
@@ -349,36 +384,16 @@ async def save_luboil_report(
             else:
                 logger.warning(f"⚠️ No match found for: '{clean_name}' — saving with null equipment_code")
 
-        # --- SMART MERGE CHECK ---
-        # Check if this specific machinery sample already exists in this report
-        result = await session.execute(
-            select(LuboilSample).filter(
-                LuboilSample.report_id == report.report_id,
-                LuboilSample.equipment_code == equipment_code
-            )
-        )
-        existing_sample = result.scalars().first()
-
-        m_sample_info = machine.get('sample_info', {})
-        lab_sample_number = m_sample_info.get('number') # This is e.g. "990166001"
+        
 
         # 2. Update the check logic
-        result = await session.execute(
-            select(LuboilSample).filter(
-                LuboilSample.report_id == report.report_id,
-                LuboilSample.equipment_code == equipment_code,
-                LuboilSample.sample_number == lab_sample_number
-            )
-        )
-        existing_sample = result.scalars().first()
-
+        m_sample_info = machine.get('sample_info', {})
         chem = machine.get('chemistry', {})
         phys = chem.get('physical', {})
         wear = chem.get('wear', {})
         cont = chem.get('contamination', {})
         adds = chem.get('additives', {})
 
-        # Prepare the dictionary of data from PDF
         tech_data = {
             "machinery_name": clean_name,
             "sample_number": m_sample_info.get('number'),
@@ -388,13 +403,11 @@ async def save_luboil_report(
             "summary_error": machine.get('summary_error'),
             "pdf_page_index": machine.get('page_index'),
             "lab_diagnosis": machine.get('diagnosis'),
-            # Physical
             "viscosity_40c": phys.get('viscosity_40c'),
             "viscosity_100c": phys.get('viscosity_100c'),
             "tan": phys.get('tan'),
             "tbn": phys.get('tbn'),
             "flash_point": phys.get('flash_point'),
-            # Wear
             "iron": wear.get('iron'),
             "chromium": wear.get('chromium'),
             "tin": wear.get('tin'),
@@ -404,13 +417,11 @@ async def save_luboil_report(
             "vanadium": wear.get('vanadium'),
             "nickel": wear.get('nickel'),
             "wpi_index": wear.get('wpi_index'),
-            # Contamination
             "water_content_pct": cont.get('water_pct'),
             "sodium": cont.get('sodium'),
             "silicon": cont.get('silicon'),
             "soot_pct": cont.get('soot_pct'),
             "ic_index": cont.get('ic_index'),
-            # Additives
             "calcium": adds.get('calcium'),
             "zinc": adds.get('zinc'),
             "phosphorus": adds.get('phosphorus'),
@@ -420,22 +431,49 @@ async def save_luboil_report(
             "barium": adds.get('barium'),
         }
 
-        if existing_sample:
-            # UPDATE existing: Loop through tech_data and update attributes
-            # This preserves officer_remarks, office_remarks, attachment_url, etc.
-            for key, value in tech_data.items():
-                setattr(existing_sample, key, value)
-            logger.info(f"ðŸ”„ Updated tech data for: {clean_name}")
+        PROTECTED_FIELDS = {
+            'officer_remarks', 'office_remarks', 'internal_remarks',
+            'attachment_url', 'is_image_required', 'is_resampling_required',
+            'is_resolved', 'resolution_remarks', 'is_approval_pending',
+            'status_change_log'
+        }
+
+        if is_duplicate:
+            # DUPLICATE: update technical fields only on existing sample under this report
+            result = await session.execute(
+                select(LuboilSample).filter(
+                    LuboilSample.report_id == report.report_id,
+                    LuboilSample.equipment_code == equipment_code,
+                    LuboilSample.sample_number == tech_data["sample_number"]
+                )
+            )
+            existing_sample = result.scalars().first()
+            if existing_sample:
+                for key, value in tech_data.items():
+                    if key not in PROTECTED_FIELDS:
+                        setattr(existing_sample, key, value)
+                logger.info(f"🔄 Duplicate: updated tech fields for {clean_name}")
+            else:
+                logger.warning(f"⚠️ Duplicate report but sample not found for {clean_name}")
         else:
-            # INSERT new: Create new sample object
+            # NEW report: always insert fresh, protected fields all None/default
             new_sample = LuboilSample(
                 report_id=report.report_id,
                 equipment_code=equipment_code,
                 **tech_data,
-                officer_remarks=None # Explicitly new
+                officer_remarks=None,
+                office_remarks=None,
+                internal_remarks=None,
+                attachment_url=None,
+                is_image_required=False,
+                is_resampling_required=False,
+                is_resolved=False,
+                resolution_remarks=None,
+                is_approval_pending=False,
+                status_change_log=None,
             )
             session.add(new_sample)
-            logger.info(f"âž• Added new sample for: {clean_name}")
+            logger.info(f"➕ New report: inserted fresh sample for {clean_name}")
 
     await session.commit()
 

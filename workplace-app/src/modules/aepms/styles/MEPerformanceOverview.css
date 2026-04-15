@@ -322,9 +322,8 @@
 /* Performance Cards Grid */
 .performance-cards-grid {
     display: grid;
-    grid-template-columns: 1fr; /* Force single column */
+    grid-template-columns: minmax(0, 1fr); 
     gap: 32px;
-    /* max-width: 1200px; Optional: Limit max width so it doesn't look too stretched on huge screens */
     margin: 0 auto; /* Center the grid */
 }
 

@@ -126,11 +126,11 @@ const OverdueVesselRow = ({
               borderRadius: "50%",
               backgroundColor: (() => {
                 if (modalType.includes("Over30")) return "#ef4444";
-                if (modalType.includes("Under30")) return "#f59e0b";
+                if (modalType.includes("Under30")) return "#ef4444";
                 if (v.overdueItems?.some((i) => i.state === "danger"))
                   return "#ef4444";
                 if (v.overdueItems?.some((i) => i.state === "warning"))
-                  return "#f59e0b";
+                  return "#ef4444";
                 if (v.overdueItems?.some((i) => i.state === "info"))
                   return "#3b82f6";
                 return "#22c55e";
@@ -1342,40 +1342,79 @@ const LuboilAnalysis = () => {
   };
   // Deep navigation handler
   const handleFeedItemClick = async (event) => {
-  // Handle vessel-wide overdue events (no specific equipment_code)
-  if (!event.equipment_code || event.machinery_name === "Vessel-Wide") {
-    // Just open the overdue modal for this vessel instead
+  // VESSEL-WIDE EVENTS: These have no specific equipment_code.
+  // Overdue workflow events (justification submitted/accepted/declined) are vessel-wide.
+  const isVesselWideEvent =
+    !event.equipment_code ||
+    event.machinery_name === "Vessel-Wide" ||
+    event.event_type === "OVERDUE_SUBMITTED" ||
+    event.event_type === "OVERDUE_ACCEPTED" ||
+    event.event_type === "OVERDUE_DECLINED" ||
+    event.event_type === "APPROVAL_REQUIRED" ||  // matches your feed message prefix
+    event.event_type === "SCHEDULE_ALERT";        // overdue schedule alerts are also vessel-wide
+
+  if (isVesselWideEvent) {
+    // Find which overdue category this vessel falls into and open the correct list modal.
     if (matrixData?.data) {
+      const today = new Date();
+      let worstOverdueType = null;
+
+      // Scan the vessel's machineries to determine which overdue modal to open
       const vesselEntry = Object.entries(matrixData.data).find(
         ([, vData]) => String(vData.imo) === String(event.imo)
       );
+
       if (vesselEntry) {
-        handleCardClick("CriticalOver30"); // or "WarningUnder30" based on priority
+        const [, vesselData] = vesselEntry;
+        Object.values(vesselData.machineries || {}).forEach((m) => {
+          if (!m.is_configured || !m.has_report || !m.last_sample) return;
+          const interval = typeof m.interval === "number" && m.interval > 0 ? m.interval : 3;
+          const dueDate = new Date(m.last_sample);
+          dueDate.setMonth(dueDate.getMonth() + interval);
+          const daysOverdue = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
+          if (daysOverdue > 30) worstOverdueType = "CriticalOver30";
+          else if (daysOverdue > 0 && worstOverdueType !== "CriticalOver30") worstOverdueType = "WarningUnder30";
+        });
       }
+
+      // Open the appropriate overdue modal (defaults to WarningUnder30 if nothing detected)
+      handleCardClick(worstOverdueType || "WarningUnder30");
     }
     return;
   }
 
-  const vesselName = Object.keys(normalizedTable.rows).find(
-    (name) =>
-      String(normalizedTable.rows[name][event.equipment_code]?.imo) ===
-      String(event.imo),
-  );
+  // EQUIPMENT-SPECIFIC EVENTS: Navigate directly to the machinery cell.
+  // Match vessel by IMO + equipment_code to avoid cross-vessel mismatches.
+  const vesselName = Object.keys(normalizedTable.rows).find((name) => {
+    const vesselRow = normalizedTable.rows[name];
+    return (
+      vesselRow &&
+      vesselRow[event.equipment_code] &&
+      String(vesselRow[event.equipment_code].imo) === String(event.imo)  // IMO check prevents wrong-vessel redirect
+    );
+  });
 
   if (vesselName) {
     const cell = normalizedTable.rows[vesselName][event.equipment_code];
+    // Prefer matching the exact sample_id, fall back to latest
     const specificSample =
-      cell.history.find((h) => h.sample_id === event.sample_id) ||
-      cell.history[0];
+      cell.history?.find((h) => h.sample_id === event.sample_id) ||
+      cell.history?.[0];
 
-    handleSelectSample(vesselName, cell, specificSample);
-    if (
-      event.event_type === "MENTION" ||
-      event.event_type === "COMMUNICATION"
-    ) {
-      setRightPanelMode("history");
-      setShowHistory(true);
+    if (specificSample) {
+      handleSelectSample(vesselName, cell, specificSample);
+      if (
+        event.event_type === "MENTION" ||
+        event.event_type === "COMMUNICATION"
+      ) {
+        setRightPanelMode("history");
+        setShowHistory(true);
+      }
     }
+  } else {
+    console.warn(
+      `Feed VIEW: Could not find vessel with IMO ${event.imo} and equipment ${event.equipment_code} in current matrix.`
+    );
   }
 };
   const handleSelectSample = (vesselName, cellData, specificSample) => {
@@ -3404,19 +3443,20 @@ const LuboilAnalysis = () => {
         </div>
 
         {/* --- LINE 2: DUE DATE BADGE (ISOLATED BOTTOM) --- */}
+        {/* --- LINE 2: DUE DATE BADGE (ISOLATED BOTTOM) --- */}
         <span
           style={{
-            backgroundColor: daysOverdue > 30 ? "#fee2e2" : daysOverdue > 0 ? "#fff7ed" : "#ffffff",
-            color: daysOverdue > 30 ? "#dc2626" : daysOverdue > 0 ? "#d97706" : "#334155",
+            backgroundColor: daysOverdue > 0 ? "#fee2e2" : "#ffffff",
+            color: daysOverdue > 0 ? "#dc2626" : "#334155",
             fontSize: "0.65rem",
             padding: "2px 10px",
             borderRadius: "4px",
             fontWeight: "700",
             whiteSpace: "nowrap",
-            border: `1px solid ${daysOverdue > 30 ? "#fca5a5" : daysOverdue > 0 ? "#fcd34d" : "#cbd5e1"}`,
+            border: `1px solid ${daysOverdue > 0 ? "#fca5a5" : "#cbd5e1"}`,
           }}
         >
-          {daysOverdue > 30 ? "⚠ " : daysOverdue > 0 ? "⚠ " : ""}Due: {dueText}
+          {daysOverdue > 0 ? "⚠ " : ""}Due: {dueText}
         </span>
       </div>
     );
@@ -4161,7 +4201,7 @@ const LuboilAnalysis = () => {
                 alignItems: "center",
                 gap: "12px",
                 cursor: "pointer",
-                borderLeft: "5px solid #f59e0b",
+                borderLeft: "5px solid #ef4444",
                 transition: "all 0.2s",
               }}
               onMouseEnter={(e) =>
@@ -4173,10 +4213,10 @@ const LuboilAnalysis = () => {
             >
               <div
                 style={{
-                  backgroundColor: "#fff7ed",
+                  backgroundColor: "#fee2e2",
                   padding: "8px",
                   borderRadius: "6px",
-                  color: "#f59e0b",
+                  color: "#ef4444",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -4845,7 +4885,7 @@ const LuboilAnalysis = () => {
                                             left: 0,
                                             width: "28px",
                                             height: "28px",
-                                            backgroundColor: daysOverdue > 30 ? "#ef4444" : "#f59e0b",
+                                            backgroundColor: "#ef4444",
                                             borderBottomRightRadius: "100%",
                                             display: "flex",
                                             alignItems: "flex-start",
@@ -5046,7 +5086,7 @@ const LuboilAnalysis = () => {
                                         bottom: "120%",
                                         left: "50%",
                                         transform: "translateX(-50%)",
-                                        width: "280px",
+                                        width: "200px",
                                         backgroundColor: "white",
                                         borderRadius: "12px",
                                         boxShadow:
@@ -5783,17 +5823,20 @@ const LuboilAnalysis = () => {
                               fontWeight: "600",
                             }}
                           >
-                            {new Date(item.created_at + "Z").toLocaleDateString(
-                              "en-GB",
-                            )}{" "}
-                            {new Date(item.created_at + "Z").toLocaleTimeString(
-                              "en-GB",
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                hour12: true,
-                              },
-                            )}
+                            {(() => {
+  // Strip trailing Z or offset before parsing to avoid double-timezone
+  const raw = item.created_at || "";
+  const normalized = raw.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(raw)
+    ? raw                    // already has timezone info, use as-is
+    : raw + "Z";             // naive UTC string, append Z
+  const d = new Date(normalized);
+  if (isNaN(d.getTime())) return "—";  // graceful fallback instead of "Invalid Date"
+  return d.toLocaleDateString("en-GB") + " " + d.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+})()}
                           </div>
 
                           <div
@@ -5827,37 +5870,38 @@ const LuboilAnalysis = () => {
                               </button>
                             )}
 
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleFeedItemClick(item);
-                              }}
-                              style={{
-                                backgroundColor: "white",
-                                color: "#2563eb",
-                                border: "1px solid #2563eb",
-                                padding: "3px 8px",
-                                borderRadius: "4px",
-                                fontSize: "0.6rem",
-                                fontWeight: "700",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                                transition: "all 0.2s",
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor =
-                                  "#2563eb";
-                                e.currentTarget.style.color = "white";
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = "white";
-                                e.currentTarget.style.color = "#2563eb";
-                              }}
-                            >
-                              <Eye size={14} /> VIEW
-                            </button>
+                            {item.event_type !== "NEW_REPORT" && (
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      handleFeedItemClick(item);
+    }}
+    style={{
+      backgroundColor: "white",
+      color: "#2563eb",
+      border: "1px solid #2563eb",
+      padding: "3px 8px",
+      borderRadius: "4px",
+      fontSize: "0.6rem",
+      fontWeight: "700",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: "6px",
+      transition: "all 0.2s",
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.backgroundColor = "#2563eb";
+      e.currentTarget.style.color = "white";
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.backgroundColor = "white";
+      e.currentTarget.style.color = "#2563eb";
+    }}
+  >
+    <Eye size={14} /> VIEW
+  </button>
+)}
                           </div>
                         </div>
                       </div>
@@ -7356,10 +7400,7 @@ const LuboilAnalysis = () => {
                     </div>
 
                     {/* 4 â”€â”€ RESAMPLING WITH LINK (shore-only) */}
-                    {(user?.access_type === "SHORE" ||
-                      user?.role === "admin" ||
-                      user?.role === "superuser" ||
-                      user?.role === "shore") && (
+                    {amIShore && (
                         <div style={{ flexShrink: 0 }}>
                           <button
                             onClick={() => {
@@ -9087,7 +9128,6 @@ const LuboilAnalysis = () => {
         <div
           style={{
             position: "fixed",
-            marginTop: "60px", // Push down to avoid Top Nav Header
             top: 0,
             left: 0,
             right: 0,
@@ -9095,14 +9135,15 @@ const LuboilAnalysis = () => {
             backgroundColor: "rgba(15, 23, 42, 0.8)",
             backdropFilter: "blur(6px)",
             display: "flex",
-            alignItems: "center", // This centers it vertically
-            justifyContent: "center", // This centers it horizontally
-            zIndex: 99999, // High z-index to cover your Top Nav Header
-            padding: "40px 20px", // Extra padding at top/bottom to prevent collisions
+            alignItems: "center", 
+            justifyContent: "center", 
+            zIndex: 100000, // Ensuring it's above everything
+            padding: "20px", 
           }}
         >
           <div
             style={{
+              marginTop: "50px", // <--- MOVED IT HERE TO THE WHITE BOX
               backgroundColor: "white",
               borderRadius: "12px",
               width: "100%",
@@ -9226,6 +9267,7 @@ const LuboilAnalysis = () => {
                           dataKey="timestamp"
                           type="number"
                           domain={["dataMin", "dataMax"]}
+                          ticks={trendModal.data.map(d => d.timestamp)}
                           tickFormatter={(unixTime) => {
                             const d = new Date(unixTime);
                             // Correctly adds 1 to the month and pads with zero
@@ -9340,6 +9382,7 @@ const LuboilAnalysis = () => {
                           dataKey="timestamp"
                           type="number"
                           domain={["dataMin", "dataMax"]}
+                          ticks={trendModal.data.map(d => d.timestamp)}
                           tickFormatter={(unixTime) => {
                             const d = new Date(unixTime);
                             // Correctly adds 1 to the month and pads with zero
@@ -9441,6 +9484,7 @@ const LuboilAnalysis = () => {
                           dataKey="timestamp"
                           type="number"
                           domain={["dataMin", "dataMax"]}
+                          ticks={trendModal.data.map(d => d.timestamp)}
                           tickFormatter={(unixTime) => {
                             const d = new Date(unixTime);
                             // Correctly adds 1 to the month and pads with zero
@@ -9555,6 +9599,7 @@ const LuboilAnalysis = () => {
                           dataKey="timestamp"
                           type="number"
                           domain={["dataMin", "dataMax"]}
+                          ticks={trendModal.data.map(d => d.timestamp)}
                           tickFormatter={(unixTime) => {
                             const d = new Date(unixTime);
                             // Correctly adds 1 to the month and pads with zero

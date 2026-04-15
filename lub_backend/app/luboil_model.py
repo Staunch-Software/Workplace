@@ -57,8 +57,8 @@ class LuboilReport(Base):
     # The Full Data Dump (Stores the entire JSON extraction for detailed chemistry lookup)
     full_json_data = Column(JSONB(none_as_null=True, astext_type=TEXT), nullable=True, comment="Complete raw JSON structure including all chemical elements")
     
-    uploaded_at = Column(TIMESTAMP, default=func.current_timestamp(), nullable=False)
-    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=False)
+    uploaded_at = Column(DateTime(timezone=True), default=func.current_timestamp(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=False)
     report_url = Column(String(500), nullable=True, comment="Azure Blob URL for the raw PDF")
     version = Column(Integer, default=1, nullable=False)
     origin = Column(String(20), default="CLOUD", nullable=True)
@@ -75,8 +75,8 @@ class LuboilReport(Base):
 
     # Constraints and Indexes
     __table_args__ = (
-        UniqueConstraint('imo_number', 'file_name', name='uq_luboil_file_per_vessel'),
         Index('ix_luboil_report_date', 'report_date'),
+        Index('ix_luboil_report_imo', 'imo_number'),
     )
 
     def __repr__(self):
@@ -153,8 +153,8 @@ class LuboilSample(Base):
     is_resolved = Column(Boolean, default=False, comment="True if the Document Resolution process is completed")
     resolution_remarks = Column(TEXT, nullable=True, comment="The 50+ character maintenance/correction narrative")
     
-    created_at = Column(TIMESTAMP, default=func.current_timestamp(), nullable=False)
-    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=func.current_timestamp(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=True)
     
     version = Column(Integer, default=1, nullable=False)
     origin = Column(String(20), default="CLOUD", nullable=True)
@@ -295,8 +295,8 @@ class LuboilEvent(Base):
     message = Column(String(500))
     sample_id = Column(Integer, nullable=True) # For deep navigation
     recipient_id = Column(UUID(as_uuid=True), nullable=True, index=True)  # FK dropped — cross-DB
-    created_at = Column(TIMESTAMP, default=func.current_timestamp())
-    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=func.current_timestamp())
+    updated_at = Column(DateTime(timezone=True), default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=True)
     version = Column(Integer, default=1, nullable=False)
     origin = Column(String(20), default="CLOUD", nullable=True)
     

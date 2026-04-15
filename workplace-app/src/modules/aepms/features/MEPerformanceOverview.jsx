@@ -2035,7 +2035,7 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
         </div>
 
         {/* ===== UNIFIED PERFORMANCE CARD ===== */}
-        <div style={{ width: "100%" }}>
+        <div style={{ width: "100%", minWidth: 0 }}>
           <Performance
             embeddedMode={true}
             onEngineTypeChange={(type) => {

@@ -1015,7 +1015,9 @@ const styles = `
       border-radius: 16px;
       box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
       border: 1px solid #e2e8f0;
-      overflow: hidden;
+      position: relative;
+      max-width: 100%;         /* <--- ADDED THIS */
+      box-sizing: border-box;  /* <--- ADDED THIS */
     }
 
     .card-header-enhanced {
@@ -1365,9 +1367,9 @@ const styles = `
       border-bottom: 1px solid #e2e8f0;
       
       /* INCREASED WIDTH */
-      width: 220px; 
-      min-width: 220px;
-      max-width: 220px;
+      width: 240px !important; 
+      min-width: 240px !important;
+      max-width: 240px !important;
       
       font-size: 0.85rem;
       color: #334155;
@@ -5256,8 +5258,8 @@ export default function Performance({
             </div>
           </div>
           {isSummaryExpanded && (
-            <div className="card-content-enhanced">
-              <table className="summary-table-enhanced">
+            <div className="card-content-enhanced" style={{ overflowX: "auto", maxWidth: "100%" }}>
+              <table className="summary-table-enhanced" style={{ minWidth: "700px" }}>
                 <thead>
                   <tr>
                     <th style={{ width: "35%", textAlign: "left" }}>
@@ -5547,6 +5549,12 @@ export default function Performance({
     // =================================================================================
     // LAYOUT 2: MULTI-REPORT MATRIX VIEW (UPDATED FOR MERGED COLUMNS)
     // =================================================================================
+    const numReports = allMonthlyReports.length;
+    const tableWidthStyle = numReports > 3 
+      ? `calc(240px + ${numReports} * ((100% - 240px) / 3))` 
+      : "100%";
+    const minTableWidth = `${240 + (numReports * 280)}px`; // Mobile protection
+
     return (
       <div
         className="enhanced-card summary-table-card"
@@ -5554,16 +5562,18 @@ export default function Performance({
       >
         <div className="card-header-enhanced">
           <h3 className="card-title-enhanced">
-            Performance Matrix ({allMonthlyReports.length} Reports)
+            Performance Matrix ({numReports} Reports)
           </h3>
           <p className="card-description-enhanced">
             Comparison across multiple dates vs Baseline
           </p>
         </div>
 
-        <div className="card-content-enhanced" style={{ padding: 0 }}>
-          <div className="matrix-scroll-container">
-            <table className="matrix-table">
+        <div className="card-content-enhanced" style={{ padding: 0, maxWidth: "100%", minWidth: 0, overflow: "hidden" }}>
+          {/* 🔥 ADDED scrollSnapType to make scrolling feel like a carousel */}
+          <div className="matrix-scroll-container" style={{ width: "100%", overflowX: "auto", display: "block", scrollSnapType: "x proximity", scrollBehavior: "smooth", scrollPaddingLeft: "240px" }}>
+            {/* 🔥 ADDED tableLayout: "fixed" and our mathematical width */}
+            <table className="matrix-table" style={{ tableLayout: "fixed", width: tableWidthStyle, minWidth: minTableWidth }}>
               <thead>
                 {/* 1. Date Group Header */}
                 <tr style={{ height: "55px" }}>
@@ -5592,6 +5602,7 @@ export default function Performance({
                         key={report.report_id}
                         colSpan={3}
                         className="matrix-group-header"
+                        style={{ scrollSnapAlign: "start" }}
                       >
                         {report.displayName}
                         {/* --- ADDED LOAD % AND POWER INFO HERE --- */}
@@ -5638,31 +5649,26 @@ export default function Performance({
 
                   {allMonthlyReports.map((report) => (
                     <React.Fragment key={`sub-${report.report_id}`}>
-                      {/* 🔥 CHANGE 1: Increased minWidth from 95px to 110px */}
                       <th
                         className="matrix-sub-header"
                         style={{
                           borderLeft: "1px solid #cbd5e1",
                           textAlign: "center",
                           color: "#475569",
-                          minWidth: "110px",
+                          minWidth: "90px", // <--- Reduced to allow math to work
                         }}
                       >
                         Shop Trial
                       </th>
-
-                      {/* 🔥 CHANGE 2: Increased minWidth from 95px to 110px */}
                       <th
                         className="matrix-sub-header"
-                        style={{ textAlign: "center", minWidth: "110px" }}
+                        style={{ textAlign: "center", minWidth: "90px" }} // <--- Reduced
                       >
                         Actual
                       </th>
-
-                      {/* 🔥 CHANGE 3: Increased minWidth from 95px to 110px */}
                       <th
                         className="matrix-sub-header"
-                        style={{ textAlign: "center", minWidth: "112px" }}
+                        style={{ textAlign: "center", minWidth: "100px" }} // <--- Reduced
                       >
                         Δ (%)
                       </th>
@@ -6430,7 +6436,7 @@ export default function Performance({
           </div>
         </div>
         {isHistoryExpanded && (
-          <div className="card-content-enhanced" style={{ overflowX: "auto" }}>
+          <div className="card-content-enhanced" style={{ overflowX: "auto", maxWidth: "100%" }}>
             <table
               className="summary-table-enhanced"
               style={{ width: "100%", tableLayout: "fixed" }}
@@ -6734,7 +6740,7 @@ export default function Performance({
           </div>
         </div>
         {isHistoryExpanded && (
-          <div className="card-content-enhanced" style={{ overflowX: "auto" }}>
+          <div className="card-content-enhanced" style={{ overflowX: "auto", maxWidth: "100%" }}>
             <table
               className="summary-table-enhanced"
               style={{ width: "100%", tableLayout: "fixed" }}
@@ -10008,7 +10014,7 @@ export default function Performance({
             boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)",
             width: "100%",
             boxSizing: "border-box",
-            flexWrap: "nowrap",
+            flexWrap: "wrap",
             overflow: "visible",
             // zIndex: 100,
           }}
