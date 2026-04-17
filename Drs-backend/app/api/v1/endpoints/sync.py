@@ -23,6 +23,7 @@ from app.models.vessel import Vessel
 from app.models.user import User
 from app.models.defect import Defect, Thread, Attachment, PrEntry, DefectImage
 from app.models.tasks import Task, Notification, LiveFeed
+from app.models.mariapps_pr_cache import MariappsPrCache
 from app.models.sync import SyncState
 # ---------------------------------------------------------------------------
 # Router & API Key Auth
@@ -397,6 +398,7 @@ async def get_changes(
         since = since.astimezone(timezone.utc)
 
     # Record that the vessel pulled from shore — only if IMO provided
+    
     if vessel_imo:
         await record_vessel_sync_time(control_db, vessel_imo, is_vessel_pushing=False,db=db)
 
@@ -409,12 +411,14 @@ async def get_changes(
         "tasks":         Task,
         "notifications": Notification,
         "live_feed":     LiveFeed,
+        "pr_cache":      MariappsPrCache,
     }
 
     results = {}
 
     for key, model in models.items():
-        stmt = select(model).where(model.updated_at > since)
+        time_col = model.updated_at if hasattr(model, 'updated_at') else model.last_scraped_at
+        stmt = select(model).where(time_col > since)
 
         if key == "users":
             stmt = stmt.options(selectinload(User.vessels))
@@ -423,8 +427,9 @@ async def get_changes(
 
         serialized_items = []
         for item in items:
-            item_data = {c.name: getattr(item, c.name) for c in item.__table__.columns}
 
+            item_data = {c.name: getattr(item, c.name) for c in item.__table__.columns}
+            
             if key == "users":
                 item_data["assigned_vessel_imos"] = [v.imo for v in item.vessels]
 

@@ -209,9 +209,91 @@ export default function AppHeader() {
     <header className="app-header">
       <div className="header-container">
         <div className="header-brand">
-          {/* <img src={logo} alt="logo" className="brand-logo" /> */}
-          <span className="brand-title">Ship Engine Performance Console</span>
-        </div>
+  {/* 9-DOT BACK BUTTON */}
+  <button
+    onClick={() => navigate("/dashboard")}
+    title="Back to Dashboard"
+    aria-label="Back to Dashboard"
+    onMouseEnter={(e) => {
+      e.currentTarget.querySelector(".dots-grid").style.opacity = "0";
+      e.currentTarget.querySelector(".dots-arrow").style.opacity = "1";
+      e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.querySelector(".dots-grid").style.opacity = "1";
+      e.currentTarget.querySelector(".dots-arrow").style.opacity = "0";
+      e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+    }}
+    style={{
+      background: "rgba(255,255,255,0.06)",
+      border: "1px solid rgba(255,255,255,0.1)",
+      borderRadius: "8px",
+      cursor: "pointer",
+      padding: "6px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      position: "relative",
+      width: "34px",
+      height: "34px",
+      flexShrink: 0,
+      transition: "background 0.2s",
+    }}
+  >
+    {/* DOTS - visible by default */}
+    <div
+      className="dots-grid"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 7px)",
+        gap: "3px",
+        position: "absolute",
+        transition: "opacity 0.2s",
+        opacity: "1",
+      }}
+    >
+      {[...Array(9)].map((_, i) => (
+        <span
+          key={i}
+          style={{
+            width: "7px",
+            height: "7px",
+            borderRadius: "2px",
+            backgroundColor: "#94a3b8",
+            display: "block",
+          }}
+        />
+      ))}
+    </div>
+
+    {/* ARROW - visible on hover */}
+    <div
+      className="dots-arrow"
+      style={{
+        position: "absolute",
+        opacity: "0",
+        width: "35px",
+        height: "35px",
+        transition: "opacity 0.2s",
+        color: "#94a3b8",
+        fontSize: "1.4rem",
+        fontWeight: "bold",
+        lineHeight: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "white",
+        borderRadius: "20%",
+        border: "1px solid rgba(48, 46, 46, 0.1)",
+      }}
+    >
+      ‹
+    </div>
+  </button>
+
+  {/* <img src={logo} alt="logo" className="brand-logo" /> */}
+  <span className="brand-title">Ship Engine Performance Console</span>
+</div>
 
         <nav className={`header-nav ${isMobileNavOpen ? "open" : ""}`}>
           {nav.map((n) => (

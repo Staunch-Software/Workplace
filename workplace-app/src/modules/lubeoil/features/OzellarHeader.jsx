@@ -25,6 +25,18 @@ const OzellarHeader = ({
   onSignOut = () => { },
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = React.useRef(null);
+  React.useEffect(() => {
+  const handleClickOutside = (event) => {
+    if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+      setShowUserMenu(false);
+    }
+  };
+  if (showUserMenu) {
+    document.addEventListener("mousedown", handleClickOutside);
+  }
+  return () => document.removeEventListener("mousedown", handleClickOutside);
+}, [showUserMenu]);
 
   const userData = user?.user || user;
   const userName = userData?.full_name || "System Administrator";
@@ -423,7 +435,7 @@ const OzellarHeader = ({
         </div>
 
         {/* User Avatar + Info */}
-        <div style={{ position: "relative" }}>
+        <div style={{ position: "relative" }} ref={userMenuRef}>
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
             style={{

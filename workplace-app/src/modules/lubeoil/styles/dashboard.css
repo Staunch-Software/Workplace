@@ -383,7 +383,7 @@
 }
 
 .vessel-table-enhanced {
-    width: 100%;
+    /* width: 100%; */
     border-collapse: separate;
     border-spacing: 0;
 }

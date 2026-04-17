@@ -764,6 +764,7 @@ class DefectService:
 
         # Now safe to put the real UUID in SyncQueue
         if _should_sync():
+            
             db.add(SyncQueue(
                 entity_id=new_pr_entry.id,         # UUID object (not str)
                 entity_type="PR_ENTRY",

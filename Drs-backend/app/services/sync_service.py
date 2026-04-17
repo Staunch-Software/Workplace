@@ -7,7 +7,7 @@ from sqlalchemy.future import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import delete, insert
 from app.models.defect import Defect, Thread, Attachment, PrEntry, DefectImage
-
+from sqlalchemy import delete, insert, text as sa_text
 from app.core.database import Base
 from app.models.sync import SyncConflict
 from app.models.user import User
@@ -20,7 +20,9 @@ IST = pytz.timezone('Asia/Kolkata')
 logger = logging.getLogger(__name__)
 SOFT_DELETE_MODELS = (Defect, Thread, Attachment, PrEntry, DefectImage)
 
+
 class SyncService:
+
     @staticmethod
     async def apply_snapshot(
         db: AsyncSession, 
@@ -401,6 +403,44 @@ class SyncService:
             # Flush to ensure the instance has an ID and is attached to session
             await db.flush()
 
+            
+            # --- NEW: MASTER SHORE-SIDE NUMBER ASSIGNMENT ---
+            if model_class == Defect and control_db is not None:
+                incoming_dn = data.get("defect_number")
+                
+                # If incoming number is Temporary (starts with T-), assign permanent master ID
+                if incoming_dn and str(incoming_dn).startswith("T-"):
+                    vessel_imo = data.get("vessel_imo")
+                    
+                    # 1. Get Vessel Name for the prefix (from control_db)
+                    v_stmt = sa_text("SELECT name FROM vessels WHERE imo = :imo")
+                    vessel_res = await control_db.execute(v_stmt, {"imo": vessel_imo})
+                    v_row = vessel_res.fetchone()
+                    prefix = v_row.name.replace(" ", "").upper()[:6] if v_row else "SHIP"
+
+                    # 2. Get Next Atomic Sequence from master Shore DB
+                    # Logic: If row exists, add 1 and return old value. If not, start at 2 and return 1.
+                    seq_stmt = sa_text("""
+                        INSERT INTO vessel_defect_sequences (vessel_imo, next_seq)
+                        VALUES (:imo, 2)
+                        ON CONFLICT (vessel_imo)
+                        DO UPDATE SET next_seq = vessel_defect_sequences.next_seq + 1
+                        RETURNING vessel_defect_sequences.next_seq
+                    """)
+                    seq_result = await db.execute(seq_stmt, {"imo": vessel_imo})
+                    assigned_seq = seq_result.scalar()
+                    
+                    final_number = f"{prefix}#{str(assigned_seq).zfill(4)}"
+
+                    # 3. Update the record and BUMP VERSION
+                    # This forces the vessel to pull the new permanent number on next sync
+                    instance.defect_number = final_number
+                    instance.version = incoming_version + 1
+                    instance.updated_at = datetime.utcnow()
+                    
+                    logger.info(f"🔢 Master Number Assigned: {incoming_dn} -> {final_number} (v{instance.version})")
+            
+            # --- END NEW LOGIC ---
             
             # --- END FIX ---
 
