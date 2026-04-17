@@ -3698,7 +3698,8 @@ const LuboilAnalysis = () => {
             )}
           </Button> */}
 
-            {/* 3. UPLOAD BUTTON AREA */}
+            {/* 3. UPLOAD BUTTON AREA — only for shore/admin, not vessel users */}
+            {amIShore && (
             <div style={{ position: "relative" }}>
               <input
                 type="file"
@@ -3731,6 +3732,7 @@ const LuboilAnalysis = () => {
                     : "Upload Report (PDF)"}
               </Button>
             </div>
+            )}
           </div>
         </div>
       )}

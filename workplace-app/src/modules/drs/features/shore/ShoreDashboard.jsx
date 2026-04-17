@@ -127,7 +127,7 @@ const useColumnResize = (setColumnWidths) => {
 
 const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, closedById, initialChatMode = 'external' }) => {
   const { user } = useAuth();
-  const ALLOWED_DELETE_EMAILS = ['gauravsingh.r@ozellar.com']; // ← add whitelisted emails here
+  const ALLOWED_DELETE_EMAILS = ['gauravsingh.r@ozellar.com', 'admin@ozellar.com', 'techdevops@ozellar.com'];
   const canDelete = ALLOWED_DELETE_EMAILS.includes(user?.email);
   const queryClient = useQueryClient();
   const [externalDraft, setExternalDraft] = useState("");
@@ -1351,7 +1351,7 @@ const ShoreDashboard = () => {
   // const [openThreadRow, setOpenThreadRow] = useState(null);
 
   const { user } = useAuth();
-  const ALLOWED_DELETE_EMAILS = ['gauravsingh.r@ozellar.com'];
+  const ALLOWED_DELETE_EMAILS = ['gauravsingh.r@ozellar.com', 'admin@ozellar.com', 'techdevops@ozellar.com'];
   const canDelete = ALLOWED_DELETE_EMAILS.includes(user?.email);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -2636,7 +2636,7 @@ const ShoreDashboard = () => {
             + Create Defect
           </button>
 
-          {user?.role === 'ADMIN' && (
+          {['admin@ozellar.com', 'techdevops@ozellar.com'].includes(user?.email) && (
             <div style={{ position: 'relative' }}>
               <button
                 onClick={() => setShowPrSync(prev => !prev)}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, Filter, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Activity, Mail } from "lucide-react";
-import { getUsers, updateUser, assignVessels, getVessels, resendWelcomeEmail } from "./lib/adminApi";
+import { Search, Filter, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Activity, Mail, Trash2 } from "lucide-react";
+import { getUsers, updateUser, assignVessels, getVessels, resendWelcomeEmail, deleteUser } from "./lib/adminApi";
 
 const SearchIcon = () => <Search size={16} />;
 const FilterIcon = () => <Filter size={16} />;
@@ -418,6 +418,17 @@ export default function AllUsers() {
         }
     };
 
+    const handleDeleteUser = async (user) => {
+        if (!window.confirm(`⚠️ Are you sure you want to permanently delete "${user.full_name}" (${user.email})?\n\nThis action cannot be undone.`)) return;
+        try {
+            await deleteUser(user.id);
+            await fetchData();
+            alert(`✅ User "${user.full_name}" deleted successfully.`);
+        } catch (err) {
+            alert(err.response?.data?.detail || "Failed to delete user");
+        }
+    };
+
     const filtered = users.filter(u => {
         const q = search.toLowerCase();
         return (
@@ -514,6 +525,7 @@ export default function AllUsers() {
                                             <button className="ap-action-btn" title="Resend Welcome Email" onClick={() => handleResendEmail(user)}><Mail size={16} /></button>
                                             <button className={"ap-action-btn " + (user.is_active ? "danger" : "success")}
                                                 onClick={() => toggleStatus(user)}><BanIcon /></button>
+                                            <button className="ap-action-btn danger" title="Delete User" onClick={() => handleDeleteUser(user)}><Trash2 size={16} /></button>
                                         </div>
                                     </td>
                                 </tr>

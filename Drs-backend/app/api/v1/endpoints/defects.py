@@ -608,8 +608,8 @@ async def create_email_draft(
         # 6. Create Outlook draft via Graph API
         # subject, body_text, recipients, cc_list are set in step 5 (with user overrides applied)
         web_link = await create_outlook_draft(
-            # user_email=current_user.email,
-            user_email="techdevops@ozellar.com",  # ✅ For testing with shared mailbox
+            user_email=current_user.email,
+            # user_email="techdevops@ozellar.com",  # was hardcoded for testing
             to_emails=recipients,
             cc_emails=cc_list,
             subject=subject,
