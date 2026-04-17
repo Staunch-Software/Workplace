@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { Flower2, Flower, RefreshCcw } from "lucide-react";
 import { MessageCircle } from "lucide-react";
-import { Check, Plus, MoreHorizontal } from 'lucide-react';
+import { Check, Plus, MoreHorizontal, Mail } from 'lucide-react';
 
 
 import { defectApi } from '@drs/services/defectApi';
@@ -1320,6 +1320,9 @@ const VesselDashboard = () => {
   const [closureModalOpen, setClosureModalOpen] = useState(false);
   const [closureDefect, setClosureDefect] = useState(null);
   const [closureValidation, setClosureValidation] = useState(null);
+  const [showEditorModal, setShowEditorModal] = useState(false);
+  const [editorData, setEditorData] = useState({ defectId: null, to: [], cc: [], subject: '', body: '' });
+  const [savingDraft, setSavingDraft] = useState(false);
 
   const { data: rawDefects, isLoading } = useQuery({
     queryKey: ['defects', vesselImo],
@@ -1946,6 +1949,41 @@ const VesselDashboard = () => {
       alert("Failed to delete: " + err.message);
     }
   });
+
+  const handleMailClick = async (e, defect) => {
+    e.stopPropagation();
+    try {
+      const data = await defectApi.getEmailRecipients(defect.id);
+      setEditorData({
+        defectId: defect.id,
+        to: data.recipients || [],
+        cc: data.vessel_email ? [data.vessel_email] : [],
+        subject: data.subject || '',
+        body: data.body_text || '',
+      });
+      setShowEditorModal(true);
+    } catch (err) {
+      alert('Failed to load defect details. Please try again.');
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    setSavingDraft(true);
+    try {
+      await defectApi.createEmailDraft(editorData.defectId, {
+        to_emails: editorData.to,
+        cc_emails: editorData.cc,
+        subject: editorData.subject,
+        body_text: editorData.body,
+      });
+      setShowEditorModal(false);
+      alert('Draft saved. Open your Outlook desktop app to review and send.');
+    } catch (err) {
+      alert('Failed to save draft. Please try again.');
+    } finally {
+      setSavingDraft(false);
+    }
+  };
 
   const handleDelete = (id) => {
     if (!canDelete) return;
@@ -2764,6 +2802,7 @@ const VesselDashboard = () => {
                       }
                     })}
 
+                    <th style={{ width: 30 }}></th>
                     {isEditMode && canDelete && <th style={{ width: 10 }}>Delete</th>}
                   </tr>
                 </SortableContext>
@@ -3233,6 +3272,24 @@ const VesselDashboard = () => {
                               return null;
                           }
                         })}
+
+                        <td style={{ textAlign: 'center', width: 30 }}>
+                          {!isClosed && (
+                            <button
+                              title="Draft Email for this Defect"
+                              onClick={(e) => handleMailClick(e, defect)}
+                              style={{
+                                border: 'none', background: 'none', cursor: 'pointer',
+                                padding: '4px', display: 'inline-flex', alignItems: 'center',
+                                color: '#0078d4', borderRadius: '4px', transition: 'background 0.2s'
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                            >
+                              <Mail size={16} />
+                            </button>
+                          )}
+                        </td>
 
                         {isEditMode && canDelete && (
                           <td style={{ textAlign: 'center' }}>
@@ -3718,6 +3775,99 @@ const VesselDashboard = () => {
         )}
 
       </div>
+
+      {/* EMAIL EDITOR MODAL */}
+      {showEditorModal && (
+        <div
+          onClick={() => setShowEditorModal(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: '12px', width: '620px',
+              maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.2)', overflow: 'hidden'
+            }}
+          >
+            <div style={{
+              padding: '16px 20px', borderBottom: '1px solid #e2e8f0',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              background: '#f8fafc'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Mail size={18} color="#0078d4" />
+                <span style={{ fontWeight: '700', fontSize: '15px', color: '#0f172a' }}>Review Email Draft</span>
+              </div>
+              <button onClick={() => setShowEditorModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '20px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', display: 'block', marginBottom: '4px' }}>TO</label>
+                <input
+                  value={editorData.to.join(', ')}
+                  onChange={e => setEditorData(d => ({ ...d, to: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', display: 'block', marginBottom: '4px' }}>CC</label>
+                <input
+                  value={editorData.cc.join(', ')}
+                  onChange={e => setEditorData(d => ({ ...d, cc: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', display: 'block', marginBottom: '4px' }}>SUBJECT</label>
+                <input
+                  value={editorData.subject}
+                  onChange={e => setEditorData(d => ({ ...d, subject: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', display: 'block', marginBottom: '4px' }}>MESSAGE</label>
+                <textarea
+                  rows={12}
+                  value={editorData.body}
+                  onChange={e => setEditorData(d => ({ ...d, body: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'monospace', lineHeight: '1.5', boxSizing: 'border-box' }}
+                />
+              </div>
+              <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>
+                Attachments (images & files) will be included automatically when saved to Outlook.
+              </p>
+            </div>
+
+            <div style={{ padding: '14px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '10px', background: '#f8fafc' }}>
+              <button
+                onClick={() => setShowEditorModal(false)}
+                style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', fontSize: '13px', fontWeight: '600', cursor: 'pointer', color: '#64748b' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveDraft}
+                disabled={savingDraft}
+                style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: savingDraft ? '#93c5fd' : '#0078d4', color: 'white', fontSize: '13px', fontWeight: '600', cursor: savingDraft ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                {savingDraft && (
+                  <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.4)', borderTop: '2px solid white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                )}
+                {savingDraft ? 'Saving...' : 'Save to My Drafts'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   );
 };

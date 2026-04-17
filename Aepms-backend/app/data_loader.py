@@ -212,15 +212,14 @@ class EfficientDataLoader:
         # Batch insert new vessels
         if vessels_to_insert:
             try:
-                await session.bulk_insert_mappings(VesselInfo, vessels_to_insert)
-                # Update cache with newly inserted vessels
-                for vessel_data in vessels_to_insert:
-                    imo_number = vessel_data['imo_number']
-                    vessel = (await session.execute(select(VesselInfo).where(VesselInfo.imo_number == imo_number))).scalar_one_or_none()
-                    if vessel:
-                        self.existing_vessels[imo_number] = vessel
+                new_vessel_objs = [VesselInfo(**vd) for vd in vessels_to_insert]
+                session.add_all(new_vessel_objs)
+                await session.flush()
+                for vessel_obj in new_vessel_objs:
+                    self.existing_vessels[vessel_obj.imo_number] = vessel_obj
             except Exception as e:
-                session.rollback()
+                await session.rollback()
+                self.stats.vessels_inserted -= len(vessels_to_insert)
                 self.stats.add_error(f"Batch insert failed: {e}", "vessel_loading", "batch operation")
         
         await session.commit()
@@ -269,22 +268,17 @@ class EfficientDataLoader:
         # Batch insert new sessions
         if sessions_to_insert:
             try:
-                await session.bulk_insert_mappings(ShopTrialSession, sessions_to_insert)
+                new_session_objs = [ShopTrialSession(**sd) for sd in sessions_to_insert]
+                session.add_all(new_session_objs)
                 await session.flush()
-                
-                # Update cache with newly inserted sessions
-                for session_data in sessions_to_insert:
-                    engine_no = session_data['engine_no']
-                    trial_date = session_data['trial_date']
-                    session_obj = (await session.execute(select(ShopTrialSession).where(ShopTrialSession.engine_no == engine_no, ShopTrialSession.trial_date == trial_date))).scalar_one_or_none()
-                    if session_obj:
-                        key_tuple = (engine_no, trial_date)
-                        key_str = f"{engine_no}_{trial_date}"
-                        self.existing_sessions[key_tuple] = session_obj
-                        self.session_id_cache[key_str] = session_obj.session_id
-                        
+                for session_obj in new_session_objs:
+                    key_tuple = (session_obj.engine_no, session_obj.trial_date)
+                    key_str = f"{session_obj.engine_no}_{session_obj.trial_date}"
+                    self.existing_sessions[key_tuple] = session_obj
+                    self.session_id_cache[key_str] = session_obj.session_id
             except Exception as e:
                 await session.rollback()
+                self.stats.sessions_inserted -= len(sessions_to_insert)
                 self.stats.add_error(f"Batch insert failed: {e}", "session_loading", "batch operation")
         
         await session.commit()
@@ -358,13 +352,13 @@ class EfficientDataLoader:
         # Batch insert new performance records
         if performance_to_insert:
             try:
-                # Process in smaller batches to avoid memory issues
                 for i in range(0, len(performance_to_insert), self.batch_size):
                     batch = performance_to_insert[i:i + self.batch_size]
-                    await session.bulk_insert_mappings(ShopTrialPerformanceData, batch)
-                    await session.flush()
+                    session.add_all([ShopTrialPerformanceData(**rec) for rec in batch])
+                await session.flush()
             except Exception as e:
                 await session.rollback()
+                self.stats.performance_records_inserted -= len(performance_to_insert)
                 self.stats.add_error(f"Batch insert failed: {e}", "performance_loading", "batch operation")
         
         await session.commit()
@@ -419,25 +413,15 @@ class EfficientDataLoader:
         # Batch insert new headers
         if headers_to_insert:
             try:
-                await session.bulk_insert_mappings(MonthlyReportHeader, headers_to_insert)
+                new_header_objs = [MonthlyReportHeader(**hd) for hd in headers_to_insert]
+                session.add_all(new_header_objs)
                 await session.flush()
-                
-                # Update cache with newly inserted headers
-                for header_data in headers_to_insert:
-                    imo_number = header_data['imo_number']
-                    report_month = header_data['report_month']
-                    header_obj = (await session.execute(
-                        select(MonthlyReportHeader).where(
-                            MonthlyReportHeader.imo_number == imo_number,
-                            MonthlyReportHeader.report_month == report_month
-                        )
-                    )).scalar_one_or_none()
-                    if header_obj:
-                        report_key = f"{imo_number}_{report_month}"
-                        self.report_id_cache[report_key] = header_obj.report_id
-                        
+                for header_obj in new_header_objs:
+                    report_key = f"{header_obj.imo_number}_{header_obj.report_month}"
+                    self.report_id_cache[report_key] = header_obj.report_id
             except Exception as e:
                 await session.rollback()
+                self.stats.monthly_headers_inserted -= len(headers_to_insert)
                 self.stats.add_error(f"Batch insert failed: {e}", "monthly_header_loading", "batch operation")
         
         await session.commit()
@@ -487,9 +471,11 @@ class EfficientDataLoader:
         # Batch insert new details
         if details_to_insert:
             try:
-                await session.bulk_insert_mappings(MonthlyReportDetailsJsonb, details_to_insert)
+                session.add_all([MonthlyReportDetailsJsonb(**dd) for dd in details_to_insert])
+                await session.flush()
             except Exception as e:
                 await session.rollback()
+                self.stats.monthly_details_inserted -= len(details_to_insert)
                 self.stats.add_error(f"Batch insert failed: {e}", "monthly_detail_loading", "batch operation")
         
         await session.commit()

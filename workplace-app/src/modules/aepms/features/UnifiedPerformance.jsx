@@ -970,6 +970,7 @@ const styles = `
       padding: 32px;
       background: linear-gradient(to bottom, #f8fafc 0%, #ffffff 100%);
       min-height: 100vh;
+      overflow-x: hidden;
     }
 
     .performance-header {
@@ -1342,15 +1343,17 @@ const styles = `
     .matrix-scroll-container {
       overflow-x: auto;
       width: 100%;
-      border-top: 1px solid #cbd5e1; /* Matched border color */
+      max-width: 100%;          /* Never exceed parent width */
+      border-top: 1px solid #cbd5e1;
       border-bottom: 1px solid #e2e8f0;
       background: white;
+      border-radius: 0 0 16px 16px; /* Match card border-radius at bottom */
     }
 
     .matrix-table {
-      border-collapse: separate; 
+      border-collapse: separate;
       border-spacing: 0;
-      width: 100%; /* Forces table to fill the card */
+      min-width: 100%; /* Fills card when ≤3 files; expands and triggers scroll when 4+ files */
     }
 
     /* --- STICKY COLUMN 1: PARAMETER --- */
@@ -5550,7 +5553,7 @@ export default function Performance({
     return (
       <div
         className="enhanced-card summary-table-card"
-        style={{ marginBottom: "32px" }}
+        style={{ marginBottom: "32px", minWidth: 0, width: "100%", boxSizing: "border-box" }}
       >
         <div className="card-header-enhanced">
           <h3 className="card-title-enhanced">
@@ -5561,9 +5564,24 @@ export default function Performance({
           </p>
         </div>
 
-        <div className="card-content-enhanced" style={{ padding: 0 }}>
-          <div className="matrix-scroll-container">
-            <table className="matrix-table">
+        <div
+          style={{
+            overflowX: "auto",
+            overflowY: "visible",
+            borderTop: "1px solid #cbd5e1",
+            borderBottom: "1px solid #e2e8f0",
+            background: "white",
+            borderRadius: "0 0 16px 16px",
+          }}
+        >
+          <table
+            style={{
+              borderCollapse: "separate",
+              borderSpacing: 0,
+              minWidth: "100%",
+              width: "max-content",
+            }}
+          >
               <thead>
                 {/* 1. Date Group Header */}
                 <tr style={{ height: "55px" }}>
@@ -5972,7 +5990,6 @@ export default function Performance({
               </tbody>
             </table>
           </div>
-        </div>
       </div>
     );
   };
@@ -10325,7 +10342,7 @@ export default function Performance({
 
       {showReport && (
         <>
-          <div ref={analysisResultsRef} style={{ scrollMarginTop: "100px" }}>
+          <div ref={analysisResultsRef} style={{ scrollMarginTop: "100px", minWidth: 0, width: "100%" }}>
             {renderMissingAlert()}
             {allMonthlyReports.length === 1 &&
               baseline &&

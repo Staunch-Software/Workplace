@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Building2, Search, Shield, LogOut, ChevronDown, Ship, X, Check, KeyRound, Activity, ChevronRight, Database, Clock, Wifi, WifiOff, FileText, Trello, Droplet, Zap, AlertCircle } from "lucide-react";
+import { Building2, Search, Shield, LogOut, ChevronDown, Ship, X, Check, KeyRound, Activity, ChevronRight, Database, Clock, Wifi, WifiOff, FileText, Trello, Droplet, Zap, AlertCircle, BookOpen } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getVesselStatus } from '../pages/admin/lib/adminApi';
@@ -680,6 +680,10 @@ const Navbar = () => {
                                             <Activity size={15} /> Vessel Status
                                         </button>
                                     )}
+
+                                    <button className="dropdown-item" onClick={() => { setDropdownOpen(false); navigate('/help'); }}>
+                                        <BookOpen size={15} /> User Guide
+                                    </button>
 
                                     <button className="dropdown-item" onClick={() => { setDropdownOpen(false); setChangePasswordOpen(true); }}>
                                         <KeyRound size={15} /> Change Password

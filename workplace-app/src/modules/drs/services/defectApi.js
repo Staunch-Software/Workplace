@@ -536,8 +536,8 @@ export const defectApi = {
   getEmailRecipients: (defectId) =>
     api.get(`/defects/${defectId}/email-recipients`).then((r) => r.data),
 
-  createEmailDraft: (defectId) =>
-    api.post(`/defects/${defectId}/draft-email`).then((r) => r.data),
+  createEmailDraft: (defectId, payload = {}) =>
+    api.post(`/defects/${defectId}/draft-email`, payload).then((r) => r.data),
 
   // ============================================
   // TASKS & NOTIFICATIONS

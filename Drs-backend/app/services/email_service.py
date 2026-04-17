@@ -81,11 +81,12 @@ async def get_recipients_for_vessel(vessel_imo: str) -> list[str]:
     return list(recipients)
 
 # --- 6. CORE: Send via Graph API ---
-async def send_graph_email(subject: str, recipients: list[str], html_content: str):
+async def send_graph_email(subject: str, recipients: list[str], html_content: str, cc_recipients: list[str] = []):
     token = get_access_token()
-    
+
     to_recipients = [{"emailAddress": {"address": email}} for email in recipients]
-    
+    cc_list = [{"emailAddress": {"address": email}} for email in cc_recipients]
+
     payload = {
         "message": {
             "subject": subject,
@@ -93,28 +94,30 @@ async def send_graph_email(subject: str, recipients: list[str], html_content: st
                 "contentType": "HTML",
                 "content": html_content
             },
-            "toRecipients": to_recipients
+            "toRecipients": to_recipients,
+            "ccRecipients": cc_list,
         },
         "saveToSentItems": "true"
     }
-    
+
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    
+
     async with httpx.AsyncClient() as client:
         response = await client.post(GRAPH_ENDPOINT, json=payload, headers=headers)
-        
+
         if response.status_code == 202:
-            print(f"✅ OAuth Email Sent to {len(recipients)} recipients.")
+            print(f"✅ OAuth Email Sent to {len(recipients)} recipients, CC: {len(cc_recipients)}.")
         else:
             print(f"❌ Graph API Error: {response.status_code} - {response.text}")
 
 # --- 7. EXPORTED FUNCTION ---
 async def send_defect_email(defect_data: dict, event_type: str):
     print(f"🚀 Processing Email for: {defect_data.get('title')}")
-    
+
     # 1. Find who to send to
     recipients = await get_recipients_for_vessel(defect_data['vessel_imo'])
-    
+    cc_recipients = []
+
     if not recipients:
         print("⚠️ No recipients found. Skipping email.")
         return
@@ -138,4 +141,4 @@ async def send_defect_email(defect_data: dict, event_type: str):
     subject = f"[{defect_data['vessel_imo']}] {subject_map.get(event_type, 'Notification')}"
 
     # 4. Fire and Forget
-    await send_graph_email(subject, recipients, html_content)
+    await send_graph_email(subject, recipients, html_content, cc_recipients)

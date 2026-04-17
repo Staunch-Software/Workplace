@@ -7,6 +7,7 @@ import { Toaster } from 'react-hot-toast';
 import Login from './pages/Login/Login';
 import Home from './pages/Dashboard/Home';
 import Navbar from './components/Navbar';
+import UserGuide from './pages/UserGuide/UserGuide';
 
 const DrsModule = lazy(() => import('./modules/drs/DrsModule'));
 const LubModule = lazy(() => import('./modules/lubeoil/Lubmodule'));
@@ -94,6 +95,13 @@ function App() {
               <Suspense fallback={<div className="p-10 text-center">Loading AEPMS...</div>}>
                 <AepmsModule />
               </Suspense>
+            </ProtectedRoute>
+          } />
+
+          {/* ── USER GUIDE ─────────────────────────────── */}
+          <Route path="/help" element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'SHORE', 'VESSEL']}>
+              <UserGuide />
             </ProtectedRoute>
           } />
 

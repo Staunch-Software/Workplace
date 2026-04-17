@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle, Clock, ClipboardList, MessageSquare,
   ChevronDown, ChevronUp, CheckCircle, ShieldAlert, Send, Paperclip,
-  X, Check, Edit2, Save, Edit3, Filter, Edit, Flower, Ship, AlertOctagon, MessageCircle, MoreHorizontal, Trash2, ArrowRightLeft, UserCircle, Download, Flag, RefreshCw
+  X, Check, Edit2, Save, Edit3, Filter, Edit, Flower, Ship, AlertOctagon, MessageCircle, MoreHorizontal, Trash2, ArrowRightLeft, UserCircle, Download, Flag, RefreshCw, Mail
 } from 'lucide-react';
 import { Image as ImageIcon, Eye, Upload } from 'lucide-react';
 import ColumnCustomizationModal from '@drs/components/modals/ColumnCustomizationModal';
@@ -1522,6 +1522,7 @@ const ShoreDashboard = () => {
   const [expandedId, setExpandedId] = useState(null);
   const [highlightedId, setHighlightedId] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [draftingId, setDraftingId] = useState(null);
 
   const [columnWidths, setColumnWidths] = useState({
     sno: 20,
@@ -2285,6 +2286,29 @@ const ShoreDashboard = () => {
       alert("Failed to delete: " + err.message);
     }
   });
+
+  const handleMailClick = async (e, defect) => {
+    e.stopPropagation();
+    const outlookTab = window.open('', '_blank');
+    if (outlookTab) {
+      outlookTab.document.write(`<html><head><title>Opening Outlook...</title></head>
+        <body style="font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;background:#f8fafc;color:#334155;">
+          <div style="width:40px;height:40px;border:3px solid #e2e8f0;border-top:3px solid #0078d4;border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:20px;"></div>
+          <style>@keyframes spin{to{transform:rotate(360deg);}}</style>
+          <h2 style="margin:0 0 8px 0;font-size:18px;">Preparing your Outlook draft...</h2>
+        </body></html>`);
+    }
+    setDraftingId(defect.id);
+    try {
+      const data = await defectApi.createEmailDraft(defect.id);
+      if (outlookTab) outlookTab.location.href = data.web_link || 'https://outlook.office365.com/mail/drafts';
+    } catch (err) {
+      alert('Failed to create email draft. Please try again.');
+      if (outlookTab) outlookTab.close();
+    } finally {
+      setDraftingId(null);
+    }
+  };
 
   const handleDelete = (id) => {
     if (!ALLOWED_DELETE_EMAILS.includes(user?.email)) return; // silently block
@@ -3180,6 +3204,7 @@ const ShoreDashboard = () => {
                       }
                     })}
 
+                    <th style={{ width: 30 }}></th>
                     {isEditMode && canDelete && <th style={{ width: 10 }}>Delete</th>}
                   </tr>
                 </SortableContext>
@@ -3695,6 +3720,27 @@ const ShoreDashboard = () => {
                               return null;
                           }
                         })}
+
+                        <td style={{ textAlign: 'center', width: 30 }}>
+                          {!isClosed && (
+                            <button
+                              title="Draft Email for this Defect"
+                              onClick={(e) => handleMailClick(e, defect)}
+                              disabled={draftingId === defect.id}
+                              style={{
+                                border: 'none', background: 'none',
+                                cursor: draftingId === defect.id ? 'not-allowed' : 'pointer',
+                                padding: '4px', display: 'inline-flex', alignItems: 'center',
+                                color: draftingId === defect.id ? '#93c5fd' : '#0078d4',
+                                borderRadius: '4px', transition: 'background 0.2s'
+                              }}
+                              onMouseEnter={e => { if (draftingId !== defect.id) e.currentTarget.style.background = '#eff6ff'; }}
+                              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                            >
+                              <Mail size={16} />
+                            </button>
+                          )}
+                        </td>
 
                         {isEditMode && canDelete && (
                           <td style={{ textAlign: 'center' }}>
