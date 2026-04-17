@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Zap } from "lucide-react";
-import { getVessels, updateVessel, updateVesselModuleStatus } from "./lib/adminApi";
+import { Search, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Zap, Trash2 } from "lucide-react";
+import { getVessels, updateVessel, updateVesselModuleStatus, deleteVessel } from "./lib/adminApi";
+import ConfirmModal from "./ConfirmModal";
 
 const SearchIcon = () => <Search size={16} />;
 const EditIcon = () => <Pencil size={16} />;
@@ -365,6 +366,8 @@ export default function AllVessels() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [editingVessel, setEditingVessel] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchVessels = async () => {
     try {
@@ -385,6 +388,19 @@ export default function AllVessels() {
       fetchVessels();
     } catch (err) {
       alert(err.response?.data?.detail || "Update failed");
+    }
+  };
+
+  const handleDeleteVessel = async () => {
+    setDeleteLoading(true);
+    try {
+      await deleteVessel(deleteConfirm.imo);
+      await fetchVessels();
+      setDeleteConfirm(null);
+    } catch (err) {
+      alert(err.response?.data?.detail || "Failed to delete vessel");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -450,6 +466,7 @@ export default function AllVessels() {
                       <button className="ap-action-btn" title="Edit" onClick={() => setEditingVessel(vessel)}><EditIcon /></button>
                       <button className={"ap-action-btn " + (vessel.is_active ? "danger" : "success")}
                         onClick={() => toggleStatus(vessel)}><BanIcon /></button>
+                      <button className="ap-action-btn danger" title="Delete Vessel" onClick={() => setDeleteConfirm(vessel)}><Trash2 size={16} /></button>
                     </div>
                   </td>
                 </tr>
@@ -465,6 +482,14 @@ export default function AllVessels() {
           onSave={fetchVessels}
         />
       )}
+      <ConfirmModal
+        isOpen={!!deleteConfirm}
+        title="Delete Vessel"
+        message={`Permanently delete vessel "${deleteConfirm?.name}" (IMO: ${deleteConfirm?.imo})? This action cannot be undone.`}
+        onConfirm={handleDeleteVessel}
+        onCancel={() => setDeleteConfirm(null)}
+        loading={deleteLoading}
+      />
     </div>
   );
 }

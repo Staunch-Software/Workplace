@@ -17,6 +17,8 @@ class User(ControlBase):
     role = Column(String, nullable=False, default="VESSEL")
     is_active = Column(Boolean, default=True, nullable=False)
     last_login = Column(DateTime, nullable=True)
+    password_reset_token = Column(String, nullable=True)
+    reset_token_expiry = Column(DateTime, nullable=True)
     can_self_assign_vessels = Column(Boolean, default=False, nullable=False, server_default='false')
     permissions = Column(JSONB, nullable=False, server_default='{"drs": false, "jira": false, "voyage": false, "lubeoil": false, "engine_performance": false}')
     preferences = Column(JSONB, nullable=False, server_default='{"visible_columns": [], "filters": {}}')

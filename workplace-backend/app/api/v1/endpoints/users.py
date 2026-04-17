@@ -264,3 +264,18 @@ async def change_password(
     user.updated_at = datetime.utcnow()
     await db.commit()
     return {"message": "Password changed successfully"}
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: uuid.UUID,
+    db: AsyncSession = Depends(get_control_db),
+    admin: User = Depends(get_current_admin),
+):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    await db.delete(user)
+    await db.commit()
+    return {"message": "User deleted successfully"}

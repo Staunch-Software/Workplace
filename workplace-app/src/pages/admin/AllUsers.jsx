@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, Filter, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Activity, Mail } from "lucide-react";
-import { getUsers, updateUser, assignVessels, getVessels, resendWelcomeEmail } from "./lib/adminApi";
+import { Search, Filter, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Activity, Mail, Trash2 } from "lucide-react";
+import { getUsers, updateUser, assignVessels, getVessels, resendWelcomeEmail, deleteUser } from "./lib/adminApi";
+import ConfirmModal from "./ConfirmModal";
 
 const SearchIcon = () => <Search size={16} />;
 const FilterIcon = () => <Filter size={16} />;
@@ -384,6 +385,8 @@ export default function AllUsers() {
     const [statusFilter, setStatusFilter] = useState("ALL");
     const [editingUser, setEditingUser] = useState(null);
     const [openVesselPopoverUserId, setOpenVesselPopoverUserId] = useState(null);
+    const [deleteConfirm, setDeleteConfirm] = useState(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
 
     const fetchData = async () => {
         try {
@@ -415,6 +418,19 @@ export default function AllUsers() {
             alert(`✅ Password reset and email sent to ${user.email}`);
         } catch (err) {
             alert(err.response?.data?.detail || "Failed to resend email");
+        }
+    };
+
+    const handleDeleteUser = async () => {
+        setDeleteLoading(true);
+        try {
+            await deleteUser(deleteConfirm.id);
+            await fetchData();
+            setDeleteConfirm(null);
+        } catch (err) {
+            alert(err.response?.data?.detail || "Failed to delete user");
+        } finally {
+            setDeleteLoading(false);
         }
     };
 
@@ -514,6 +530,7 @@ export default function AllUsers() {
                                             <button className="ap-action-btn" title="Resend Welcome Email" onClick={() => handleResendEmail(user)}><Mail size={16} /></button>
                                             <button className={"ap-action-btn " + (user.is_active ? "danger" : "success")}
                                                 onClick={() => toggleStatus(user)}><BanIcon /></button>
+                                            <button className="ap-action-btn danger" title="Delete User" onClick={() => setDeleteConfirm(user)}><Trash2 size={16} /></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -530,6 +547,14 @@ export default function AllUsers() {
                     onSave={fetchData}
                 />
             )}
+            <ConfirmModal
+                isOpen={!!deleteConfirm}
+                title="Delete User"
+                message={`Permanently delete "${deleteConfirm?.full_name}" (${deleteConfirm?.email})? This action cannot be undone.`}
+                onConfirm={handleDeleteUser}
+                onCancel={() => setDeleteConfirm(null)}
+                loading={deleteLoading}
+            />
         </div>
     );
 }

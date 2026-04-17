@@ -69,6 +69,7 @@ from app.models.user import User
 from app.models.enums import UserRole, DefectStatus, DefectPriority, DefectSource
 from app.models.vessel import Vessel
 from app.models.sync import SyncQueue
+from app.models.mariapps_pr_cache import MariappsPrCache
 from app.schemas.defect import (
     DefectCreate,
     DefectUpdate,
@@ -112,7 +113,50 @@ from app.services.live_feed_service import (
 )
 from app.services.defect_service import DefectService, _should_sync
 from app.models.defect import UserDefectFlag
+from pydantic import BaseModel
+from typing import Optional
 logger = logging.getLogger(__name__)
+
+
+class EmailDraftRequest(BaseModel):
+    to_emails: Optional[list[str]] = None
+    cc_emails: Optional[list[str]] = None
+    subject: Optional[str] = None
+    body_text: Optional[str] = None
+
+
+def _build_email_content(defect, vessel_name: str, defect_ref: str) -> tuple[str, str]:
+    """Return (subject, body_text) for a defect email draft."""
+    date_identified = (
+        defect.date_identified.strftime("%Y-%m-%d") if defect.date_identified else "N/A"
+    )
+    target_close = (
+        defect.target_close_date.strftime("%Y-%m-%d") if defect.target_close_date else "N/A"
+    )
+    priority = (
+        defect.priority.value if hasattr(defect.priority, "value") else str(defect.priority)
+    )
+    subject = f"Defect Raised - {defect_ref} | [{vessel_name}] {defect.title}"
+    body_text = "\n".join(
+        [
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "DEFECT REPORT — Maritime DRS",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"Vessel        : {vessel_name}",
+            f"Title         : {defect.title}",
+            f"Equipment     : {defect.equipment_name}",
+            f"Priority      : {priority}",
+            f"Identified On : {date_identified}",
+            f"Target Close  : {target_close}",
+            "",
+            "Description:",
+            defect.description,
+            "",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "Generated from Workplace Platform",
+        ]
+    )
+    return subject, body_text
 router = APIRouter(redirect_slashes=False)
 
 # IST timezone — used for all date display and Excel export
@@ -378,12 +422,16 @@ async def get_email_recipients(
             short_uuid = str(defect.id)[:8]
             defect_ref = f"{vessel_initials}-{date_part}-{short_uuid}"
 
+        subject, body_text = _build_email_content(defect, vessel_name, defect_ref)
+
         return {
             "recipients": recipients,
             "vessel_email": (
                 vessel.vessel_email if vessel and vessel.vessel_email else None
             ),
             "defect_ref": defect_ref,
+            "subject": subject,
+            "body_text": body_text,
             "defect": {
                 "id": str(defect.id),
                 "title": defect.title,
@@ -434,6 +482,7 @@ async def get_email_recipients(
 @router.post("/{defect_id}/draft-email")
 async def create_email_draft(
     defect_id: UUID,
+    request: EmailDraftRequest = EmailDraftRequest(),
     db: AsyncSession = Depends(get_db),
     control_db: AsyncSession = Depends(get_control_db),
     current_user: User = Depends(get_current_user),
@@ -441,6 +490,8 @@ async def create_email_draft(
     """
     Creates an Outlook draft email with defect details and
     actual file attachments (before/after images + thread attachments).
+    Accepts optional overrides for to_emails, cc_emails, subject, body_text
+    (used when the vessel user edits the email in-app before saving).
     """
     try:
         # 1. Fetch defect with all relationships
@@ -489,42 +540,12 @@ async def create_email_draft(
             short_uuid = str(defect.id)[:8]
             defect_ref = f"{vessel_initials}-{date_part}-{short_uuid}"
 
-        # 5. Build email body
-        date_identified = (
-            defect.date_identified.strftime("%Y-%m-%d")
-            if defect.date_identified
-            else "N/A"
-        )
-        target_close = (
-            defect.target_close_date.strftime("%Y-%m-%d")
-            if defect.target_close_date
-            else "N/A"
-        )
-        priority = (
-            defect.priority.value
-            if hasattr(defect.priority, "value")
-            else str(defect.priority)
-        )
-
-        body_text = "\n".join(
-            [
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                "DEFECT REPORT — Maritime DRS",
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                f"Vessel        : {vessel_name}",
-                f"Title         : {defect.title}",
-                f"Equipment     : {defect.equipment_name}",
-                f"Priority      : {priority}",
-                f"Identified On : {date_identified}",
-                f"Target Close  : {target_close}",
-                "",
-                "Description:",
-                defect.description,
-                "",
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                "Generated from Workplace Platform",
-            ]
-        )
+        # 5. Build email subject/body (use overrides if provided by vessel in-app editor)
+        auto_subject, auto_body = _build_email_content(defect, vessel_name, defect_ref)
+        subject = request.subject if request.subject is not None else auto_subject
+        body_text = request.body_text if request.body_text is not None else auto_body
+        recipients = request.to_emails if request.to_emails is not None else recipients
+        cc_list = request.cc_emails if request.cc_emails is not None else ([vessel_email] if vessel_email else [])
 
         # 5. Download blobs and build attachments list
         attachments = []
@@ -585,12 +606,12 @@ async def create_email_draft(
                     )
 
         # 6. Create Outlook draft via Graph API
-        subject = f"Defect Raised - {defect_ref} | [{vessel_name}] {defect.title}"
+        # subject, body_text, recipients, cc_list are set in step 5 (with user overrides applied)
         web_link = await create_outlook_draft(
-            # user_email=current_user.email,
-            user_email="techdevops@ozellar.com",
+            user_email=current_user.email,
+            # user_email="techdevops@ozellar.com",  # was hardcoded for testing
             to_emails=recipients,
-            cc_emails=[vessel_email] if vessel_email else [],
+            cc_emails=cc_list,
             subject=subject,
             body_text=body_text,
             attachments=attachments,
@@ -731,7 +752,9 @@ async def get_defects(
     flagged_ids = {row[0] for row in flag_result.all()}
 
     for defect in defects:
-        defect.pr_entries = [pr for pr in defect.pr_entries if not pr.is_deleted]
+        # Use __dict__ to avoid mutating the ORM collection (prevents SQLAlchemy
+        # from nullifying defect_id on removed items at session flush)
+        defect.__dict__['pr_entries'] = [pr for pr in defect.pr_entries if not pr.is_deleted]
         defect.vessel_name = vessel_map.get(defect.vessel_imo, defect.vessel_imo)
         defect.__dict__['is_flagged'] = defect.id in flagged_ids
 
@@ -1826,20 +1849,23 @@ async def import_defects(
                             )
                             if not existing_pr_res.scalars().first():
                                 pr_id = uuid.uuid4()
-                                prs_to_insert.append(
-                                    PrEntry(
-                                        id=pr_id,
-                                        defect_id=existing_defect.id,
-                                        pr_number=pr_no,
-                                        pr_description="Updated via Excel",
-                                        created_by_id=current_user.id,
-                                        is_deleted=False,
-                                        version=1,
-                                        origin="SHORE",
-                                        created_at=datetime.utcnow(),
-                                        updated_at=datetime.utcnow(),
-                                    )
+                                cache_result = await db.execute(
+                                    select(MariappsPrCache).where(MariappsPrCache.requisition_no == pr_no)
                                 )
+                                cached = cache_result.scalars().first()
+                                prs_to_insert.append(PrEntry(
+                                    id=pr_id,
+                                    defect_id=existing_defect.id,
+                                    pr_number=pr_no,
+                                    pr_description="Updated via Excel",
+                                    created_by_id=current_user.id,
+                                    is_deleted=False,
+                                    version=1,
+                                    updated_at=datetime.utcnow(),
+                                    origin="VESSEL" if _should_sync() else "SHORE",
+                                    mariapps_pr_status=cached.status if cached else None,
+                                    created_at=datetime.utcnow(),
+                                ))
  
                     # FIX: increment BEFORE the update path ends — do NOT continue yet
                     updated_count += 1
@@ -1961,20 +1987,23 @@ async def import_defects(
                         p.strip() for p in str(pr_val).split(",") if p.strip()
                     ]:
                         pr_id = uuid.uuid4()
-                        prs_to_insert.append(
-                            PrEntry(
-                                id=pr_id,
-                                defect_id=new_id,
-                                pr_number=pr_no,
-                                pr_description="Imported via Excel",
-                                created_by_id=current_user.id,
-                                is_deleted=False,
-                                version=1,
-                                origin="SHORE",
-                                created_at=datetime.utcnow(),
-                                updated_at=datetime.utcnow(),
-                            )
+                        cache_result = await db.execute(
+                            select(MariappsPrCache).where(MariappsPrCache.requisition_no == pr_no)
                         )
+                        cached = cache_result.scalars().first()
+                        prs_to_insert.append(PrEntry(
+                            id=pr_id,
+                            defect_id=new_id,
+                            pr_number=pr_no,
+                            pr_description="Imported via Excel",
+                            created_by_id=current_user.id,
+                            is_deleted=False,
+                            version=1,
+                            updated_at=datetime.utcnow(),
+                            origin="VESSEL" if _should_sync() else "SHORE",
+                            mariapps_pr_status=cached.status if cached else None,
+                            created_at=datetime.utcnow()
+                        ))
  
                         if _should_sync():
                             syncs_to_insert.append(
@@ -2205,7 +2234,9 @@ async def get_defect(defect_id: UUID, db: AsyncSession = Depends(get_db)):
         if not defect or defect.is_deleted:
             raise HTTPException(status_code=404, detail="Defect not found")
         await db.refresh(defect, attribute_names=["pr_entries"])
-        defect.pr_entries = [pr for pr in defect.pr_entries if not pr.is_deleted]
+        # Use __dict__ to avoid mutating the ORM collection (prevents SQLAlchemy
+        # from nullifying defect_id on removed items at session flush)
+        defect.__dict__['pr_entries'] = [pr for pr in defect.pr_entries if not pr.is_deleted]
         return defect
     except HTTPException:
         raise

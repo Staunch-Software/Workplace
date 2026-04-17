@@ -27,3 +27,6 @@ export const updateVesselModuleStatus = (imo, status) =>
 
 export const getVesselStatus = () =>
   api.get('/vessels/status');
+
+export const deleteUser = (id) => api.delete(`/users/${id}`);
+export const deleteVessel = (imo) => api.delete(`/vessels/${imo}`);

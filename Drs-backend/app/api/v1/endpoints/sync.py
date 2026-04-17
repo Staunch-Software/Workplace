@@ -23,6 +23,7 @@ from app.models.vessel import Vessel
 from app.models.user import User
 from app.models.defect import Defect, Thread, Attachment, PrEntry, DefectImage
 from app.models.tasks import Task, Notification, LiveFeed
+from app.models.mariapps_pr_cache import MariappsPrCache
 from app.models.sync import SyncState
 # ---------------------------------------------------------------------------
 # Router & API Key Auth

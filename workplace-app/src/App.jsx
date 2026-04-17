@@ -5,8 +5,10 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
 
 import Login from './pages/Login/Login';
+import ResetPassword from './pages/ResetPassword/ResetPassword';
 import Home from './pages/Dashboard/Home';
 import Navbar from './components/Navbar';
+import UserGuide from './pages/UserGuide/UserGuide';
 
 const DrsModule = lazy(() => import('./modules/drs/DrsModule'));
 const LubModule = lazy(() => import('./modules/lubeoil/Lubmodule'));
@@ -22,6 +24,7 @@ function App() {
         <Routes>
           {/* ── PUBLIC ─────────────────────────────────── */}
           <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* ── WORKSPACE DASHBOARD ────────────────────── */}
           <Route path="/dashboard" element={
@@ -94,6 +97,13 @@ function App() {
               <Suspense fallback={<div className="p-10 text-center">Loading AEPMS...</div>}>
                 <AepmsModule />
               </Suspense>
+            </ProtectedRoute>
+          } />
+
+          {/* ── USER GUIDE ─────────────────────────────── */}
+          <Route path="/help" element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'SHORE', 'VESSEL']}>
+              <UserGuide />
             </ProtectedRoute>
           } />
 

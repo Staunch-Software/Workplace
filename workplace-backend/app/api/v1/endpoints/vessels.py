@@ -223,3 +223,18 @@ async def update_vessel(
             for u in vessel.users
         ],
     )
+
+
+@router.delete("/vessels/{imo}")
+async def delete_vessel(
+    imo: str,
+    db: AsyncSession = Depends(get_control_db),
+    admin: User = Depends(get_current_admin),
+):
+    result = await db.execute(select(Vessel).where(Vessel.imo == imo))
+    vessel = result.scalar_one_or_none()
+    if not vessel:
+        raise HTTPException(status_code=404, detail="Vessel not found")
+    await db.delete(vessel)
+    await db.commit()
+    return {"message": "Vessel deleted successfully"}

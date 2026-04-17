@@ -10,6 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../api/axios';
 import './Login.css';
 import ozellarLogo from '../../assets/ozellar-marine-global-logo.gif';
 import shipImage from '../../assets/AM_Tarang.jpeg';
@@ -47,12 +48,66 @@ const Login = () => {
     }
   };
 
-  // ── NEW: mount animation ──
+  // ── mount animation ──
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
-  // ── NEW: show/hide password ──
+  // ── show/hide password ──
   const [showPassword, setShowPassword] = useState(false);
+
+  // ── Forgot Password modal ──
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotStatus, setForgotStatus] = useState('idle'); // idle | loading | sent | error
+  const [forgotError, setForgotError] = useState('');
+
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    setForgotStatus('loading');
+    try {
+      await api.post('/auth/forgot-password', { email: forgotEmail });
+      setForgotStatus('sent');
+    } catch {
+      setForgotStatus('error');
+      setForgotError('Something went wrong. Please try again.');
+    }
+  };
+
+  const closeForgotModal = () => {
+    setShowForgotModal(false);
+    setForgotEmail('');
+    setForgotStatus('idle');
+    setForgotError('');
+  };
+
+  // ── Contact Administrator modal ──
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactMsg, setContactMsg] = useState('');
+  const [contactStatus, setContactStatus] = useState('idle'); // idle | loading | sent | error
+  const [contactError, setContactError] = useState('');
+
+  const handleContactSubmit = async (e) => {
+    e.preventDefault();
+    setContactStatus('loading');
+    try {
+      await api.post('/contact', { name: contactName, email: contactEmail, message: contactMsg });
+      setContactStatus('sent');
+    } catch {
+      setContactStatus('error');
+      setContactError('Failed to send your message. Please try again.');
+    }
+  };
+
+  const closeContactModal = () => {
+    setShowContactModal(false);
+    setContactName('');
+    setContactEmail('');
+    setContactMsg('');
+    setContactStatus('idle');
+    setContactError('');
+  };
 
   return (
     <div className={"login-container" + (mounted ? " fade-in" : "")}>
@@ -191,7 +246,7 @@ const Login = () => {
                 <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} disabled={isLoading} />
                 Remember me
               </label>
-              <a href="#" className="forgot-link">Forgot password?</a>
+              <a href="#" className="forgot-link" onClick={e => { e.preventDefault(); setShowForgotModal(true); }}>Forgot password?</a>
             </div>
 
             <button type="submit" className="submit-btn" disabled={isLoading}>
@@ -202,11 +257,103 @@ const Login = () => {
           </form>
 
           <p className="help-text">
-            Having trouble? <a href="#" className="help-link">Contact your administrator</a>
+            Having trouble? <a href="#" className="help-link" onClick={e => { e.preventDefault(); setShowContactModal(true); }}>Contact your administrator</a>
           </p>
 
         </div>
       </div>
+
+      {/* ── FORGOT PASSWORD MODAL ── */}
+      {showForgotModal && (
+        <div className="login-modal-backdrop" onClick={closeForgotModal}>
+          <div className="login-modal-card" onClick={e => e.stopPropagation()}>
+            <button className="login-modal-close" onClick={closeForgotModal} aria-label="Close">&#x2715;</button>
+            <h3 className="login-modal-title">Reset your password</h3>
+
+            {forgotStatus === 'sent' ? (
+              <div className="login-modal-success">
+                <div className="login-modal-success-icon">&#10003;</div>
+                <p>Check your inbox for a reset link. It expires in 1 hour.</p>
+                <button className="login-modal-btn" onClick={closeForgotModal}>Done</button>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotSubmit}>
+                <p className="login-modal-desc">Enter your account email and we'll send you a link to reset your password.</p>
+                <label className="login-modal-label">Email address</label>
+                <input
+                  className="login-modal-input"
+                  type="email"
+                  placeholder="you@ozellar.com"
+                  value={forgotEmail}
+                  onChange={e => setForgotEmail(e.target.value)}
+                  required
+                  disabled={forgotStatus === 'loading'}
+                />
+                {forgotStatus === 'error' && <p className="login-modal-error">{forgotError}</p>}
+                <button className="login-modal-btn" type="submit" disabled={forgotStatus === 'loading'}>
+                  {forgotStatus === 'loading' ? 'Sending...' : 'Send Reset Link'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── CONTACT ADMINISTRATOR MODAL ── */}
+      {showContactModal && (
+        <div className="login-modal-backdrop" onClick={closeContactModal}>
+          <div className="login-modal-card" onClick={e => e.stopPropagation()}>
+            <button className="login-modal-close" onClick={closeContactModal} aria-label="Close">&#x2715;</button>
+            <h3 className="login-modal-title">Contact Administrator</h3>
+
+            {contactStatus === 'sent' ? (
+              <div className="login-modal-success">
+                <div className="login-modal-success-icon">&#10003;</div>
+                <p>Your message has been sent. We'll get back to you shortly.</p>
+                <button className="login-modal-btn" onClick={closeContactModal}>Done</button>
+              </div>
+            ) : (
+              <form onSubmit={handleContactSubmit}>
+                <p className="login-modal-desc">Describe your issue and an administrator will reach out to you.</p>
+                <label className="login-modal-label">Your name</label>
+                <input
+                  className="login-modal-input"
+                  type="text"
+                  placeholder="Full name"
+                  value={contactName}
+                  onChange={e => setContactName(e.target.value)}
+                  required
+                  disabled={contactStatus === 'loading'}
+                />
+                <label className="login-modal-label">Your email</label>
+                <input
+                  className="login-modal-input"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={contactEmail}
+                  onChange={e => setContactEmail(e.target.value)}
+                  required
+                  disabled={contactStatus === 'loading'}
+                />
+                <label className="login-modal-label">Message</label>
+                <textarea
+                  className="login-modal-input login-modal-textarea"
+                  placeholder="Describe your issue..."
+                  value={contactMsg}
+                  onChange={e => setContactMsg(e.target.value)}
+                  required
+                  rows={4}
+                  disabled={contactStatus === 'loading'}
+                />
+                {contactStatus === 'error' && <p className="login-modal-error">{contactError}</p>}
+                <button className="login-modal-btn" type="submit" disabled={contactStatus === 'loading'}>
+                  {contactStatus === 'loading' ? 'Sending...' : 'Send Message'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
