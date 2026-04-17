@@ -9,6 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from urllib.parse import quote_plus
 import os
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
@@ -61,7 +62,7 @@ async def backfill():
 
         updated = 0
         skipped = 0
-
+        now_utc = datetime.utcnow()
         for imo, dlist in vessel_defects.items():
             vessel_name = vessel_map.get(imo)
             if not vessel_name:
@@ -82,8 +83,17 @@ async def backfill():
 
                 defect_number = f"{prefix}#{str(seq).zfill(4)}"
                 await db.execute(
-                    text("UPDATE defects SET defect_number = :dn WHERE id = :id"),
-                    {"dn": defect_number, "id": defect.id}
+                    text("""
+                        UPDATE defects 
+                        SET defect_number = :dn, 
+                            updated_at = :now 
+                        WHERE id = :id
+                    """),
+                    {
+                        "dn": defect_number, 
+                        "id": defect.id, 
+                        "now": now_utc
+                    }
                 )
                 updated += 1
 

@@ -69,6 +69,7 @@ from app.models.user import User
 from app.models.enums import UserRole, DefectStatus, DefectPriority, DefectSource
 from app.models.vessel import Vessel
 from app.models.sync import SyncQueue
+from app.models.mariapps_pr_cache import MariappsPrCache
 from app.schemas.defect import (
     DefectCreate,
     DefectUpdate,
@@ -1826,20 +1827,23 @@ async def import_defects(
                             )
                             if not existing_pr_res.scalars().first():
                                 pr_id = uuid.uuid4()
-                                prs_to_insert.append(
-                                    PrEntry(
-                                        id=pr_id,
-                                        defect_id=existing_defect.id,
-                                        pr_number=pr_no,
-                                        pr_description="Updated via Excel",
-                                        created_by_id=current_user.id,
-                                        is_deleted=False,
-                                        version=1,
-                                        origin="SHORE",
-                                        created_at=datetime.utcnow(),
-                                        updated_at=datetime.utcnow(),
-                                    )
+                                cache_result = await db.execute(
+                                    select(MariappsPrCache).where(MariappsPrCache.requisition_no == pr_no)
                                 )
+                                cached = cache_result.scalars().first()
+                                prs_to_insert.append(PrEntry(
+                                    id=pr_id,
+                                    defect_id=existing_defect.id,
+                                    pr_number=pr_no,
+                                    pr_description="Updated via Excel",
+                                    created_by_id=current_user.id,
+                                    is_deleted=False,
+                                    version=1,
+                                    updated_at=datetime.utcnow(),
+                                    origin="VESSEL" if _should_sync() else "SHORE",
+                                    mariapps_pr_status=cached.status if cached else None,
+                                    created_at=datetime.utcnow(),
+                                ))
  
                     # FIX: increment BEFORE the update path ends — do NOT continue yet
                     updated_count += 1
@@ -1961,20 +1965,23 @@ async def import_defects(
                         p.strip() for p in str(pr_val).split(",") if p.strip()
                     ]:
                         pr_id = uuid.uuid4()
-                        prs_to_insert.append(
-                            PrEntry(
-                                id=pr_id,
-                                defect_id=new_id,
-                                pr_number=pr_no,
-                                pr_description="Imported via Excel",
-                                created_by_id=current_user.id,
-                                is_deleted=False,
-                                version=1,
-                                origin="SHORE",
-                                created_at=datetime.utcnow(),
-                                updated_at=datetime.utcnow(),
-                            )
+                        cache_result = await db.execute(
+                            select(MariappsPrCache).where(MariappsPrCache.requisition_no == pr_no)
                         )
+                        cached = cache_result.scalars().first()
+                        prs_to_insert.append(PrEntry(
+                            id=pr_id,
+                            defect_id=new_id,
+                            pr_number=pr_no,
+                            pr_description="Imported via Excel",
+                            created_by_id=current_user.id,
+                            is_deleted=False,
+                            version=1,
+                            updated_at=datetime.utcnow(),
+                            origin="VESSEL" if _should_sync() else "SHORE",
+                            mariapps_pr_status=cached.status if cached else None,
+                            created_at=datetime.utcnow()
+                        ))
  
                         if _should_sync():
                             syncs_to_insert.append(
