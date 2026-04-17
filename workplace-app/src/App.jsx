@@ -5,6 +5,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
 
 import Login from './pages/Login/Login';
+import ResetPassword from './pages/ResetPassword/ResetPassword';
 import Home from './pages/Dashboard/Home';
 import Navbar from './components/Navbar';
 import UserGuide from './pages/UserGuide/UserGuide';
@@ -23,6 +24,7 @@ function App() {
         <Routes>
           {/* ── PUBLIC ─────────────────────────────────── */}
           <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* ── WORKSPACE DASHBOARD ────────────────────── */}
           <Route path="/dashboard" element={

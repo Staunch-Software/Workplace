@@ -222,3 +222,36 @@ async def send_password_reset_email(to_email: str, full_name: str, token: str):
 
     except Exception as e:
         logger.error(f"❌ Failed to send reset email to {to_email}: {e}")
+
+
+# ── Contact Administrator Email ───────────────────────────────────────────────
+
+async def send_contact_email(name: str, from_email: str, message: str):
+    try:
+        html_body = f"""
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+          <div style="background:white;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+            <h1 style="color:#0f172a;font-size:20px;margin-bottom:8px;">New Contact Request</h1>
+            <p style="color:#475569;font-size:14px;margin-bottom:24px;">A user has submitted a contact request via the Workplace platform login page.</p>
+            <table style="width:100%;border-collapse:collapse;font-size:14px;">
+              <tr><td style="padding:8px 0;color:#64748b;font-weight:600;width:100px;">Name</td><td style="padding:8px 0;color:#0f172a;">{name}</td></tr>
+              <tr><td style="padding:8px 0;color:#64748b;font-weight:600;">Email</td><td style="padding:8px 0;color:#0f172a;"><a href="mailto:{from_email}" style="color:#2563eb;">{from_email}</a></td></tr>
+            </table>
+            <div style="margin-top:20px;padding:16px;background:#f8fafc;border-radius:8px;border-left:4px solid #2563eb;">
+              <p style="color:#64748b;font-size:12px;font-weight:600;margin:0 0 8px;">MESSAGE</p>
+              <p style="color:#0f172a;font-size:14px;margin:0;line-height:1.6;">{message}</p>
+            </div>
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;"/>
+            <p style="margin:0;font-size:11px;color:#94a3b8;text-align:center;">Workplace Platform · Ozellar Global</p>
+          </div>
+        </div>
+        """
+        await _send_email(
+            to_email="techdevops@ozellar.com",
+            subject=f"Workplace Platform - Contact from {name}",
+            html_body=html_body,
+        )
+        logger.info(f"✅ Contact email sent from {from_email}")
+    except Exception as e:
+        logger.error(f"❌ Failed to send contact email: {e}")
+        raise
