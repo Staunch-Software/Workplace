@@ -1,7 +1,6 @@
 import os
-import requests
-import schedule
-import time
+import httpx       # <-- Replaced requests
+import asyncio     # <-- Replaced schedule and time
 import logging
 import io
 import sys
@@ -106,7 +105,7 @@ logger.addHandler(file_handler)
 # ============================================================
 #  STEP 1 — GET MICROSOFT GRAPH ACCESS TOKEN
 # ============================================================
-def get_graph_token() -> str:
+async def get_graph_token() -> str:
     """
     Authenticates with Azure AD using Client Credentials flow.
     Returns a Bearer token for Microsoft Graph API calls.
@@ -121,15 +120,16 @@ def get_graph_token() -> str:
     }
 
     try:
-        response = requests.post(url, data=payload, timeout=30)
-        response.raise_for_status()
-        token = response.json().get("access_token")
-        if not token:
-            raise ValueError("No access_token in response")
-        logger.debug("✅ Microsoft Graph token obtained successfully.")
-        return token
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, data=payload, timeout=30.0)
+            response.raise_for_status()
+            token = response.json().get("access_token")
+            if not token:
+                raise ValueError("No access_token in response")
+            logger.debug("✅ Microsoft Graph token obtained successfully.")
+            return token
 
-    except requests.exceptions.RequestException as e:
+    except httpx.RequestError as e:
         logger.error(f"❌ Failed to get Graph token: {e}")
         raise
     except ValueError as e:
@@ -140,7 +140,7 @@ def get_graph_token() -> str:
 # ============================================================
 #  STEP 2 — FETCH EMAILS FROM INBOX (LAST 24 HOURS ONLY)
 # ============================================================
-def fetch_recent_luboil_emails(graph_token: str) -> list:
+async def fetch_recent_luboil_emails(graph_token: str) -> list:
     """
     Queries the Outlook inbox for emails from the last 24 hours that:
       - Come from ShellLubeAnalyst sender
@@ -168,12 +168,13 @@ def fetch_recent_luboil_emails(graph_token: str) -> list:
     )
 
     try:
-        response = requests.get(url, headers=headers, timeout=30)
-        response.raise_for_status()
-        all_messages = response.json().get("value", [])
-        logger.info(f"📬 Found {len(all_messages)} email(s) with attachments from the last 24 hours.")
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, timeout=30.0)
+            response.raise_for_status()
+            all_messages = response.json().get("value", [])
+            logger.info(f"📬 Found {len(all_messages)} email(s) with attachments from the last 24 hours.")
 
-    except requests.exceptions.RequestException as e:
+    except httpx.RequestError as e:
         logger.error(f"❌ Failed to fetch emails: {e}")
         return []
 
@@ -209,10 +210,11 @@ def fetch_recent_luboil_emails(graph_token: str) -> list:
     logger.info(f"🎯 {len(matched_emails)} LubeAnalyst email(s) matched the filter.")
     return matched_emails
 
+
 # ============================================================
 #  STEP 3 — GET PDF ATTACHMENTS FROM AN EMAIL (IN MEMORY)
 # ============================================================
-def get_pdf_attachments(graph_token: str, message_id: str) -> list:
+async def get_pdf_attachments(graph_token: str, message_id: str) -> list:
     """
     Fetches all PDF attachments from a specific email message.
     Returns list of dicts: [{'filename': str, 'content': bytes}, ...]
@@ -229,11 +231,12 @@ def get_pdf_attachments(graph_token: str, message_id: str) -> list:
     )
 
     try:
-        response = requests.get(url, headers=headers, timeout=60)
-        response.raise_for_status()
-        attachments = response.json().get("value", [])
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, timeout=60.0)
+            response.raise_for_status()
+            attachments = response.json().get("value", [])
 
-    except requests.exceptions.RequestException as e:
+    except httpx.RequestError as e:
         logger.error(f"❌ Failed to fetch attachments for message {message_id}: {e}")
         return []
 
@@ -279,7 +282,7 @@ def get_pdf_attachments(graph_token: str, message_id: str) -> list:
 # ============================================================
 #  STEP 4 — GET FASTAPI BEARER TOKEN
 # ============================================================
-def get_fastapi_token() -> str:
+async def get_fastapi_token() -> str:
     """
     Logs in to your FastAPI backend using admin credentials.
     Returns a Bearer token for authenticated API calls.
@@ -291,31 +294,32 @@ def get_fastapi_token() -> str:
     }
 
     try:
-        response = requests.post(
-            FASTAPI_LOGIN_URL,
-            json=payload,  # MUST be json=payload
-            timeout=30
-        )
-        response.raise_for_status()
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                FASTAPI_LOGIN_URL,
+                json=payload,  # MUST be json=payload
+                timeout=30.0
+            )
+            response.raise_for_status()
 
-        token = (
-            response.json().get("access_token") or
-            response.json().get("token")
-        )
+            token = (
+                response.json().get("access_token") or
+                response.json().get("token")
+            )
 
-        if not token:
-            raise ValueError(f"No token in login response: {response.json()}")
+            if not token:
+                raise ValueError(f"No token in login response: {response.json()}")
 
-        logger.debug("✅ FastAPI Bearer token obtained successfully.")
-        return token
+            logger.debug("✅ FastAPI Bearer token obtained successfully.")
+            return token
 
-    except requests.exceptions.ConnectionError:
+    except httpx.ConnectError:
         logger.error(f"❌ Cannot connect to FastAPI at {FASTAPI_LOGIN_URL}. Is the server running?")
         raise
-    except requests.exceptions.HTTPError as e:
+    except httpx.HTTPStatusError as e:
         logger.error(f"❌ FastAPI login failed. Status: {e.response.status_code}, Detail: {e.response.text}")
         raise
-    except requests.exceptions.RequestException as e:
+    except httpx.RequestError as e:
         logger.error(f"❌ FastAPI request error: {e}")
         raise
     except ValueError as e:
@@ -326,7 +330,7 @@ def get_fastapi_token() -> str:
 # ============================================================
 #  STEP 5 — UPLOAD PDF TO FASTAPI ENDPOINT
 # ============================================================
-def upload_pdf_to_fastapi(bearer_token: str, pdf_bytes: bytes, filename: str) -> dict:
+async def upload_pdf_to_fastapi(bearer_token: str, pdf_bytes: bytes, filename: str) -> dict:
     """
     POSTs the PDF (from memory) to /api/upload-luboil-report/.
     Returns the API response as a dict.
@@ -336,39 +340,40 @@ def upload_pdf_to_fastapi(bearer_token: str, pdf_bytes: bytes, filename: str) ->
     """
     headers = {
         "Authorization": f"Bearer {bearer_token}"
-        # Note: Do NOT set Content-Type manually — requests sets it
+        # Note: Do NOT set Content-Type manually — httpx sets it
         # automatically with the correct boundary for multipart
     }
 
-    # Wrap bytes in a file-like object so requests can stream it
+    # Wrap bytes in a tuple for httpx multipart/form-data format
     files = {
-        "file": (filename, io.BytesIO(pdf_bytes), "application/pdf")
+        "file": (filename, pdf_bytes, "application/pdf")
     }
 
     try:
-        response = requests.post(
-            FASTAPI_UPLOAD_URL,
-            headers=headers,
-            files=files,
-            timeout=120  # 2 minutes — PDFs can be large
-        )
-        response.raise_for_status()
-        result = response.json()
-        return result
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                FASTAPI_UPLOAD_URL,
+                headers=headers,
+                files=files,
+                timeout=120.0  # 2 minutes — PDFs can be large
+            )
+            response.raise_for_status()
+            result = response.json()
+            return result
 
-    except requests.exceptions.ConnectionError:
+    except httpx.ConnectError:
         logger.error(f"❌ Cannot connect to FastAPI upload endpoint at {FASTAPI_UPLOAD_URL}")
         raise
-    except requests.exceptions.Timeout:
+    except httpx.TimeoutException:
         logger.error(f"❌ Upload timed out for '{filename}' after 120 seconds")
         raise
-    except requests.exceptions.HTTPError as e:
+    except httpx.HTTPStatusError as e:
         logger.error(
             f"❌ Upload HTTP error for '{filename}': "
             f"{e.response.status_code} — {e.response.text[:300]}"
         )
         raise
-    except requests.exceptions.RequestException as e:
+    except httpx.RequestError as e:
         logger.error(f"❌ Upload failed for '{filename}': {e}")
         raise
 
@@ -376,27 +381,28 @@ def upload_pdf_to_fastapi(bearer_token: str, pdf_bytes: bytes, filename: str) ->
 # ============================================================
 #  STEP 6 — MARK EMAIL AS READ
 # ============================================================
-# def mark_email_as_read(graph_token: str, message_id: str) -> bool:
-    
+# async def mark_email_as_read(graph_token: str, message_id: str) -> bool:
+#     
 #     headers = {
 #         "Authorization": f"Bearer {graph_token}",
 #         "Content-Type":  "application/json"
 #     }
-
+# 
 #     url = (
 #         f"https://graph.microsoft.com/v1.0/users/{MAILBOX_EMAIL}"
 #         f"/messages/{message_id}"
 #     )
-
+# 
 #     payload = {"isRead": True}
-
+# 
 #     try:
-#         response = requests.patch(url, headers=headers, json=payload, timeout=30)
-#         response.raise_for_status()
-#         logger.info(f"✅ Email marked as READ. (ID: ...{message_id[-12:]})")
-#         return True
-
-#     except requests.exceptions.RequestException as e:
+#         async with httpx.AsyncClient() as client:
+#             response = await client.patch(url, headers=headers, json=payload, timeout=30.0)
+#             response.raise_for_status()
+#             logger.info(f"✅ Email marked as READ. (ID: ...{message_id[-12:]})")
+#             return True
+# 
+#     except httpx.RequestError as e:
 #         logger.error(f"❌ Failed to mark email as read: {e}")
 #         return False
 
@@ -404,7 +410,7 @@ def upload_pdf_to_fastapi(bearer_token: str, pdf_bytes: bytes, filename: str) ->
 # ============================================================
 #  MAIN JOB — Processes emails from the last 24 hours
 # ============================================================
-def run_luboil_email_upload_job():
+async def run_luboil_email_upload_job():
     run_start = datetime.now()
     logger.info("=" * 60)
     logger.info(f"🚀 LUBOIL AUTO-UPLOAD JOB STARTED — {run_start.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -420,11 +426,11 @@ def run_luboil_email_upload_job():
     try:
         # ── STEP 1: Get Microsoft Graph token ──────────────────
         logger.info("🔐 STEP 1: Authenticating with Microsoft Graph API...")
-        graph_token = get_graph_token()
+        graph_token = await get_graph_token()
 
         # ── STEP 2: Find matching emails (Last 24 Hours) ────────
         logger.info("📬 STEP 2: Scanning inbox for LubeAnalyst emails (Last 24 hours)...")
-        matched_emails = fetch_recent_luboil_emails(graph_token)
+        matched_emails = await fetch_recent_luboil_emails(graph_token)
         emails_found = len(matched_emails)
 
         if not matched_emails:
@@ -434,7 +440,7 @@ def run_luboil_email_upload_job():
 
         # ── STEP 3: Get FastAPI Bearer token ────────────────────
         logger.info("🔑 STEP 3: Logging in to FastAPI backend...")
-        bearer_token = get_fastapi_token()
+        bearer_token = await get_fastapi_token()
 
         # ── STEP 4: Process each email ──────────────────────────
         for idx, email_msg in enumerate(matched_emails, start=1):
@@ -447,7 +453,7 @@ def run_luboil_email_upload_job():
             logger.info(f"   Received : {email_received}")
 
             # Get PDF attachments (in memory)
-            pdf_list = get_pdf_attachments(graph_token, email_id)
+            pdf_list = await get_pdf_attachments(graph_token, email_id)
 
             if not pdf_list:
                 logger.warning(f"⚠️  Email has no PDF attachments. Skipping. Subject: '{email_subject}'")
@@ -464,7 +470,7 @@ def run_luboil_email_upload_job():
                 logger.info(f"📤 Uploading: '{filename}' ({size_kb} KB) → {FASTAPI_UPLOAD_URL}")
 
                 try:
-                    result = upload_pdf_to_fastapi(bearer_token, pdf_bytes, filename)
+                    result = await upload_pdf_to_fastapi(bearer_token, pdf_bytes, filename)
 
                     is_duplicate  = result.get("is_duplicate", False)
                     vessel        = result.get("vessel", "Unknown")
@@ -513,27 +519,40 @@ def run_luboil_email_upload_job():
 # ============================================================
 #  SCHEDULER — Runs job twice a day at 08:00 and 17:00
 # ============================================================
-def start_scheduler():
+async def start_async_email_scheduler():
     logger.info("=" * 60)
-    logger.info("  LUBOIL AUTO-UPLOAD SCHEDULER STARTED")
+    logger.info("  ASYNC LUBOIL AUTO-UPLOAD SCHEDULER STARTED")
     logger.info("  Scheduled run times: 08:00 AM and 05:00 PM (17:00) daily")
     logger.info(f"  Watching mailbox   : {MAILBOX_EMAIL}")
-    logger.info(f"  FastAPI backend    : {FASTAPI_BASE_URL}")
+    logger.info(f"  FastAPI backend    : {FASTAPI_UPLOAD_BASE}")
     logger.info("=" * 60)
-
-    # Schedule the job twice a day
-    schedule.every().day.at("08:00").do(run_luboil_email_upload_job)
-    schedule.every().day.at("17:00").do(run_luboil_email_upload_job)
 
     # Optional: Also run immediately on startup
     logger.info("▶️  Running immediate check on startup...")
-    run_luboil_email_upload_job()
+    await run_luboil_email_upload_job()
 
-    # Keep the scheduler alive
-    logger.info(f"\n⏰ Scheduler active. Waiting for next scheduled time. Press Ctrl+C to stop.\n")
+    last_run_time = None
+
+    # Keep the scheduler alive asynchronously
+    logger.info(f"\n⏰ Scheduler active. Waiting for next scheduled time.\n")
     while True:
-        schedule.run_pending()
-        time.sleep(60)  # Check every 60 seconds
+        try:
+            # Check the current time
+            now_str = datetime.now().strftime("%H:%M")
+            
+            if now_str in ["08:00", "16:00"] and last_run_time != now_str:
+                await run_luboil_email_upload_job()
+                last_run_time = now_str  # Mark as run so it doesn't run repeatedly this minute
+            
+            # Reset the flag when the minute passes
+            if now_str not in ["08:00", "16:00"]:
+                last_run_time = None
+
+        except Exception as e:
+            logger.error(f"Scheduler loop error prevented crash: {e}")
+
+        # Sleep asynchronously for 60 seconds (does NOT block FastAPI)
+        await asyncio.sleep(60)
 
 
 # ============================================================
@@ -548,6 +567,6 @@ if __name__ == "__main__":
 
     if "--once" in sys.argv:
         logger.info("🔄 Running single one-time check (--once mode)...")
-        run_luboil_email_upload_job()
+        asyncio.run(run_luboil_email_upload_job())
     else:
-        start_scheduler()
+        asyncio.run(start_async_email_scheduler())

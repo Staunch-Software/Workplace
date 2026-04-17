@@ -11,6 +11,10 @@ __pycache__
 # Environment files
 .env
 .json
+
+*.log
+
+
 # OS
 .DS_Store
 Thumbs.db

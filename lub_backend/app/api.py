@@ -200,6 +200,11 @@ async def startup_event():
         from app.services.sync_worker import start_background_sync
         asyncio.create_task(start_background_sync())
         logger.info("Sync worker started (vessel instance).")
+
+    from app.luboil_email_auto_upload import start_async_email_scheduler
+    asyncio.create_task(start_async_email_scheduler())
+    logger.info("Email Auto-Upload Scheduler started in background.")
+
     # try:
     #     create_all_tables()
     #     logger.info("Database tables checked/created successfully.")
@@ -215,6 +220,33 @@ async def startup_event():
     #         db.close()
     # except Exception as e:
     #     logger.error(f"Failed to initialize database on startup: {e}", exc_info=True)
+
+
+@app.post("/api/admin/trigger-email-sync", tags=["Admin", "Lube Oil"])
+async def trigger_manual_email_sync(
+    # current_user: Any = Depends(auth.get_current_user) # Uncomment if you want to restrict to logged-in users
+):
+    """
+    Manually forces the backend to check the Outlook inbox for LubeAnalyst emails 
+    from the last 24 hours and process them immediately, without waiting for the schedule.
+    """
+    import asyncio
+    from app.luboil_email_auto_upload import run_luboil_email_upload_job
+
+    try:
+        logger.info("Manual Email Sync triggered via API.")
+        
+        # We use create_task so the API returns immediately ("Sync started") 
+        # while the actual download/upload happens in the background.
+        asyncio.create_task(run_luboil_email_upload_job())
+        
+        return {
+            "status": "success", 
+            "message": "Email sync job started in the background. Check logs for progress."
+        }
+    except Exception as e:
+        logger.error(f"Failed to trigger email sync: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================
