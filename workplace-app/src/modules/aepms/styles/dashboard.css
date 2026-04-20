@@ -362,6 +362,7 @@
     max-height: 400px;
     overflow-y: auto;
     overflow-x: auto;
+    width: 100%;
 }
 
 .vessel-table-wrapper::-webkit-scrollbar {
@@ -694,8 +695,12 @@ select.enhanced-select:disabled {
 .ae-generator {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    transition: all 0.2s ease-in-out;
+    justify-content: center;
+    gap: 10px;
+    flex: 1;                  /* ADD THIS — equal space for each */
+    min-width: 300px;         /* ADD THIS — prevent over-stretching */
+    padding: 8px 16px;
+    box-sizing: border-box;
 }
 
 .ae-generator div {
@@ -1221,6 +1226,8 @@ select.enhanced-select:disabled {
     border-radius: 1rem;
     box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
     animation: fadeInUp 0.5s ease;
+    width: 100%;
+    box-sizing: border-box;
 }
 /* .card-header-enhanced {
     display: flex;
@@ -1312,6 +1319,8 @@ select.enhanced-select:disabled {
 
 .card-content-enhanced {
     padding: 1.5rem;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* ========================================

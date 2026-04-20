@@ -2514,8 +2514,9 @@ export default function Performance({
       baselineSource === "upload" ||
       !shipId ||
       !fleet.length
-    )
-      return;
+    ) return;
+
+    if (displayedReportIds.length > 0) return;  // ADD THIS LINE ONLY
 
     const ship = fleet.find((s) => s.id === shipId);
     if (!ship) return;
@@ -2560,7 +2561,7 @@ export default function Performance({
         console.error("Failed to load auxiliary baseline:", error);
       })
       .finally(() => setLoading(false));
-  }, [selectedGeneratorId, shipId, fleet, baselineSource, analysisMode]);
+  }, [selectedGeneratorId, shipId, fleet, baselineSource, analysisMode, displayedReportIds]);
   // 🔥 NEW FUNCTION: Fetch last report dates
   // --- REPLACE YOUR EXISTING fetchLastReportDates FUNCTION WITH THIS ---
 
@@ -3375,7 +3376,9 @@ export default function Performance({
     setDownloadGenId(null); // Clear selected generator
     setDownloadableReports([]); // Clear the dropdown list momentarily
     // -------------------------
-    if (onShipChange) onShipChange(newShipId);
+    const selectedShip = fleet.find(s => String(s.id) === String(newShipId));
+    const imoToPass = selectedShip ? (selectedShip.imo || selectedShip.imo_number) : newShipId;
+    if (onShipChange) onShipChange(imoToPass);
   };
 
   const handleModeChange = (value) => {

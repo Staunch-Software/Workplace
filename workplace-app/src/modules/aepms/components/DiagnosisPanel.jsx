@@ -1121,10 +1121,10 @@ const SFOCInsightCard = ({ findings, report, baseline, analysisMode }) => {
   if (sfocFinding.finding?.includes("exhaust temperatures")) rootCausesFound.push("Late Combustion");
 
   const savingsMetrics = [
-    { label: "Extra Fuel / Day",   value: extraFuelPerDay   != null ? `${extraFuelPerDay.toFixed(2)} t`   : "N/A", sub: "vs shop trial baseline",          icon: "⛽", color: accentColor },
-    { label: "Extra Fuel / Month", value: extraFuelPerMonth != null ? `${extraFuelPerMonth.toFixed(1)} t` : "N/A", sub: "recoverable if SFOC restored",     icon: "📦", color: accentColor },
-    { label: "Cost Impact / Month",value: costPerMonth      != null ? `$${costPerMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "N/A", sub: `@ $${bunkerPrice}/tonne bunker`, icon: "💰", color: isRed ? "#f87171" : "#fcd34d" },
-    { label: "CO₂ Excess / Month", value: co2PerMonth       != null ? `${co2PerMonth.toFixed(1)} t`       : "N/A", sub: "HFO emission factor 3.114",         icon: "🌿", color: "#86efac" },
+    { label: "Extra Fuel / Day",   value: extraFuelPerDay   != null ? `${extraFuelPerDay.toFixed(2)} t`   : "N/A", sub: "vs shop trial baseline",          icon: "", color: accentColor },
+    { label: "Extra Fuel / Month", value: extraFuelPerMonth != null ? `${extraFuelPerMonth.toFixed(1)} t` : "N/A", sub: "recoverable if SFOC restored",     icon: "", color: accentColor },
+    { label: "Cost Impact / Month",value: costPerMonth      != null ? `$${costPerMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "N/A", sub: `@ $${bunkerPrice}/tonne bunker`, icon: "", color: isRed ? "#f87171" : "#fcd34d" },
+    { label: "CO₂ Excess / Month", value: co2PerMonth       != null ? `${co2PerMonth.toFixed(1)} t`       : "N/A", sub: "HFO emission factor 3.114",         icon: "", color: "#86efac" },
   ];
 
   return (
@@ -1134,7 +1134,7 @@ const SFOCInsightCard = ({ findings, report, baseline, analysisMode }) => {
         style={{ backgroundColor: headerBg, borderBottom: isExpanded ? `1.5px solid ${borderColor}` : "none", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }}
       >
         <h3 style={{ margin: 0, color: "#fff7ed", fontWeight: "800", fontSize: "1rem", display: "flex", alignItems: "center", gap: "10px" }}>
-          ⚡ SFOC Analysis & Savings Impact
+           SFOC Analysis & Savings Impact
           <span style={{ backgroundColor: `${badgeColor}22`, color: badgeColor, fontSize: "0.7rem", fontWeight: "700", padding: "2px 10px", borderRadius: "20px", border: `1px solid ${badgeColor}55` }}>
             {sfocDev != null ? `+${sfocDev.toFixed(1)}% from baseline` : "Elevated"}
           </span>

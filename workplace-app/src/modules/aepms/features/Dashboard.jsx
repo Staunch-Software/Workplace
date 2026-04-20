@@ -50,7 +50,8 @@ const AeVesselRow = ({ vessel, onViewPdf, onViewData }) => {
                 {vessel.imo || vessel.imo_number}
             </td>
             <td className="py-2 pr-6" colSpan="2">
-                <div className="flex flex-col justify-evenly">
+                {/* w-full stretches the div. justify-around spreads them out. gap-8 forces space between them */}
+                <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly', width: '100%', padding: '0 24px' }}>
                     {generators.map((gen) => (
                         <div key={gen.generator_id} className="ae-generator">
                             <div>
@@ -441,7 +442,7 @@ export default function Dashboard() {
             <div className="table-card-body">
                 <div className="vessel-table-wrapper">
                     <table className="vessel-table-enhanced">
-                        <thead><tr><th>Vessel Name</th><th>IMO Number</th><th>Status</th></tr></thead>
+                        <thead><tr><th>Vessel Name</th><th>IMO Number</th><th style={{textAlign: 'center'}}>Status</th></tr></thead>
                         <tbody>
                             {list.length === 0 ? (<tr><td colSpan="3" className="all-configured-cell"><div className="success-message">All vessels configured!</div></td></tr>) : (
                                 list.map((ship) => (<tr key={ship.id}><td className="vessel-name-cell">{formatVesselName(ship.name)}</td><td className="imo-cell">{ship.imo}</td><td><span className="status-badge status-error">Not Configured</span></td></tr>))

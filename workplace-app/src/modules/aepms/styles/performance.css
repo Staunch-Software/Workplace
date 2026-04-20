@@ -23,14 +23,14 @@
 }
 
 .performance-title {
-  font-size: 24px;
+  font-size: clamp(16px, 2vw, 24px);
   font-weight: 600;
   margin: 0 0 4px 0;
   color: var(--foreground);
 }
 
 .performance-subtitle {
-  font-size: 14px;
+  font-size: clamp(11px, 1.2vw, 14px);
   color: var(--muted-foreground);
   margin: 0 0 8px 0;
 }
@@ -42,7 +42,7 @@
   padding: 4px 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: clamp(10px, 1vw, 12px);
 }
 
 .deviation-label {
@@ -127,7 +127,7 @@
   padding: 8px 12px;
   background: rgba(248, 250, 252, 0.8);
   border-radius: 4px;
-  font-size: 12px;
+  font-size: clamp(10px, 1vw, 12px);
   margin-top: 8px;
   border: 1px solid #e5e7eb;
 }
@@ -165,7 +165,7 @@
   border-radius: 6px;
   padding: 8px 12px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  font-size: 12px;
+  font-size: clamp(10px, 1vw, 12px);
 }
 
 .tooltip-label {
@@ -227,7 +227,7 @@
 }
 
 .chart-title {
-  font-size: 16px;
+  font-size: clamp(12px, 1.4vw, 16px);
   font-weight: 600;
 }
 
@@ -349,7 +349,7 @@
 }
 
 .ship-info {
-  font-size: 14px;
+  font-size: clamp(11px, 1.2vw, 14px);
   color: var(--muted-foreground);
 }
 
@@ -371,14 +371,14 @@
 
 .awaiting-upload {
   color: var(--muted-foreground);
-  font-size: 14px;
+  font-size: clamp(11px, 1.2vw, 14px);
 }
 
 .deviation-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  font-size: 14px;
+  font-size: clamp(11px, 1.2vw, 14px);
 }
 
 .deviation-row {
@@ -433,7 +433,7 @@
   padding: 4px 8px;
   background-color: rgba(202, 138, 4, 0.1);
   border-radius: 4px;
-  font-size: 0.875rem;
+  font-size: clamp(0.72rem, 0.9vw, 0.875rem);
 }
 
 .month-label {
@@ -450,7 +450,7 @@
   text-align: center;
   font-style: italic;
   color: #6b7280;
-  font-size: 0.8rem;
+  font-size: clamp(0.65rem, 0.85vw, 0.8rem);
   padding: 4px;
 }
 
@@ -459,6 +459,7 @@
   color: #6b7280;
   font-style: italic;
   padding: 12px;
+  font-size: clamp(0.65rem, 0.85vw, 0.8rem)
 }
 
 /* Loading state indicator */
@@ -524,7 +525,7 @@
   .chevron-icon {
     display: inline-block;
     transition: transform 0.3s ease; /* Smooth rotation */
-    font-size: 0.8rem;
+    font-size: clamp(0.65rem, 0.85vw, 0.8rem);
     color: #64748b;
   }
 
@@ -539,7 +540,7 @@
   .chevron-icon {
     display: inline-block;
     transition: transform 0.3s ease;
-    font-size: 0.7rem; /* Adjusted for smaller dropdowns */
+    font-size: clamp(0.58rem, 0.75vw, 0.7rem); /* Adjusted for smaller dropdowns */
     color: #64748b;
     margin-left: 8px;
   }

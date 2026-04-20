@@ -801,7 +801,7 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
   
    useEffect(() => {
   if (consoleShipId) {
-    const vessel = daysElapsedData.find(v => String(v.id || v.imo_number) === String(consoleShipId));
+    const vessel = daysElapsedData.find(v => String(v.imo_number) === String(consoleShipId));
     if (vessel) {
       // Automatically set the multi-select filter to this vessel
       setSelectedDaysVesselsFilter([vessel]);
@@ -1715,7 +1715,7 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
                       </div>
                     </div>
 
-                    <div className="vessel-dropdown-scroll">
+                    <div className="vessel-dropdown-scroll" style={{ maxHeight: "144px", overflowY: "auto" }}>
                       {propellerTrendData.map((vessel) => (
                         <div
                           key={vessel.imo_number}
@@ -2042,11 +2042,13 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
               setUnifiedEngineType(type);
               // CHANGE 1: This closes the history table when switching ME <-> AE
               setSelectedVesselDetails(null); 
+              setSelectedDaysVesselsFilter([]); 
             }}
             onShipChange={(id) => {
               setConsoleShipId(id);
               // CHANGE 2: This closes the table if you change to a different vessel
               setSelectedVesselDetails(null); 
+              setSelectedDaysVesselsFilter([]);
             }}
           />
         </div>

@@ -785,7 +785,7 @@
     padding: 14px 32px;
     gap: 20px;
     justify-content: space-between;
-    max-width: 1400px;
+    /* max-width: 1400px; */
     margin: 0 auto;
   }
 
@@ -855,7 +855,7 @@
     padding: 18px 48px;
     gap: 24px;
     justify-content: space-between;
-    max-width: 1600px;
+    /* max-width: 1600px; */
     margin: 0 auto;
   }
 
@@ -1292,22 +1292,4 @@
     transform: translateY(0);
   }
 }
-@media (max-width: 374px) {
-  body, main, .main-content {
-    padding-top: 48px; /* Small screens */
-  }
-}
 
-@media (min-width: 375px) and (max-width: 767px) {
-  body, main, .main-content {
-    padding-top: 52px; /* Tablets */
-  }
-}
-
-@media (min-width: 768px) {
-  .app-header ~ main,
-  .app-header ~ .main-content,
-  .app-header + * {
-    padding-top: 30px;
-  }
-}
