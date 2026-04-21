@@ -2315,6 +2315,348 @@ async def vessel_overdue_workflow(
     await db.commit()
     return {"message": "Vessel overdue workflow updated successfully."}
 
+
+# ============================================================
+# ADD THESE ENDPOINTS TO YOUR app/api.py
+# Place them after your existing imports / before __main__
+# ============================================================
+
+# ─── request schemas ──────────────────────────────────────────────────────
+
+class VesselCreateRequest(BaseModel):
+    imo_number: int
+    vessel_name: str
+    is_active: bool = True
+
+class VesselUpdateRequest(BaseModel):
+    vessel_name: str
+    is_active: bool = True
+
+class EquipmentCreateRequest(BaseModel):
+    code: str
+    ui_label: str
+    category: Optional[str] = None
+    default_interval_months: int = 3
+    sort_order: int = 0
+
+class EquipmentUpdateRequest(BaseModel):
+    ui_label: str
+    category: Optional[str] = None
+    default_interval_months: int = 3
+    sort_order: int = 0
+
+class VesselConfigUpsertRequest(BaseModel):
+    imo_number: str
+    equipment_code: str
+    is_active: bool = True
+    lab_analyst_code: Optional[str] = None
+
+
+# ─── helper: shore/admin gate ─────────────────────────────────────────────
+
+def require_admin(current_user: dict):
+    """Raise 403 if user is not a shore/admin role."""
+    if isinstance(current_user, dict):
+        role = str(current_user.get("role") or "").upper()
+    else:
+        role = str(getattr(current_user, "role", "") or "").upper()
+    if role not in ("ADMIN", "SUPERUSER", "SHORE", "SUPERINTENDENT"):
+        raise HTTPException(status_code=403, detail="Admin access required.")
+
+
+# ════════════════════════════════════════════════════════════════
+# VESSEL CRUD
+# ════════════════════════════════════════════════════════════════
+
+@app.get("/api/config/vessels", tags=["Config"])
+async def list_config_vessels(
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user),
+):
+    """Returns vessels that have at least one entry in LuboilVesselConfig."""
+    require_admin(current_user)
+ 
+    # Get IMOs that have configs
+    res = await db.execute(
+        sa_select(LuboilVesselConfig.imo_number).distinct()
+    )
+    configured_imos = {row[0] for row in res.all()}  # set of strings
+ 
+    from app.models.control.vessel import Vessel as ControlVessel
+    control_db = SessionControl()
+    try:
+        vessels = control_db.query(ControlVessel).order_by(ControlVessel.name).all()
+    finally:
+        control_db.close()
+ 
+    return [
+        {
+            "imo_number": v.imo,
+            "vessel_name": v.name,
+            "is_active": True,
+        }
+        for v in vessels
+        if str(v.imo) in configured_imos
+    ]
+
+@app.get("/api/config/vessels/unconfigured", tags=["Config"])
+async def list_unconfigured_vessels(
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user),
+):
+    """Returns vessels from control DB that have NO entries in LuboilVesselConfig."""
+    require_admin(current_user)
+ 
+    # Get IMOs that already have configs
+    res = await db.execute(
+        sa_select(LuboilVesselConfig.imo_number).distinct()
+    )
+    configured_imos = {row[0] for row in res.all()}
+ 
+    from app.models.control.vessel import Vessel as ControlVessel
+    control_db = SessionControl()
+    try:
+        vessels = control_db.query(ControlVessel).order_by(ControlVessel.name).all()
+    finally:
+        control_db.close()
+ 
+    return [
+        {
+            "imo_number": v.imo,
+            "vessel_name": v.name,
+            "is_active": True,
+        }
+        for v in vessels
+        if str(v.imo) not in configured_imos
+    ]
+
+
+@app.post("/api/config/vessels", tags=["Config"], status_code=201)
+async def create_config_vessel(
+    payload: VesselCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user),
+):
+    require_admin(current_user)
+    # Check duplicate
+    res = await db.execute(
+        sa_select(LuboilVessel).where(LuboilVessel.imo_number == payload.imo_number)
+    )
+    if res.scalars().first():
+        raise HTTPException(status_code=409, detail="Vessel with this IMO already exists.")
+    db.add(LuboilVessel(
+        imo_number=payload.imo_number,
+        vessel_name=payload.vessel_name,
+        is_active=payload.is_active,
+    ))
+    await db.commit()
+    return {"message": "Vessel registered", "imo_number": payload.imo_number}
+
+
+@app.put("/api/config/vessels/{imo_number}", tags=["Config"])
+async def update_config_vessel(
+    imo_number: int,
+    payload: VesselUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user),
+):
+    require_admin(current_user)
+    res = await db.execute(
+        sa_select(LuboilVessel).where(LuboilVessel.imo_number == imo_number)
+    )
+    vessel = res.scalars().first()
+    if not vessel:
+        raise HTTPException(status_code=404, detail="Vessel not found.")
+    vessel.vessel_name = payload.vessel_name
+    vessel.is_active = payload.is_active
+    await db.commit()
+    return {"message": "Vessel updated"}
+
+
+@app.delete("/api/config/vessels/{imo_number}", tags=["Config"])
+async def delete_config_vessel(
+    imo_number: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user),
+):
+    require_admin(current_user)
+    res = await db.execute(
+        sa_select(LuboilVessel).where(LuboilVessel.imo_number == imo_number)
+    )
+    vessel = res.scalars().first()
+    if not vessel:
+        raise HTTPException(status_code=404, detail="Vessel not found.")
+
+    # Also remove all configs for this vessel
+    from sqlalchemy import delete as sa_delete
+    await db.execute(
+        sa_delete(LuboilVesselConfig).where(
+            LuboilVesselConfig.imo_number == str(imo_number)
+        )
+    )
+    await db.delete(vessel)
+    await db.commit()
+    return {"message": "Vessel and its configs deleted"}
+
+
+# ════════════════════════════════════════════════════════════════
+# EQUIPMENT TYPE CRUD
+# ════════════════════════════════════════════════════════════════
+
+@app.get("/api/config/equipment", tags=["Config"])
+async def list_config_equipment(
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user),
+):
+    require_admin(current_user)
+    res = await db.execute(
+        sa_select(LuboilEquipmentType).order_by(
+            LuboilEquipmentType.category,
+            LuboilEquipmentType.sort_order,
+        )
+    )
+    items = res.scalars().all()
+    return [
+        {
+            "code": e.code,
+            "ui_label": e.ui_label,
+            "category": e.category,
+            "default_interval_months": e.default_interval_months,
+            "sort_order": e.sort_order,
+        }
+        for e in items
+    ]
+
+
+@app.post("/api/config/equipment", tags=["Config"], status_code=201)
+async def create_config_equipment(
+    payload: EquipmentCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user),
+):
+    require_admin(current_user)
+    res = await db.execute(
+        sa_select(LuboilEquipmentType).where(LuboilEquipmentType.code == payload.code)
+    )
+    if res.scalars().first():
+        raise HTTPException(status_code=409, detail="Equipment code already exists.")
+    db.add(LuboilEquipmentType(
+        code=payload.code,
+        ui_label=payload.ui_label,
+        category=payload.category,
+        default_interval_months=payload.default_interval_months,
+        sort_order=payload.sort_order,
+    ))
+    await db.commit()
+    return {"message": "Equipment added", "code": payload.code}
+
+
+@app.put("/api/config/equipment/{code}", tags=["Config"])
+async def update_config_equipment(
+    code: str,
+    payload: EquipmentUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user),
+):
+    require_admin(current_user)
+    res = await db.execute(
+        sa_select(LuboilEquipmentType).where(LuboilEquipmentType.code == code)
+    )
+    eq = res.scalars().first()
+    if not eq:
+        raise HTTPException(status_code=404, detail="Equipment not found.")
+    eq.ui_label = payload.ui_label
+    eq.category = payload.category
+    eq.default_interval_months = payload.default_interval_months
+    eq.sort_order = payload.sort_order
+    await db.commit()
+    return {"message": "Equipment updated"}
+
+
+@app.delete("/api/config/equipment/{code}", tags=["Config"])
+async def delete_config_equipment(
+    code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user),
+):
+    require_admin(current_user)
+    res = await db.execute(
+        sa_select(LuboilEquipmentType).where(LuboilEquipmentType.code == code)
+    )
+    eq = res.scalars().first()
+    if not eq:
+        raise HTTPException(status_code=404, detail="Equipment not found.")
+
+    # Also remove vessel configs using this code
+    from sqlalchemy import delete as sa_delete
+    await db.execute(
+        sa_delete(LuboilVesselConfig).where(LuboilVesselConfig.equipment_code == code)
+    )
+    await db.delete(eq)
+    await db.commit()
+    return {"message": "Equipment and its configs deleted"}
+
+
+# ════════════════════════════════════════════════════════════════
+# VESSEL-EQUIPMENT CONFIG (MAPPING)
+# ════════════════════════════════════════════════════════════════
+
+@app.get("/api/config/vessel-configs", tags=["Config"])
+async def list_vessel_configs(
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user),
+):
+    """Returns ALL vessel-equipment configs (active + inactive)."""
+    require_admin(current_user)
+    res = await db.execute(sa_select(LuboilVesselConfig))
+    configs = res.scalars().all()
+    return [
+        {
+            "imo_number": c.imo_number,
+            "equipment_code": c.equipment_code,
+            "is_active": c.is_active,
+            "lab_analyst_code": c.lab_analyst_code,
+        }
+        for c in configs
+    ]
+
+
+@app.post("/api/config/vessel-configs", tags=["Config"])
+async def upsert_vessel_config(
+    payload: VesselConfigUpsertRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user),
+):
+    """
+    Upsert a single vessel-equipment config row.
+    Creates it if it doesn't exist; updates if it does.
+    """
+    require_admin(current_user)
+
+    res = await db.execute(
+        sa_select(LuboilVesselConfig).where(
+            LuboilVesselConfig.imo_number == payload.imo_number,
+            LuboilVesselConfig.equipment_code == payload.equipment_code,
+        )
+    )
+    cfg = res.scalars().first()
+
+    if cfg:
+        cfg.is_active = payload.is_active
+        cfg.lab_analyst_code = payload.lab_analyst_code
+    else:
+        db.add(LuboilVesselConfig(
+            imo_number=payload.imo_number,
+            equipment_code=payload.equipment_code,
+            is_active=payload.is_active,
+            lab_analyst_code=payload.lab_analyst_code,
+        ))
+
+    await db.commit()
+    return {"message": "Config saved", "imo_number": payload.imo_number, "equipment_code": payload.equipment_code}
+
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.api:app", host="0.0.0.0", port=8002, reload=True)

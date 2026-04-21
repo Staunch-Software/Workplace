@@ -1,0 +1,471 @@
+/**
+ * VesselConfigPage.responsive.css
+ *
+ * Responsive / media-query overrides for VesselConfigPage.jsx
+ * Import this file inside VesselConfigPage.jsx (or its parent):
+ *
+ *   import "./VesselConfigPage.responsive.css";
+ *
+ * All breakpoints:
+ *   xl   ≥ 1280 px   — large desktops  (baseline; existing inline styles cover this)
+ *   lg   < 1280 px   — small desktops / large tablets (landscape)
+ *   md   < 1024 px   — tablets (portrait) / large phones (landscape)
+ *   sm   < 768  px   — phones (landscape / medium portrait)
+ *   xs   < 480  px   — small phones
+ *
+ * Strategy:
+ *   - Sidebar collapses to a horizontal top-nav strip on md and below
+ *   - Content panel removes its left margin and fills full width
+ *   - Tables switch to a card/stack layout on sm and below
+ *   - Modals go full-screen on xs
+ *   - Typography, spacing and button sizes scale down gracefully
+ */
+
+/* ─────────────────────────────────────────────────────────────
+   CSS custom properties (mirror JS tokens so overrides are
+   consistent even in pure-CSS rules)
+───────────────────────────────────────────────────────────── */
+:root {
+  --lub-bg:           #f0f4f8;
+  --lub-sidebar:      #1e293b;
+  --lub-white:        #ffffff;
+  --lub-accent:       #1e293b;
+  --lub-accentBtn:    #3b82f6;
+  --lub-green:        #10b981;
+  --lub-red:          #ef4444;
+  --lub-amber:        #f59e0b;
+  --lub-text:         #0f172a;
+  --lub-textMid:      #475569;
+  --lub-textLight:    #94a3b8;
+  --lub-border:       #e2e8f0;
+
+  --topbar-h:  56px;
+  --sidebar-w: 300px;
+  --hnav-h:    52px;   /* height of the collapsed horizontal nav on ≤ md */
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LG  — small desktops / wide tablets  (< 1280 px)
+   Sidebar narrows slightly; content padding tightens.
+═══════════════════════════════════════════════════════════════ */
+@media (max-width: 1279px) {
+
+  /* Narrow the sidebar */
+  .lub-sidebar {
+    width: 240px !important;
+  }
+
+  /* Shift content panel to match narrower sidebar */
+  .lub-content-panel {
+    margin-left: 240px !important;
+    padding-left: 18px !important;
+    padding-right: 18px !important;
+  }
+
+  /* Slightly smaller vessel cards */
+  .vessel-card {
+    padding: 14px 16px !important;
+  }
+
+  /* Tighten section header padding */
+  .lub-section-header {
+    padding: 14px 18px 12px !important;
+    margin-left: -18px !important;
+    margin-right: -18px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MD  — tablets portrait / large phones landscape  (< 1024 px)
+   Sidebar becomes a horizontal top-strip below the topbar.
+═══════════════════════════════════════════════════════════════ */
+@media (max-width: 1023px) {
+
+  /* ── Topbar ── */
+  .lub-topbar {
+    padding: 0 16px !important;
+  }
+
+  .lub-topbar-title {
+    font-size: 0.82rem !important;
+  }
+
+  .lub-topbar-subtitle {
+    display: none !important;
+  }
+
+  /* ── Body wrapper: add room for horizontal nav strip ── */
+  .lub-body-wrapper {
+    margin-top: calc(var(--topbar-h) + var(--hnav-h)) !important;
+    height: calc(100vh - var(--topbar-h) - var(--hnav-h)) !important;
+  }
+
+  /* ── Sidebar → horizontal strip ── */
+  .lub-sidebar {
+    width: 100% !important;
+    height: var(--hnav-h) !important;
+    top: var(--topbar-h) !important;
+    left: 0 !important;
+    right: 0 !important;
+    flex-direction: row !important;
+    padding: 0 12px !important;
+    gap: 4px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    align-items: center !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    /* Hide the "Navigation" label */
+  }
+
+  /* Hide the "Navigation" label in horizontal mode */
+  .lub-sidebar > div:first-child {
+    display: none !important;
+  }
+
+  /* Hide sidebar footer summary in horizontal mode */
+  .lub-sidebar-footer {
+    display: none !important;
+  }
+
+  /* Nav buttons — compact pill style in strip */
+  .lub-sidebar .nav-item {
+    flex-direction: row !important;
+    align-items: center !important;
+    padding: 6px 12px !important;
+    border-radius: 8px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Hide the description text inside nav items */
+  .lub-sidebar .nav-item > div > div:last-child {
+    display: none !important;
+  }
+
+  .lub-sidebar .nav-item > div > div:first-child {
+    font-size: 0.78rem !important;
+  }
+
+  /* Active left-bar indicator → bottom bar in strip */
+  .lub-sidebar .nav-item [style*="position: absolute"][style*="left: 0"] {
+    top: auto !important;
+    bottom: 0 !important;
+    left: 20% !important;
+    right: 20% !important;
+    width: auto !important;
+    height: 3px !important;
+    border-radius: "3px 3px 0 0" !important;
+  }
+
+  /* ── Content panel: full width, no left margin ── */
+  .lub-content-panel {
+    margin-left: 0 !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  /* ── Section header ── */
+  .lub-section-header {
+    padding: 12px 16px 10px !important;
+    margin-left: -16px !important;
+    margin-right: -16px !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  /* Shrink section header icon box */
+  .lub-section-header > div:first-child > div:first-child {
+    width: 30px !important;
+    height: 30px !important;
+  }
+
+  /* Search inputs in section header go full width on md */
+  .lub-section-header input[type="text"],
+  .lub-section-header input:not([type]) {
+    width: 100% !important;
+  }
+
+  /* ── Vessel cards: stack info/button vertically when narrow ── */
+  .vessel-card {
+    flex-wrap: wrap !important;
+    gap: 12px !important;
+    padding: 14px !important;
+  }
+
+  .vessel-card > div:last-child {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+  }
+
+  /* ── Mapping grid header bar ── */
+  .lub-mapping-header-bar {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding: 10px 14px !important;
+  }
+
+  .lub-mapping-header-bar input {
+    width: 180px !important;
+  }
+
+  /* ── Equipment modal: full-width at this breakpoint ── */
+  .lub-equip-modal-inner {
+    width: 95vw !important;
+    padding: 20px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SM  — phones landscape / medium portrait  (< 768 px)
+   Tables become scrollable; vessel cards fully stacked.
+═══════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+
+  /* ── Topbar ── */
+  .lub-topbar {
+    padding: 0 12px !important;
+  }
+
+  /* ── Content panel ── */
+  .lub-content-panel {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    padding-bottom: 16px !important;
+  }
+
+  /* ── Section header: icon hidden, title smaller ── */
+  .lub-section-header > div:first-child > div:first-child {
+    display: none !important;
+  }
+
+  .lub-section-header h2 {
+    font-size: 0.95rem !important;
+  }
+
+  .lub-section-header p {
+    font-size: 0.72rem !important;
+  }
+
+  /* ── Vessel cards ── */
+  .vessel-card {
+    padding: 12px !important;
+  }
+
+  /* Vessel name text size */
+  .vessel-card [style*="fontWeight: 700"][style*="fontSize: 0.95rem"] {
+    font-size: 0.88rem !important;
+  }
+
+  /* ── Equipment category accordion ── */
+
+  /* Horizontal scroll wrapper for category tables */
+  .lub-equip-category-table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .lub-equip-category-table-wrap table {
+    min-width: 520px !important;
+  }
+
+  /* ── Mapping grid: make the table horizontally scrollable ── */
+  .lub-mapping-table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .lub-mapping-table-wrap table {
+    min-width: 680px !important;
+  }
+
+  /* ── Back-to-vessels button row ── */
+  .lub-vessel-mapping-header {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  /* ── Mapping footer note ── */
+  .lub-mapping-footer-note {
+    font-size: 0.68rem !important;
+  }
+
+  /* ── Equipment modal ── */
+  .lub-equip-modal-inner {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 16px 16px 0 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    padding: 20px 16px !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+  }
+
+  /* Slide-up animation for bottom-sheet modal */
+  .lub-equip-modal-inner {
+    animation: slideUp 0.25s ease !important;
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(40px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  /* Backdrop aligns to bottom for bottom-sheet */
+  .lub-equip-modal-backdrop {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  /* Form grid in modal: single column */
+  .lub-equip-modal-inner [style*="gridTemplateColumns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Toast: full width at bottom ── */
+  .lub-toast {
+    left: 12px !important;
+    right: 12px !important;
+    bottom: 16px !important;
+    max-width: unset !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   XS  — small phones  (< 480 px)
+   Maximum compression; ensure nothing overflows.
+═══════════════════════════════════════════════════════════════ */
+@media (max-width: 479px) {
+
+  /* ── Topbar: hide "Back" text label, keep chevron ── */
+  .lub-topbar-back-label {
+    display: none !important;
+  }
+
+  /* ── Nav pills: icon only ── */
+  .lub-sidebar .nav-item > div {
+    display: none !important;
+  }
+
+  .lub-sidebar .nav-item {
+    padding: 6px 10px !important;
+  }
+
+  /* Badge count in nav: hide on xs to save space */
+  .lub-sidebar .nav-item > span:last-child {
+    display: none !important;
+  }
+
+  /* ── Section header: actions (search) go below title ── */
+  .lub-section-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  .lub-section-header > div:last-child {
+    width: 100% !important;
+  }
+
+  .lub-section-header input {
+    width: 100% !important;
+  }
+
+  /* ── Vessel card: tighten ── */
+  .vessel-card {
+    padding: 10px !important;
+    gap: 8px !important;
+  }
+
+  /* Vessel icon box */
+  .vessel-card > div:first-child > div:first-child {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Action buttons on vessel cards — full width */
+  .vessel-card .action-btn {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 8px 12px !important;
+  }
+
+  /* ── Mapping grid header bar ── */
+  .lub-mapping-header-bar {
+    padding: 8px 10px !important;
+  }
+
+  .lub-mapping-header-bar input {
+    width: 100% !important;
+  }
+
+  /* ── Mapping table: bump min-width so columns don't crush ── */
+  .lub-mapping-table-wrap table {
+    min-width: 600px !important;
+  }
+
+  /* ── Equipment category table ── */
+  .lub-equip-category-table-wrap table {
+    min-width: 440px !important;
+  }
+
+  /* ── Toast ── */
+  .lub-toast {
+    font-size: 0.78rem !important;
+    padding: 10px 14px !important;
+  }
+
+  /* ── Empty-state icon: smaller on xs ── */
+  .lub-empty-state svg {
+    width: 30px !important;
+    height: 30px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILITY: scrollbar polish for horizontal scrollable tables
+═══════════════════════════════════════════════════════════════ */
+.lub-equip-category-table-wrap::-webkit-scrollbar,
+.lub-mapping-table-wrap::-webkit-scrollbar {
+  height: 4px;
+}
+
+.lub-equip-category-table-wrap::-webkit-scrollbar-thumb,
+.lub-mapping-table-wrap::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PRINT: hide sidebar & topbar; show full table
+═══════════════════════════════════════════════════════════════ */
+@media print {
+  .lub-topbar,
+  .lub-sidebar {
+    display: none !important;
+  }
+
+  .lub-content-panel {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+
+  .lub-body-wrapper {
+    margin-top: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .lub-mapping-table-wrap,
+  .lub-equip-category-table-wrap {
+    overflow: visible !important;
+  }
+
+  .lub-mapping-table-wrap table,
+  .lub-equip-category-table-wrap table {
+    min-width: unset !important;
+  }
+}

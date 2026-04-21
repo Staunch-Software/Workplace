@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Bell,
   Plus,
@@ -6,37 +7,40 @@ import {
   Activity,
   ChevronDown,
   X,
-  ChevronLeft
+  ChevronLeft,
+  Settings2, // NEW
 } from "lucide-react";
-import '../styles/luboil.css'
+import "../styles/luboil.css";
 
 const OzellarHeader = ({
   unreadCount = 0,
   notifications = [],
   showNotifDropdown = false,
   notifRef = null,
-  onBellClick = () => { },
-  onNotifClick = () => { },
-  onHideNotification = () => { },
-  onFeedClick = () => { },
+  onBellClick = () => {},
+  onNotifClick = () => {},
+  onHideNotification = () => {},
+  onFeedClick = () => {},
   viewMode = "matrix",
   user = null,
-  onRegisterVessel = () => { },
-  onSignOut = () => { },
+  onRegisterVessel = () => {},
+  onSignOut = () => {},
 }) => {
+  const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = React.useRef(null);
+
   React.useEffect(() => {
-  const handleClickOutside = (event) => {
-    if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
-      setShowUserMenu(false);
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setShowUserMenu(false);
+      }
+    };
+    if (showUserMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
     }
-  };
-  if (showUserMenu) {
-    document.addEventListener("mousedown", handleClickOutside);
-  }
-  return () => document.removeEventListener("mousedown", handleClickOutside);
-}, [showUserMenu]);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showUserMenu]);
 
   const userData = user?.user || user;
   const userName = userData?.full_name || "System Administrator";
@@ -48,7 +52,28 @@ const OzellarHeader = ({
     .join("")
     .toUpperCase();
 
+  // Determine if user is admin/superuser — only they see Config Vessel
+  const uRole = String(userData?.role || "").toUpperCase();
+  const isAdmin = ["ADMIN", "SUPERUSER", "SHORE", "SUPERINTENDENT"].includes(
+    uRole,
+  );
+
   const activeNav = viewMode === "liveFeed" ? "feed" : "dashboard";
+
+  // Shared menu item style
+  const menuItemStyle = {
+    padding: "9px 14px",
+    cursor: "pointer",
+    fontSize: "0.82rem",
+    fontWeight: "600",
+    color: "#334155",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    transition: "background 0.15s",
+    borderBottom: "0.5px solid #f1f5f9",
+    whiteSpace: "nowrap",
+  };
 
   return (
     <header
@@ -68,19 +93,28 @@ const OzellarHeader = ({
       }}
     >
       {/* ── LEFT: Logo + Brand ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: "220px" }}>
-
-        {/* 9-DOT BACK BUTTON */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          minWidth: "220px",
+        }}
+      >
         <button
           className="nine-dot-btn"
-          onClick={() => window.location.href = '/dashboard'}
+          onClick={() => (window.location.href = "/dashboard")}
           title="Back to Dashboard"
           aria-label="Back to Dashboard"
         >
           <div className="nine-dot-grid">
-            {[...Array(9)].map((_, i) => <span key={i} className="dot" />)}
+            {[...Array(9)].map((_, i) => (
+              <span key={i} className="dot" />
+            ))}
           </div>
-          <span className="nine-dot-label"><ChevronLeft size={20} /></span>
+          <span className="nine-dot-label">
+            <ChevronLeft size={20} />
+          </span>
         </button>
 
         <div
@@ -139,7 +173,6 @@ const OzellarHeader = ({
 
       {/* ── CENTER: Navigation ── */}
       <nav style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-        {/* Dashboard */}
         <button
           onClick={() => {
             if (viewMode === "liveFeed") onFeedClick();
@@ -163,8 +196,7 @@ const OzellarHeader = ({
           }}
           onMouseEnter={(e) => {
             if (activeNav !== "dashboard") {
-              e.currentTarget.style.backgroundColor =
-                "rgba(255,255,255,0.07)";
+              e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.07)";
               e.currentTarget.style.color = "#e2e8f0";
             }
           }}
@@ -179,7 +211,6 @@ const OzellarHeader = ({
           Dashboard
         </button>
 
-        {/* My Feed */}
         <button
           onClick={onFeedClick}
           style={{
@@ -194,15 +225,12 @@ const OzellarHeader = ({
             fontWeight: activeNav === "feed" ? "700" : "500",
             color: activeNav === "feed" ? "white" : "#94a3b8",
             backgroundColor:
-              activeNav === "feed"
-                ? "rgba(255,255,255,0.12)"
-                : "transparent",
+              activeNav === "feed" ? "rgba(255,255,255,0.12)" : "transparent",
             transition: "all 0.2s ease",
           }}
           onMouseEnter={(e) => {
             if (activeNav !== "feed") {
-              e.currentTarget.style.backgroundColor =
-                "rgba(255,255,255,0.07)";
+              e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.07)";
               e.currentTarget.style.color = "#e2e8f0";
             }
           }}
@@ -218,7 +246,7 @@ const OzellarHeader = ({
         </button>
       </nav>
 
-      {/* ── RIGHT: Register + Bell + User ── */}
+      {/* ── RIGHT: Bell + User ── */}
       <div
         style={{
           display: "flex",
@@ -228,39 +256,8 @@ const OzellarHeader = ({
           justifyContent: "flex-end",
         }}
       >
-        {/* Register Vessel */}
-        {/* <button
-          onClick={onRegisterVessel}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            padding: "8px 16px",
-            borderRadius: "8px",
-            border: "none",
-            cursor: "pointer",
-            backgroundColor: "#10b981",
-            color: "white",
-            fontSize: "0.8rem",
-            fontWeight: "700",
-            boxShadow: "0 2px 8px rgba(16,185,129,0.35)",
-            transition: "all 0.2s",
-            whiteSpace: "nowrap",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#059669";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#10b981";
-          }}
-        >
-          <Plus size={15} strokeWidth={2.5} />
-          Register Vessel
-        </button> */}
-
         {/* Notification Bell */}
         <div style={{ position: "relative" }} ref={notifRef}>
-          {/* BELL TRIGGER BUTTON - Colors updated to be visible in dark header */}
           <button
             onClick={onBellClick}
             style={{
@@ -300,10 +297,8 @@ const OzellarHeader = ({
             )}
           </button>
 
-          {/* NOTIFICATION DROPDOWN */}
           {showNotifDropdown && (
             <div
-              /* FIXED: Removed ref={notifRef} from here to fix the click-outside logic */
               style={{
                 position: "absolute",
                 top: "calc(100% + 10px)",
@@ -315,10 +310,9 @@ const OzellarHeader = ({
                 boxShadow: "0 20px 40px rgba(0,0,0,0.25)",
                 border: "1px solid #e2e8f0",
                 overflow: "hidden",
-                zIndex: 10000, // Ensuring it's above the Live Feed filters
+                zIndex: 10000,
               }}
             >
-              {/* Header with Title and Unread Count */}
               <div
                 style={{
                   padding: "12px 16px",
@@ -341,15 +335,27 @@ const OzellarHeader = ({
                   Notifications
                 </span>
                 {unreadCount > 0 && (
-                  <span style={{ fontSize: "0.7rem", color: "#2563eb", fontWeight: "700" }}>
+                  <span
+                    style={{
+                      fontSize: "0.7rem",
+                      color: "#2563eb",
+                      fontWeight: "700",
+                    }}
+                  >
                     {unreadCount} unread
                   </span>
                 )}
               </div>
-
               <div style={{ overflowY: "auto", maxHeight: "360px" }}>
                 {notifications.length === 0 ? (
-                  <div style={{ padding: "32px", textAlign: "center", color: "#94a3b8", fontSize: "0.85rem" }}>
+                  <div
+                    style={{
+                      padding: "32px",
+                      textAlign: "center",
+                      color: "#94a3b8",
+                      fontSize: "0.85rem",
+                    }}
+                  >
                     No recent notifications
                   </div>
                 ) : (
@@ -366,13 +372,16 @@ const OzellarHeader = ({
                         position: "relative",
                       }}
                       onMouseEnter={(e) =>
-                        (e.currentTarget.style.backgroundColor = n.is_read ? "#f8fafc" : "#e0f2fe")
+                        (e.currentTarget.style.backgroundColor = n.is_read
+                          ? "#f8fafc"
+                          : "#e0f2fe")
                       }
                       onMouseLeave={(e) =>
-                        (e.currentTarget.style.backgroundColor = n.is_read ? "transparent" : "#f0f9ff")
+                        (e.currentTarget.style.backgroundColor = n.is_read
+                          ? "transparent"
+                          : "#f0f9ff")
                       }
                     >
-                      {/* Hide (Soft Delete) Button */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -389,13 +398,15 @@ const OzellarHeader = ({
                           padding: "4px",
                           zIndex: 2,
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
-                        onMouseLeave={(e) => (e.currentTarget.style.color = "#cbd5e1")}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.color = "#ef4444")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.color = "#cbd5e1")
+                        }
                       >
                         <X size={13} />
                       </button>
-
-                      {/* Message with Sender Bolding Logic Preserved */}
                       <div
                         style={{
                           fontSize: "0.82rem",
@@ -405,19 +416,27 @@ const OzellarHeader = ({
                         }}
                       >
                         {n.sender_name && n.message.includes(n.sender_name)
-                          ? n.message.split(n.sender_name).map((part, i, arr) => (
-                            <React.Fragment key={i}>
-                              {part}
-                              {i < arr.length - 1 && (
-                                <strong style={{ fontWeight: "800" }}>{n.sender_name}</strong>
-                              )}
-                            </React.Fragment>
-                          ))
+                          ? n.message
+                              .split(n.sender_name)
+                              .map((part, i, arr) => (
+                                <React.Fragment key={i}>
+                                  {part}
+                                  {i < arr.length - 1 && (
+                                    <strong style={{ fontWeight: "800" }}>
+                                      {n.sender_name}
+                                    </strong>
+                                  )}
+                                </React.Fragment>
+                              ))
                           : n.message}
                       </div>
-
-                      {/* Formatted Date Logic Preserved */}
-                      <div style={{ fontSize: "0.7rem", color: "#94a3b8", marginTop: "5px" }}>
+                      <div
+                        style={{
+                          fontSize: "0.7rem",
+                          color: "#94a3b8",
+                          marginTop: "5px",
+                        }}
+                      >
                         {new Date(n.created_at + "Z").toLocaleString("en-GB", {
                           day: "2-digit",
                           month: "short",
@@ -434,7 +453,7 @@ const OzellarHeader = ({
           )}
         </div>
 
-        {/* User Avatar + Info */}
+        {/* User Avatar + Dropdown */}
         <div style={{ position: "relative" }} ref={userMenuRef}>
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
@@ -452,8 +471,7 @@ const OzellarHeader = ({
               transition: "all 0.2s",
             }}
             onMouseEnter={(e) =>
-            (e.currentTarget.style.backgroundColor =
-              "rgba(255,255,255,0.12)")
+              (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.12)")
             }
             onMouseLeave={(e) => {
               if (!showUserMenu)
@@ -509,14 +527,14 @@ const OzellarHeader = ({
             />
           </button>
 
-          {/* User dropdown */}
+          {/* ── DROPDOWN MENU ── */}
           {showUserMenu && (
             <div
               style={{
                 position: "absolute",
                 top: "calc(100% + 8px)",
                 right: 0,
-                width: "180px",
+                minWidth: "200px",
                 backgroundColor: "white",
                 borderRadius: "10px",
                 boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
@@ -525,24 +543,49 @@ const OzellarHeader = ({
                 zIndex: 10000,
               }}
             >
+              {/* ── Back to Dashboard ── */}
               <div
-                onClick={() => window.location.href = '/dashboard'}
-                style={{
-                  padding: "10px 14px",
-                  cursor: "pointer",
-                  fontSize: "0.82rem",
-                  fontWeight: "600",
-                  color: "#334155",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  transition: "background 0.15s",
+                onClick={() => {
+                  setShowUserMenu(false);
+                  window.location.href = "/dashboard";
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f8fafc"}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                style={menuItemStyle}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#f8fafc")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "white")
+                }
               >
-                ← Back to Dashboard
+                <ChevronLeft size={14} color="#64748b" />
+                Back to Dashboard
               </div>
+
+              {/* ── Config Vessel (admin/shore only) ── */}
+              {isAdmin && (
+                <div
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    navigate("/lub/VesselConfig");
+                  }}
+                  style={{
+                    ...menuItemStyle,
+                    borderBottom: "none",
+                    color: "#0f172a",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#f0f9ff";
+                    e.currentTarget.style.color = "#2563eb";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "white";
+                    e.currentTarget.style.color = "#0f172a";
+                  }}
+                >
+                  <Settings2 size={14} color="#2563eb" />
+                  Config Vessel
+                </div>
+              )}
             </div>
           )}
         </div>

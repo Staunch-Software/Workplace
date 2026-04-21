@@ -1,5 +1,7 @@
 import React, { Suspense, lazy, useEffect } from 'react';
+import { Routes, Route } from "react-router-dom";
 const LuboilAnalysis = lazy(() => import('./features/LuboilAnalysis'));
+const VesselConfig = lazy(() => import('./features/VesselConfig'));
 
 function LubModule() {
   useEffect(() => { document.title = 'Lubeoil Analysis'; }, []);
@@ -21,7 +23,10 @@ function LubModule() {
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     }>
-      <LuboilAnalysis />
+      <Routes>
+        <Route path="/" element={<LuboilAnalysis />} />
+        <Route path="VesselConfig" element={<VesselConfig />} />
+      </Routes>
     </Suspense>
   );
 }
