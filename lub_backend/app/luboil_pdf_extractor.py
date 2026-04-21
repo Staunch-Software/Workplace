@@ -236,22 +236,40 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
                     full_report['metadata']['vessel_code'] = v_match.group(2).strip()
 
                 # Strategy B: Fallback — "Name - 5+ Digit Code" on any line
+                # Strategy B: Fallback — "Name - 5+ Digit Code" on any line
                 if not full_report['metadata']['vessel_name']:
                     lines = p1_text.split('\n')
                     for line in lines:
-                        match = re.search(r"([A-Z0-9][\w\s\(\)\.]+?)\s+-\s+\d{5,}", line)
+                        # Look for text followed by a dash and a 5+ digit code
+                        match = re.search(r"(.*?)\s+-\s+(\d{5,})", line)
                         if match:
-                            candidate = re.sub(r"^[\d\s/]+", "", match.group(1).strip())
+                            candidate = match.group(1).strip()
+                            
+                            # FIX: pdfplumber sometimes merges columns like:
+                            # "Stern Tube - Bearings and Seals AM KIRTI"
+                            
+                            # 1. Split by multiple spaces if they exist
+                            if "  " in candidate:
+                                candidate = candidate.split("  ")[-1].strip()
+                                
+                            # 2. Strip out merged equipment prefixes using regex
+                            noise_pattern = r"(?i).*(?:bearings and seals|crankcase|system|filter|pump|crane|gear|winch|tube|engine)\s*"
+                            candidate = re.sub(noise_pattern, "", candidate).strip()
+
                             bad_keywords = [
                                 "Manufacturer", "Model", "LubeAnalyst", "Code",
                                 "Site/Vessel", "Component", "Precision", "Crane",
                                 "System", "Hydraulic", "Provision", "Registered", "Lubricant"
                             ]
-                            if any(bad in candidate for bad in bad_keywords): continue
-                            if len(candidate) < 3: continue
+                            if any(bad.lower() in candidate.lower() for bad in bad_keywords): 
+                                continue
+                            if len(candidate) < 3: 
+                                continue
+                                
                             full_report['metadata']['vessel_name'] = candidate
+                            full_report['metadata']['vessel_code'] = match.group(2)
                             break
-
+                            
                 # 2. EXTRACT REPORT DATE
                 # Strategy A: Standard Date Pattern (DD/MM/YYYY)
                 dates = re.findall(r"(\d{2}/\d{2}/\d{4})", p1_text)

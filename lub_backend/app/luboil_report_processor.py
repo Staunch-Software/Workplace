@@ -226,8 +226,19 @@ async def save_luboil_report(
                     break
 
         if not vessel:
-            noise_words = r'(?i)crankcase|engine|stern|tube|system|bearings|seals|auxiliary|main'
-            clean_name = re.sub(noise_words, '', vessel_name_extracted).strip().split('-')[0].strip()
+            # FIX: Added '\b' for word boundaries, and added 'and', 'gear', 'winch', 'pump' 
+            # to handle strings like "Bearings and Seals AM KIRTI"
+            noise_words = r'(?i)\b(crankcase|engine|stern|tube|system|bearings|seals|auxiliary|main|and|gear|winch|pump)\b'
+            clean_name = re.sub(noise_words, '', vessel_name_extracted).strip()
+            
+            # Remove any stray punctuation (like dashes or dots) and extra spaces
+            clean_name = re.sub(r'[^a-zA-Z0-9\s]', '', clean_name).strip()
+            clean_name = " ".join(clean_name.split()) # normalizes spaces
+            
+            # Fallback: if there are still stray words, vessel names are usually the last 2 words
+            if len(clean_name.split()) > 2 and "GCL" not in clean_name and "AM" not in clean_name:
+                clean_name = " ".join(clean_name.split()[-2:])
+                
             vessel = control_db.query(ControlVessel).filter(
                 ControlVessel.name.ilike(f"%{clean_name}%"),
                 ControlVessel.is_active == True
@@ -294,10 +305,9 @@ async def save_luboil_report(
 
         all_match = (
             len(pdf_sample_numbers) > 0 and
-            all(
+            any(
                 sn in existing_map and
-                (report_date_str is None or str(existing_map[sn].sample_date) == report_date_str) and
-                normalize_status(existing_map[sn].status) == get_pdf_status(sn)
+                str(existing_map[sn].sample_date) == report_date_str
                 for sn in pdf_sample_numbers
             )
         )
@@ -316,16 +326,42 @@ async def save_luboil_report(
             logger.info(f"DUPLICATE: reusing report_id={report.report_id}")
 
     if not is_duplicate:
-        report = LuboilReport(
-            imo_number=vessel_imo,
-            file_name=filename,
-            lab_name=meta.get('lab_name', 'Shell LubeAnalyst'),
-            report_date=report_date_parsed,
-            full_json_data=extracted_data,
-            oil_source=oil_source_extracted
+        # Extra safety: if same vessel + same date report already exists, treat as duplicate
+        existing_report_check = await session.execute(
+            select(LuboilReport).where(
+                LuboilReport.imo_number == vessel_imo,
+                LuboilReport.report_date == report_date_parsed
+            )
         )
-        session.add(report)
-        logger.info(f"NEW report created for {vessel_display_name} date={report_date_str}")
+        existing_report = existing_report_check.scalars().first()
+
+        if existing_report:
+            # Found same vessel + date → treat as duplicate, reuse that report
+            is_duplicate = True
+            report = existing_report
+            report.file_name = filename
+            report.full_json_data = extracted_data
+            report.oil_source = oil_source_extracted
+
+            # Rebuild existing_map from this report's samples for the update loop below
+            existing_samples_re = await session.execute(
+                select(LuboilSample).where(
+                    LuboilSample.report_id == existing_report.report_id
+                )
+            )
+            existing_map = {s.sample_number: s for s in existing_samples_re.scalars().all()}
+            logger.info(f"SAFETY CATCH: reusing existing report_id={existing_report.report_id}")
+        else:
+            report = LuboilReport(
+                imo_number=vessel_imo,
+                file_name=filename,
+                lab_name=meta.get('lab_name', 'Shell LubeAnalyst'),
+                report_date=report_date_parsed,
+                full_json_data=extracted_data,
+                oil_source=oil_source_extracted
+            )
+            session.add(report)
+            logger.info(f"NEW report created for {vessel_display_name} date={report_date_str}")
 
     await session.flush()
     
@@ -439,13 +475,12 @@ async def save_luboil_report(
         }
 
         if is_duplicate:
-            # DUPLICATE: update technical fields only on existing sample under this report
+            # DUPLICATE: search by sample_number scoped to vessel IMO (not just report_id)
             result = await session.execute(
-                select(LuboilSample).filter(
-                    LuboilSample.report_id == report.report_id,
-                    LuboilSample.equipment_code == equipment_code,
-                    LuboilSample.sample_number == tech_data["sample_number"]
-                )
+                select(LuboilSample)
+                .join(LuboilReport, LuboilSample.report_id == LuboilReport.report_id)
+                .where(LuboilReport.imo_number == vessel_imo)
+                .where(LuboilSample.sample_number == tech_data["sample_number"])
             )
             existing_sample = result.scalars().first()
             if existing_sample:
@@ -454,7 +489,7 @@ async def save_luboil_report(
                         setattr(existing_sample, key, value)
                 logger.info(f"🔄 Duplicate: updated tech fields for {clean_name}")
             else:
-                logger.warning(f"⚠️ Duplicate report but sample not found for {clean_name}")
+                logger.warning(f"⚠️ Duplicate: sample_number {tech_data['sample_number']} not found for {clean_name}")
         else:
             # NEW report: always insert fresh, protected fields all None/default
             new_sample = LuboilSample(
