@@ -372,7 +372,10 @@ async def get_email_recipients(
         if not defect:
             raise HTTPException(status_code=404, detail="Defect not found")
 
-        vessel = await control_db.get(Vessel, defect.vessel_imo)
+        vessel_result = await control_db.execute(
+            select(Vessel).where(Vessel.imo == defect.vessel_imo)
+        )
+        vessel = vessel_result.scalars().first()
         vessel_name = vessel.name if vessel else defect.vessel_imo
 
         from app.models.associations import user_vessel_link
@@ -508,7 +511,10 @@ async def create_email_draft(
             raise HTTPException(status_code=404, detail="Defect not found")
 
         # 2. Get vessel name
-        vessel = await control_db.get(Vessel, defect.vessel_imo)
+        vessel_result = await control_db.execute(
+            select(Vessel).where(Vessel.imo == defect.vessel_imo)
+        )
+        vessel = vessel_result.scalars().first()
         vessel_name = vessel.name if vessel else defect.vessel_imo
         vessel_email = vessel.vessel_email if vessel and vessel.vessel_email else None
 
@@ -1886,7 +1892,10 @@ async def import_defects(
                     raise ValueError("Duplicate: defect already exists.")
                 
                 from sqlalchemy import text as sa_text
-                vessel_for_num = await control_db.get(Vessel, vessel.imo)
+                vessel_result = await control_db.execute(
+                    select(Vessel).where(Vessel.imo == vessel.imo)
+                )
+                vessel_for_num = vessel_result.scalars().first()
                 vessel_name_for_num = vessel_for_num.name if vessel_for_num else vessel.imo
                 prefix = vessel_name_for_num.replace(" ", "").upper()[:6]
 
@@ -2084,7 +2093,10 @@ async def import_defects(
         for v_imo in affected_vessels:
             v_count = sum(1 for d in defects_to_insert if d.vessel_imo == v_imo)
             try:
-                vessel_obj = await control_db.get(Vessel, v_imo)
+                vessel_result = await control_db.execute(
+                    select(Vessel).where(Vessel.imo == v_imo)
+                )
+                vessel_obj = vessel_result.scalars().first()
                 vessel_name = vessel_obj.name if vessel_obj else v_imo
                 background_tasks.add_task(
                     notify_vessel_users,
@@ -2193,7 +2205,11 @@ async def create_defect(
             f"🆕 Creating defect for vessel: {defect_in.vessel_imo} | {defect_in.equipment}"
         )
 
-        vessel = await control_db.get(Vessel, defect_in.vessel_imo)
+        vessel_result = await control_db.execute(
+            select(Vessel).where(Vessel.imo == defect_in.vessel_imo)
+        )
+        vessel = vessel_result.scalars().first()
+
         if not vessel:
             raise HTTPException(status_code=404, detail="Vessel not found")
 
@@ -2453,7 +2469,10 @@ async def shore_close_defect(
 
         # Notification to vessel crew
         try:
-            vessel = await control_db.get(Vessel, defect.vessel_imo)
+            vessel_result = await control_db.execute(
+                select(Vessel).where(Vessel.imo == defect.vessel_imo)
+            )
+            vessel = vessel_result.scalars().first()
             vessel_name = vessel.name if vessel else defect.vessel_imo
             await notify_vessel_users(
                 db=db,

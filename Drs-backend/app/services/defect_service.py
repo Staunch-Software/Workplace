@@ -94,7 +94,10 @@ class DefectService:
         logger.info(f"[DefectService] Creating defect for vessel: {defect_in.vessel_imo}")
 
         # --- Generate defect_number via atomic sequence upsert ---
-        vessel_for_num = await control_db.get(Vessel, defect_in.vessel_imo)
+        vessel_result = await control_db.execute(
+            select(Vessel).where(Vessel.imo == defect_in.vessel_imo)
+        )
+        vessel_for_num = vessel_result.scalars().first()
         vessel_name_for_num = vessel_for_num.name if vessel_for_num else defect_in.vessel_imo
         prefix = vessel_name_for_num.replace(" ", "").upper()[:6]
 

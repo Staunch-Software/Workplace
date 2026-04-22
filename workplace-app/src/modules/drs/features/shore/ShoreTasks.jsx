@@ -164,6 +164,7 @@ const DescTooltip = ({ text, children }) => {
 };
 
 // ── Select dropdown ────────────────────────────────────────────────────────
+// ── Select dropdown ────────────────────────────────────────────────────────
 const Select = ({ value, onChange, options, placeholder }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef();
@@ -192,10 +193,18 @@ const Select = ({ value, onChange, options, placeholder }) => {
         <div style={{
           position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
           background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.08)', zIndex: 1000, overflow: 'hidden',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.08)', zIndex: 1000, 
+          // --- ADDED SCROLL LOGIC HERE ---
+          maxHeight: '280px', 
+          overflowY: 'auto',
+          // -------------------------------
         }}>
           <div onClick={() => { onChange(''); setOpen(false); }}
-            style={{ padding: '9px 12px', fontSize: '13px', color: '#94a3b8', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}>
+            style={{ 
+              padding: '9px 12px', fontSize: '13px', color: '#94a3b8', 
+              cursor: 'pointer', borderBottom: '1px solid #f1f5f9',
+              position: 'sticky', top: 0, background: 'white', zIndex: 1 
+            }}>
             {placeholder}
           </div>
           {options.map(opt => (
@@ -214,7 +223,6 @@ const Select = ({ value, onChange, options, placeholder }) => {
     </div>
   );
 };
-
 // ── Format date ────────────────────────────────────────────────────────────
 const formatDateTime = (dt) => {
   if (!dt) return '—';

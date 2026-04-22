@@ -97,76 +97,78 @@ from app.models.sync import SyncState
 from app.core.database_control import get_control_db
 from app.core.database import get_db
 
-# ⚠️ MUST be before /{imo}/sync-log to avoid "all" being caught as {imo}
 @router.get("/sync-status/all")
 async def get_all_vessel_sync_status(
-    db: AsyncSession = Depends(get_db),
-    control_db: AsyncSession = Depends(get_control_db),
+    db: AsyncSession = Depends(get_db),              # Module DB
+    control_db: AsyncSession = Depends(get_control_db), # Control DB
 ):
-    vessels_res = await control_db.execute(select(Vessel))
-    vessels = vessels_res.scalars().all()
+    """Returns a summary of sync health for all vessels."""
+    try:
+        # Fetch all vessels from Control DB
+        v_res = await control_db.execute(select(Vessel))
+        vessels = v_res.scalars().all()
 
-    result = {}
-    for vessel in vessels:
-        try:
-            error_history = json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
-            if not isinstance(error_history, list):
-                error_history = []
-        except Exception:
-            error_history = []
+        # Fetch all sync states for DRS from Module DB
+        ss_res = await db.execute(select(SyncState).where(SyncState.sync_scope == "DEFECT"))
+        sync_states = {s.vessel_imo: s for s in ss_res.scalars().all()}
 
-        failed_items_count = sum(
-            1 for e in error_history if e.get("type") == "vessel_error"
-        )
-
-        result[vessel.imo] = {
-            "last_sync_success":  vessel.last_sync_success,
-            "failed_items_count": failed_items_count,
-            "latest_error": error_history[0] if error_history else None,
-        }
-
-    return result
+        result = {}
+        for v in vessels:
+            state = sync_states.get(v.imo)
+            # Use the live active_errors list to determine health
+            active_errors = state.active_errors if state else []
+            
+            result[v.imo] = {
+                "name": v.name,
+                "last_sync_success": len(active_errors) == 0,
+                "failed_items_count": len(active_errors),
+                "latest_error": active_errors[0] if active_errors else None
+            }
+        return result
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{imo}/sync-log")
 async def get_vessel_sync_log(
     imo: str,
-    db: AsyncSession = Depends(get_db),
-    control_db: AsyncSession = Depends(get_control_db),
+    db: AsyncSession = Depends(get_db),              # Module DB
+    control_db: AsyncSession = Depends(get_control_db), # Control DB
 ):
-    res = await control_db.execute(select(Vessel).where(Vessel.imo == imo))
-    vessel = res.scalar_one_or_none()
+    # 1. Fetch High-level info from Control DB
+    v_res = await control_db.execute(select(Vessel).where(Vessel.imo == imo))
+    vessel = v_res.scalar_one_or_none()
     if not vessel:
         raise HTTPException(status_code=404, detail=f"Vessel {imo} not found")
 
-    try:
-        error_history = json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
-        if not isinstance(error_history, list):
-            error_history = []
-    except Exception:
-        error_history = []
-
-    # Fetch SyncState rows
-    sync_states_res = await db.execute(
-        select(SyncState).where(SyncState.vessel_imo == imo)
+    # 2. Fetch Module-Specific Sync State from Module DB (DRS Scope)
+    ss_res = await db.execute(
+        select(SyncState).where(
+            SyncState.vessel_imo == imo, 
+            SyncState.sync_scope == "DEFECT"
+        )
     )
-    sync_states = {row.sync_scope: row for row in sync_states_res.scalars().all()}
+    sync_state = ss_res.scalar_one_or_none()
 
-    defect_scope = sync_states.get("DEFECT")
-
-    failed_items_count = sum(
-        1 for e in error_history if e.get("type") == "vessel_error"
-    )
+    # 3. Handle Active Errors (The logic for disappearing errors)
+    # If sync_state exists, use its active_errors list. Otherwise, empty list.
+    active_errors = sync_state.active_errors if sync_state else []
 
     return {
         "imo": imo,
-        # Flat fields matching VesselSyncDetail exactly
-        "vessel_reported_push": defect_scope.last_pull_at if defect_scope else None,  # vessel → shore
-        "vessel_reported_pull": defect_scope.last_push_at if defect_scope else None,  # shore → vessel
-        # Status fields
-        "last_sync_success":  vessel.last_sync_success,
-        "failed_items_count": failed_items_count,
-        "last_sync_error":    vessel.last_sync_error,  # raw JSON string — frontend parses it
-        # Vessel-level timestamps (for reference)
-        "last_pull_at": vessel.last_pull_at,
-        "last_push_at": vessel.last_push_at,
+        "name": vessel.name,
+        "last_sync_success": vessel.last_sync_success,
+        
+        # Live Timestamps from the Module Table
+        "vessel_reported_push": sync_state.last_pull_at if sync_state else None, 
+        "vessel_reported_pull": sync_state.last_push_at if sync_state else None,
+        
+        # THE LIVE ERROR LIST: Fixed errors won't be in this list
+        "active_errors": active_errors, 
+        
+        # Aggregate count for badges
+        "failed_items_count": len(active_errors),
+        
+        # Historical log (audit trail - doesn't affect "Active" UI)
+        "error_history": json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
     }

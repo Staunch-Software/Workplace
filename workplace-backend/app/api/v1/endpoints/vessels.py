@@ -75,8 +75,8 @@ async def get_vessel_status(
             "imo": vessel.imo,
             "name": vessel.name,
             "online": (
-                (now - to_utc(vessel.last_pull_at)) < ONLINE_THRESHOLD
-                if vessel.last_pull_at
+                (now - to_utc(vessel.last_push_at)) < ONLINE_THRESHOLD
+                if vessel.last_push_at
                 else False
             ),
             "last_pull_at": (

@@ -43,7 +43,7 @@ async def init_models():
         from app.models.vessel import Vessel
         from app.models.user import User
         from app.models.defect import Defect
-        from app.models.mariapps_pr_cache import MariappsPrCache
+        # from app.models.mariapps_pr_cache import MariappsPrCache
         from app.models.vessel_sequence import VesselDefectSequence
         
         # Create all tables

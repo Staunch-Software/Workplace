@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle, Clock, ClipboardList, MessageSquare,
   ChevronDown, ChevronUp, CheckCircle, ShieldAlert, Send, Paperclip,
-  X, Check, Edit2, Save, Edit3, Filter, Edit, Flower, Ship, AlertOctagon, MessageCircle, MoreHorizontal, Trash2, ArrowRightLeft, UserCircle, Download, Flag, RefreshCw, Mail
+  X, Check, Edit2, Save, Edit3, Filter, Edit, Flower, Ship, AlertOctagon, MessageCircle, MoreHorizontal, Trash2, ArrowRightLeft, UserCircle, Download, Flag, RefreshCw, ArrowUp, ArrowDown, Mail
 } from 'lucide-react';
 import { Image as ImageIcon, Eye, Upload } from 'lucide-react';
 import ColumnCustomizationModal from '@drs/components/modals/ColumnCustomizationModal';
