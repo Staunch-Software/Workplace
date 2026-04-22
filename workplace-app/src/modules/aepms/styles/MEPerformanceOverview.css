@@ -1,5 +1,32 @@
 /* --- ENHANCED ME PERFORMANCE OVERVIEW STYLES --- */
+/* ===== VESSEL FILTER DROPDOWN - SAME ROW AS HEADER ===== */
+/* Card Header Enhanced - Modified */
+.card-header-enhanced {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 24px !important; /* Matched AE's cleaner spacing */
+    background: #ffffff !important; /* Matched AE's clean white look */
+    border-bottom: 1px solid #e2e8f0 !important; /* Lighter border to match AE */
+    position: relative;
+    flex-wrap: wrap;
+    overflow: visible !important;
+    border-radius: 20px 20px 0 0;
+    transition: border-radius 0.2s ease, border-bottom 0.2s ease;
+}
 
+/* NEW: Fixes the collapsed/closed state corners and removes the ugly bottom line */
+.card-header-enhanced.header-closed {
+    border-bottom: none !important;
+    border-radius: 20px !important;
+}
+
+/* Updated Title Group to match AE flex layout */
+.card-title-group {
+    flex: 1 !important; /* Pushes the dropdown and chevron neatly to the right */
+    min-width: 0;
+    margin-right: 16px;
+}
 /* Main Container */
 .me-performance-container {
     min-height: 100vh;
@@ -1068,4 +1095,51 @@
 
 body {
     background: #fbf6f6;  /* matches container gradient start color */
+}
+
+
+/* ==========================================================================
+   RESPONSIVENESS - STEP 1: PROPELLER MARGIN & HEADERS
+   ========================================================================== */
+
+/* Default: 2 Columns for Large Screens */
+.propeller-responsive-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    width: 100%;
+}
+
+/* Small Laptops & Tablets (1200px and below) */
+@media (max-width: 1250px) {
+    /* Switch Propeller grid to 1 column so charts don't squish */
+    .propeller-responsive-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Prevent Header titles from colliding with dropdowns */
+    .card-header-enhanced {
+        flex-wrap: wrap; /* Allow elements to wrap to the next line */
+        gap: 12px;
+    }
+
+    .card-title-group {
+        flex: 1 1 100% !important; /* Force title to take full width if needed */
+        margin-right: 0 !important;
+    }
+
+    .vessel-filter-wrapper {
+        margin-left: auto !important; /* Push dropdown to the right on wrap */
+    }
+}
+
+/* Mobile Screens (768px and below) */
+@media (max-width: 768px) {
+    .vessel-filter-wrapper {
+        width: 100%; /* Dropdown takes full width on mobile */
+    }
+    
+    .vessel-dropdown-btn {
+        width: 100% !important;
+    }
 }

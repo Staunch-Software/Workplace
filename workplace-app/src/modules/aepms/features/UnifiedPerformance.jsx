@@ -1021,9 +1021,16 @@ const styles = `
     }
 
     .card-header-enhanced {
-      padding: 24px 28px 20px;
-      border-bottom: 2px solid #f1f5f9;
-      background: linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%);
+      padding: 16px 24px;
+      border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc;
+      border-radius: 16px 16px 0 0;
+      transition: border-radius 0.2s ease, border-bottom 0.2s ease;
+    }
+
+    .card-header-enhanced.header-closed {
+      border-bottom: none !important;
+      border-radius: 16px !important;
     }
 
     .card-title-enhanced {
@@ -4517,17 +4524,16 @@ export default function Performance({
     return (
       <div className="enhanced-card load-diagram-enhanced load-diagram-card">
         <div
-          className="card-header-enhanced"
-          onClick={() => setIsLoadDiagramExpanded(!isLoadDiagramExpanded)}
-          style={{
-            cursor: "pointer",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            userSelect: "none",
-            padding: "10px 16px",
-          }}
-        >
+  className={`card-header-enhanced ${!isLoadDiagramExpanded ? 'header-closed' : ''}`}
+  onClick={() => setIsLoadDiagramExpanded(!isLoadDiagramExpanded)}
+  style={{
+    cursor: "pointer",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    userSelect: "none",
+  }}
+>
           <div>
             <h3
               className="card-title-enhanced"
@@ -5197,7 +5203,7 @@ export default function Performance({
           style={{ marginBottom: "32px" }}
         >
           <div
-            className="card-header-enhanced"
+            className={`card-header-enhanced ${!isSummaryExpanded ? 'header-closed' : ''}`}
             onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
             style={{
               display: "flex",
@@ -5205,7 +5211,6 @@ export default function Performance({
               alignItems: "center",
               cursor: "pointer",
               userSelect: "none",
-              padding: "10px 16px",
             }}
           >
             <div>
@@ -6379,17 +6384,16 @@ export default function Performance({
         style={{ marginTop: "32px", marginBottom: "40px" }}
       >
         <div
-          className="card-header-enhanced"
-          onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            cursor: "pointer",
-            userSelect: "none",
-            padding: "10px 16px",
-          }}
-        >
+  className={`card-header-enhanced ${!isHistoryExpanded ? 'header-closed' : ''}`}
+  onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    cursor: "pointer",
+    userSelect: "none",
+  }}
+>
           <div>
             <h3
               className="card-title-enhanced"
@@ -6685,16 +6689,16 @@ export default function Performance({
         style={{ marginTop: "32px", marginBottom: "40px" }}
       >
         <div
-          className="card-header-enhanced"
-          onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center", // Changed to center for horizontal alignment with the arrow
-            cursor: "pointer",
-            userSelect: "none",
-          }}
-        >
+  className={`card-header-enhanced ${!isHistoryExpanded ? 'header-closed' : ''}`}
+  onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    cursor: "pointer",
+    userSelect: "none",
+  }}
+>
           <div>
             <h3
               className="card-title-enhanced"
@@ -11529,20 +11533,16 @@ export default function Performance({
                   >
                     {/* COLLAPSIBLE HEADER — unchanged */}
                     <div
-                      onClick={() => setIsTrendCardExpanded((p) => !p)}
-                      style={{
-                        padding: "14px 24px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        cursor: "pointer",
-                        backgroundColor: "#f8fafc",
-                        borderBottom: isTrendCardExpanded
-                          ? "1px solid #e2e8f0"
-                          : "none",
-                        userSelect: "none",
-                      }}
-                    >
+  className={`card-header-enhanced ${!isTrendCardExpanded ? 'header-closed' : ''}`}
+  onClick={() => setIsTrendCardExpanded((p) => !p)}
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    cursor: "pointer",
+    userSelect: "none",
+  }}
+>
                       <div
                         style={{
                           display: "flex",
@@ -12228,20 +12228,16 @@ export default function Performance({
                   >
                     {/* COLLAPSIBLE HEADER */}
                     <div
-                      onClick={() => setIsEnvelopeCardExpanded((p) => !p)}
-                      style={{
-                        padding: "14px 24px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        cursor: "pointer",
-                        backgroundColor: "#f8fafc",
-                        borderBottom: isEnvelopeCardExpanded
-                          ? "1px solid #e2e8f0"
-                          : "none",
-                        userSelect: "none",
-                      }}
-                    >
+  className={`card-header-enhanced ${!isEnvelopeCardExpanded ? 'header-closed' : ''}`}
+  onClick={() => setIsEnvelopeCardExpanded((p) => !p)}
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    cursor: "pointer",
+    userSelect: "none",
+  }}
+>
                       <div
                         style={{
                           display: "flex",

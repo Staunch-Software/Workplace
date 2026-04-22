@@ -1632,11 +1632,19 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
         <div
           ref={propellerCardRef}
           className="performance-data-card enhanced-card"
-          style={{ width: "100%", animationDelay: "0.2s", scrollMarginTop: "100px" }}
+          style={{
+            width: "100%",
+            borderRadius: "12px",
+            overflow: "hidden",
+            border: "1px solid #e2e8f0",
+            scrollMarginTop: "100px",
+            boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
+            animationDelay: "0.2s"
+          }}
         >
           <div
-              className="card-header-enhanced"
-              style={{ cursor: "pointer", padding: "12px 16px" }}
+              className={`card-header-enhanced ${!isPropellerCardOpen ? 'header-closed' : ''}`}
+              style={{ cursor: "pointer" }}
               onClick={() => setIsPropellerCardOpen(!isPropellerCardOpen)}
             >
             {/* Icon */}
@@ -1798,20 +1806,13 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
                   style={{
                     padding: "20px",
                     backgroundColor: "#f8fafc",
-                    maxHeight: "520px",
+                    maxHeight: "510px",
                     overflowY: "auto",
                     scrollbarGutter: "stable",
                   }}
                 >
                   {/* GRID CONTAINER: 2 Columns (50% each) */}
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(2, 1fr)", // Exact 50% split
-                      gap: "20px",
-                      width: "100%",
-                    }}
-                  >
+                  <div className="propeller-responsive-grid">
                     {filteredPropellerData.map((vessel, index) => {
                       const margin = vessel.current_margin;
 
@@ -2061,13 +2062,20 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
           <div
             ref={daysElapsedCardRef}
             className="performance-data-card enhanced-card"
-            style={{ width: "100%", scrollMarginTop: "100px" }}
+            style={{
+              width: "100%",
+              borderRadius: "12px",
+              overflow: "hidden",
+              border: "1px solid #e2e8f0",
+              scrollMarginTop: "100px",
+              boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
+            }}
           >
             <div
-              className="card-header-enhanced"
-              style={{ cursor: "pointer" }}
-              onClick={() => setIsReportStatusOpen(!isReportStatusOpen)}
-            >
+                className={`card-header-enhanced ${!isReportStatusOpen ? 'header-closed' : ''}`}
+                style={{ cursor: "pointer" }}
+                onClick={() => setIsReportStatusOpen(!isReportStatusOpen)}
+              >
               <div className="card-icon-badge pulsing-icon">
                 <Clock size={24} />
               </div>
@@ -2225,19 +2233,17 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
                   <div
                     className="performance-table-wrapper"
                     style={{
-                      width: "100%",
                       overflowX: "auto",
-                      overflowY: "auto",
-                      maxHeight: "355px", // Reduced slightly to ensure it stays above the fold of the screen// Limits height so page doesn't scroll
-                      position: "static",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "8px",
+                      maxWidth: "100%",
+                      position: "relative",
+                      background: "#fff",
                     }}
                   >
                     <table
                       className="performance-table-modern"
                       style={{
-                        width: "100%",
+                        width: "max-content",
+                        minWidth: "100%",
                         borderCollapse: "separate",
                         borderSpacing: 0,
                         tableLayout: "fixed",
@@ -2747,10 +2753,8 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
                       </tbody>
 
                       {/* --- FOOTER (Fixed to BOTTOM) --- */}
-                      <tfoot
-                        style={{ position: "sticky", bottom: 0, zIndex: 50 }}
-                      >
-                        <tr>
+                      <tfoot style={{ position: "sticky", bottom: 0, zIndex: 50 }}>
+  <tr style={{ backgroundColor: "#fff" }}>
                           <td
                             colSpan="4"
                             style={{
@@ -2803,16 +2807,11 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
                             );
                           })}
                           <td
-                            style={{
-                              position: "sticky",
-                              right: 0,
-                              bottom: 0,
-                              borderTop: "2px solid #e5e7eb",
-                              backgroundColor: "#fff",
-                              zIndex: 60,
-                              borderLeft: "1px solid #f3f4f6",
-                            }}
-                          ></td>
+  style={{
+    borderTop: "2px solid #e5e7eb",
+    backgroundColor: "#fff",
+  }}
+></td>
                         </tr>
                       </tfoot>
                     </table>
