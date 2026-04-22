@@ -18,7 +18,11 @@
   align-items: center;
 }
 
-.nav-left { display: flex; align-items: center; gap: 0.75rem; }
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
 
 .logo-icon {
   background: var(--primary-light);
@@ -31,16 +35,31 @@
 }
 
 .brand-name {
-  font-size: 1.25rem;       /* text-xl */
-  font-weight: 600;          /* font-semibold */
-  letter-spacing: -0.025em;  /* tracking-tight */
+  font-size: 1.25rem;
+  /* text-xl */
+  font-weight: 600;
+  /* font-semibold */
+  letter-spacing: -0.025em;
+  /* tracking-tight */
   color: var(--gray-900);
 }
 
-.nav-right { display: flex; align-items: center; gap: 1rem; }
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
 
-.search-wrapper { position: relative; display: none; }
-@media (min-width: 768px) { .search-wrapper { display: block; } }
+.search-wrapper {
+  position: relative;
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .search-wrapper {
+    display: block;
+  }
+}
 
 .search-icon {
   position: absolute;
@@ -58,7 +77,8 @@
   background: var(--gray-50);
   border: none;
   border-radius: 9999px;
-  font-size: 0.875rem;       /* text-sm */
+  font-size: 0.875rem;
+  /* text-sm */
   font-family: 'Inter', sans-serif;
   width: 256px;
   outline: none;
@@ -67,7 +87,8 @@
 }
 
 .search-input:focus {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);  /* focus:ring-2 focus:ring-primary/20 */
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  /* focus:ring-2 focus:ring-primary/20 */
 }
 
 
@@ -75,16 +96,19 @@
 
 .divider {
   width: 1px;
-  height: 32px;              /* h-8 */
+  height: 32px;
+  /* h-8 */
   background: var(--gray-200);
-  margin: 0 8px;             /* mx-2 */
+  margin: 0 8px;
+  /* mx-2 */
 }
 
 .profile-btn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 4px 8px 4px 4px;  /* p-1 pr-2 */
+  padding: 4px 8px 4px 4px;
+  /* p-1 pr-2 */
   border-radius: 9999px;
   border: 1px solid transparent;
   background: none;
@@ -98,27 +122,37 @@
 }
 
 .avatar {
-  width: 32px;               /* w-8 */
-  height: 32px;              /* h-8 */
+  width: 32px;
+  /* w-8 */
+  height: 32px;
+  /* h-8 */
   background: linear-gradient(to top right, var(--primary), #60a5fa);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 0.75rem;        /* was missing */
-  font-weight: 500;          /* font-medium */
+  font-size: 0.75rem;
+  /* was missing */
+  font-weight: 500;
+  /* font-medium */
   box-shadow: var(--shadow-sm);
 }
 
 .profile-name {
-  font-size: 0.875rem;       /* text-sm */
-  font-weight: 500;          /* font-medium */
+  font-size: 0.875rem;
+  /* text-sm */
+  font-weight: 500;
+  /* font-medium */
   color: var(--gray-700);
   display: none;
 }
 
-@media (min-width: 640px) { .profile-name { display: block; } }
+@media (min-width: 640px) {
+  .profile-name {
+    display: block;
+  }
+}
 
 /* ── Profile Dropdown ─────────────────────────────── */
 .profile-wrapper {
@@ -129,6 +163,7 @@
   color: var(--gray-400);
   transition: transform 0.2s;
 }
+
 .chevron.open {
   transform: rotate(180deg);
 }
@@ -141,15 +176,22 @@
   background: var(--white);
   border: 1px solid var(--gray-200);
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   z-index: 100;
   overflow: hidden;
   animation: dropdownIn 0.15s ease;
 }
 
 @keyframes dropdownIn {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .dropdown-user-info {
@@ -225,4 +267,178 @@
 
 .dropdown-item.danger:hover {
   background: #fef2f2;
+}
+
+/* ============================================================
+   1. LARGE LAPTOPS & SMALL DESKTOPS (1500px to 1899px)
+   ============================================================ */
+@media (min-width: 1500px) and (max-width: 1899px) {
+  .nav-container {
+    max-width: 1450px !important;
+    height: 72px; /* Slightly taller */
+  }
+
+  .search-input {
+    width: 350px;
+    height: 42px;
+  }
+
+  .brand-name {
+    font-size: 1.4rem;
+  }
+
+  .avatar {
+    width: 38px;
+    height: 38px;
+  }
+}
+
+/* ============================================================
+   2. 2K MONITORS & WIDE DESKTOPS (1900px to 2299px)
+   ============================================================ */
+@media (min-width: 1900px) and (max-width: 2299px) {
+  .nav-container {
+    max-width: 92% !important;
+    height: 80px;
+    padding: 0 3rem;
+  }
+
+  .logo-icon svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .brand-name {
+    font-size: 1.55rem;
+  }
+
+  .search-input {
+    width: 400px;
+    height: 46px;
+    font-size: 1rem;
+  }
+
+  .avatar {
+    width: 42px;
+    height: 42px;
+  }
+
+  .dn-profile-dropdown {
+    width: 260px;
+  }
+}
+
+/* ============================================================
+   3. ULTRA-WIDE & 4K SCREENS (2300px+)
+   ============================================================ */
+@media (min-width: 2300px) {
+  .nav-container {
+    max-width: 94% !important;
+    height: 95px; /* Significant height for 4K */
+    padding: 0 4rem;
+  }
+
+  /* Scale Branding */
+  .logo-icon {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .logo-icon svg {
+    width: 36px;
+    height: 36px;
+  }
+
+  .brand-name {
+    font-size: 1.85rem;
+  }
+
+  /* Scale Search Bar */
+  .search-input {
+    width: 500px;
+    height: 54px;
+    font-size: 1.2rem;
+    padding: 8px 16px 8px 60px;
+  }
+
+  .search-icon {
+    left: 22px;
+    width: 24px;
+    height: 24px;
+  }
+
+  /* Profile Button and Dropdown */
+  .avatar {
+    width: 52px;
+    height: 52px;
+    font-size: 1.1rem;
+  }
+
+  .profile-name {
+    font-size: 1.2rem;
+  }
+
+  .dn-profile-dropdown {
+    width: 320px;
+    top: calc(100% + 15px);
+  }
+
+  .dropdown-item {
+    padding: 18px 24px;
+    font-size: 1.15rem;
+    gap: 15px;
+  }
+
+  /* Modal Scaling for 4K */
+  div[style*="position: fixed"] > div[style*="background: var(--white)"] {
+    transform: scale(1.25); /* Larger scale for ultra-wide */
+  }
+
+  /* Vessel Status Console 4K Expansion */
+  div[style*="width: 1000px"] {
+    width: 1600px !important;
+    height: 75vh !important;
+  }
+}
+
+@media (min-width:1900px) {
+  .fsize-24 {
+    font-size: 24px !important;
+  }
+
+  .fsize-20 {
+    font-size: 20px !important;
+  }
+
+  .fsize-21 {
+    font-size: 20px !important;
+  }
+
+  .fsize-19 {
+    font-size: 19px !important;
+  }
+
+  .fsize-18 {
+    font-size: 18px !important;
+  }
+
+  .fsize-17 {
+    font-size: 17px !important;
+  }
+
+  .fsize-15 {
+    font-size: 15px !important;
+  }
+
+  .fsize-14 {
+    font-size: 14px !important;
+  }
+
+  .fsize-13 {
+    font-size: 13px !important;
+  }
+
+  .width-500{
+    width: 500px !important;
+  }
 }

@@ -333,62 +333,22 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
   return (
     <div className="thread-container">
       {/* HEADER with Chat Mode Toggle */}
-      <div style={{
-        padding: '12px 15px',
-        borderBottom: '1px solid #e2e8f0',
-        background: '#f8fafc',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          fontWeight: '600',
-          fontSize: '13px',
-          color: '#334155'
-        }}>
-          <MessageSquare size={16} /> Discussion & Updates
+      <div className="thread-header">
+        <div className="thread-title">
+          <MessageSquare size={16} /> <span>Discussion & Updates</span>
         </div>
 
         {isShoreUser && (
-          <div style={{
-            display: 'flex',
-            gap: '4px',
-            background: '#e2e8f0',
-            padding: '3px',
-            borderRadius: '6px'
-          }}>
+          <div className="chat-mode-toggle">
             <button
               onClick={() => setChatMode('external')}
-              style={{
-                padding: '4px 12px',
-                borderRadius: '4px',
-                border: 'none',
-                fontSize: '11px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                background: chatMode === 'external' ? '#ea580c' : 'transparent',
-                color: chatMode === 'external' ? 'white' : '#64748b',
-                transition: 'all 0.2s'
-              }}
+              className={`toggle-btn ${chatMode === 'external' ? 'active-external' : ''}`}
             >
               External
             </button>
             <button
               onClick={() => setChatMode('internal')}
-              style={{
-                padding: '4px 12px',
-                borderRadius: '4px',
-                border: 'none',
-                fontSize: '11px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                background: chatMode === 'internal' ? '#3b82f6' : 'transparent',
-                color: chatMode === 'internal' ? 'white' : '#64748b',
-                transition: 'all 0.2s'
-              }}
+              className={`toggle-btn ${chatMode === 'internal' ? 'active-internal' : ''}`}
             >
               Internal
             </button>
@@ -408,7 +368,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
         }}
       >
         {threads.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+          <p className="empty-thread-text" style={{ textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
             {chatMode === 'internal'
               ? 'No internal messages yet.'
               : 'No messages yet.'}
@@ -429,10 +389,10 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
                       textAlign: 'center',
                       boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
                     }}>
-                      <div style={{ color: '#15803d', fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.05em' }}>
+                      <div className="closure-label" style={{ color: '#15803d', fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.05em' }}>
                         Closure Remark
                       </div>
-                      <div style={{
+                      <div className="closure-body" style={{
                         color: '#44403c',
                         fontSize: '13px',
                         fontWeight: '500',
@@ -451,7 +411,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
               // ✅ OLD UI: Remains exactly as it was for standard system messages
               return (
                 <div key={t.id} style={{ textAlign: 'center', margin: '15px 0' }}>
-                  <span style={{
+                  <span className="system-pill" style={{
                     background: '#f1f5f9',
                     fontSize: '11px',
                     padding: '4px 12px',
@@ -504,7 +464,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
                     marginBottom: '4px',
                     gap: '10px'
                   }}>
-                    <strong style={{ fontSize: '13px', color: messageTextColor }}>
+                    <strong className='thread-author' style={{ fontSize: '13px', color: messageTextColor }}>
                       {t.author || t.author_role}
                       {/* {t.is_internal && (
                         <span style={{
@@ -520,11 +480,11 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
                         </span>
                       )} */}
                     </strong>
-                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                    <span className='thread-author-time' style={{ fontSize: '11px', color: '#94a3b8' }}>
                       {new Date(t.created_at).toLocaleString()}
                     </span>
                   </div>
-                  <p style={{ fontSize: '14px', color: '#334155', margin: '0' }}>{t.body}</p>
+                  <p className='thread-body' style={{ fontSize: '14px', color: '#334155', margin: '0' }}>{t.body}</p>
                   {t.attachments?.length > 0 && (
                     <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {t.attachments.map(a => <AttachmentLink key={a.id} attachment={a} />)}
@@ -559,7 +519,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
               minWidth: 0,
               overflow: 'hidden'
             }}>
-              <h4 style={{
+              <h4 className='closure-hearder' style={{
                 margin: '0 0 5px 0',
                 color: '#9a3412',
                 fontSize: '14px',
@@ -567,7 +527,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
               }}>
                 Closure Requested
               </h4>
-              <p style={{
+              <p className='closure-remark' style={{
                 margin: 0,
                 fontSize: '13px',
                 color: '#334155',
@@ -590,6 +550,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
                   flexWrap: 'wrap'
                 }}>
                   <button
+                    className='closre-btn-accept'
                     onClick={() => handleDecision('ACCEPT')}
                     style={{
                       background: '#16a34a',
@@ -610,6 +571,8 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
                   </button>
                   <button
                     onClick={() => handleDecision('REJECT')}
+                    className='closre-btn-accept'
+
                     style={{
                       background: '#dc2626',
                       color: 'white',
@@ -629,7 +592,9 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
                   </button>
                 </div>
               ) : (
-                <div style={{
+                <div
+                className='closure-remark' 
+                style={{
                   fontSize: '12px',
                   color: '#ea580c',
                   fontWeight: '600'
@@ -650,7 +615,9 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
           background: chatMode === 'internal' ? '#eff6ff' : 'white'
         }}>
           {chatMode === 'internal' && (
-            <div style={{
+            <div 
+            className='closed-thread'
+            style={{
               marginBottom: '8px',
               fontSize: '11px',
               color: '#3b82f6',
@@ -665,6 +632,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
 
           <div style={{ position: 'relative' }}>
             <textarea
+              className='input-thread-text'
               style={{
                 width: '100%',
                 border: chatMode === 'internal' ? '2px solid #3b82f6' : '1px solid #cbd5e1',
@@ -733,6 +701,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
 
                   return (
                     <div
+                     className='empty-thread-text'
                       key={u.id}
                       onClick={() => selectMention(u)}
                       style={{
@@ -755,7 +724,9 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
                       </div>
 
                       {isShore && (
-                        <span style={{
+                        <span
+                        className='closed-thread' 
+                        style={{
                           fontSize: '9px',
                           background: '#dbeafe',
                           color: '#1e40af',
@@ -776,6 +747,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
 
           <div style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
             <label
+             className='empty-thread-text'
               style={{
                 cursor: 'pointer',
                 color: '#64748b',
@@ -792,7 +764,9 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
           </div>
         </div>
       ) : (
-        <div style={{
+        <div
+        className='empty-thread-text'
+         style={{
           padding: '12px',
           borderTop: '1px solid #e2e8f0',
           textAlign: 'center',
@@ -912,11 +886,11 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
     <div style={{ padding: '12px', background: isClosed ? '#f8fafc' : 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
       {/* HEADER */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-        <h4 style={{ margin: 0, fontSize: '13px', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <h4 className='closed-defect-td' style={{ margin: 0, fontSize: '13px', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <ImageIcon size={14} />
           {type === 'before' ? 'Before' : 'After'}
           {totalCount > 0 && (
-            <span style={{ fontSize: '10px', background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: '10px', fontWeight: '600' }}>
+            <span className='closed-thread' style={{ fontSize: '10px', background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: '10px', fontWeight: '600' }}>
               {totalCount} {totalCount === 1 ? 'Image' : 'Images'}
             </span>
           )}
@@ -925,6 +899,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
           {!isClosed && onToggleRequired && (
             <div
               onClick={(e) => { e.stopPropagation(); onToggleRequired(); }}
+              className='closed-thread'
               style={{
                 cursor: 'pointer', padding: '4px 8px', borderRadius: '12px',
                 border: isMandatory ? '1px solid #dc2626' : '1px solid #3b82f6',
@@ -941,6 +916,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
           )}
           {totalCount > 0 && (
             <button
+              className='closre-btn-accept'
               onClick={() => setShowSidebar(true)}
               style={{ background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
             >
@@ -966,6 +942,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
                 >
                   <span
                     onClick={() => setLocalPreviewIndex(idx)}  // ✅ Click to preview
+                    className='closed-defect-td'
                     style={{
                       fontSize: '13px', color: '#2563eb',
                       textDecoration: 'underline', cursor: 'pointer',
@@ -992,6 +969,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
             <input type="file" multiple accept="image/*" id={`${type}-upload-${defectId}`} onChange={handleFileChange} hidden />
             <label
               htmlFor={`${type}-upload-${defectId}`}
+              className='closre-btn-accept'
               style={{
                 cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px',
                 color: '#ea580c', fontWeight: '600', fontSize: '11px', padding: '6px 10px',
@@ -1006,6 +984,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
 
             {previewImages.length > 0 && (
               <button
+              className='closre-btn-accept'
                 onClick={handleUpload}
                 disabled={isUploading}
                 style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '4px', padding: '6px 10px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
@@ -1018,14 +997,14 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
       )}
 
       {isClosed && (
-        <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', padding: '8px' }}>
+        <div className='closre-btn-accept' style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', padding: '8px' }}>
           <Lock size={12} style={{ display: 'inline', marginRight: '4px' }} />
           Upload disabled (Defect closed)
         </div>
       )}
 
       {isMandatory && (
-        <div style={{ marginTop: '8px', background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '4px', padding: '6px', fontSize: '10px', color: '#92400e', fontWeight: '600', textAlign: 'center' }}>
+        <div className='closed-thread' style={{ marginTop: '8px', background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '4px', padding: '6px', fontSize: '10px', color: '#92400e', fontWeight: '600', textAlign: 'center' }}>
           ⚠️ MANDATORY
         </div>
       )}
@@ -1096,6 +1075,7 @@ const ImageGalleryModal = ({ images, initialIndex = 0, onClose }) => {
       {images.length > 1 && (
         <>
           <button
+            className='image-size-hearer'
             onClick={(e) => { e.stopPropagation(); handlePrev(); }}
             style={{
               position: 'absolute',
@@ -1114,6 +1094,7 @@ const ImageGalleryModal = ({ images, initialIndex = 0, onClose }) => {
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); handleNext(); }}
+            className='image-size-hearer'
             style={{
               position: 'absolute',
               right: '20px',
@@ -1143,7 +1124,7 @@ const ImageGalleryModal = ({ images, initialIndex = 0, onClose }) => {
             borderRadius: '8px'
           }}
         />
-        <p style={{ color: 'white', marginTop: '15px', fontSize: '14px' }}>
+        <p className='closure-hearder' style={{ color: 'white', marginTop: '15px', fontSize: '14px' }}>
           {currentIndex + 1} / {images.length} - {images[currentIndex].name}
         </p>
       </div>
@@ -1209,7 +1190,7 @@ const ImageSidebar = ({ images, onClose, title }) => {
           alignItems: 'center',
           background: '#f8fafc'
         }}>
-          <h3 style={{ margin: 0, fontSize: '15px', color: '#334155', fontWeight: '700' }}>
+          <h3 className='closure-hearder' style={{ margin: 0, fontSize: '15px', color: '#334155', fontWeight: '700' }}>
             {title} ({images.length})
           </h3>
           <button
@@ -1276,7 +1257,7 @@ const ImageSidebar = ({ images, onClose, title }) => {
                     color: 'white',
                     pointerEvents: 'none'
                   }}>
-                    <p style={{
+                    <p className='closure-remark' style={{
                       margin: 0,
                       fontSize: '11px',
                       fontWeight: '600',
@@ -2187,7 +2168,7 @@ const ShoreDashboard = () => {
 
   const calculateColspan = () => {
     // Start at 2 to account for: 1. S.No column AND 2. Vessel column
-    let count = 2;
+    let count = 3;
 
     if (isColumnVisible('date')) count++;
     if (isColumnVisible('deadline')) count++;
@@ -2614,110 +2595,74 @@ const ShoreDashboard = () => {
       <div className="table-card">
         <div className='table-action-bar'>
           {/* LEFT: Create Defect Button */}
-          <button
-            onClick={() => {
-              setCurrentPage(1);
-              setShowCreateRow(true);
-            }}
+          <div className="action-buttons-group">
+            <button
+              onClick={() => {
+                setCurrentPage(1);
+                setShowCreateRow(true);
+              }}
 
-            disabled={showCreateRow}
-            style={{
-              background: '#ea580c',
-              color: 'white',
-              border: 'none',
-              padding: '8px 14px',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontWeight: '600',
-              marginLeft: '10px',
-              cursor: showCreateRow ? 'not-allowed' : 'pointer'
-            }}
-          >
-            + Create Defect
-          </button>
+              disabled={showCreateRow}
+              className="btn-create-defect-main"
+            >
+              + Create Defect
+            </button>
 
-          {['admin@ozellar.com', 'techdevops@ozellar.com'].includes(user?.email) && (
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={() => setShowPrSync(prev => !prev)}
-                style={{
-                  background: '#0f172a',
-                  color: 'white',
-                  border: 'none',
-                  padding: '8px 14px',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <RefreshCw size={14} />
-                PR Sync
-              </button>
-              {showPrSync && (
-                <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 1000 }}>
-                  <PrSyncManager onClose={() => setShowPrSync(false)} />
-                </div>
-              )}
-            </div>
-          )}
+            {['admin@ozellar.com', 'techdevops@ozellar.com'].includes(user?.email) && (
+              <div className="pr-sync-wrapper">
+                <button
+                  onClick={() => setShowPrSync(prev => !prev)}
+                  className="btn-pr-sync"
+                >
+                  <RefreshCw size={14} />
+                  <span className="btn-text">PR Sync</span>
+                </button>
+                {showPrSync && (
+                  <div className="pr-sync-popover">
+                    <PrSyncManager onClose={() => setShowPrSync(false)} />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* RIGHT: Legend */}
           <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '10px 14px',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              fontSize: '13px',
-              color: '#334155',
-              gap: '24px'
-            }}
+            className="legend-container"
           >
             {/* PRIORITY */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="legend-item">
               <strong>Priority:</strong>
-              <span style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <AlertTriangle size={14} color="#16a34a" /> Low
-                <AlertTriangle size={14} color="#2563eb" /> Medium
-                <AlertTriangle size={14} color="#f97316" /> High
-                <AlertTriangle size={14} color="#dc2626" /> Critical
+              <span className="legend-icons">
+                <AlertTriangle size={14} color="#16a34a" /> <label>Low</label>
+                <AlertTriangle size={14} color="#2563eb" /> <label>Medium</label>
+                <AlertTriangle size={14} color="#f97316" /> <label>High</label>
+                <AlertTriangle size={14} color="#dc2626" /> <label>Critical</label>
               </span>
             </div>
 
             {/* STATUS */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="legend-item">
               <strong>Status:</strong>
-              <span style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <Flower size={14} color="#3b82f6" />Open
-                <Flower size={14} color="#f59e0b" />Pending Closure
-                <Flower size={14} color="#22c55e" />Closed
+              <span className="legend-icons">
+                <Flower size={14} color="#3b82f6" /><label>Open</label>
+                <Flower size={14} color="#f59e0b" /><label>Pending</label>
+                <Flower size={14} color="#22c55e" /><label>Closed</label>
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="legend-item">
               <strong>Due Date:</strong>
-              <span style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <Clock size={14} color="#16a34a" /> Normal
-                <Clock size={14} color="#f59e0b" /> ≤15 Days
-                <Clock size={14} color="#dc2626" /> Overdue
+              <span className="legend-icons">
+                <Clock size={14} color="#16a34a" /> <label>Normal</label>
+                <Clock size={14} color="#f59e0b" /> <label>≤15d</label>
+                <Clock size={14} color="#dc2626" /> <label>Overdue</label>
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="legend-item">
               <strong>Other:</strong>
-              <span style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <Flag size={14} color="#e8290b" fill="#e8290b" /> Flagged
-                <div style={{
-                  width: '17px', height: '17px', borderRadius: '50%',
-                  border: '2px solid #0ea5e9', background: '#e0f2fe',
-                  color: '#0ea5e9', fontSize: '9px', fontWeight: '900',
-                  display: 'inline-flex', alignItems: 'center',
-                  justifyContent: 'center', fontFamily: 'monospace'
-                }}>DD</div> Dry Dock
+              <span className="legend-icons">
+                <Flag size={14} color="#e8290b" fill="#e8290b" /> <label>Flag</label>
+                <div className="dd-icon-small">DD</div> <label>DryDock</label>
               </span>
             </div>
           </div>
@@ -3232,7 +3177,7 @@ const ShoreDashboard = () => {
                       >
 
 
-                        <td style={{ textAlign: "center", fontWeight: 600, fontSize: '12px', color: '#1e293b', whiteSpace: 'nowrap' }}>
+                        <td style={{ textAlign: "center", fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap' }}>
                           <div id={`row-${defect.id}`} className="row-anchor" />
                           {defect.defect_number || `#${(currentPage - 1) * pageSize + index + 1}`}
                         </td>
@@ -3319,7 +3264,7 @@ const ShoreDashboard = () => {
                                         }}
                                         style={{
                                           cursor: 'pointer',
-                                          fontSize: '13px',
+                                          // fontSize: '13px',
                                           display: '-webkit-box',
                                           WebkitLineClamp: 2,
                                           WebkitBoxOrient: 'vertical',
@@ -3355,7 +3300,7 @@ const ShoreDashboard = () => {
                                             marginTop: '4px',
                                             zIndex: 50,
                                             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                            fontSize: '13px'
+                                            // fontSize: '13px'
                                           }}
                                         >
                                           <textarea
@@ -3365,7 +3310,7 @@ const ShoreDashboard = () => {
                                             style={{
                                               width: '100%',
                                               minHeight: '80px',
-                                              fontSize: '13px',
+                                              // fontSize: '13px',
                                               padding: '6px',
                                               border: '1px solid #cbd5e1',
                                               borderRadius: '4px',
@@ -3437,7 +3382,7 @@ const ShoreDashboard = () => {
                                         }}
                                         style={{
                                           cursor: 'pointer',
-                                          fontSize: '13px',
+                                          // fontSize: '13px',
                                           display: '-webkit-box',
                                           WebkitLineClamp: 2,
                                           WebkitBoxOrient: 'vertical',
@@ -3469,7 +3414,7 @@ const ShoreDashboard = () => {
                                             zIndex: 50,
                                             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                                             whiteSpace: 'pre-wrap',
-                                            fontSize: '13px',
+                                            // fontSize: '13px',
                                             textTransform: 'uppercase',
 
                                           }}
@@ -3761,7 +3706,9 @@ const ShoreDashboard = () => {
                             <td colSpan={calculateColspan()} style={{ padding: 0 }}>
                               <div style={{ background: '#f8fafc', padding: '20px', borderBottom: '1px solid #e2e8f0' }}>
                                 {isClosed && (
-                                  <div style={{
+                                  <div
+                                  className='closed-defect-td' 
+                                  style={{
                                     background: '#fef3c7',
                                     border: '1px solid #fbbf24',
                                     borderRadius: '8px',
@@ -3778,7 +3725,7 @@ const ShoreDashboard = () => {
                                     CLOSED - Read Only Mode (All editing disabled)
                                   </div>
                                 )}
-                                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', height: "450px" }}>
+                                <div className='thread-td-height' style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', height: "450px" }}>
                                   <ThreadSection
                                     defectId={defect.id}
                                     defectStatus={defect.status}
@@ -3831,7 +3778,7 @@ const ShoreDashboard = () => {
                         className="ghost-select"
                         value={newDefect.vessel_imo}
                         onChange={(e) => setNewDefect(prev => ({ ...prev, vessel_imo: e.target.value }))}
-                        style={{ width: '100%' }}
+                        style={{ width: '100%', boxSizing: 'border-box', maxWidth: '100%' }}
                       >
                         <option value="">Select Vessel...</option>
                         {vessels.map((v) => (
@@ -3849,21 +3796,21 @@ const ShoreDashboard = () => {
                           return (
                             <td key="date" style={{ width: columnWidths.date_identified }}>
                               <input type="date" className="ghost-input" value={newDefect.date_identified}
-                                onChange={(e) => setNewDefect(prev => ({ ...prev, date_identified: e.target.value }))} style={{ width: '100%' }} />
+                                onChange={(e) => setNewDefect(prev => ({ ...prev, date_identified: e.target.value }))} style={{ width: '100%', boxSizing: 'border-box', maxWidth: '100%' }} />
                             </td>
                           );
                         case 'deadline':
                           return (
                             <td key="deadline" style={{ width: columnWidths.target_close_date }}>
                               <input type="date" className="ghost-input" value={newDefect.target_close_date}
-                                onChange={(e) => setNewDefect(prev => ({ ...prev, target_close_date: e.target.value }))} style={{ width: '100%' }} />
+                                onChange={(e) => setNewDefect(prev => ({ ...prev, target_close_date: e.target.value }))} style={{ width: '100%', boxSizing: 'border-box', maxWidth: '100%' }} />
                             </td>
                           );
                         case 'source':
                           return (
                             <td key="source" style={{ width: columnWidths.defect_source, minWidth: "90px" }}>
                               <select className="ghost-select" value={newDefect.defect_source}
-                                onChange={(e) => setNewDefect(prev => ({ ...prev, defect_source: e.target.value }))} style={{ width: '100%' }}>
+                                onChange={(e) => setNewDefect(prev => ({ ...prev, defect_source: e.target.value }))} style={{ width: '100%', boxSizing: 'border-box', maxWidth: '100%' }}>
                                 {DEFECT_SOURCE_OPTIONS.map(src => <option key={src} value={src}>{getDefectSourceLabel(src)}</option>)}
                               </select>
                             </td>
@@ -3872,7 +3819,7 @@ const ShoreDashboard = () => {
                           return (
                             <td key="equipment" style={{ width: columnWidths.equipment, minWidth: "105px" }}>
                               <select className="ghost-select" value={newDefect.equipment_name}
-                                onChange={(e) => setNewDefect(prev => ({ ...prev, equipment_name: e.target.value }))} style={{ width: '100%' }}>
+                                onChange={(e) => setNewDefect(prev => ({ ...prev, equipment_name: e.target.value }))} style={{ width: '100%', boxSizing: 'border-box', maxWidth: '100%' }}>
                                 <option value="">Select Area of Concern…</option>
                                 {COMPONENT_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                               </select>
@@ -3882,14 +3829,14 @@ const ShoreDashboard = () => {
                           return (
                             <td key="description" style={{ width: columnWidths.description, minWidth: "10px", position: 'relative' }}>
                               <div onClick={(e) => { e.stopPropagation(); setExpandedDescId('CREATE_NEW'); }}
-                                style={{ cursor: 'pointer', fontSize: '13px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.4', maxHeight: '2.8em', textDecoration: 'underline', textDecorationStyle: 'dashed', textDecorationColor: '#cbd5e1', textUnderlineOffset: '2px', textTransform: 'uppercase', minHeight: '2.8em', color: newDefect.description ? '#1e293b' : '#94a3b8' }}>
+                                style={{ cursor: 'pointer', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.4', maxHeight: '2.8em', textDecoration: 'underline', textDecorationStyle: 'dashed', textDecorationColor: '#cbd5e1', textUnderlineOffset: '2px', textTransform: 'uppercase', minHeight: '2.8em', color: newDefect.description ? '#1e293b' : '#94a3b8' }}>
                                 {newDefect.description || 'Click to enter description…'}
                               </div>
                               {expandedDescId === 'CREATE_NEW' && (
-                                <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: '100%', left: 0, width: '100%', background: 'white', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '10px', marginTop: '4px', zIndex: 50, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '13px' }}>
-                                  <textarea autoFocus value={newDefect.description} onChange={(e) => setNewDefect(prev => ({ ...prev, description: e.target.value }))} placeholder="Enter description…" style={{ width: '100%', minHeight: '80px', fontSize: '13px', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', resize: 'vertical', textTransform: 'uppercase' }} />
+                                <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: '100%', left: 0, width: '100%', background: 'white', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '10px', marginTop: '4px', zIndex: 50, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+                                  <textarea autoFocus value={newDefect.description} onChange={(e) => setNewDefect(prev => ({ ...prev, description: e.target.value }))} placeholder="Enter description…" style={{ width: '100%', minHeight: '80px', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '4px', resize: 'vertical', textTransform: 'uppercase' }} />
                                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
-                                    <button onClick={() => setExpandedDescId(null)} style={{ background: '#ea580c', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 10px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Done</button>
+                                    <button onClick={() => setExpandedDescId(null)} style={{ background: '#ea580c', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 10px', fontWeight: '600', cursor: 'pointer' }}>Done</button>
                                     <button onClick={() => setExpandedDescId(null)} style={{ background: 'transparent', border: 'none', color: '#ea580c', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Close</button>
                                   </div>
                                 </div>
@@ -3898,7 +3845,7 @@ const ShoreDashboard = () => {
                           );
                         case 'priority':
                           return (
-                            <td key="priority" style={{ width: 20 }}>
+                            <td key="priority" style={{ width: 20,overflow: 'hidden' }}>
                               <FloatingSelectWithIcon icon={getPriorityIcon(newDefect.priority)} value={newDefect.priority} options={PRIORITY_OPTIONS} iconRenderer={getPriorityIcon} onChange={(val) => setNewDefect(prev => ({ ...prev, priority: val }))} />
                             </td>
                           );
@@ -3906,7 +3853,7 @@ const ShoreDashboard = () => {
                         // ✅ ADDED: Owner Selection Column
                         case 'owner':
                           return (
-                            <td key="owner" style={{ width: 24 }}>
+                            <td key="owner" style={{ width: 24 ,overflow: 'hidden'}}>
                               <OwnerFloatingSelectWithIcon
                                 icon={getOwnerIcon(newDefect.is_owner)}
                                 value={newDefect.is_owner}
@@ -3924,13 +3871,13 @@ const ShoreDashboard = () => {
 
                         case 'status':
                           return (
-                            <td key="status" style={{ width: 20 }}>
+                            <td key="status" style={{ width: 20,overflow: 'hidden' }}>
                               <FloatingSelectWithIcon icon={getStatusIcon(newDefect.status)} value={newDefect.status} options={STATUS_OPTIONS} iconRenderer={getStatusIcon} onChange={(val) => setNewDefect(prev => ({ ...prev, status: val }))} />
                             </td>
                           );
                         case 'deadline_icon':
                           return (
-                            <td key="deadline_icon" style={{ width: 20, textAlign: 'center' }}>
+                            <td key="deadline_icon" style={{ width: 20, textAlign: 'center',overflow: 'hidden' }}>
                               <Clock size={20} color="#94a3b8" title="Set due date first" />
                             </td>
                           );
@@ -3943,7 +3890,7 @@ const ShoreDashboard = () => {
 
                         case 'flag':
                           return (
-                            <td key="flag" style={{ width: 24, textAlign: 'center' }}>
+                            <td key="flag" style={{ width: 24, textAlign: 'center',overflow: 'hidden' }}>
                               <div
                                 onClick={() => setNewDefect(prev => ({ ...prev, is_flagged: !prev.is_flagged }))}
                                 style={{ cursor: 'pointer', display: 'inline-flex', padding: '4px', borderRadius: '4px' }}
@@ -3956,7 +3903,7 @@ const ShoreDashboard = () => {
 
                         case 'dd':
                           return (
-                            <td key="dd" style={{ width: 24, textAlign: 'center' }}>
+                            <td key="dd" style={{ width: 24, textAlign: 'center',overflow: 'hidden' }}>
                               <div
                                 onClick={() => setNewDefect(prev => ({ ...prev, is_dd: !prev.is_dd }))}
                                 style={{ cursor: 'pointer', display: 'inline-flex', padding: '4px', borderRadius: '4px' }}
@@ -3972,7 +3919,7 @@ const ShoreDashboard = () => {
                     })}
 
                     {/* Action Column */}
-                    <td style={{ textAlign: 'center', width: 60 }} colSpan={isEditMode ? 2 : 1}>
+                    <td style={{ textAlign: 'center', width: 60 }} colSpan={isEditMode ? 4 : 3}>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
                         <button
                           onClick={handleCreateSave}
@@ -4128,22 +4075,22 @@ const DraggableTh = ({ id, children, disabled, style }) => {
     transform: transform ? CSS.Transform.toString(transform) : undefined,
     transition,
     opacity: disabled ? 1 : 0.95,
+    cursor: disabled ? 'default' : 'grab',
     ...style
   };
 
-
   return (
-    <th ref={setNodeRef} style={fstyle}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-        {!disabled && (
-          <span
-            {...attributes}
-            {...listeners}
-            style={{ cursor: 'grab', display: 'flex' }}
-          >
-            <ArrowRightLeft size={10} />
-          </span>
-        )}
+    <th
+      ref={setNodeRef}
+      style={fstyle}
+      {...(!disabled ? attributes : {})}
+      {...(!disabled ? listeners : {})}
+    >
+      <div
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        style={{ display: 'flex', alignItems: 'center' }}
+      >
         {children}
       </div>
     </th>

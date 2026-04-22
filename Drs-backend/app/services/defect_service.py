@@ -192,7 +192,10 @@ class DefectService:
         await db.refresh(new_defect, attribute_names=["pr_entries"])
 
         # --- Notifications (non-blocking, separate commit so main write is safe) ---
-        vessel = await control_db.get(Vessel, defect_in.vessel_imo)
+        vessel_result = await control_db.execute(
+            select(Vessel).where(Vessel.imo == defect_in.vessel_imo)
+        )
+        vessel = vessel_result.scalars().first()
         vessel_name = vessel.name if vessel else defect_in.vessel_imo
         try:
             await notify_vessel_users(
@@ -399,7 +402,10 @@ class DefectService:
         if notification_task or priority_changed:
             logger.info(f"[DEBUG] priority_changed={priority_changed}, notification_task={notification_task}")
             try:
-                vessel = await control_db.get(Vessel, defect.vessel_imo)
+                vessel_result = await control_db.execute(
+                    select(Vessel).where(Vessel.imo == defect.vessel_imo)
+                )
+                vessel = vessel_result.scalars().first()
                 logger.info(f"[DEBUG] vessel={vessel}, vessel_imo={defect.vessel_imo}")
                 vessel_name = vessel.name if vessel else defect.vessel_imo
 
@@ -547,7 +553,10 @@ class DefectService:
         await db.refresh(defect, attribute_names=["pr_entries"])
 
         try:
-            vessel = await control_db.get(Vessel, defect.vessel_imo)
+            vessel_result = await control_db.execute(
+                select(Vessel).where(Vessel.imo == defect.vessel_imo)
+            )
+            vessel = vessel_result.scalars().first()
             vessel_name = vessel.name if vessel else defect.vessel_imo
             await notify_vessel_users(
                 db=db,

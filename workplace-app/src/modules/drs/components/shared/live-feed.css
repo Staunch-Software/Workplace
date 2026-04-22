@@ -1,0 +1,1967 @@
+/* --- Base Wrapper --- */
+.tooltip-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* --- Tooltip Bubble --- */
+.tooltip-bubble {
+  position: absolute;
+  bottom: 115%; /* Slight gap from the element */
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 9999;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: opacity 0.2s ease;
+}
+
+/* --- The Triangle Arrow --- */
+.tooltip-arrow {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid #1e293b;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   RESPONSIVE OVERRIDES
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* --- Mobile Devices (320px to 480px) --- */
+@media (max-width: 480px) {
+  .tooltip-bubble {
+    /* On tiny screens, nowrap can cause overflow. 
+       We allow wrapping and set a max-width */
+    white-space: normal;
+    min-width: 120px;
+    max-width: 180px;
+    text-align: center;
+    padding: 8px;
+    font-size: 11px;
+  }
+}
+
+/* --- Large Desktop / QHD (2560px) --- */
+@media (min-width: 2500px) {
+  .tooltip-bubble {
+    padding: 10px 16px;
+    font-size: 18px; /* Larger text for high res */
+    border-radius: 10px;
+    bottom: 120%;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+  .tooltip-arrow {
+    border-left-width: 8px;
+    border-right-width: 8px;
+    border-top-width: 8px;
+  }
+}
+
+/* --- 4K Big Screens (3840px+) --- */
+@media (min-width: 3800px) {
+  .tooltip-bubble {
+    padding: 14px 22px;
+    font-size: 24px; /* Scaled for 4K visibility */
+    border-radius: 12px;
+    bottom: 125%;
+  }
+  .tooltip-arrow {
+    border-left-width: 12px;
+    border-right-width: 12px;
+    border-top-width: 12px;
+  }
+}
+
+
+/* --- Trigger Wrapper --- */
+.desc-tooltip-trigger {
+  position: relative;
+  display: inline;
+}
+
+/* --- Portal Bubble --- */
+.desc-tooltip-portal {
+  position: fixed;
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  max-width: 340px; /* Standard Desktop */
+  z-index: 99999;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-transform: uppercase;
+}
+
+/* --- Base Arrow Triangle --- */
+.desc-tooltip-arrow {
+  position: absolute;
+  left: 12px;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+}
+
+/* Arrow Logic: Tooltip is ABOVE the text, arrow points DOWN */
+.desc-tooltip-portal.is-above .desc-tooltip-arrow {
+  top: 100%;
+  border-top: 5px solid #1e293b;
+}
+
+/* Arrow Logic: Tooltip is BELOW the text, arrow points UP */
+.desc-tooltip-portal.is-below .desc-tooltip-arrow {
+  bottom: 100%;
+  border-bottom: 5px solid #1e293b;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   RESPONSIVE OVERRIDES
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* --- Mobile Devices (Small Screen) --- */
+@media (max-width: 480px) {
+  .desc-tooltip-portal {
+    max-width: 85vw; /* Don't exceed screen width */
+    font-size: 11px;
+    padding: 10px;
+    /* Ensure the tooltip doesn't go off the left edge */
+    left: 10px !important; 
+  }
+}
+
+/* --- Large Desktop / QHD (2560px) --- */
+@media (min-width: 2500px) {
+  .desc-tooltip-portal {
+    max-width: 500px;
+    padding: 14px 20px;
+    font-size: 18px;
+    border-radius: 12px;
+  }
+  .desc-tooltip-arrow {
+    border-left-width: 8px;
+    border-right-width: 8px;
+  }
+  .desc-tooltip-portal.is-above .desc-tooltip-arrow { border-top-width: 8px; }
+  .desc-tooltip-portal.is-below .desc-tooltip-arrow { border-bottom-width: 8px; }
+}
+
+/* --- 4K Big Screens (3840px+) --- */
+@media (min-width: 3800px) {
+  .desc-tooltip-portal {
+    max-width: 700px;
+    padding: 20px 30px;
+    font-size: 26px;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  }
+  .desc-tooltip-arrow {
+    left: 20px;
+    border-left-width: 12px;
+    border-right-width: 12px;
+  }
+  .desc-tooltip-portal.is-above .desc-tooltip-arrow { border-top-width: 12px; }
+  .desc-tooltip-portal.is-below .desc-tooltip-arrow { border-bottom-width: 12px; }
+}
+
+/* --- Select Container --- */
+.custom-select-container {
+  position: relative;
+  min-width: 140px;
+  font-family: inherit;
+}
+
+/* --- Trigger Button --- */
+.select-trigger {
+  width: 100%;
+  padding: 8px 12px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #94a3b8; /* Placeholder color */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.select-trigger.has-value {
+  color: #1e293b;
+}
+
+.select-trigger:hover {
+  border-color: #cbd5e1;
+}
+
+/* --- Chevron Animation --- */
+.select-chevron {
+  color: #94a3b8;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.select-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+/* --- Dropdown Menu --- */
+.select-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  z-index: 1000;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+/* --- Sticky Reset Option --- */
+.select-reset-option {
+  padding: 9px 12px;
+  font-size: 13px;
+  color: #94a3b8;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1;
+}
+
+.select-reset-option:hover {
+  background: #f8fafc;
+}
+
+/* --- List Items --- */
+.select-item {
+  padding: 9px 12px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.select-item:hover {
+  background: #f1f5f9;
+}
+
+.select-item.is-selected {
+  color: #2563eb;
+  background: #eff6ff;
+  font-weight: 600;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   RESPONSIVE OVERRIDES
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* --- Mobile Devices (320px to 480px) --- */
+@media (max-width: 480px) {
+  .custom-select-container {
+    min-width: 100%; /* Fill container on mobile */
+  }
+  .select-trigger {
+    padding: 12px; /* Larger tap target */
+    font-size: 14px;
+  }
+  .select-item, .select-reset-option {
+    padding: 14px 12px; /* Thicker rows for easier thumb-tapping */
+    font-size: 14px;
+  }
+  .select-dropdown {
+    max-height: 200px; /* Shorter dropdown to prevent keyboard overlap */
+  }
+}
+
+/* --- Large Desktop / QHD (2560px) --- */
+@media (min-width: 2500px) {
+  .select-trigger {
+    padding: 12px 18px;
+    font-size: 18px;
+    border-radius: 12px;
+  }
+  .select-item, .select-reset-option {
+    padding: 14px 20px;
+    font-size: 18px;
+  }
+  .select-dropdown {
+    max-height: 450px;
+    border-radius: 12px;
+  }
+}
+
+/* --- 4K Big Screens (3840px+) --- */
+@media (min-width: 3800px) {
+  .custom-select-container {
+    min-width: 280px;
+  }
+  .select-trigger {
+    padding: 18px 26px;
+    font-size: 26px;
+    border-radius: 16px;
+    border-width: 2px;
+  }
+  .select-item, .select-reset-option {
+    padding: 22px 30px;
+    font-size: 26px;
+  }
+  .select-dropdown {
+    max-height: 700px;
+    border-radius: 16px;
+    border-width: 2px;
+    top: calc(100% + 10px);
+  }
+  /* Scale the chevron icon */
+  .select-chevron {
+    transform: scale(1.8);
+  }
+  .select-chevron.is-open {
+    transform: scale(1.8) rotate(180deg);
+  }
+}
+
+/* Custom Scrollbar for the dropdown */
+.select-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+.select-dropdown::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 4px;
+}
+
+.live-feed-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.feed-header {
+  padding: 1.5rem 2rem 0;
+  background: #f8fafc;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.header-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Tabs */
+.tab-switcher {
+  display: flex;
+  gap: 4px;
+  background: #e2e8f0;
+  border-radius: 10px;
+  padding: 4px;
+  width: fit-content;
+}
+
+.tab-btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  background: transparent;
+  color: #64748b;
+  transition: 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tab-btn.is-active {
+  background: white;
+  color: #0f172a;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Filters Toolbar */
+.filter-toolbar {
+  background: white;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 1rem;
+  display: grid;
+  /* Multi-column grid for standard screens */
+  grid-template-columns: repeat(3, minmax(140px, 1fr)) auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.date-picker-group {
+  display: flex;
+  gap: 12px;
+}
+
+.date-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.search-field {
+  position: relative;
+}
+
+.search-field input {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.feed-scroll-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 2rem 2rem;
+}
+@media (max-width: 508px) {
+    .header-top-row {
+    flex-direction: column;
+    align-items: center;
+  }
+  .nav-group{
+    flex-direction: row;
+    gap: 40px;
+  } 
+}
+
+@media (max-width: 768px) {
+  .feed-header {
+    padding: 1rem 1rem 0;
+  }
+
+  .header-top-row {
+    align-items: flex-start;
+  }
+
+  .control-group {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .filter-toolbar {
+    /* Stack filters on mobile */
+    grid-template-columns: 1fr;
+    padding: 0.75rem;
+  }
+
+  .date-picker-group {
+    /* flex-direction: column; */
+    gap: 8px;
+  }
+
+  .date-field {
+    justify-content: space-between;
+  }
+
+  .date-field input {
+    width: 60%;
+  }
+
+  .feed-scroll-container {
+    padding: 0 1rem 1rem;
+  }
+}
+
+@media (min-width: 3800px) {
+  /* Increase base font size */
+  .live-feed-page {
+    font-size: 24px;
+  }
+
+  .feed-header {
+    padding: 3rem 4rem 0;
+  }
+
+  /* Scale Buttons and Tabs */
+  .tab-btn {
+    padding: 20px 40px;
+    font-size: 26px;
+    border-radius: 16px;
+  }
+
+  .unread-badge {
+    padding: 4px 12px;
+    font-size: 18px;
+  }
+
+  /* Scale Filter Bar */
+  .filter-toolbar {
+    padding: 2rem;
+    gap: 30px;
+    border-radius: 24px;
+    border-width: 3px;
+  }
+
+  .search-field input {
+    padding: 24px 24px 24px 70px;
+    font-size: 26px;
+    border-radius: 16px;
+  }
+
+  .search-icon {
+    left: 25px;
+    transform: scale(2);
+  }
+
+  .date-field {
+    font-size: 18px;
+    gap: 15px;
+  }
+
+  .date-field input {
+    padding: 15px;
+    font-size: 22px;
+    border-radius: 12px;
+  }
+
+  /* Scale scroll area */
+  .feed-scroll-container {
+    padding: 0 4rem 4rem;
+    gap: 20px;
+  }
+  
+  /* Refresh spinning icon scale */
+  .icon-sm {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* --- Base Tab Container --- */
+.tab-container {
+  display: flex;
+  gap: 4px;
+  background: #e2e8f0;
+  border-radius: 10px;
+  padding: 3px;
+  width: fit-content;
+}
+
+/* --- Base Tab Button --- */
+.tab-btn {
+  padding: 6px 18px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  background: transparent;
+  color: #64748b;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* --- Active State --- */
+.tab-btn.active {
+  background: white;
+  color: #0f172a;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* --- Mention Badge --- */
+.tab-badge {
+  background: #3b82f6;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  line-height: 1.4;
+}
+
+/* --- Icon Sizing --- */
+.tab-icon {
+  width: 13px;
+  height: 13px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   RESPONSIVE OVERRIDES
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* --- Mobile Devices (320px to 480px) --- */
+@media (max-width: 480px) {
+  .tab-container {
+    width: 100%; /* Tabs take full width on mobile */
+    gap: 2px;
+  }
+  .tab-btn {
+    flex: 1; /* Equal width tabs */
+    justify-content: center;
+    padding: 10px 5px; /* Larger touch target */
+    font-size: 12px;
+  }
+  .tab-badge {
+    padding: 1px 4px;
+    font-size: 9px;
+  }
+}
+
+/* --- Large Desktop / QHD (2560px) --- */
+@media (min-width: 2500px) {
+  .tab-container {
+    border-radius: 15px;
+    padding: 5px;
+    gap: 8px;
+  }
+  .tab-btn {
+    padding: 10px 28px;
+    font-size: 18px;
+    border-radius: 12px;
+    gap: 10px;
+  }
+  .tab-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .tab-badge {
+    font-size: 14px;
+    padding: 2px 8px;
+  }
+}
+
+/* --- 4K Big Screens (3840px+) --- */
+@media (min-width: 3800px) {
+  .tab-container {
+    border-radius: 20px;
+    padding: 8px;
+    gap: 12px;
+  }
+  .tab-btn {
+    padding: 16px 45px;
+    font-size: 28px;
+    border-radius: 16px;
+    gap: 15px;
+  }
+  .tab-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .tab-badge {
+    font-size: 20px;
+    padding: 4px 12px;
+    border-radius: 20px;
+  }
+}
+
+/* --- Base Summary Styles --- */
+.feed-summary-text {
+  margin: 4px 0 0; /* Increased slightly from 2px for better baseline alignment */
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.filter-context {
+  color: #94a3b8;
+}
+
+.refreshing-indicator {
+  margin-left: 8px;
+  color: #60a5fa;
+  font-weight: 600;
+  display: inline-block;
+  /* Optional: adds a subtle pulse to the "Refreshing" text */
+  animation: pulse 2s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   RESPONSIVE OVERRIDES
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* --- Mobile Devices (320px to 480px) --- */
+@media (max-width: 480px) {
+  .feed-summary-text {
+    font-size: 14px; /* Slightly larger for mobile readability */
+    margin-top: 8px; /* More space between tabs and this text on mobile */
+    text-align: center; /* Center align if tabs are full width */
+    width: 100%;
+  }
+  .refreshing-indicator {
+    display: block; /* Move to own line on very small screens if crowded */
+    margin-left: 0;
+    margin-top: 2px;
+  }
+}
+
+/* --- Large Desktop / QHD (2560px) --- */
+@media (min-width: 2500px) {
+  .feed-summary-text {
+    font-size: 18px;
+    margin-top: 8px;
+  }
+  .refreshing-indicator {
+    margin-left: 12px;
+  }
+}
+
+/* --- 4K Big Screens (3840px+) --- */
+@media (min-width: 3800px) {
+  .feed-summary-text {
+    font-size: 26px; /* Scaled for 4K visibility */
+    margin-top: 12px;
+  }
+  .refreshing-indicator {
+    margin-left: 20px;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   1. DESIGN SYSTEM VARIABLES
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  --bg-main: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-dark: #1e293b;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --text-inv: #f8fafc;
+  --accent: #3b82f6;
+  --border: #e2e8f0;
+  --border-heavy: #cbd5e1;
+
+  --transition: 0.2s ease;
+  
+  /* Desktop Defaults */
+  --font-size-xs: 10px;
+  --font-size-sm: 12px;
+  --font-size-md: 13px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 20px;
+  --tooltip-width: 340px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   2. CORE LAYOUT
+   ────────────────────────────────────────────────────────────────────────── */
+.live-feed-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-main);
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.feed-header {
+  padding: var(--spacing-lg) var(--spacing-lg) 0;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.header-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+  gap: var(--spacing-md);
+}
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.feed-scroll-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 var(--spacing-lg) var(--spacing-lg);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   3. COMPONENTS (Tooltips, Selects, Tabs)
+   ────────────────────────────────────────────────────────────────────────── */
+.tooltip-bubble, .desc-tooltip-portal {
+  background: var(--bg-dark);
+  color: var(--text-inv);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  z-index: 99999;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.desc-tooltip-portal {
+  position: fixed;
+  max-width: var(--tooltip-width);
+  line-height: 1.6;
+  text-transform: uppercase;
+}
+
+.tab-container {
+  display: flex;
+  gap: 4px;
+  background: var(--border);
+  border-radius: var(--radius-lg);
+  padding: 4px;
+  width: fit-content;
+}
+
+.tab-btn {
+  padding: 8px 18px;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  background: transparent;
+  color: var(--text-muted);
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-btn.active, .tab-btn.is-active {
+  background: white;
+  color: var(--bg-dark);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.filter-toolbar {
+  background: white;
+  border: 1.5px solid var(--border-heavy);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  display: grid;
+  /* Default Desktop: 3 selects, then flexible search/dates */
+  grid-template-columns: repeat(3, minmax(130px, 1fr)) auto 1fr auto;
+  gap: var(--spacing-md);
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.search-field input {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-main);
+  font-size: var(--font-size-md);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   4. RESPONSIVE: MOBILE (Up to 480px)
+   ────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  :root { --spacing-lg: 12px; --font-size-md: 14px; }
+
+  .header-top-row { flex-direction: column; }
+  .nav-group { flex-direction: row; width: 100%; justify-content: center; }
+  .tab-container { width: 100%; }
+  .tab-btn { flex: 1; justify-content: center; padding: 12px 4px; }
+  .filter-toolbar { grid-template-columns: 1fr; }
+  .feed-summary-text { text-align: center; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   5. RESPONSIVE: TABLET (481px to 1024px)
+   ────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 481px) and (max-width: 1024px) {
+  :root {
+    --spacing-lg: 16px;
+    --font-size-md: 13px;
+  }
+
+  .filter-toolbar {
+    /* 2 columns for selects, search and dates span full width below */
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  /* Make search and date pickers take full width on tablets to avoid cramping */
+  .search-field, .date-picker-group {
+    grid-column: span 2;
+  }
+
+  .header-top-row {
+    flex-wrap: wrap; /* Allow wrapping if many tabs exist */
+  }
+  .tab-btn{
+    font-size: 12px;
+    padding: 5px 10px;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   6. RESPONSIVE: QHD / 2K (2500px+)
+   ────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 2500px) {
+  :root {
+    --font-size-sm: 16px;
+    --font-size-md: 18px;
+    --spacing-md: 18px;
+    --spacing-lg: 32px;
+    --radius-md: 12px;
+    --radius-lg: 18px;
+    --tooltip-width: 500px;
+  }
+  .select-trigger, .tab-btn { padding: 14px 24px; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   7. RESPONSIVE: 4K ULTRA (3800px+)
+   ────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 3800px) {
+  :root {
+    --font-size-sm: 22px;
+    --font-size-md: 26px;
+    --font-size-lg: 32px;
+    --spacing-sm: 16px;
+    --spacing-md: 24px;
+    --spacing-lg: 60px;
+    --radius-md: 18px;
+    --radius-lg: 30px;
+    --tooltip-width: 800px;
+  }
+
+  .filter-toolbar { 
+    border-width: 4px; 
+    padding: 40px; 
+    gap: 40px; 
+    border-radius: 40px;
+  }
+
+  .search-field input {
+    padding: 24px 24px 24px 80px;
+    font-size: 28px;
+    border-radius: 20px;
+  }
+
+  .select-trigger, .tab-btn { 
+    padding: 30px 50px; 
+    font-size: 28px;
+    border-radius: 20px;
+  }
+
+  .tab-container { padding: 10px; border-radius: 30px; }
+
+  .tooltip-bubble, .desc-tooltip-portal {
+    padding: 30px 45px;
+    font-size: 26px;
+    border-radius: 24px;
+  }
+
+  /* Scale Arrows */
+  .tooltip-arrow { border-width: 15px; }
+  .desc-tooltip-portal.is-above .desc-tooltip-arrow { border-top-width: 20px; border-left-width: 20px; border-right-width: 20px; left: 40px;}
+  .desc-tooltip-portal.is-below .desc-tooltip-arrow { border-bottom-width: 20px; border-left-width: 20px; border-right-width: 20px; left: 40px;}
+
+  .feed-summary-text { font-size: 28px; margin-top: 20px; }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background: var(--border-heavy); border-radius: 10px; }
+
+/* --- Container for Switcher + Refresh Button --- */
+.view-mode-container {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+/* --- Small Tab Switcher (All/Unread/Read) --- */
+.view-mode-switcher {
+  display: flex;
+  background: var(--border);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  gap: 2px;
+}
+
+.view-mode-btn {
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+}
+
+.view-mode-btn.is-active {
+  background: white;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* --- Unread Pill --- */
+.unread-pill {
+  margin-left: 6px;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 10px;
+  min-width: 16px;
+  text-align: center;
+}
+.unread-pill.bg-blue { background: #3b82f6; }
+.unread-pill.bg-red { background: #ef4444; }
+
+/* --- Refresh Button --- */
+.refresh-btn {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 7px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #475569;
+  font-family: inherit;
+  transition: var(--transition);
+}
+
+.refresh-btn:hover {
+  background: var(--bg-main);
+  border-color: var(--border-heavy);
+}
+
+.refresh-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.refresh-icon.is-spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   RESPONSIVE OVERRIDES
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* --- Mobile (Stack them if screen is tiny) --- */
+@media (max-width: 480px) {
+  .view-mode-container {
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+  }
+  .view-mode-switcher, .refresh-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .view-mode-btn {
+    flex: 1;
+    padding: 10px;
+    font-size: 13px;
+  }
+}
+
+/* --- Tablet (481px to 1024px) --- */
+@media (min-width: 481px) and (max-width: 1024px) {
+  .view-mode-btn {
+    padding: 6px 13px;
+  }
+  .refresh-btn {
+    padding: 8px 16px;
+  }
+}
+
+/* --- Large Desktop / QHD (2500px+) --- */
+@media (min-width: 2500px) {
+  .view-mode-btn {
+    font-size: 18px;
+    padding: 10px 20px;
+    border-radius: 10px;
+  }
+  .unread-pill {
+    font-size: 14px;
+    padding: 2px 8px;
+  }
+  .refresh-btn {
+    font-size: 18px;
+    padding: 12px 20px;
+    gap: 10px;
+  }
+  .refresh-icon {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* --- 4K Ultra Big Screens (3840px+) --- */
+@media (min-width: 3800px) {
+  .view-mode-switcher {
+    padding: 8px;
+    border-radius: 20px;
+  }
+  .view-mode-btn {
+    font-size: 28px;
+    padding: 20px 40px;
+    border-radius: 16px;
+  }
+  .unread-pill {
+    font-size: 22px;
+    padding: 4px 12px;
+    border-radius: 30px;
+    margin-left: 15px;
+  }
+  .refresh-btn {
+    font-size: 28px;
+    padding: 24px 40px;
+    border-radius: 20px;
+    border-width: 3px;
+    gap: 20px;
+  }
+  .refresh-icon {
+    width: 32px;
+    height: 32px;
+    stroke-width: 2.5px;
+  }
+}
+
+/* --- Base Desktop (Standard) --- */
+.filter-toolbar {
+  background: white;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.date-picker-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.date-input {
+  padding: 7px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #475569;
+  font-family: inherit;
+  background: #f8fafc;
+}
+
+.search-field-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  width: 14px;
+  height: 14px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 12px 8px 32px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #1e293b;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+  background: #f8fafc;
+}
+
+.clear-filters-btn {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #ef4444;
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.clear-btn-icon {
+  width: 12px;
+  height: 12px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   RESPONSIVE OVERRIDES
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* --- Mobile (320px - 480px) --- */
+@media (max-width: 480px) {
+  .filter-toolbar {
+    padding: 12px;
+    gap: 8px;
+  }
+  .date-picker-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .date-input {
+    padding: 10px;
+    font-size: 14px; /* Larger for touch */
+  }
+  .search-input {
+    padding: 12px 12px 12px 36px;
+    font-size: 14px;
+  }
+  .clear-filters-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 12px;
+    font-size: 14px;
+  }
+}
+
+/* --- Tablet (481px - 1024px) --- */
+@media (min-width: 481px) and (max-width: 1024px) {
+  .filter-toolbar {
+    padding: 12px 15px;
+  }
+  .date-input, .search-input {
+    font-size: 13px;
+  }
+}
+
+/* --- Large Desktop / QHD (2500px+) --- */
+@media (min-width: 2500px) {
+  .filter-toolbar {
+    padding: 20px 25px;
+    gap: 15px;
+    border-radius: 16px;
+  }
+  .date-label { font-size: 16px; }
+  .date-input {
+    padding: 12px 16px;
+    font-size: 18px;
+    border-radius: 10px;
+  }
+  .search-input {
+    padding: 14px 18px 14px 48px;
+    font-size: 18px;
+    border-radius: 10px;
+  }
+  .search-icon { width: 18px; height: 18px; left: 18px; }
+  .clear-filters-btn {
+    padding: 12px 18px;
+    font-size: 18px;
+    border-radius: 10px;
+  }
+  .clear-btn-icon { width: 16px; height: 16px; }
+}
+
+/* --- 4K Ultra Big Screens (3840px+) --- */
+@media (min-width: 3800px) {
+  .filter-toolbar {
+    padding: 35px 45px;
+    gap: 30px;
+    border-radius: 24px;
+    border-width: 3px;
+  }
+  .date-field { gap: 15px; }
+  .date-label { font-size: 24px; letter-spacing: 1px; }
+  .date-input {
+    padding: 24px 30px;
+    font-size: 26px;
+    border-radius: 16px;
+    border-width: 2px;
+  }
+  .search-input {
+    padding: 24px 30px 24px 85px;
+    font-size: 28px;
+    border-radius: 20px;
+    border-width: 2px;
+  }
+  .search-icon { 
+    width: 32px; 
+    height: 32px; 
+    left: 30px; 
+  }
+  .clear-filters-btn {
+    padding: 24px 40px;
+    font-size: 26px;
+    border-radius: 16px;
+    border-width: 2px;
+    gap: 12px;
+  }
+  .clear-btn-icon { width: 28px; height: 28px; }
+}
+
+/* --- Base Scroll Container --- */
+.feed-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  max-height: calc(100vh - 250px);
+}
+
+/* --- List Wrapper --- */
+.feed-list-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.feed-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* Spacing between rows in a section */
+  margin-bottom: 8px;
+}
+
+/* --- Loading & Empty States --- */
+.feed-status-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  gap: 12px;
+}
+
+.loading-text, .feed-empty-text {
+  color: #94a3b8;
+  font-size: 14px;
+  margin: 0;
+  text-align: center;
+}
+
+.feed-empty-icon {
+  width: 36px;
+  height: 36px;
+  color: #cbd5e1;
+}
+
+/* --- Empty State Clear Button --- */
+.feed-empty-clear-btn {
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: #64748b;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.feed-empty-clear-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   RESPONSIVE OVERRIDES
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* --- Mobile (Up to 480px) --- */
+@media (max-width: 480px) {
+  .feed-scroll-area {
+    padding: 0 12px 12px;
+    max-height: calc(100vh - 320px); /* More space for header/filters */
+  }
+  .feed-empty-text { font-size: 13px; }
+  .feed-empty-clear-btn { padding: 10px 18px; font-size: 13px; }
+}
+
+/* --- Tablet (481px to 1024px) --- */
+@media (min-width: 481px) and (max-width: 1024px) {
+  .feed-scroll-area {
+    padding: 0 20px 20px;
+  }
+}
+
+/* --- Large Desktop / QHD (2500px+) --- */
+@media (min-width: 2500px) {
+  .feed-scroll-area {
+    padding: 0 40px 40px;
+    max-height: calc(100vh - 400px);
+  }
+  .feed-list-content, .feed-section { gap: 14px; }
+  .loading-text, .feed-empty-text { font-size: 20px; }
+  .feed-empty-icon { width: 60px; height: 60px; }
+  .feed-empty-clear-btn {
+    padding: 12px 24px;
+    font-size: 18px;
+    border-radius: 12px;
+  }
+}
+
+/* --- 4K Ultra Big Screens (3840px+) --- */
+@media (min-width: 3800px) {
+  .feed-scroll-area {
+    padding: 0 60px 60px;
+    max-height: calc(100vh - 600px) ; /* 4K needs a larger offset for the massive header */
+  }
+  .feed-list-content, .feed-section { gap: 24px; }
+  
+  .feed-status-container { height: 600px; gap: 30px; }
+  .loading-text, .feed-empty-text { font-size: 32px; }
+  .feed-empty-icon { width: 100px; height: 100px; stroke-width: 1.5px; }
+  
+  .feed-empty-clear-btn {
+    padding: 24px 45px;
+    font-size: 28px;
+    border-radius: 20px;
+    border-width: 2px;
+  }
+}
+
+/* --- Base Desktop Styles --- */
+.section-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 6px; /* Slightly more breathing room */
+  width: 100%;
+}
+
+.divider-line {
+  height: 1px;
+  flex: 1;
+  background: #e2e8f0;
+}
+
+.divider-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--divider-color);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  background: white;
+  padding: 2px 10px;
+  border-radius: 10px;
+  /* Replicates the '22' alpha hex (approx 14% opacity) */
+  border: 1px solid color-mix(in srgb, var(--divider-color), transparent 86%);
+  flex-shrink: 0;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   RESPONSIVE OVERRIDES
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* --- Mobile (Up to 480px) --- */
+@media (max-width: 480px) {
+  .section-divider {
+    gap: 8px;
+    margin: 16px 0 8px;
+  }
+  .divider-label {
+    font-size: 11px; /* Slightly larger for mobile eyes */
+    padding: 3px 12px;
+  }
+}
+
+/* --- Tablet (481px to 1024px) --- */
+@media (min-width: 481px) and (max-width: 1024px) {
+  .section-divider {
+    margin: 14px 0 7px;
+  }
+}
+
+/* --- Large Desktop / QHD (2500px+) --- */
+@media (min-width: 2500px) {
+  .section-divider {
+    gap: 15px;
+    margin: 20px 0 10px;
+  }
+  .divider-line {
+    height: 2px; /* Thicker line for high res */
+  }
+  .divider-label {
+    font-size: 16px;
+    padding: 4px 16px;
+    border-radius: 15px;
+    border-width: 2px;
+  }
+}
+
+/* --- 4K Ultra Big Screens (3840px+) --- */
+@media (min-width: 3800px) {
+  .section-divider {
+    gap: 25px;
+    margin: 40px 0 20px;
+  }
+  .divider-line {
+    height: 3px; /* Stronger visual separation on 4K */
+    background: #cbd5e1; /* Slightly darker to remain visible */
+  }
+  .divider-label {
+    font-size: 26px; /* Scaled for 4K UI */
+    padding: 8px 24px;
+    border-radius: 20px;
+    letter-spacing: 1.5px;
+    border-width: 3px;
+  }
+}
+
+/* --- Base Row Container --- */
+.feed-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  min-width: 0;
+}
+
+.feed-row.is-unread {
+  background: var(--row-bg);
+  border: 1px solid var(--row-border);
+  border-left: 3.5px solid var(--row-accent);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--row-accent), transparent 90%);
+}
+
+.feed-row.is-read {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-left: 3.5px solid #e2e8f0;
+  opacity: 0.72;
+}
+
+/* --- Left Icon Box --- */
+.feed-row-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--row-bg);
+  border: 1px solid var(--row-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.type-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--row-accent);
+}
+
+/* --- Content Styling --- */
+.feed-row-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.feed-row-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.vessel-tag {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.vessel-icon { width: 11px; height: 11px; color: #94a3b8; }
+
+.desc-text {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #1e293b;
+  text-transform: uppercase;
+}
+
+.desc-text.has-tooltip {
+  cursor: default;
+  border-bottom: 1px dashed #cbd5e1;
+  padding-bottom: 1px;
+}
+
+.separator { color: #94a3b8; font-size: 13px; font-weight: 900; margin: 0 2px; }
+
+.equipment-tag, .source-tag {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  text-transform: uppercase;
+}
+
+.feed-row-bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.message-text, .remark-text {
+  font-size: 12px;
+  color: #334155;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.remark-group { display: flex; align-items: center; gap: 8px; }
+.vertical-divider { color: #cbd5e1; font-size: 13px; font-weight: 300; }
+
+/* --- Right Side Actions --- */
+.feed-row-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.timestamp {
+  font-size: 11px;
+  color: #5f5f5f;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.btn-group { display: flex; gap: 6px; }
+
+.action-btn {
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 35px;
+  height: 24px;
+  transition: opacity 0.2s;
+}
+
+.view-btn { border: 1px solid #e2e8f0; background: white; color: #475569; }
+.done-btn { border: 1px solid var(--row-border); background: var(--row-bg); color: var(--row-accent); }
+.btn-icon { width: 14px; height: 14px; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   RESPONSIVE OVERRIDES
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* --- Mobile (Up to 480px) --- */
+@media (max-width: 480px) {
+  .feed-row { padding: 10px; gap: 10px; flex-wrap: wrap; }
+  .feed-row-icon-box { width: 30px; height: 30px; }
+  .feed-row-content { width: 100%; order: 1; }
+  .feed-row-actions { width: 100%; flex-direction: row; justify-content: space-between; align-items: center; order: 2; padding-top: 8px; border-top: 1px solid #f1f5f9; }
+  .action-btn { width: 45px; height: 32px; } /* Larger tap area */
+}
+
+/* --- QHD (2500px+) --- */
+@media (min-width: 2500px) {
+  .feed-row { padding: 20px 24px; gap: 20px; border-radius: 16px; border-left-width: 5px; }
+  .feed-row-icon-box { width: 50px; height: 50px; border-radius: 12px; }
+  .type-icon { width: 26px; height: 26px; }
+  .vessel-tag, .desc-text { font-size: 18px; }
+  .vessel-icon { width: 16px; height: 16px; }
+  .equipment-tag, .source-tag { font-size: 18px; }
+
+  .message-text, .remark-text, .timestamp { font-size: 16px; }
+  .action-btn { width: 50px; height: 35px; border-radius: 10px; }
+  .btn-icon { width: 20px; height: 20px; }
+  .btn-group svg {transform: scale(1.3);}
+  .feed-row-icon-box svg {transform: scale(1.7);}
+  .vessel-tag svg {transform: scale(1.3);}
+}
+
+/* --- 4K Ultra Big Screens (3840px+) --- */
+@media (min-width: 3800px) {
+  .feed-row { padding: 30px 40px; gap: 35px; border-radius: 24px; border-left-width: 8px; }
+  .feed-row-icon-box { width: 80px; height: 80px; border-radius: 20px; border-width: 2px; }
+  .type-icon { width: 40px; height: 40px; stroke-width: 2.5px; }
+  
+  .feed-row-top { gap: 15px; margin-bottom: 12px; }
+  .vessel-tag, .desc-text { font-size: 28px; gap: 10px; }
+  .vessel-icon { width: 24px; height: 24px; }
+  .equipment-tag, .source-tag { font-size: 26px; }
+  
+  .feed-row-bottom { gap: 20px; }
+  .message-text, .remark-text { font-size: 26px; line-height: 1.6; }
+  
+  .feed-row-actions { gap: 15px; }
+  .timestamp { font-size: 24px; margin-bottom: 10px; }
+  .btn-group { gap: 15px; }
+  
+  .action-btn { width: 90px; height: 55px; border-radius: 15px; border-width: 2px; }
+  .btn-icon { width: 34px; height: 34px; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   RESPONSIVE OVERRIDE: TABLET (481px to 1024px)
+   ────────────────────────────────────────────────────────────────────────── */
+
+@media (min-width: 481px) and (max-width: 1024px) {
+  
+  /* --- Row Container --- */
+  .feed-row {
+    padding: 7px 9px; /* Slightly roomier than mobile */
+    gap: 15px;
+    border-radius: 12px;
+  }
+
+  /* --- Icon Box --- */
+  .feed-row-icon-box {
+    width: 30px;  /* Larger icon container for better visibility */
+    height: 30px;
+  }
+  .feed-row-bottom{
+    margin-bottom: 10px;
+  }
+
+  .type-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* --- Main Content Typography --- */
+  .vessel-tag, 
+  .desc-text {
+    font-size: 9px; /* Boosted for comfortable reading */
+    margin-bottom: -7px;
+
+  }
+
+  .vessel-icon {
+    width: 13px;
+    height: 13px;
+  }
+
+  .equipment-tag, 
+  .source-tag {
+    font-size: 9px;
+    margin-bottom: -7px;
+  }
+
+  .message-text, 
+  .remark-text {
+    font-size: 9px; /* Improved legibility */
+    line-height: 1.5;
+    margin-bottom: -7px;
+  }
+
+  /* --- Right Side Meta & Actions --- */
+  .feed-row-actions {
+    gap: 10px;
+  }
+
+  .timestamp {
+    font-size: 9px;
+  }
+
+  .btn-group {
+    gap: 4px; /* More space between buttons to prevent accidental clicks */
+  }
+
+  /* --- Buttons (Finger-Friendly Scaling) --- */
+  .action-btn {
+    width: 35px;   /* Wider tap target for fingers */
+    height: 22px;  /* Taller tap target */
+    border-radius: 8px;
+  }
+
+  .btn-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* --- Section Divider Scaling for Tablet --- */
+  .section-divider {
+    margin: 18px 0 10px;
+  }
+
+  .divider-label {
+    font-size: 12px;
+    padding: 3px 14px;
+  }
+
+  .btn-group svg {transform: scale(0.8);}
+  .feed-row-icon-box svg {transform: scale(0.9);}
+  .vessel-tag svg {transform: scale(0.8);}
+}
+
+/* --- Internal Badge Styling --- */
+.internal-badge {
+  font-size: 9px;
+  font-weight: 700;
+  background: #dbeafe;
+  color: #1e40af;
+  padding: 2px 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 4px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.lock-icon {
+  width: 9px;
+  height: 9px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   TABLET OVERRIDES (481px to 1024px)
+   ────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 481px) and (max-width: 1024px) {
+  .internal-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+  .lock-icon {
+    width: 10px;
+    height: 10px;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   MOBILE OVERRIDES (Up to 480px)
+   ────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .internal-badge {
+    font-size: 10px;
+    margin-left: 0;
+    margin-top: 4px; /* Wrap to new line on tiny mobile screens if crowded */
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   LARGE DESKTOP / QHD (2500px+)
+   ────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 2500px) {
+  .internal-badge {
+    font-size: 14px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    gap: 5px;
+    margin-left: 8px;
+  }
+  .lock-icon {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   4K ULTRA SCREENS (3840px+)
+   ────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 3800px) {
+  .internal-badge {
+    font-size: 22px; /* Massive for 4K legibility */
+    padding: 8px 20px;
+    border-radius: 20px;
+    gap: 10px;
+    margin-left: 15px;
+  }
+  .lock-icon {
+    width: 24px;
+    height: 24px;
+    stroke-width: 2.5px;
+  }
+}

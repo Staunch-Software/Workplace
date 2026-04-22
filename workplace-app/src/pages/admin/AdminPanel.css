@@ -660,3 +660,1043 @@
 .ap-btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .ap-input-imo { padding-left: 48px !important; font-family: monospace; }
+
+
+
+/* ============================================================
+   BASE LAYOUT (Applied to All Desktop Sizes)
+   ============================================================ */
+:root {
+  --ap-sidebar-width: 256px;
+}
+
+.ap-layout {
+  display: flex;
+}
+
+.ap-sidebar {
+  width: var(--ap-sidebar-width);
+  transition: width 0.3s ease;
+}
+
+.ap-main {
+  flex: 1;
+  margin-left: var(--ap-sidebar-width);
+  transition: margin-left 0.3s ease;
+}
+
+/* Ensure Icons don't shrink if text wraps */
+.ap-sidebar-link svg, 
+.ap-back-btn svg {
+  flex-shrink: 0 !important;
+}
+
+
+
+/* ============================================================
+   2. LARGE LAPTOPS & SMALL DESKTOPS (1500px to 1899px)
+   ============================================================ */
+@media (min-width: 1600px) and (max-width: 1899px) {
+  :root {
+    --ap-sidebar-width: 280px;
+  }
+
+  .ap-sidebar-header { height: 72px; padding: 0 28px; }
+  .ap-sidebar-brand { font-size: 1.25rem; }
+  
+  .ap-sidebar-link { font-size: 1rem; padding: 10px 16px; }
+  .ap-sidebar-section-label { font-size: 0.8rem; margin-top: 10px; }
+
+  .ap-page-wrapper { padding: 40px; }
+  .ap-page-title { font-size: 1.8rem; }
+}
+
+/* ============================================================
+   3. 2K MONITORS & WIDE DESKTOPS (1900px to 2299px)
+   ============================================================ */
+@media (min-width: 1900px) and (max-width: 2299px) {
+  :root {
+    --ap-sidebar-width: 320px;
+  }
+
+  .ap-sidebar-header { height: 85px; gap: 15px; }
+  .ap-sidebar-header svg { width: 28px; height: 28px; }
+  .ap-sidebar-brand { font-size: 1.4rem; }
+
+  .ap-sidebar-body { padding: 32px 24px; gap: 40px; }
+  .ap-sidebar-link { font-size: 1.1rem; padding: 14px 20px; gap: 16px; }
+  .ap-sidebar-link svg { width: 20px; height: 20px; }
+
+  .ap-page-wrapper { padding: 50px 60px; max-width: 92%; }
+  .ap-page-title { font-size: 2.2rem; }
+  .ap-page-subtitle { font-size: 1rem; }
+
+  /* Scaling the Edit/Create Slideovers */
+  .ap-slideover-panel { width: 550px; }
+}
+
+/* ============================================================
+   4. ULTRA-WIDE & 4K SCREENS (2300px+)
+   ============================================================ */
+@media (min-width: 2300px) {
+  :root {
+    --ap-sidebar-width: 400px;
+  }
+
+  /* Scale Sidebar */
+  .ap-sidebar-header { height: 110px; padding: 0 40px; gap: 20px; }
+  .ap-sidebar-header svg { width: 36px; height: 36px; }
+  .ap-sidebar-brand { font-size: 1.8rem; }
+
+  .ap-sidebar-body { padding: 48px 32px; gap: 60px; }
+  .ap-sidebar-section-label { font-size: 1rem; letter-spacing: 0.12em; margin-bottom: 15px; }
+  
+  .ap-sidebar-link { font-size: 1.3rem; padding: 20px 24px; border-radius: 12px; gap: 20px; }
+  .ap-sidebar-link svg { width: 24px; height: 24px; }
+  .ap-back-btn { font-size: 1.2rem; margin-bottom: 20px; padding: 12px 24px; }
+
+  .ap-sidebar-footer { padding: 32px; gap: 20px; }
+  .ap-sidebar-avatar { width: 50px; height: 50px; font-size: 1rem; }
+  .ap-sidebar-user-name { font-size: 1.2rem; }
+  .ap-sidebar-user-email { font-size: 1rem; }
+
+  /* Main Content Area */
+  .ap-page-wrapper { padding: 80px 100px; max-width: 94%; }
+  .ap-page-title { font-size: 3rem; }
+  .ap-page-subtitle { font-size: 1.4rem; }
+
+  /* Slide-over (User/Vessel Edit) */
+  .ap-slideover-panel { width: 750px; }
+  .ap-slideover-header { padding: 40px; }
+  .ap-slideover-title { font-size: 2rem; }
+}
+
+/* ============================================================
+   TABLET OPTIMIZATION (Sidebar remains visible)
+   ============================================================ */
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  :root {
+    /* Reduce sidebar width to icons-only size */
+    --ap-sidebar-width: 150px; 
+  }
+
+  .ap-sidebar {
+    width: var(--ap-sidebar-width);
+    overflow: hidden;
+    
+  }
+
+  .ap-sidebar-body{
+    padding: 16px 8px;
+    gap: 18px;
+  }
+
+  /* 1. Hide all text labels in the sidebar */
+   
+  .ap-sidebar-section-label, 
+  .ap-sidebar-user-name, 
+  .ap-sidebar-user-email,
+  .ap-sidebar-link span,
+  .ap-back-btn span {
+    font-size: 11px;
+  }
+
+  .ap-sidebar-user-name, 
+  .ap-sidebar-user-email{
+    align-items: center;
+    text-align: center;
+  }
+
+  .ap-sidebar-brand{
+    font-size: 13px;
+  }
+
+  /* 2. Center the Icons */
+  .ap-sidebar-header {
+    padding: 0 !important;
+    justify-content: center;
+  }
+  .ap-sidebar-footer{
+    align-items: center;
+    padding: 5px;
+    gap: 4px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ap-sidebar-nav {
+    align-items: center;
+    gap: 0px;
+  }
+
+  .ap-sidebar-link, 
+  .ap-back-btn {
+    width:140px;
+    height: 40px;
+    padding: 0 !important;
+    justify-content: start;
+    margin: 4px auto;
+    font-size: 0.775rem;
+  }
+
+  /* 3. Main Content Adjustment */
+  .ap-main {
+    margin-left: var(--ap-sidebar-width);
+  }
+
+  .ap-page-wrapper {
+    padding: 24px 16px;
+  }
+
+  /* 4. Filter Bar: Stack on Tablet */
+  .ap-filters-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .ap-search-box {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .ap-filters-right {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  /* 5. Forms: Stack 2-columns into 1-column */
+  .ap-form-grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 16px;
+  }
+
+  /* 6. Create User/Vessel Layout Stacking */
+  .ap-create-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .ap-create-left, 
+  .ap-create-right {
+    width: 100%;
+  }
+
+  /* 7. Grids for Roles and Vessels */
+  .ap-role-grid {
+    grid-template-columns: 1fr 1fr 1fr; /* Keep 3 for short text */
+  }
+
+  .ap-vessel-grid {
+    grid-template-columns: 1fr !important; /* Stack vessels vertically */
+  }
+
+  /* 8. User Management Table Protection */
+  /* Ensures the horizontal scroll is clean */
+  .ap-table-wrapper {
+    overflow-x: auto;
+    border: 1px solid var(--ap-border);
+    border-radius: 8px;
+  }
+
+  .ap-table {
+    min-width: 850px; /* Force scroll instead of squishing columns */
+  }
+
+  .ap-page-title{
+    font-size: 18px;
+  }
+}
+
+/* ============================================================
+   1. TABLET OPTIMIZATION (Under 1024px)
+   Focus: Reduce font sizes to fit heavy data columns
+   ============================================================ */
+@media (max-width: 1023px) {
+  /* Page Header */
+  .ap-page-title { font-size: 1.15rem !important; }
+  .ap-page-subtitle { font-size: 0.75rem !important; }
+
+  /* Table Headers */
+  .ap-table th { 
+    font-size: 0.6rem !important; 
+    padding: 10px 8px !important; 
+  }
+
+  /* Table Body */
+  .ap-table td { 
+    font-size: 0.75rem !important; 
+    padding: 8px !important; 
+  }
+
+  .ap-td-name { font-size: 0.8rem !important; }
+  .ap-td-email { font-size: 0.65rem !important; }
+
+  /* Badges & Tags */
+  .ap-badge { font-size: 0.6rem !important; padding: 1px 6px !important; }
+  .ap-vessel-type-tag { font-size: 0.65rem !important; }
+  
+  /* Inputs and Selects */
+  .ap-input, .ap-select { font-size: 0.8rem !important; padding: 6px 10px !important; }
+  
+  /* Vessel Count Circle */
+  .ap-vessel-count { width: 20px !important; height: 20px !important; font-size: 0.65rem !important; }
+
+  /* Sidebar (If labels are shown in specific tablet views) */
+  .ap-sidebar-link { font-size: 0.8rem !important; gap: 8px !important; }
+}
+
+/* ============================================================
+   2. BIG SCREEN / 4K SCALING (Above 1900px)
+   Focus: Increase sizes so UI doesn't look like tiny dots
+   ============================================================ */
+@media (min-width: 1900px) {
+  /* Page Header */
+  .ap-page-title { font-size: 2.2rem !important; margin-bottom: 8px !important; }
+  .ap-page-subtitle { font-size: 1.1rem !important; }
+
+  /* Table Headers */
+  .ap-table th { 
+    font-size: 0.85rem !important; 
+    padding: 15px 20px !important; 
+    letter-spacing: 0.12em !important; 
+  }
+
+  /* Table Body */
+  .ap-table td { 
+    font-size: 1.05rem !important; 
+    padding: 18px 20px !important; 
+  }
+
+  .ap-td-name { font-size: 1.15rem !important; }
+  .ap-td-email { font-size: 0.95rem !important; }
+
+  /* Badges & Tags */
+  .ap-badge { font-size: 0.85rem !important; padding: 4px 12px !important; border-radius: 6px !important; }
+  .ap-vessel-type-tag { font-size: 0.9rem !important; padding: 4px 12px !important; }
+
+  /* Inputs and Selects */
+  .ap-input, .ap-select { 
+    font-size: 1.1rem !important; 
+    padding: 12px 18px !important; 
+    border-radius: 10px !important; 
+  }
+
+  /* Vessel Count Circle */
+  .ap-vessel-count { 
+    width: 32px !important; 
+    height: 32px !important; 
+    font-size: 1rem !important; 
+  }
+
+  /* Icons */
+  .ap-module-icon svg { width: 18px !important; height: 18px !important; }
+  .ap-action-btn svg { width: 20px !important; height: 20px !important; }
+  
+  /* Sidebar Scaling */
+  .ap-sidebar-section-label { font-size: 0.9rem !important; margin-bottom: 12px !important; }
+  .ap-sidebar-link { font-size: 1.15rem !important; padding: 12px 20px !important; }
+  .ap-sidebar-user-name { font-size: 1.1rem !important; }
+  .ap-sidebar-user-email { font-size: 0.9rem !important; }
+
+  /* Slideovers (Edit User Forms) */
+  .ap-slideover-title { font-size: 1.8rem !important; }
+  .ap-label { font-size: 1rem !important; margin-bottom: 8px !important; }
+  .ap-form-section-title { font-size: 1.1rem !important; }
+  .ap-btn { padding: 12px 28px !important; font-size: 1rem !important; }
+}
+
+/* ============================================================
+   3. EXTRA SCALE FOR ULTRA-WIDE (Above 2500px)
+   ============================================================ */
+@media (min-width: 2500px) {
+  .ap-page-title { font-size: 3rem !important; }
+  .ap-table td { font-size: 1.25rem !important; }
+  .ap-td-name { font-size: 1.35rem !important; }
+  .ap-input, .ap-select { font-size: 1.3rem !important; }
+}
+
+/* ============================================================
+   TABLET FILTER BAR FIX (768px - 1023px)
+   ============================================================ */
+
+@media (max-width: 1023px) {
+  .ap-filters-bar {
+    display: flex !important;
+    flex-direction: column !important; /* Stack Search above Dropdowns */
+    align-items: stretch !important;
+    gap: 12px !important;
+    padding: 12px !important;
+  }
+
+  /* 1. Search Box: Make it full width */
+  .ap-search-box {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: none !important;
+  }
+
+  /* 2. Dropdowns Container: Put them side-by-side */
+  .ap-filters-right {
+    display: flex !important;
+    width: 100% !important;
+    gap: 10px !important;
+    align-items: center !important;
+  }
+
+  /* 3. Dropdown Groups: Make them equal width */
+  .ap-filter-group {
+    flex: 1 !important; /* Share 50% width */
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+  }
+
+  /* Target the Status dropdown which is loose in your JSX */
+  .ap-filters-right > .ap-select {
+    flex: 1 !important; /* Share 50% width */
+  }
+
+  /* 4. Select Elements: Ensure they fill their container */
+  .ap-select {
+    width: 100% !important;
+    font-size: 0.85rem !important;
+    padding: 8px !important;
+    height: 38px !important; /* Consistent height */
+  }
+  .ap-search-box .ap-input {
+    padding-left: 28px !important;
+}
+}
+
+/* ============================================================
+   BIG SCREEN FILTER BAR SCALING (Above 1900px)
+   Keep it on one line but make it bigger
+   ============================================================ */
+@media (min-width: 1900px) {
+  .ap-filters-bar {
+    padding: 20px 25px !important;
+    margin-bottom: 32px !important;
+  }
+
+  .ap-search-box {
+    max-width: 600px !important;
+  }
+
+  .ap-filters-right {
+    gap: 24px !important;
+  }
+
+  .ap-filter-group {
+    gap: 12px !important;
+  }
+  .ap-search-box .ap-input {
+    padding-left: 40px !important;
+}
+}
+
+.ap-vessel-popover-panel {
+  position: fixed;
+  z-index: 2500;
+  background: var(--ap-surface);
+  border: 1px solid var(--ap-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+  min-width: 320px;
+  max-width: 420px;
+}
+
+.ap-popover-inner { padding: 16px; }
+
+.ap-popover-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.ap-popover-header p {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ap-text);
+  margin: 0;
+}
+
+.ap-popover-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.ap-vessel-pop-card {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--ap-bg);
+  border: 1px solid var(--ap-border);
+  border-left: 4px solid var(--ap-primary);
+  transition: transform 0.2s;
+}
+
+.v-pop-name { font-size: 0.9rem; font-weight: 600; color: var(--ap-text); margin-bottom: 2px; }
+.v-pop-imo { font-size: 0.75rem; color: var(--ap-text-muted); font-family: monospace; }
+.v-pop-type {
+    font-size: 0.65rem;
+    color: var(--ap-primary);
+    background: rgba(59, 130, 246, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-top: 6px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+/* Arrow Styling */
+.ap-popover-arrow {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--ap-surface);
+  border: 1px solid var(--ap-border);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.arrow-on-right .ap-popover-arrow { right: -7px; border-left: none; border-bottom: none; }
+.arrow-on-left .ap-popover-arrow { left: -7px; border-right: none; border-top: none; }
+
+@media (max-width: 1023px) {
+  .ap-vessel-popover-panel {
+    min-width: 280px;
+    max-width: 320px; /* Slimmer for tablet portrait */
+  }
+
+  .ap-popover-list {
+    max-height: 300px; /* Avoid taking up the whole screen height */
+  }
+
+  .ap-vessel-pop-card {
+    padding: 14px; /* Larger tap target */
+  }
+}
+
+@media (min-width: 1900px) {
+  .ap-vessel-popover-panel {
+    min-width: 450px;
+    max-width: 550px;
+    border-radius: 20px;
+  }
+
+  .ap-popover-inner { padding: 24px; }
+
+  .ap-popover-header p { font-size: 1.2rem; }
+  .ap-popover-icon { width: 24px !important; height: 24px !important; }
+
+  .ap-vessel-pop-card {
+    padding: 18px 22px;
+    border-radius: 12px;
+  }
+
+  .v-pop-name { font-size: 1.15rem; }
+  .v-pop-imo { font-size: 0.95rem; }
+  .v-pop-type { font-size: 0.8rem; padding: 4px 12px; }
+
+  .ap-popover-list { max-height: 600px; gap: 15px; }
+  
+  .ap-popover-arrow { width: 18px; height: 18px; }
+}
+
+/* ============================================================
+   1. TABLET OPTIMIZATION (Under 1024px)
+   Focus: Shrinking Vessel data to prevent horizontal overflow
+   ============================================================ */
+@media (max-width: 1023px) {
+  /* Table specific to Vessel Page */
+  .ap-table td { 
+    font-size: 0.75rem !important; 
+    padding: 10px 8px !important; 
+  }
+
+  /* Vessel Name & Email */
+  .ap-td-name { font-size: 0.8rem !important; }
+  .ap-td-email { font-size: 0.65rem !important; }
+
+  /* IMO Number Column */
+  td[style*="fontFamily: monospace"] {
+    font-size: 0.7rem !important;
+    letter-spacing: -0.02em;
+  }
+
+  /* Vessel Type Tag */
+  .ap-vessel-type-tag {
+    font-size: 0.6rem !important;
+    padding: 1px 6px !important;
+  }
+
+  /* Status Dot & Text */
+  .ap-status-dot { width: 6px !important; height: 6px !important; }
+  span[style*="fontSize: 0.875rem"] { font-size: 0.75rem !important; }
+
+  /* User Count Circle */
+  .ap-vessel-count { 
+    width: 20px !important; 
+    height: 20px !important; 
+    font-size: 0.65rem !important; 
+  }
+
+  /* Table Container */
+  .ap-table-wrapper {
+    overflow-x: auto;
+    border-radius: 8px;
+  }
+
+  .ap-table {
+    min-width: 750px !important; /* Ensure vessel columns don't crush */
+  }
+}
+
+/* ============================================================
+   2. BIG SCREEN / 4K SCALING (Above 1900px)
+   Focus: Expanding UI for high-resolution readability
+   ============================================================ */
+@media (min-width: 1900px) {
+  /* Table Sizing */
+  .ap-table th { font-size: 0.85rem !important; padding: 18px 20px !important; }
+  .ap-table td { font-size: 1.05rem !important; padding: 20px !important; }
+
+  .ap-td-name { font-size: 1.15rem !important; }
+  .ap-td-email { font-size: 0.95rem !important; }
+
+  /* IMO Number scaling */
+  td[style*="fontFamily: monospace"] {
+    font-size: 1.05rem !important;
+  }
+
+  /* Vessel Type Tag scaling */
+  .ap-vessel-type-tag {
+    font-size: 0.85rem !important;
+    padding: 4px 12px !important;
+    border-radius: 6px !important;
+  }
+
+  /* User Count Badge scaling */
+  .ap-vessel-count { 
+    width: 32px !important; 
+    height: 32px !important; 
+    font-size: 1rem !important; 
+  }
+
+  /* Status Dot scaling */
+  .ap-status-dot { width: 10px !important; height: 10px !important; }
+  span[style*="fontSize: 0.875rem"] { font-size: 1.05rem !important; }
+
+  /* Module Installation Cards (inside Edit Vessel) */
+  div[style*="padding: 10px 14px"] {
+    padding: 18px 24px !important;
+    border-radius: 14px !important;
+    margin-bottom: 12px !important;
+  }
+
+  div[style*="width: 30"] {
+    width: 45px !important;
+    height: 45px !important;
+    border-radius: 12px !important;
+  }
+
+  div[style*="fontSize: 0.85rem"] { font-size: 1.1rem !important; }
+  div[style*="fontSize: 0.7rem"] { font-size: 0.9rem !important; }
+
+  /* Popover scaling (Assigned Users list) */
+  .ap-popover {
+    min-width: 400px !important;
+    border-radius: 12px !important;
+  }
+  
+  .ap-popover p { font-size: 1.1rem !important; }
+  
+  /* User cards inside popover */
+  div[style*="padding: 10px 12px"] {
+    padding: 15px 20px !important;
+    border-radius: 10px !important;
+  }
+}
+
+/* ============================================================
+   3. EXTRA LARGE 4K (Above 2500px)
+   ============================================================ */
+@media (min-width: 2500px) {
+  .ap-page-title { font-size: 3rem !important; }
+  .ap-table td { font-size: 1.2rem !important; }
+  
+  /* Make the edit button and other actions much larger */
+  .ap-action-btn svg {
+    width: 24px !important;
+    height: 24px !important;
+  }
+  
+  .ap-row-actions { gap: 12px !important; }
+}
+
+.ap-user-popover-panel {
+  position: fixed;
+  z-index: 2500;
+  background: var(--ap-surface);
+  border: 1px solid var(--ap-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+  min-width: 300px;
+  max-width: 400px;
+}
+
+.ap-popover-inner { padding: 16px; }
+
+.ap-popover-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ap-text);
+  margin-bottom: 12px;
+}
+
+.ap-popover-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.ap-user-pop-card {
+  padding: 10px 12px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.v-user-pop-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.v-user-pop-name { font-size: 0.875rem; font-weight: 600; color: var(--ap-text); }
+
+.v-user-pop-badge {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: white;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.v-user-pop-email { font-size: 0.75rem; color: var(--ap-text-muted); }
+
+/* Unified Arrow System */
+.ap-popover-arrow {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--ap-surface);
+  border: 1px solid var(--ap-border);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.arrow-on-right .ap-popover-arrow { right: -7px; border-left: none; border-bottom: none; }
+.arrow-on-left .ap-popover-arrow { left: -7px; border-right: none; border-top: none; }
+
+@media (max-width: 1023px) {
+  .ap-user-popover-panel {
+    min-width: 260px;
+    max-width: 300px;
+  }
+
+  .ap-popover-list {
+    max-height: 300px; /* Shorter for small screens */
+  }
+
+  .v-user-pop-name { font-size: 0.8rem; }
+  .v-user-pop-email { font-size: 0.7rem; }
+}
+
+@media (min-width: 1900px) {
+  .ap-user-popover-panel {
+    min-width: 450px;
+    max-width: 550px;
+    border-radius: 16px;
+  }
+
+  .ap-popover-inner { padding: 24px; }
+  .ap-popover-title { font-size: 1.15rem; margin-bottom: 16px; }
+
+  .ap-user-pop-card { padding: 15px 20px; }
+
+  .v-user-pop-name { font-size: 1.1rem; }
+  .v-user-pop-badge { font-size: 0.8rem; padding: 4px 10px; }
+  .v-user-pop-email { font-size: 0.95rem; }
+
+  .ap-popover-list { max-height: 600px; gap: 12px; }
+  .ap-popover-arrow { width: 16px; height: 16px; }
+}
+
+/* ============================================================
+   CREATE USER PAGE: LARGE SCREEN & 4K SCALING (1900px+)
+   ============================================================ */
+
+/* --- 1. 2K MONITORS (1900px to 2299px) --- */
+@media (min-width: 1900px) {
+  .ap-create-layout {
+    gap: 32px; /* Wider gap between the two main columns */
+  }
+
+  /* Card and Spacing */
+  .ap-card-body { padding: 40px !important; border-radius: 16px !important; }
+  .ap-card-title { font-size: 1.5rem !important; margin-bottom: 24px !important; }
+
+  /* Form Elements */
+  .ap-label { font-size: 1.1rem !important; margin-bottom: 8px !important; }
+  .ap-input { 
+    height: 54px !important; 
+    font-size: 1.15rem !important; 
+    padding: 0 20px !important;
+    border-radius: 10px !important;
+  }
+
+  /* Role Grid (Admin/Shore/Vessel buttons) */
+  .ap-role-grid { gap: 15px !important; }
+  .ap-role-option { 
+    padding: 24px !important; 
+    font-size: 1.2rem !important; 
+    border-radius: 12px !important; 
+  }
+
+  /* Vessel Selection List */
+  .ap-vessel-grid { max-height: 500px !important; gap: 12px !important; }
+  .ap-vessel-option { padding: 18px !important; border-radius: 12px !important; }
+  .ap-vessel-option-name { font-size: 1.1rem !important; }
+  .ap-vessel-option-sub { font-size: 0.9rem !important; }
+
+  /* Module Permissions List */
+  .ap-module-toggle-row { padding: 15px 0 !important; }
+  .ap-module-toggle-label { font-size: 1.15rem !important; gap: 15px !important; }
+  .ap-module-icon-wrap { width: 48px !important; height: 48px !important; }
+  .ap-module-icon-wrap svg { width: 22px !important; height: 22px !important; }
+
+  /* Toggle Switch Scaling */
+  .ap-toggle { width: 50px !important; height: 28px !important; }
+  .ap-toggle-knob { width: 20px !important; height: 20px !important; }
+  .ap-toggle.on .ap-toggle-knob { transform: translateX(26px) !important; }
+
+  /* Primary Action Button */
+  .ap-btn-primary.ap-btn-full { 
+    height: 64px !important; 
+    font-size: 1.25rem !important; 
+    border-radius: 12px !important; 
+  }
+  .ap-btn-primary svg { width: 24px !important; height: 24px !important; }
+}
+
+/* --- 2. ULTRA-WIDE & 4K SCREENS (2300px+) --- */
+@media (min-width: 2300px) {
+  .ap-create-layout { gap: 48px; }
+
+  .ap-card-body { padding: 56px !important; border-radius: 24px !important; }
+  .ap-card-title { font-size: 1.9rem !important; margin-bottom: 32px !important; }
+
+  .ap-label { font-size: 1.3rem !important; margin-bottom: 12px !important; }
+  .ap-input { height: 72px !important; font-size: 1.4rem !important; border-radius: 14px !important; }
+
+  /* Role Grid scaling */
+  .ap-role-option { padding: 32px !important; font-size: 1.5rem !important; border-radius: 16px !important; }
+
+  /* Vessel List scaling */
+  .ap-vessel-grid { max-height: 650px !important; gap: 20px !important; }
+  .ap-vessel-option { padding: 24px !important; gap: 20px !important; }
+  .ap-vessel-option-name { font-size: 1.3rem !important; }
+  .ap-vessel-option-sub { font-size: 1.05rem !important; }
+
+  /* Module Toggles scaling */
+  .ap-module-toggle-label { font-size: 1.4rem !important; gap: 20px !important; }
+  .ap-module-icon-wrap { width: 60px !important; height: 60px !important; }
+  .ap-module-icon-wrap svg { width: 28px !important; height: 28px !important; }
+
+  /* Large Toggle Switch for 4K */
+  .ap-toggle { width: 68px !important; height: 36px !important; }
+  .ap-toggle-knob { width: 28px !important; height: 28px !important; }
+  .ap-toggle.on .ap-toggle-knob { transform: translateX(36px) !important; }
+
+  /* Info Box 4K */
+  .ap-info-box { padding: 32px !important; gap: 24px !important; border-radius: 16px !important; }
+  .ap-info-box svg { width: 36px !important; height: 36px !important; }
+  .ap-info-box-title { font-size: 1.5rem !important; }
+  .ap-info-box-text { font-size: 1.2rem !important; }
+
+  /* Create Button */
+  .ap-btn-primary.ap-btn-full { height: 85px !important; font-size: 1.6rem !important; border-radius: 18px !important; }
+}
+
+/* ============================================================
+   REGISTER VESSEL PAGE RESPONSIVENESS
+   ============================================================ */
+
+/* --- 1. TABLET OPTIMIZATION (Under 1024px) --- */
+@media (max-width: 1023px) {
+  /* Allow the form card to fill the screen width */
+  div[style*="maxWidth: 800"] {
+    max-width: 100% !important;
+  }
+
+  .ap-card-body { padding: 20px !important; }
+
+  /* Stack the 2-column grid to 1-column */
+  .ap-form-grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 16px;
+  }
+
+  .ap-page-title { font-size: 1.25rem !important; }
+  
+  .ap-input, .ap-select {
+    font-size: 0.9rem !important;
+    padding: 10px 12px !important;
+  }
+
+  /* Adjust the IMO prefix positioning for tablet */
+  .ap-imo-prefix {
+    font-size: 0.8rem !important;
+    left: 10px !important;
+  }
+  .ap-input-imo {
+    padding-left: 42px !important;
+  }
+}
+
+/* --- 2. LARGE LAPTOPS & SMALL DESKTOPS (1500px - 1899px) --- */
+@media (min-width: 1600px) {
+  div[style*="maxWidth: 800"] { max-width: 1000px !important; }
+  
+  .ap-card-body { padding: 32px !important; }
+  .ap-card-title { font-size: 1.3rem !important; }
+
+  .ap-label { font-size: 0.95rem !important; }
+  .ap-input, .ap-select { height: 48px !important; font-size: 1rem !important; }
+  
+  /* Scale IMO Prefix */
+  .ap-imo-prefix { font-size: 0.95rem !important; left: 14px !important; }
+  .ap-input-imo { padding-left: 54px !important; }
+}
+
+/* --- 3. 2K MONITORS & WIDE DESKTOPS (1900px - 2299px) --- */
+@media (min-width: 1900px) {
+  div[style*="maxWidth: 800"] { max-width: 1200px !important; }
+  
+  .ap-page-wrapper { padding: 60px; max-width: 92%; }
+  .ap-page-title { font-size: 2.4rem; }
+
+  .ap-card-body { padding: 48px !important; border-radius: 16px !important; }
+  
+  .ap-label { font-size: 1.1rem !important; margin-bottom: 8px !important; }
+  .ap-input, .ap-select { height: 56px !important; font-size: 1.15rem !important; border-radius: 10px !important; }
+
+  /* Scale IMO Prefix */
+  .ap-imo-prefix { font-size: 1.1rem !important; left: 16px !important; }
+  .ap-input-imo { padding-left: 64px !important; }
+
+  .ap-btn { height: 56px !important; font-size: 1.15rem !important; border-radius: 10px !important; }
+  
+  .ap-info-box { padding: 24px !important; border-radius: 12px !important; }
+}
+
+/* --- 4. ULTRA-WIDE & 4K SCREENS (2300px+) --- */
+@media (min-width: 2300px) {
+  div[style*="maxWidth: 800"] { max-width: 1400px !important; }
+
+  .ap-page-wrapper { padding: 80px 100px; max-width: 94%; }
+  .ap-page-title { font-size: 3.2rem; }
+  .ap-page-subtitle { font-size: 1.4rem; }
+
+  .ap-card-body { padding: 64px !important; border-radius: 24px !important; }
+  
+  .ap-label { font-size: 1.3rem !important; margin-bottom: 12px !important; }
+  .ap-input, .ap-select { height: 72px !important; font-size: 1.4rem !important; border-radius: 14px !important; }
+
+  /* Scale IMO Prefix for 4K */
+  .ap-imo-prefix { font-size: 1.3rem !important; left: 20px !important; }
+  .ap-input-imo { padding-left: 85px !important; }
+
+  .ap-info-box { padding: 32px !important; gap: 24px !important; }
+  .ap-info-box-title { font-size: 1.4rem !important; }
+  .ap-info-box-text { font-size: 1.15rem !important; }
+
+  .ap-form-footer { margin-top: 40px !important; padding-top: 40px !important; gap: 24px !important; }
+  .ap-btn { height: 75px !important; font-size: 1.4rem !important; padding: 0 40px !important; border-radius: 14px !important; }
+}
+
+/* ============================================================
+   RESPONSIVE BACK BUTTON SCALING
+   ============================================================ */
+
+/* --- 1. TABLET OPTIMIZATION (Under 1024px) --- */
+@media (max-width: 1023px) {
+  .ap-btn-back {
+    font-size: 0.8rem !important;
+    margin-bottom: 12px !important;
+    padding: 8px 0 !important; /* Larger vertical hit area for touch */
+  }
+  
+  .ap-btn-back svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+}
+
+/* --- 2. LARGE DESKTOPS (1500px - 1899px) --- */
+@media (min-width: 1600px) {
+  .ap-btn-back {
+    font-size: 1rem !important;
+    gap: 6px !important;
+    margin-bottom: 24px !important;
+  }
+
+  .ap-btn-back svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+}
+
+/* --- 3. 2K MONITORS (1900px - 2299px) --- */
+@media (min-width: 1900px) {
+  .ap-btn-back {
+    font-size: 1.15rem !important;
+    gap: 8px !important;
+    margin-bottom: 32px !important;
+  }
+
+  .ap-btn-back svg {
+    width: 22px !important;
+    height: 22px !important;
+    stroke-width: 2.5; /* Thicker icon for high-res */
+  }
+}
+
+/* --- 4. ULTRA-WIDE & 4K SCREENS (2300px+) --- */
+@media (min-width: 2300px) {
+  .ap-btn-back {
+    font-size: 1.4rem !important;
+    gap: 12px !important;
+    margin-bottom: 40px !important;
+  }
+
+  .ap-btn-back svg {
+    width: 28px !important;
+    height: 28px !important;
+    stroke-width: 2.5;
+  }
+}
+

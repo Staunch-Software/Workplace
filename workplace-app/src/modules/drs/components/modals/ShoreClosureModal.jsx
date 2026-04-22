@@ -4,6 +4,7 @@ import { X, CheckCircle, Upload } from 'lucide-react';
 import { defectApi } from '@drs/services/defectApi';
 import { blobUploadService } from '@drs/services/blobUploadService';
 import { generateId } from '@drs/services/idGenerator';
+import './EnhancedClosureModal.css';
 
 const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
     const queryClient = useQueryClient();
@@ -116,6 +117,7 @@ const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
             onClick={onClose}
         >
             <div
+                 className='clousure-model'
                 style={{
                     background: 'white',
                     borderRadius: '12px',
@@ -138,8 +140,8 @@ const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
                     alignItems: 'center'
                 }}>
                     <div>
-                        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Close Defect</h2>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '12px', opacity: 0.9 }}>
+                        <h2 className='closure-fsize-22' style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Close Defect</h2>
+                        <p className='closure-fsize-16' style={{ margin: '4px 0 0 0', fontSize: '12px', opacity: 0.9 }}>
                             {defect.equipment_name || defect.title}
                         </p>
                     </div>
@@ -156,7 +158,7 @@ const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
 
                     {/* Closure Remarks */}
                     <div style={{ marginBottom: '20px' }}>
-                        <label style={{
+                        <label className='closure-fsize-16' style={{
                             fontSize: '13px', fontWeight: '700', color: '#0f172a',
                             display: 'block', marginBottom: '8px'
                         }}>
@@ -167,6 +169,7 @@ const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
                             onChange={e => setRemarks(e.target.value)}
                             placeholder="Describe the resolution and actions taken... (minimum 50 characters)"
                             rows={4}
+                            className='closure-fsize-16'
                             style={{
                                 width: '100%', padding: '10px', fontSize: '13px',
                                 border: `1px solid ${remarksValid ? '#cbd5e1' : remarks.length > 0 ? '#fca5a5' : '#cbd5e1'}`,
@@ -174,7 +177,7 @@ const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
                                 boxSizing: 'border-box', fontFamily: 'inherit', lineHeight: 1.5
                             }}
                         />
-                        <div style={{
+                        <div className='closure-fsize-14' style={{
                             fontSize: '11px', marginTop: '5px',
                             color: remarksValid ? '#16a34a' : remarks.length > 0 ? '#dc2626' : '#94a3b8'
                         }}>
@@ -187,7 +190,7 @@ const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
                         padding: '14px', background: '#f8fafc',
                         border: '1px solid #e2e8f0', borderRadius: '8px'
                     }}>
-                        <p style={{ fontSize: '12px', fontWeight: '700', color: '#374151', margin: '0 0 12px 0' }}>
+                        <p className='closure-fsize-16' style={{ fontSize: '12px', fontWeight: '700', color: '#374151', margin: '0 0 12px 0' }}>
                             Upload Images (Optional)
                         </p>
 
@@ -213,7 +216,7 @@ const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
                                                 accentColor: '#ea580c', cursor: 'pointer', flexShrink: 0
                                             }}
                                         />
-                                        <span style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a' }}>
+                                        <span className='closure-fsize-16' style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a' }}>
                                             {label}
                                         </span>
                                     </label>
@@ -225,12 +228,12 @@ const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
                                             background: 'white', border: '1px solid #e2e8f0', borderRadius: '6px'
                                         }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <span style={{ fontSize: '12px', color: '#64748b' }}>
+                                                <span className='closure-fsize-16' style={{ fontSize: '12px', color: '#64748b' }}>
                                                     {uploadedImages[type].length > 0
                                                         ? `${uploadedImages[type].length} file(s) uploaded`
                                                         : 'No image selected'}
                                                 </span>
-                                                <label style={{
+                                                <label className='closure-fsize-16' style={{
                                                     background: uploading ? '#e5e7eb' : '#ea580c',
                                                     color: uploading ? '#9ca3af' : 'white',
                                                     padding: '4px 12px', borderRadius: '4px',
@@ -255,7 +258,7 @@ const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
                                             </div>
 
                                             {uploadProgress[type] && (
-                                                <p style={{ fontSize: '11px', color: '#ea580c', margin: '6px 0 0 0', fontStyle: 'italic' }}>
+                                                <p className='closure-fsize-14' style={{ fontSize: '11px', color: '#ea580c', margin: '6px 0 0 0', fontStyle: 'italic' }}>
                                                     {uploadProgress[type]}
                                                 </p>
                                             )}
@@ -263,7 +266,7 @@ const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
                                             {uploadedImages[type].length > 0 && (
                                                 <ul style={{ margin: '8px 0 0 0', padding: 0, listStyle: 'none' }}>
                                                     {uploadedImages[type].map(img => (
-                                                        <li key={img.id} style={{
+                                                        <li key={img.id} className='closure-fsize-14' style={{
                                                             fontSize: '11px', color: '#16a34a',
                                                             display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px'
                                                         }}>
@@ -287,7 +290,7 @@ const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
                     display: 'flex', justifyContent: 'flex-end', gap: '10px',
                     background: '#f9fafb', borderRadius: '0 0 12px 12px'
                 }}>
-                    <button onClick={onClose} style={{
+                    <button onClick={onClose} className='closure-fsize-16' style={{
                         background: 'white', border: '1px solid #d1d5db', color: '#374151',
                         padding: '8px 16px', borderRadius: '6px', fontSize: '13px',
                         fontWeight: '600', cursor: 'pointer'
@@ -297,6 +300,7 @@ const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
                     <button
                         onClick={handleClose}
                         disabled={!canProceed}
+                        className='closure-fsize-16'
                         style={{
                             background: canProceed ? 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)' : '#e5e7eb',
                             border: 'none', color: canProceed ? 'white' : '#9ca3af',

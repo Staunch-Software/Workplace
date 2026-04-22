@@ -46,7 +46,7 @@ export default function CreateVessel() {
         <h1 className="ap-page-title">Register New Vessel</h1>
         <p className="ap-page-subtitle">Add a new vessel to the platform</p>
       </div>
-      <div className="ap-card ap-card-body" style={{ maxWidth: 800 }}>
+      <div className="ap-card ap-card-body">
         <form onSubmit={handleSubmit}>
           <div className="ap-form-grid-2">
             <div className="ap-form-group">

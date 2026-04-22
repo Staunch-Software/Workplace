@@ -52,7 +52,6 @@ import {
 
 
 
-
 // Image Gallery Modal with Navigation
 const ImageGalleryModal = ({ images, initialIndex = 0, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -381,8 +380,8 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
 
   return (
     <div className="thread-container">
-      <div style={{ padding: '12px 15px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: '600', fontSize: '13px', color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <MessageSquare size={16} /> Discussion & Updates
+      <div className='fsize-17' style={{ padding: '12px 15px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: '600', fontSize: '13px', color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <MessageSquare size={16} /> <span>Discussion & Updates</span>
       </div>
       <div
         ref={threadScrollRef}
@@ -396,7 +395,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
       >
 
         {threads.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '13px', padding: '20px' }}>No messages yet.</div>
+          <div className='fsize-17' style={{ textAlign: 'center', color: '#94a3b8', fontSize: '13px', padding: '20px' }}>No messages yet.</div>
         ) : (
           threads.map(t => {
             // REPLACE WITH
@@ -413,10 +412,10 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                       textAlign: 'center',
                       boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
                     }}>
-                      <div style={{ color: '#15803d', fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.05em' }}>
+                      <div className='fsize-14' style={{ color: '#15803d', fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.05em' }}>
                         Closure Remark
                       </div>
-                      <div style={{
+                      <div className='fsize-17' style={{
                         color: '#44403c',
                         fontSize: '13px',
                         fontWeight: '500',
@@ -434,7 +433,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
 
               return (
                 <div key={t.id} style={{ textAlign: 'center', margin: '15px 0' }}>
-                  <span style={{
+                  <span className='fsize-15' style={{
                     background: '#f1f5f9',
                     fontSize: '11px',
                     padding: '4px 12px',
@@ -464,7 +463,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                 alignItems: isMine ? 'flex-end' : 'flex-start',
                 marginBottom: '12px'
               }}>
-                <div style={{
+                <div className='fsize-14' style={{
                   fontSize: '10px',
                   color: '#64748b',
                   marginBottom: '4px',
@@ -486,10 +485,10 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                   whiteSpace: 'pre-wrap',
                   overflowWrap: 'anywhere'
                 }}>
-                  <div style={{ fontSize: '14px', lineHeight: '1.4' }}>
+                  <div className='fsize-18' style={{ fontSize: '14px', lineHeight: '1.4' }}>
                     {messageParts.map((part, idx) => (
                       part.type === 'mention' ? (
-                        <span key={idx} style={{
+                        <span key={idx} className='fsize-17' style={{
                           background: isMine ? 'rgba(255,255,255,0.2)' : '#e3f2fd',
                           color: isMine ? 'white' : '#1565c0',
                           padding: '1px 4px',
@@ -539,7 +538,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
               minWidth: 0,
               overflow: 'hidden'
             }}>
-              <h4 style={{
+              <h4 className='fsize-18' style={{
                 margin: '0 0 5px 0',
                 color: '#9a3412',
                 fontSize: '14px',
@@ -547,7 +546,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
               }}>
                 Closure Requested
               </h4>
-              <p style={{
+              <p className='fsize-17' style={{
                 margin: 0,
                 fontSize: '13px',
                 color: '#334155',
@@ -572,6 +571,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                 }}>
                   <button
                     onClick={() => handleDecision('ACCEPT')}
+                    className='fsize-16'
                     style={{
                       background: '#16a34a',
                       color: 'white',
@@ -591,6 +591,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                   </button>
                   <button
                     onClick={() => handleDecision('REJECT')}
+                    className='fsize-16'
                     style={{
                       background: '#dc2626',
                       color: 'white',
@@ -610,7 +611,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                   </button>
                 </div>
               ) : (
-                <div style={{
+                <div className='fsize-16' style={{
                   fontSize: '12px',
                   color: '#ea580c',
                   fontWeight: '600'
@@ -627,6 +628,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
         <div style={{ padding: '12px', borderTop: '1px solid #e2e8f0', background: 'white' }}>
           <div style={{ position: 'relative' }}>
             <textarea
+              className='fsize-17'
               style={{
                 width: '100%',
                 border: '1px solid #cbd5e1',
@@ -646,6 +648,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
             <button
               onClick={handleReply}
               disabled={isUploading || (!replyText && files.length === 0)}
+              className='fsize-16'
               style={{
                 position: 'absolute',
                 bottom: '27px',
@@ -687,6 +690,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                   <div
                     key={u.id}
                     onClick={() => selectMention(u)}
+                    className='fsize-17'
                     style={{
                       padding: '8px 12px',
                       cursor: 'pointer',
@@ -709,6 +713,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
           {/* ATTACHMENT ROW */}
           <div style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
             <label
+              className='fsize-16'
               style={{
                 cursor: 'pointer',
                 color: '#64748b',
@@ -726,7 +731,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
         </div>
 
       ) : (
-        <div style={{ padding: '12px', borderTop: '1px solid #e2e8f0', textAlign: 'center', background: '#f8fafc', color: '#64748b', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+        <div className='fsize-16' style={{ padding: '12px', borderTop: '1px solid #e2e8f0', textAlign: 'center', background: '#f8fafc', color: '#64748b', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
           <Lock size={14} /> Thread Locked (Defect Closed)
         </div>
       )}
@@ -769,6 +774,7 @@ const ImageSidebar = ({ images, onClose, title }) => {
   return (
     <>
       <div
+        className='width-450'
         style={{
           position: 'fixed',
           top: 0,
@@ -791,7 +797,7 @@ const ImageSidebar = ({ images, onClose, title }) => {
           alignItems: 'center',
           background: '#f8fafc'
         }}>
-          <h3 style={{ margin: 0, fontSize: '15px', color: '#334155', fontWeight: '700' }}>
+          <h3 className='fsize-19' style={{ margin: 0, fontSize: '15px', color: '#334155', fontWeight: '700' }}>
             {title} ({images.length})
           </h3>
           <button
@@ -857,7 +863,7 @@ const ImageSidebar = ({ images, onClose, title }) => {
                     color: 'white',
                     pointerEvents: 'none'
                   }}>
-                    <p style={{
+                    <p className='fsize-15' style={{
                       margin: 0,
                       fontSize: '11px',
                       fontWeight: '600',
@@ -1015,11 +1021,11 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus }) =
   return (
     <div style={{ padding: '12px', background: isClosed ? '#f8fafc' : 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-        <h4 style={{ margin: 0, fontSize: '13px', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <h4 className='fsize-17' style={{ margin: 0, fontSize: '13px', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <ImageIcon size={14} />
           {type === 'before' ? 'Before' : 'After'}
           {existingImagesMapped.length > 0 && (
-            <span style={{ fontSize: '10px', background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: '10px', fontWeight: '600' }}>
+            <span className='fsize-14' style={{ fontSize: '10px', background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: '10px', fontWeight: '600' }}>
               {existingImagesMapped.length} {existingImagesMapped.length === 1 ? 'Image' : 'Images'}
 
             </span>
@@ -1028,6 +1034,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus }) =
         {existingImagesMapped.length > 0 && (
           <button
             onClick={() => setShowSidebar(true)}
+            className='fsize-15'
             style={{ background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
           >
             View
@@ -1055,6 +1062,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus }) =
                 >
                   <span
                     onClick={() => setLocalPreviewIndex(idx)}
+                    className='fsize-17'
                     style={{
                       fontSize: '13px',
                       color: '#2563eb',
@@ -1085,6 +1093,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus }) =
             <input type="file" multiple accept="image/*" id={`${type}-upload-${defectId}`} onChange={handleFileChange} hidden />
             <label
               htmlFor={`${type}-upload-${defectId}`}
+              className='fsize-15'
               style={{
                 cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px',
                 color: '#ea580c', fontWeight: '600', fontSize: '11px', padding: '6px 12px',
@@ -1098,6 +1107,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus }) =
               <button
                 onClick={handleUpload}
                 disabled={isUploading}
+                className='fsize-15'
                 style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '4px', padding: '7px 12px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
               >
                 {isUploading ? 'Uploading...' : 'Upload'}
@@ -1108,7 +1118,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus }) =
       )}
 
       {isMandatory && existingImagesMapped.length === 0 && (
-        <div style={{ marginTop: '8px', background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '4px', padding: '6px', fontSize: '10px', color: '#92400e', fontWeight: '600', textAlign: 'center' }}>
+        <div className='fsize-14' style={{ marginTop: '8px', background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '4px', padding: '6px', fontSize: '10px', color: '#92400e', fontWeight: '600', textAlign: 'center' }}>
           ⚠️ MANDATORY
         </div>
       )}
@@ -2214,18 +2224,18 @@ const VesselDashboard = () => {
   return (
     <div className="dashboard-wrapper">
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <h1 className="page-title">Vessel Overview</h1>
+        <div className="defect-header-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <h1 className="page-title defect-page-title" style={{ marginBottom: "0px" }}>Vessel Overview</h1>
           <button
             onClick={() => setIsEditMode(!isEditMode)}
+            className="defect-edit-btn"
             style={{
               background: isEditMode ? '#ea580c' : 'white',
               color: isEditMode ? 'white' : '#334155',
               border: '1px solid #cbd5e1',
-              padding: '8px 16px',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontWeight: '600',
+              // padding: '8px 16px',
+              // borderRadius: '6px',
+              // fontWeight: '600',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -2243,91 +2253,91 @@ const VesselDashboard = () => {
         </div> */}
       </div>
 
-      <div className="kpi-grid">
+      <div className="kpi-grid defect-kpi-grid">
         <div
-          className={`kpi-card blue ${sf.status.includes('OPEN') ? 'active' : ''}`}
+          className={`kpi-card blue defect-kpi-card ${sf.status.includes('OPEN') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('OPEN')}
 
         >
-          <div className="kpi-icon"
+          <div className="kpi-icon defect-kpi-icon"
           ><AlertTriangle size={24} /></div>
           <div className="kpi-data">
-            <h2>{openCount}</h2>
-            <p>Open Defects</p>
+            <h2 className="defect-kpi-number">{openCount}</h2>
+            <p className="defect-kpi-label">Open Defects</p>
           </div>
         </div>
 
         <div
-          className={`kpi-card orange ${sf.priority.includes('HIGH') ? 'active' : ''}`}
+          className={`kpi-card orange defect-kpi-card ${sf.priority.includes('HIGH') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('HIGH')}
         >
-          <div className="kpi-icon">
+          <div className="kpi-icon defect-kpi-icon">
             <AlertTriangle size={24} />
           </div>
           <div className="kpi-data">
-            <h2>{highPriorityCount}</h2>
-            <p>High Priority</p>
+            <h2 className="defect-kpi-number">{highPriorityCount}</h2>
+            <p className="defect-kpi-label">High Priority</p>
           </div>
         </div>
 
         <div
-          className={`kpi-card red ${sf.priority.includes('CRITICAL') ? 'active' : ''}`}
+          className={`kpi-card red defect-kpi-card ${sf.priority.includes('CRITICAL') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('CRITICAL')}
         >
-          <div className="kpi-icon">
+          <div className="kpi-icon defect-kpi-icon">
             <AlertOctagon size={24} />
           </div>
           <div className="kpi-data">
-            <h2>{criticalCount}</h2>
-            <p>Critical Defects</p>
+            <h2 className="defect-kpi-number">{criticalCount}</h2>
+            <p className="defect-kpi-label">Critical Defects</p>
           </div>
         </div>
 
 
         {/* ✅ NEW OVERDUE CARD */}
         <div
-          className={`kpi-card red ${sf.deadline_status.includes('OVERDUE') ? 'active' : ''}`}
+          className={`kpi-card red defect-kpi-card ${sf.deadline_status.includes('OVERDUE') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('OVERDUE')}
         >
-          <div className="kpi-icon">
+          <div className="kpi-icon defect-kpi-icon">
             <Clock size={24} />
           </div>
           <div className="kpi-data">
-            <h2>{overdueCount}</h2>
-            <p>Overdue Defects</p>
+            <h2 className="defect-kpi-number">{overdueCount}</h2>
+            <p className="defect-kpi-label">Overdue Defects</p>
           </div>
         </div>
 
         <div
-          className={`kpi-card orange ${filters.pending_closure ? 'active' : ''}`}
+          className={`kpi-card orange defect-kpi-card ${filters.pending_closure ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('PENDING_CLOSURE')}
         >
-          <div className="kpi-icon">
+          <div className="kpi-icon defect-kpi-icon">
             <Clock size={24} />
           </div>
           <div className="kpi-data">
-            <h2>{pendingClosureCount}</h2>
-            <p>Pending Closure</p>
+            <h2 className="defect-kpi-number">{pendingClosureCount}</h2>
+            <p className="defect-kpi-label">Pending Closure</p>
           </div>
         </div>
 
 
         <div
-          className={`kpi-card green ${sf.status.includes('CLOSED') ? 'active' : ''}`}
+          className={`kpi-card green defect-kpi-card ${sf.status.includes('CLOSED') ? 'active' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => handleKpiFilter('CLOSED')}
         >
-          <div className="kpi-icon">
+          <div className="kpi-icon defect-kpi-icon">
             <CheckCircle size={24} />
           </div>
           <div className="kpi-data">
-            <h2>{closedCount}</h2>
-            <p>Total Closed</p>
+            <h2 className="defect-kpi-number">{closedCount}</h2>
+            <p className="defect-kpi-label">Total Closed</p>
           </div>
         </div>
 
@@ -2344,74 +2354,49 @@ const VesselDashboard = () => {
             }}
 
             disabled={showCreateRow}
-            style={{
-              background: '#ea580c',
-              color: 'white',
-              border: 'none',
-              padding: '8px 14px',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontWeight: '600',
-              marginLeft: '10px',
-              cursor: showCreateRow ? 'not-allowed' : 'pointer'
-            }}
+            // style={{ maxWidth: "200px" }}
+            className="btn-create-defect-main"
           >
             + Create Defect
           </button>
 
           {/* RIGHT: Legend */}
           <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '10px 14px',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              fontSize: '13px',
-              color: '#334155',
-              gap: '24px'
-            }}
+            className="legend-container"
           >
             {/* PRIORITY */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="legend-item">
               <strong>Priority:</strong>
               <span style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <AlertTriangle size={14} color="#16a34a" /> Low
-                <AlertTriangle size={14} color="#2563eb" /> Medium
-                <AlertTriangle size={14} color="#f97316" /> High
-                <AlertTriangle size={14} color="#dc2626" /> Critical
+                <AlertTriangle size={14} color="#16a34a" /> <label>Low</label>
+                <AlertTriangle size={14} color="#2563eb" /> <label>Medium</label>
+                <AlertTriangle size={14} color="#f97316" /> <label>High</label>
+                <AlertTriangle size={14} color="#dc2626" /> <label>Critical</label>
               </span>
             </div>
 
             {/* STATUS */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="legend-item">
               <strong>Status:</strong>
-              <span style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <Flower size={14} color="#3b82f6" />Open
-                <Flower size={14} color="#f59e0b" />Pending Closure
-                <Flower size={14} color="#22c55e" />Closed
+              <span className="legend-icons">
+                <Flower size={14} color="#3b82f6" /><label>Open</label>
+                <Flower size={14} color="#f59e0b" /><label>Pending</label>
+                <Flower size={14} color="#22c55e" /><label>Closed</label>
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="legend-item">
               <strong>Due Date:</strong>
-              <span style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <Clock size={14} color="#16a34a" /> Normal
-                <Clock size={14} color="#f59e0b" /> ≤15 Days
-                <Clock size={14} color="#dc2626" /> Overdue
+              <span className="legend-icons">
+                <Clock size={14} color="#16a34a" /> <label>Normal</label>
+                <Clock size={14} color="#f59e0b" /> <label>≤15d</label>
+                <Clock size={14} color="#dc2626" /> <label>Overdue</label>
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="legend-item">
               <strong>Other:</strong>
-              <span style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <Flag size={14} color="#e8290b" fill="#e8290b" /> Flagged
-                <div style={{
-                  width: '17px', height: '17px', borderRadius: '50%',
-                  border: '2px solid #0ea5e9', background: '#e0f2fe',
-                  color: '#0ea5e9', fontSize: '9px', fontWeight: '900',
-                  display: 'inline-flex', alignItems: 'center',
-                  justifyContent: 'center', fontFamily: 'monospace'
-                }}>DD</div> Dry Dock
+              <span className="legend-icons">
+                <Flag size={14} color="#e8290b" fill="#e8290b" /> <label>Flag</label>
+                <div className="dd-icon-small">DD</div> <label>DryDock</label>
               </span>
             </div>
           </div>
@@ -2449,7 +2434,7 @@ const VesselDashboard = () => {
               updateColumnsMutation.mutate(reorderedColumns);
             }}
           >
-            <table className="data-table">
+            <table className="data-table vessel">
               <thead>
                 <SortableContext
                   items={visibleColumns}
@@ -2785,7 +2770,7 @@ const VesselDashboard = () => {
 
                         case 'pr_details':
                           return (
-                            <DraggableTh key="pr_details" id="pr_details" disabled={!isEditMode} style={{ width: columnWidths.pr_number, padding: "12px 0px" }}>
+                            <DraggableTh key="pr_details" id="pr_details" disabled={!isEditMode} style={{ width: columnWidths.pr_number }}>
                               <FilterHeader
                                 label="PR Details"
                                 field="pr_number"
@@ -2918,7 +2903,7 @@ const VesselDashboard = () => {
                                         }}
                                         style={{
                                           cursor: 'pointer',
-                                          fontSize: '13px',
+                                          // fontSize: '13px',
                                           display: '-webkit-box',
                                           WebkitLineClamp: 2,
                                           WebkitBoxOrient: 'vertical',
@@ -2954,7 +2939,7 @@ const VesselDashboard = () => {
                                             marginTop: '4px',
                                             zIndex: 50,
                                             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                            fontSize: '13px'
+                                            // fontSize: '13px'
                                           }}
                                         >
                                           <textarea
@@ -2964,7 +2949,7 @@ const VesselDashboard = () => {
                                             style={{
                                               width: '100%',
                                               minHeight: '80px',
-                                              fontSize: '13px',
+                                              // fontSize: '13px',
                                               padding: '6px',
                                               border: '1px solid #cbd5e1',
                                               borderRadius: '4px',
@@ -3036,7 +3021,7 @@ const VesselDashboard = () => {
                                         }}
                                         style={{
                                           cursor: 'pointer',
-                                          fontSize: '13px',
+                                          // fontSize: '13px',
                                           display: '-webkit-box',
                                           WebkitLineClamp: 2,
                                           WebkitBoxOrient: 'vertical',
@@ -3068,7 +3053,7 @@ const VesselDashboard = () => {
                                             zIndex: 50,
                                             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                                             whiteSpace: 'pre-wrap',
-                                            fontSize: '13px',
+                                            // fontSize: '13px',
                                             textTransform: 'uppercase',
 
                                           }}
@@ -3310,7 +3295,7 @@ const VesselDashboard = () => {
                             <td colSpan={calculateColspan()} style={{ padding: 0 }}>
                               <div style={{ background: '#f8fafc', padding: '20px', borderBottom: '1px solid #e2e8f0' }}>
                                 {isClosed && (
-                                  <div style={{
+                                  <div className='fsize-17' style={{
                                     background: '#fef3c7',
                                     border: '1px solid #fbbf24',
                                     borderRadius: '8px',
@@ -3327,7 +3312,7 @@ const VesselDashboard = () => {
                                     CLOSED - Read Only Mode (All editing disabled)
                                   </div>
                                 )}
-                                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', height: "450px" }}>
+                                <div className='thread-td-height' style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', height: "450px" }}>
                                   <ThreadSection
                                     defectId={defect.id}
                                     defectStatus={defect.status}

@@ -100,93 +100,25 @@ function VesselPopover({ vessels, isOpen, onClose, triggerRef }) {
     return (
         <div
             ref={popoverRef}
-            style={{
-                position: "fixed",
-                top: `${position.top}px`,
-                left: `${position.left}px`,
-                zIndex: 1000,
-                background: "var(--ap-bg)",
-                border: "1px solid var(--ap-border)",
-                borderRadius: "8px",
-                boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
-                minWidth: "300px",
-                maxWidth: "420px",
-            }}
-            className="ap-popover"
+            style={{ top: `${position.top}px`, left: `${position.left}px` }}
+            className={`ap-vessel-popover-panel ${position.arrowSide === 'left' ? 'arrow-on-left' : 'arrow-on-right'}`}
         >
-            {/* Arrow border layer — dynamically points at the trigger */}
-            <div
-                style={{
-                    position: "absolute",
-                    right: "-8px",
-                    top: `${arrowTop}px`,
-                    transform: "translateY(-50%)",
-                    width: 0,
-                    height: 0,
-                    borderTop: "8px solid transparent",
-                    borderBottom: "8px solid transparent",
-                    borderLeft: "8px solid var(--ap-border)",
-                }}
-            />
-            {/* Arrow fill layer — masks border for clean outlined look */}
-            <div
-                style={{
-                    position: "absolute",
-                    right: "-6px",
-                    top: `${arrowTop}px`,
-                    transform: "translateY(-50%)",
-                    width: 0,
-                    height: 0,
-                    borderTop: "7px solid transparent",
-                    borderBottom: "7px solid transparent",
-                    borderLeft: "7px solid var(--ap-bg)",
-                }}
-            />
+            {/* The dynamic arrow */}
+            <div className="ap-popover-arrow" style={{ top: `${arrowTop}px` }} />
 
-            <div style={{ padding: "16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                    <Ship size={16} style={{ color: "var(--ap-primary)" }} />
-                    <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--ap-text)", margin: 0 }}>
-                        Assigned Vessels ({vessels.length})
-                    </p>
+            <div className="ap-popover-inner">
+                <div className="ap-popover-header">
+                    <Ship size={18} className="ap-popover-icon" />
+                    <p>Assigned Vessels ({vessels.length})</p>
                 </div>
-                <div style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 10,
-                    maxHeight: "420px",
-                    overflowY: "auto",
-                    paddingRight: "6px",
-                }}>
+                
+                <div className="ap-popover-list">
                     {vessels.map(vessel => (
-                        <div
-                            key={vessel.imo}
-                            style={{
-                                padding: "12px 14px",
-                                borderRadius: 7,
-                                background: "linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.02) 100%)",
-                                border: "1px solid rgba(59, 130, 246, 0.2)",
-                                borderLeft: "3px solid var(--ap-primary)",
-                                flexShrink: 0,
-                                transition: "all 0.2s ease",
-                            }}
-                        >
-                            <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--ap-text)", marginBottom: 4 }}>
-                                {vessel.name}
-                            </div>
-                            <div style={{ fontSize: "0.75rem", color: "var(--ap-text-muted)", fontFamily: "monospace", letterSpacing: "0.5px" }}>
-                                IMO {vessel.imo}
-                            </div>
+                        <div key={vessel.imo} className="ap-vessel-pop-card">
+                            <div className="v-pop-name">{vessel.name}</div>
+                            <div className="v-pop-imo">IMO {vessel.imo}</div>
                             {vessel.vessel_type && (
-                                <div style={{
-                                    fontSize: "0.7rem",
-                                    color: "var(--ap-text-muted)",
-                                    marginTop: 4,
-                                    display: "inline-block",
-                                    padding: "2px 8px",
-                                    borderRadius: 3,
-                                    background: "rgba(59, 130, 246, 0.1)",
-                                }}>
+                                <div className="v-pop-type">
                                     {vessel.vessel_type.replace(/_/g, " ")}
                                 </div>
                             )}
@@ -197,6 +129,7 @@ function VesselPopover({ vessels, isOpen, onClose, triggerRef }) {
         </div>
     );
 }
+
 
 function EditSlideOver({ user, vessels, onClose, onSave }) {
     const [data, setData] = useState({

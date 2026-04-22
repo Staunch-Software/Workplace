@@ -16,11 +16,11 @@ const MODULE_META = [
   { key: "engine_performance", label: "Engine Performance", icon: <Zap size={14} />, color: "#22c55e" },
 ];
 function getRoleStyle(role) {
-    const r = role?.toUpperCase();
-    if (r === "ADMIN") return { bg: "rgba(139, 92, 246, 0.06)", border: "#8b5cf6", badge: "#8b5cf6" };
-    if (r === "SHORE") return { bg: "rgba(59, 130, 246, 0.05)", border: "#3b82f6", badge: "#3b82f6" };
-    return { bg: "rgba(249, 115, 22, 0.05)", border: "#f97316", badge: "#f97316" };
-  }
+  const r = role?.toUpperCase();
+  if (r === "ADMIN") return { bg: "rgba(139, 92, 246, 0.06)", border: "#8b5cf6", badge: "#8b5cf6" };
+  if (r === "SHORE") return { bg: "rgba(59, 130, 246, 0.05)", border: "#3b82f6", badge: "#3b82f6" };
+  return { bg: "rgba(249, 115, 22, 0.05)", border: "#f97316", badge: "#f97316" };
+}
 function AssignedUsersPopover({ users, isOpen, onClose, triggerRef }) {
   const popoverRef = useRef(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -90,108 +90,34 @@ function AssignedUsersPopover({ users, isOpen, onClose, triggerRef }) {
     // clamp so arrow never goes below the popover bottom edge
     (popoverRef.current?.offsetHeight ?? 200) - 16
   ));
-  
+
   return (
     <div
       ref={popoverRef}
-      style={{
-        position: "fixed",
-        top: `${position.top}px`,
-        left: `${position.left}px`,
-        zIndex: 1000,
-        background: "var(--ap-bg)",
-        border: "1px solid var(--ap-border)",
-        borderRadius: "8px",
-        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-        minWidth: "280px",
-        maxWidth: "400px",
-      }}
-      className="ap-popover"
+      style={{ top: `${position.top}px`, left: `${position.left}px` }}
+      className={`ap-user-popover-panel ${position.arrowSide === 'left' ? 'arrow-on-left' : 'arrow-on-right'}`}
     >
-      {/* Arrow border layer — top is dynamic, always points at the trigger */}
-      <div
-        style={{
-          position: "absolute",
-          right: "-8px",
-          top: `${arrowTop}px`,
-          transform: "translateY(-50%)",
-          width: 0,
-          height: 0,
-          borderTop: "8px solid transparent",
-          borderBottom: "8px solid transparent",
-          borderLeft: "8px solid var(--ap-border)",
-        }}
-      />
-      {/* Arrow fill layer */}
-      <div
-        style={{
-          position: "absolute",
-          right: "-6px",
-          top: `${arrowTop}px`,
-          transform: "translateY(-50%)",
-          width: 0,
-          height: 0,
-          borderTop: "7px solid transparent",
-          borderBottom: "7px solid transparent",
-          borderLeft: "7px solid var(--ap-bg)",
-        }}
-      />
+      {/* The dynamic arrow */}
+      <div className="ap-popover-arrow" style={{ top: `${arrowTop}px` }} />
 
-      <div style={{ padding: "12px 16px" }}>
-        <p style={{ fontSize: "0.875rem", fontWeight: 600, marginBottom: 12, color: "var(--ap-text)" }}>
-          Assigned Users ({users.length})
-        </p>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-            maxHeight: "400px",
-            overflowY: "auto",
-            paddingRight: "4px",
-          }}
-        >
+      <div className="ap-popover-inner">
+        <p className="ap-popover-title">Assigned Users ({users.length})</p>
+        <div className="ap-popover-list">
           {users.map(user => {
             const { bg, border, badge } = getRoleStyle(user.role);
-            const roleDisplay = user.role ? user.role.toUpperCase() : "UNKNOWN";
-
             return (
               <div
                 key={user.id}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 6,
-                  background: bg,
-                  borderLeft: `3px solid ${border}`,
-                  flexShrink: 0,
-                }}
+                className="ap-user-pop-card"
+                style={{ background: bg, borderLeft: `3px solid ${border}` }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontSize: "0.875rem",
-                    fontWeight: 500,
-                    color: "var(--ap-text)",
-                  }}
-                >
-                  {user.full_name}
-                  <span
-                    style={{
-                      fontSize: "0.65rem",
-                      padding: "2px 6px",
-                      borderRadius: 3,
-                      background: badge,
-                      color: "white",
-                    }}
-                  >
-                    {roleDisplay}
+                <div className="v-user-pop-row">
+                  <span className="v-user-pop-name">{user.full_name}</span>
+                  <span className="v-user-pop-badge" style={{ background: badge }}>
+                    {user.role}
                   </span>
                 </div>
-                <div style={{ fontSize: "0.75rem", color: "var(--ap-text-muted)", marginTop: 4 }}>
-                  {user.email}
-                </div>
+                <div className="v-user-pop-email">{user.email}</div>
               </div>
             );
           })}
@@ -218,7 +144,7 @@ function EditVesselSlideOver({ vessel, onClose, onSave }) {
     setSaving(true);
     try {
       await updateVessel(vessel.imo, data);
-await updateVesselModuleStatus(vessel.imo, moduleStatus);
+      await updateVesselModuleStatus(vessel.imo, moduleStatus);
       await onSave();
       onClose();
     } catch (err) {

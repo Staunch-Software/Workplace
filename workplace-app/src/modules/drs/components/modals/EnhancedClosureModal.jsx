@@ -5,6 +5,7 @@ import { defectApi } from '@drs/services/defectApi';
 import { blobUploadService } from '@drs/services/blobUploadService';
 import { generateId } from '@drs/services/idGenerator';
 import AttachmentLink from '../shared/AttachmentLink';
+import './EnhancedClosureModal.css';
 
 /**
  * Enhanced Defect Closure Modal - Integrates with PENDING_CLOSURE workflow
@@ -142,6 +143,7 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
       console.error('Closure request failed:', error);
     }
   };
+  
 
   return (
     <div 
@@ -161,6 +163,7 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
       onClick={onClose}
     >
       <div 
+        className='clousure-model'
         style={{
           background: 'white',
           borderRadius: '12px',
@@ -184,10 +187,10 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
           borderRadius: '12px 12px 0 0'
         }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>
+            <h2 className='closure-fsize-22' style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>
               Request Defect Closure
             </h2>
-            <p style={{ margin: '4px 0 0 0', fontSize: '12px', opacity: 0.9 }}>
+            <p className='closure-fsize-16' style={{ margin: '4px 0 0 0', fontSize: '12px', opacity: 0.9 }}>
               {defect.equipment_name}
             </p>
           </div>
@@ -210,8 +213,10 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
         <div style={{ padding: '24px' }}>
           
           {/* Closure Remarks */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ 
+          <div  style={{ marginBottom: '20px' }}>
+            <label
+            className='closure-fsize-16' 
+            style={{ 
               fontSize: '13px', 
               fontWeight: '700', 
               color: '#0f172a',
@@ -224,6 +229,7 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
               placeholder="Describe the resolution and actions taken... (minimum 50 characters)"
+              className='closure-fsize-16' 
               style={{
                 width: '100%',
                 minHeight: '100px',
@@ -235,7 +241,7 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
                 outline: 'none'
               }}
             />
-            <div style={{
+            <div className='closure-fsize-14' style={{
               fontSize: '11px',
               marginTop: '6px',
               color: remarksValid ? '#16a34a' : remarks.length > 0 ? '#dc2626' : '#64748b'
@@ -247,7 +253,7 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
           {/* Image Upload Section - Only show if missing mandatory images */}
           {showImageSection && (
             <div style={{ marginBottom: '16px' }}>
-              <p style={{ 
+              <p className='closure-fsize-16' style={{ 
                 fontSize: '12px', 
                 fontWeight: '700',
                 color: '#0f172a',
@@ -271,14 +277,14 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
                     alignItems: 'center',
                     marginBottom: '8px'
                   }}>
-                    <span style={{ 
+                    <span className='closure-fsize-16' style={{ 
                       fontSize: '12px', 
                       fontWeight: '600',
                       color: '#991b1b'
                     }}>
                       ⚠️ Before Images (MANDATORY)
                     </span>
-                    <label style={{
+                    <label className='closure-fsize-16' style={{
                       background: '#ef4444',
                       color: 'white',
                       padding: '4px 10px',
@@ -308,7 +314,7 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
                   </div>
 
                   {uploadProgress.before && (
-                    <div style={{
+                    <div className='closure-fsize-16' style={{
                       fontSize: '11px',
                       color: '#ea580c',
                       marginBottom: '6px',
@@ -318,7 +324,7 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
                     </div>
                   )}
 
-                  <p style={{ 
+                  <p className='closure-fsize-16' style={{ 
                     fontSize: '11px', 
                     color: '#991b1b',
                     margin: '6px 0 0 0'
@@ -342,14 +348,14 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
                     alignItems: 'center',
                     marginBottom: '8px'
                   }}>
-                    <span style={{ 
+                    <span className='closure-fsize-16' style={{ 
                       fontSize: '12px', 
                       fontWeight: '600',
                       color: '#991b1b'
                     }}>
                       ⚠️ After Images (MANDATORY)
                     </span>
-                    <label style={{
+                    <label className='closure-fsize-16' style={{
                       background: '#ef4444',
                       color: 'white',
                       padding: '4px 10px',
@@ -379,7 +385,7 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
                   </div>
 
                   {uploadProgress.after && (
-                    <div style={{
+                    <div className='closure-fsize-16' style={{
                       fontSize: '11px',
                       color: '#ea580c',
                       marginBottom: '6px',
@@ -389,7 +395,7 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
                     </div>
                   )}
 
-                  <p style={{ 
+                  <p className='closure-fsize-16' style={{ 
                     fontSize: '11px', 
                     color: '#991b1b',
                     margin: '6px 0 0 0'
@@ -403,7 +409,7 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
 
           {/* Success message if all images are already uploaded */}
           {!showImageSection && (defect.before_image_required || defect.after_image_required) && (
-            <div style={{
+            <div className='closure-fsize-16' style={{
               padding: '12px',
               background: '#f0fdf4',
               border: '1px solid #86efac',
@@ -424,7 +430,7 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
 
           {/* No images required at all */}
           {!defect.before_image_required && !defect.after_image_required && (
-            <div style={{
+            <div className='closure-fsize-16' style={{
               padding: '10px',
               background: '#f1f5f9',
               border: '1px solid #cbd5e1',
@@ -450,6 +456,7 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
         }}>
           <button
             onClick={onClose}
+            className='closure-fsize-16'
             style={{
               background: 'white',
               border: '1px solid #d1d5db',
@@ -466,6 +473,7 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
           <button
             onClick={handleProceed}
             disabled={!canProceed || closureMutation.isPending}
+            className='closure-fsize-16'
             style={{
               background: canProceed ? 'linear-gradient(135deg, #f59e0b 0%, #fb923c 100%)' : '#e5e7eb',
               border: 'none',

@@ -1159,7 +1159,7 @@ const AnalyticsDashboard = () => {
             // onOpen={() => setTimeout(buildTrendChart, 0)}
             >
                 {/* Donut row */}
-                <div className="stats-donut-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                <div className="stats-donut-grid" style={{ display: 'grid',overflowX:"auto", gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
                     <div className="table-card " style={{ padding: 0 }}>
                         <div className="defect-card-header" style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
                             <span className="defect-card-title">Status Distribution</span>

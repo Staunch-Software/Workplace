@@ -110,8 +110,10 @@ const ShoreLayout = () => {
 
     let link = notification.link;
 
-    if (link?.startsWith('/drs/shore/vessels')) {
-      link = link.replace('/drs/shore/vessels', '/drs/shore/dashboard');
+    if (link?.startsWith('/drs/shore/vessels') || link?.startsWith('/drs/shore/history')) {
+      link = link
+        .replace('/drs/shore/vessels', '/drs/shore/dashboard')
+        .replace('/drs/shore/history', '/drs/shore/dashboard');
     }
 
 
@@ -214,7 +216,7 @@ const ShoreLayout = () => {
           </button>
 
           <div className="vessel-brand defect-nav-brand">
-            <div className="brand-logo" style={{margin:"0px"}}><Building2 size={24} color="#2dd4bf" /></div>
+            <div className="brand-logo" style={{ margin: "0px" }}><Building2 size={24} color="#2dd4bf" /></div>
             <div className="vessel-info">
               <h1 className="defect-nav-title">Ozellar Marine</h1>
               <span className="imo-badge defect-nav-badge">Shore HQ</span>
@@ -374,7 +376,7 @@ const ShoreLayout = () => {
                               alignItems: 'center',
                               gap: '8px'
                             }}>
-                              <span style={{
+                              <span className='closure-remark' style={{
                                 fontSize: '11px',
                                 color: '#94a3b8',
                                 fontWeight: '500'

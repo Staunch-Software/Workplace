@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { defectApi } from '@drs/services/defectApi';
 import { DEFECT_SOURCE_OPTIONS } from '../../components/shared/constants';
+import "../../components/shared/live-feed.css"
 
 import {
   AlertCircle, AlertTriangle, Info, Zap,
@@ -94,26 +95,15 @@ const Tooltip = ({ text, children }) => {
   const [show, setShow] = useState(false);
   return (
     <span
-      style={{ position: 'relative', display: 'inline-block' }}
+      className="tooltip-wrapper"
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
     >
       {children}
       {show && (
-        <div style={{
-          position: 'absolute', bottom: '110%', left: '50%',
-          transform: 'translateX(-50%)', background: '#1e293b', color: '#f8fafc',
-          padding: '6px 10px', borderRadius: '6px', fontSize: '12px',
-          whiteSpace: 'nowrap', zIndex: 9999, pointerEvents: 'none',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-        }}>
+        <div className="tooltip-bubble">
           {text}
-          <div style={{
-            position: 'absolute', top: '100%', left: '50%',
-            transform: 'translateX(-50%)', width: 0, height: 0,
-            borderLeft: '5px solid transparent', borderRight: '5px solid transparent',
-            borderTop: '5px solid #1e293b',
-          }} />
+          <div className="tooltip-arrow" />
         </div>
       )}
     </span>
@@ -136,26 +126,19 @@ const DescTooltip = ({ text, children }) => {
   };
 
   return (
-    <span ref={ref} style={{ position: 'relative', display: 'inline' }}
+    <span ref={ref} className="desc-tooltip-trigger"
       onMouseEnter={handleMouseEnter} onMouseLeave={() => setShow(false)}>
       {children}
       {show && ReactDOM.createPortal(
-        <div style={{
-          position: 'fixed',
-          top: pos.below ? pos.top : undefined,
-          bottom: pos.below ? undefined : `calc(100vh - ${pos.top}px)`,
-          left: pos.left, background: '#1e293b', color: '#f8fafc',
-          padding: '8px 12px', borderRadius: '8px', fontSize: '12px',
-          lineHeight: '1.6', maxWidth: '340px', zIndex: 99999,
-          pointerEvents: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
-          whiteSpace: 'pre-wrap', wordBreak: 'break-word', textTransform: 'uppercase',
-        }}>
+        <div
+          className={`desc-tooltip-portal ${pos.below ? 'is-below' : 'is-above'}`}
+          style={{
+            top: pos.below ? pos.top : undefined,
+            bottom: pos.below ? undefined : `calc(100vh - ${pos.top}px)`,
+            left: pos.left,
+          }}>
           {text}
-          <div style={{
-            position: 'absolute', top: '100%', left: '12px', width: 0, height: 0,
-            borderLeft: '5px solid transparent', borderRight: '5px solid transparent',
-            borderTop: '5px solid #1e293b',
-          }} />
+          <div className="desc-tooltip-arrow" />
         </div>,
         document.body
       )}
@@ -178,43 +161,20 @@ const Select = ({ value, onChange, options, placeholder }) => {
   const selected = options.find(o => o.value === value);
 
   return (
-    <div ref={ref} style={{ position: 'relative', minWidth: '140px' }}>
-      <button onClick={() => setOpen(!open)} style={{
-        width: '100%', padding: '8px 12px', background: 'white',
-        border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px',
-        color: value ? '#1e293b' : '#94a3b8', cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: '8px', fontFamily: 'inherit',
-      }}>
-        <span>{selected ? selected.label : placeholder}</span>
-        <ChevronDown size={14} style={{ color: '#94a3b8', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+    <div ref={ref} className="custom-select-container">
+      <button onClick={() => setOpen(!open)} className={`select-trigger ${value ? 'has-value' : ''}`}>
+        <span className="select-label">{selected ? selected.label : placeholder}</span>
+        <ChevronDown size={14} className={`select-chevron ${open ? 'is-open' : ''}`} />
       </button>
       {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
-          background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.08)', zIndex: 1000, 
-          // --- ADDED SCROLL LOGIC HERE ---
-          maxHeight: '280px', 
-          overflowY: 'auto',
-          // -------------------------------
-        }}>
+        <div className="select-dropdown">
           <div onClick={() => { onChange(''); setOpen(false); }}
-            style={{ 
-              padding: '9px 12px', fontSize: '13px', color: '#94a3b8', 
-              cursor: 'pointer', borderBottom: '1px solid #f1f5f9',
-              position: 'sticky', top: 0, background: 'white', zIndex: 1 
-            }}>
+            className="select-reset-option">
             {placeholder}
           </div>
           {options.map(opt => (
             <div key={opt.value} onClick={() => { onChange(opt.value); setOpen(false); }}
-              style={{
-                padding: '9px 12px', fontSize: '13px',
-                color: value === opt.value ? '#2563eb' : '#374151',
-                background: value === opt.value ? '#eff6ff' : 'transparent',
-                cursor: 'pointer', fontWeight: value === opt.value ? '600' : '400',
-              }}>
+              className={`select-item ${value === opt.value ? 'is-selected' : ''}`}>
               {opt.label}
             </div>
           ))}
@@ -398,49 +358,28 @@ const LiveFeed = () => {
   }, [displayItems]);
 
   return (
-    <div style={{
-      height: '100vh', display: 'flex', flexDirection: 'column',
-      background: '#f8fafc', fontFamily: "'DM Sans', 'Segoe UI', sans-serif", overflow: 'hidden',
-    }}>
+    <div className="live-feed-page">
 
       {/* ── Header ── */}
-      <div style={{ padding: '18px 24px 0', background: '#f8fafc', flexShrink: 0, zIndex: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <div>
+      <div className="feed-header">
+        <div className="header-top-row">
+          <div className="nav-group">
             {/* FIX 4: clearFilters() on every tab switch */}
-            <div style={{ display: 'flex', gap: '4px', background: '#e2e8f0', borderRadius: '10px', padding: '3px', width: 'fit-content' }}>
+            <div className="tab-container">
               <button
                 onClick={() => { setActiveTab('live'); setViewMode('all'); clearFilters(); }}
-                style={{
-                  padding: '6px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  fontFamily: 'inherit', fontSize: '13px', fontWeight: '700',
-                  background: activeTab === 'live' ? 'white' : 'transparent',
-                  color: activeTab === 'live' ? '#0f172a' : '#64748b',
-                  boxShadow: activeTab === 'live' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.15s ease',
-                }}
+                className={`tab-btn ${activeTab === 'live' ? 'active' : ''}`}
               >
                 Live Feed
               </button>
               <button
                 onClick={() => { setActiveTab('mine'); setViewMode('all'); clearFilters(); }}
-                style={{
-                  padding: '6px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  fontFamily: 'inherit', fontSize: '13px', fontWeight: '700',
-                  background: activeTab === 'mine' ? 'white' : 'transparent',
-                  color: activeTab === 'mine' ? '#0f172a' : '#64748b',
-                  boxShadow: activeTab === 'mine' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.15s ease',
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                }}
+                className={`tab-btn ${activeTab === 'mine' ? 'active' : ''}`}
               >
                 <AtSign size={13} />
                 My Feed
                 {myMentionUnreadCount > 0 && (
-                  <span style={{
-                    background: '#3b82f6', color: 'white', fontSize: '10px',
-                    fontWeight: '700', padding: '1px 6px', borderRadius: '10px', lineHeight: '1.4',
-                  }}>
+                  <span className="tab-badge">
                     {myMentionUnreadCount}
                   </span>
                 )}
@@ -448,49 +387,33 @@ const LiveFeed = () => {
             </div>
 
             {/* FIX 5: "X of Y" uses correct base count per tab */}
-            <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#94a3b8' }}>
+            <p className="feed-summary-text">
               {displayItems.length} {activeTab === 'live' ? 'event' : 'mention'}{displayItems.length !== 1 ? 's' : ''}
               {hasFilters && (
-                <span style={{ color: '#94a3b8' }}>
+                <span className="filter-context">
                   {' '}of {activeTab === 'live'
                     ? feedItems.filter(i => i.event_type !== 'MENTION').length
                     : myMentions.length}
                 </span>
               )}
-              {isFetching && <span style={{ marginLeft: '8px', color: '#60a5fa' }}>Refreshing…</span>}
+              {isFetching && <span className="refreshing-indicator">Refreshing…</span>}
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: '8px', padding: '3px', gap: '2px' }}>
+          <div className="view-mode-container">
+            <div className="view-mode-switcher">
               {[{ key: 'all', label: 'All' }, { key: 'unread', label: 'Unread' }, { key: 'read', label: 'Read' }].map(opt => (
-                <button key={opt.key} onClick={() => setViewMode(opt.key)} style={{
-                  padding: '5px 14px', borderRadius: '6px', border: 'none', fontSize: '12px',
-                  fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit',
-                  background: viewMode === opt.key ? 'white' : 'transparent',
-                  color: viewMode === opt.key ? '#0f172a' : '#64748b',
-                  boxShadow: viewMode === opt.key ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.15s ease',
-                }}>
+                <button key={opt.key} onClick={() => setViewMode(opt.key)} className={`view-mode-btn ${viewMode === opt.key ? 'is-active' : ''}`}>
                   {opt.label}
                   {opt.key === 'unread' && unreadCount > 0 && (
-                    <span style={{
-                      marginLeft: '5px',
-                      background: activeTab === 'mine' ? '#3b82f6' : '#ef4444',
-                      color: 'white', fontSize: '10px', fontWeight: '700',
-                      padding: '1px 5px', borderRadius: '10px',
-                    }}>
+                    <span className={`unread-pill ${activeTab === 'mine' ? 'bg-blue' : 'bg-red'}`}>
                       {unreadCount}
                     </span>
                   )}
                 </button>
               ))}
             </div>
-            <button onClick={() => refetch()} style={{
-              background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px',
-              padding: '7px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center',
-              gap: '6px', fontSize: '13px', color: '#475569', fontFamily: 'inherit',
-            }}>
+            <button onClick={() => refetch()} className="refresh-btn">
               <RefreshCw size={14} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
               Refresh
             </button>
@@ -498,41 +421,29 @@ const LiveFeed = () => {
         </div>
 
         {/* ── Filter Bar ── */}
-        <div style={{
-          background: 'white', border: '1.5px solid #cbd5e1', borderRadius: '12px',
-          padding: '14px 18px', display: 'flex', gap: '10px', alignItems: 'center',
-          flexWrap: 'wrap', marginBottom: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-        }}>
+        <div className="filter-toolbar">
           <Select value={vesselFilter} onChange={setVesselFilter} options={vesselOptions} placeholder="All Vessels" />
           <Select value={priorityFilter} onChange={setPriorityFilter} options={priorityOptions} placeholder="All Priorities" />
           <Select value={sourceFilter} onChange={setSourceFilter} options={sourceOptions} placeholder="All Sources" />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px' }}>From</span>
+          <div className="date-picker-group">
+
+            <span className="date-label">From</span>
             <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-              style={{ padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '12px', color: '#475569', fontFamily: 'inherit', background: '#f8fafc' }} />
-            <span style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px' }}>To</span>
+              className="date-input" />
+            <span className="date-label">To</span>
             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-              style={{ padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '12px', color: '#475569', fontFamily: 'inherit', background: '#f8fafc' }} />
+              className="date-input" />
           </div>
 
-          <div style={{ position: 'relative', flex: '1', minWidth: '180px' }}>
+          <div className="search-field-wrapper">
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search equipment, description…"
-              style={{
-                width: '100%', padding: '8px 12px 8px 32px', border: '1px solid #e2e8f0',
-                borderRadius: '8px', fontSize: '13px', color: '#1e293b', outline: 'none',
-                fontFamily: 'inherit', boxSizing: 'border-box', background: '#f8fafc',
-              }} />
+              className="search-input" />
           </div>
 
           {hasFilters && (
-            <button onClick={clearFilters} style={{
-              background: '#fef2f2', border: '1px solid #fecaca', color: '#ef4444',
-              borderRadius: '8px', padding: '7px 10px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '4px',
-              fontSize: '12px', fontWeight: '600', fontFamily: 'inherit',
-            }}>
+            <button onClick={clearFilters} className="clear-filters-btn">
               <X size={12} /> Clear
             </button>
           )}
@@ -540,28 +451,21 @@ const LiveFeed = () => {
       </div>
 
       {/* ── Feed List ── */}
-      <div style={{
-        flex: 1, overflowY: 'auto', padding: '0 24px 24px',
-        display: 'flex', flexDirection: 'column', gap: '8px',
-        minHeight: 0, maxHeight: 'calc(100vh - 250px)',
-      }}>
+      <div className="feed-scroll-area">
         {isLoading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#94a3b8', fontSize: '14px' }}>
-            Loading feed…
+          <div className="feed-status-container">
+            <span className="loading-text">Loading feed…</span>
           </div>
         ) : displayItems.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px', gap: '10px' }}>
+          <div className="feed-status-container empty">
             {activeTab === 'mine' ? <AtSign size={36} color="#cbd5e1" /> : <Anchor size={36} color="#cbd5e1" />}
-            <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>
+            <p className="feed-empty-text">
               {activeTab === 'mine'
                 ? hasFilters ? 'No mentions match your filters' : 'No mentions yet'
                 : hasFilters ? 'No events match your filters' : 'No feed events found'}
             </p>
             {hasFilters && (
-              <button onClick={clearFilters} style={{
-                background: 'none', border: '1px solid #e2e8f0', borderRadius: '8px',
-                padding: '6px 14px', fontSize: '12px', color: '#64748b', cursor: 'pointer', fontFamily: 'inherit',
-              }}>
+              <button onClick={clearFilters} className="feed-empty-clear-btn">
                 Clear filters
               </button>
             )}
@@ -615,18 +519,14 @@ const LiveFeed = () => {
 
 // ── Section divider ────────────────────────────────────────────────────────
 const SectionDivider = ({ label, color }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '4px 0 2px' }}>
-    <div style={{ height: '1px', flex: 1, background: '#e2e8f0' }} />
-    <span style={{
-      fontSize: '10px', fontWeight: '700', color, letterSpacing: '0.8px', textTransform: 'uppercase',
-      background: 'white', padding: '2px 10px', borderRadius: '10px', border: `1px solid ${color}22`, flexShrink: 0,
-    }}>
+  <div className="section-divider" style={{ "--divider-color": color }}>
+    <div className="divider-line" />
+    <span className="divider-label">
       {label}
     </span>
-    <div style={{ height: '1px', flex: 1, background: '#e2e8f0' }} />
+    <div className="divider-line" />
   </div>
 );
-
 // ── Feed row ───────────────────────────────────────────────────────────────
 const FeedRow = ({ item, onView, onMarkDone, isPending }) => {
   const cfg = EVENT_CONFIG[item.event_type] || EVENT_CONFIG.DEFECT_OPENED;
@@ -641,42 +541,39 @@ const FeedRow = ({ item, onView, onMarkDone, isPending }) => {
   const hasFullDesc = desc.length > 50;
 
   return (
-    <div style={{
-      background: item.is_read ? 'white' : accentBg,
-      border: `1px solid ${item.is_read ? '#e2e8f0' : accentBorder}`,
-      borderLeft: `3px solid ${item.is_read ? '#e2e8f0' : accentColor}`,
-      borderRadius: '10px', padding: '12px 14px',
-      display: 'flex', alignItems: 'center', gap: '12px',
-      boxShadow: item.is_read ? 'none' : `0 1px 4px ${accentColor}18`,
-      opacity: item.is_read ? 0.72 : 1, transition: 'all 0.2s ease',
-    }}>
-      <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: accentBg, border: `1px solid ${accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+    <div className={`feed-row ${item.is_read ? 'is-read' : 'is-unread'}`}
+      style={{
+        "--row-accent": accentColor,
+        "--row-bg": accentBg,
+        "--row-border": accentBorder
+      }}>
+      <div className="feed-row-icon-box">
         <AlertTriangle size={18} color={accentColor} />
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+      <div className="feed-row-content">
+        <div className="feed-row-top">
+          <span className="vessel-tag">
             <Anchor size={11} color="#94a3b8" />{item.vessel_name || '—'}
           </span>
           {desc && (hasFullDesc ? (
             <DescTooltip text={desc}>
-              <span style={{ fontSize: '13.5px', fontWeight: '500', color: '#1e293b', cursor: 'default', textTransform: 'uppercase', borderBottom: '1px dashed #cbd5e1', paddingBottom: '1px' }}>{shortDesc}</span>
+              <span className="desc-text has-tooltip">{shortDesc}</span>
             </DescTooltip>
           ) : (
-            <span style={{ fontSize: '13.5px', fontWeight: '500', color: '#1e293b', textTransform: 'uppercase' }}>{shortDesc}</span>
+            <span className="desc-text">{shortDesc}</span>
           ))}
           {item.defect?.equipment_name && (
             <>
-              <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 'bolder', margin: '0 2px' }}>–</span>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0, textTransform: 'uppercase' }}>{item.defect.equipment_name}</span>
+              <span className="separator">–</span>
+              <span className="equipment-tag">{item.defect.equipment_name}</span>
             </>
           )}
           {item.defect?.defect_source && (
-            <span style={{ fontWeight: '600', color: '#1e293b', textTransform: 'uppercase', fontSize: '13px' }}>{"(" + item.defect.defect_source + ")"}</span>
+            <span className="source-tag">{"(" + item.defect.defect_source + ")"}</span>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '12px', color: '#334155', lineHeight: '1.4', fontWeight: '500' }}>
+        <div className="feed-row-bottom">
+          <span className="message-text">
             {item.message}
           </span>
 
@@ -690,42 +587,39 @@ const FeedRow = ({ item, onView, onMarkDone, isPending }) => {
             const isLong = remark.length > 50;
 
             return (
-              <>
-                <span style={{ color: '#cbd5e1', fontSize: '13px', fontWeight: '300' }}>|</span>
+              <div className="remark-group">
+                <span className="vertical-divider">|</span>
                 {/* <Wrench size={11} color="#10b981" style={{ flexShrink: 0 }} /> */}
                 {/* <span style={{ fontSize: '11px', fontWeight: '700', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.4px', flexShrink: 0 }}>
                   Work Done:
                 </span> */}
                 {isLong ? (
                   <DescTooltip text={remark}>
-                    <span style={{
-                      fontSize: '12px', fontWeight: '500', color: '#334155',
-                      cursor: 'default', borderBottom: '1px dashed #cbd5e1', paddingBottom: '1px',
-                    }}>
+                    <span className="remark-text has-tooltip">
                       {shortRemark}
                     </span>
                   </DescTooltip>
                 ) : (
-                  <span style={{ fontSize: '12px', fontWeight: '500', color: '#334155' }}>{remark}</span>
+                  <span className="remark-text">{remark}</span>
                 )}
-              </>
+              </div>
             );
           })()}
         </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0 }}>
-        <span style={{ fontSize: '12px', color: '#5f5f5f', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatDateTime(item.created_at)}</span>
-        <div style={{ display: 'flex', gap: '6px' }}>
+      <div className="feed-row-actions">
+        <span className="timestamp">{formatDateTime(item.created_at)}</span>
+        <div className="btn-group">
           {item.defect_id && (
             <Tooltip text="View Defect">
-              <button onClick={() => onView(item.defect_id)} style={{ border: '1px solid #e2e8f0', borderRadius: '7px', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', width: "35px", height: "24px" }}>
+              <button onClick={() => onView(item.defect_id)} className="action-btn view-btn">
                 <Eye size={14} />
               </button>
             </Tooltip>
           )}
           {!item.is_read && (
             <Tooltip text="Mark as Done">
-              <button onClick={() => onMarkDone(item.id)} disabled={isPending} style={{ border: `1px solid ${accentBorder}`, borderRadius: '7px', background: accentBg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: accentColor, width: "35px", height: "24px" }}>
+              <button onClick={() => onMarkDone(item.id)} disabled={isPending} className="action-btn done-btn">
                 <CheckCircle size={14} />
               </button>
             </Tooltip>
@@ -758,81 +652,74 @@ const MentionRow = ({ item, onView, onMarkDone, isPending }) => {
   const isInternal = item.meta?.is_internal;
 
   return (
-    <div style={{
-      background: item.is_read ? 'white' : accentBg,
-      border: `1px solid ${item.is_read ? '#e2e8f0' : accentBorder}`,
-      borderLeft: `3px solid ${item.is_read ? '#e2e8f0' : accentColor}`,
-      borderRadius: '10px', padding: '12px 14px',
-      display: 'flex', alignItems: 'center', gap: '12px',
-      boxShadow: item.is_read ? 'none' : `0 1px 4px ${accentColor}18`,
-      opacity: item.is_read ? 0.72 : 1, transition: 'all 0.2s ease',
-    }}>
-      {/* Icon Box - Exact same as FeedRow */}
-      <div style={{
-        width: '36px', height: '36px', borderRadius: '9px',
-        background: accentBg, border: `1px solid ${accentBorder}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+    <div className={`feed-row mention-row ${item.is_read ? 'is-read' : 'is-unread'}`}
+      style={{
+        "--row-accent": accentColor,
+        "--row-bg": accentBg,
+        "--row-border": accentBorder
       }}>
+      {/* Icon Box - Exact same as FeedRow */}
+      <div className="feed-row-icon-box">
         <AtSign size={18} color={accentColor} />
       </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="feed-row-content">
         {/* Top Line: Vessel, Description (if any), and Equipment (from DB title) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+        <div className="feed-row-top">
+          <span className="vessel-tag">
             <Anchor size={11} color="#94a3b8" />{item.vessel_name || '—'}
           </span>
 
           {desc && (hasFullDesc ? (
             <DescTooltip text={desc}>
-              <span style={{ fontSize: '13.5px', fontWeight: '500', color: '#1e293b', cursor: 'default', textTransform: 'uppercase', borderBottom: '1px dashed #cbd5e1', paddingBottom: '1px' }}>{shortDesc}</span>
+              <span className="desc-text has-tooltip">{shortDesc}</span>
             </DescTooltip>
           ) : (
-            <span style={{ fontSize: '13.5px', fontWeight: '500', color: '#1e293b', textTransform: 'uppercase' }}>{shortDesc}</span>
+            <span className="desc-text">{shortDesc}</span>
           ))}
 
           {displayEquipment && (
             <>
-              <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 'bolder', margin: '0 2px' }}>–</span>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0, textTransform: 'uppercase' }}>
+              <span className="separator">–</span>
+              <span className="equipment-tag">
                 {displayEquipment}
               </span>
             </>
           )}
 
           {item.defect?.defect_source && (
-            <span style={{ fontWeight: '600', color: '#1e293b', textTransform: 'uppercase', fontSize: '13px' }}>{"(" + item.defect.defect_source + ")"}</span>
+            <span className="source-tag">{"(" + item.defect.defect_source + ")"}</span>
           )}
 
           {isInternal && (
-            <span style={{ fontSize: '9px', fontWeight: '700', background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '3px', marginLeft: '4px' }}>
+            <span className="internal-badge">
               <Lock size={9} /> INTERNAL
             </span>
           )}
         </div>
 
         {/* Message Line: Shows "Capt.sujil mentioned you: @Sujil hi sujil" */}
-        <span style={{ fontSize: '12px', color: '#334155', lineHeight: '1.4', fontWeight: '500' }}>
-          {item.message}
-        </span>
+        <div className="feed-row-bottom">
+          <span className="message-text">{item.message}</span>
+        </div>
       </div>
 
       {/* Date and Buttons - Exact same as FeedRow */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0 }}>
-        <span style={{ fontSize: '12px', color: '#5f5f5f', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+      <div className="feed-row-actions">
+        <span className="timestamp">
           {formatDateTime(item.created_at)}
         </span>
-        <div style={{ display: 'flex', gap: '6px' }}>
+        <div className="btn-group">
           {item.defect_id && (
             <Tooltip text="View Defect">
-              <button onClick={() => onView(item.defect_id, item.meta?.is_internal)} style={{ border: '1px solid #e2e8f0', borderRadius: '7px', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', width: "35px", height: "24px" }}>
+              <button onClick={() => onView(item.defect_id, item.meta?.is_internal)} className="action-btn view-btn">
                 <Eye size={14} />
               </button>
             </Tooltip>
           )}
           {!item.is_read && (
             <Tooltip text="Mark as Done">
-              <button onClick={() => onMarkDone(item.id)} disabled={isPending} style={{ border: `1px solid ${accentBorder}`, borderRadius: '7px', background: accentBg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: accentColor, width: "35px", height: "24px" }}>
+              <button onClick={() => onMarkDone(item.id)} disabled={isPending} className="action-btn done-btn">
                 <CheckCircle size={14} />
               </button>
             </Tooltip>

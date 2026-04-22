@@ -38,9 +38,9 @@ async def notify_vessel_users(
         else:  
             # SHORE/ADMIN logic remains (split pages usually)
             if defect and defect.status == DefectStatus.CLOSED:
-                target_link = f"/drs/shore/history?highlightDefectId={defect_id}"
+                target_link = f"/drs/shore/dashboard?highlightDefectId={defect_id}"
             else:
-                target_link = f"/drs/shore/vessels?highlightDefectId={defect_id}"
+                target_link = f"/drs/shore/dashboard?highlightDefectId={defect_id}"
 
         new_notif = Notification(
             user_id=recipient.id,
