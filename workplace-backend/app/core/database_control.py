@@ -6,6 +6,8 @@ engine_control = create_async_engine(
     settings.CONTROL_DATABASE_URL,
     echo=False,
     pool_pre_ping=True,
+    pool_size=3,
+    max_overflow=5,
 )
 
 AsyncSessionControl = async_sessionmaker(

@@ -6,8 +6,10 @@ from app.core.config import settings
 # 1. Create the Async Engine
 engine = create_async_engine(
     settings.SQLALCHEMY_DATABASE_URI,
-    echo=True, 
-    future=True
+    echo=True,
+    future=True,
+    pool_size=5,
+    max_overflow=5,
 )
 
 # 2. Create the Session Factory
