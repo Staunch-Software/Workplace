@@ -1,0 +1,1068 @@
+/* ==========================================================================
+   AeResponsiveness.css — Days Elapsed Card (self-contained)
+   Mirrors MeResponsiveness.css Section 2 pattern exactly.
+
+   AE-specific column structure (desktop 1440px):
+     vessel=140  gen=50  lastReport=110  days=70  load=70  nav=40
+     offsets: gen=140  lastReport=190  days=300  load=370  nav=440
+     frozen sum = 140+50+110+70+70 = 440  (= nav-left left offset)
+     Month width: 73px
+   ========================================================================== */
+
+
+/* ==========================================================================
+   SECTION 1 — OUTER CARD
+   ========================================================================== */
+
+.ae-days-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    border-radius: 12px !important;
+    overflow: visible !important;          /* must NOT clip dropdown */
+    border: 1px solid #e2e8f0;
+    scroll-margin-top: 100px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+    background: #ffffff;
+}
+
+/* Card header — overflow visible so dropdown escapes the card */
+.ae-days-card .card-header-enhanced {
+    overflow: visible !important;
+    position: relative !important;
+    z-index: 30 !important;
+    cursor: pointer;
+    display: flex !important;
+    align-items: center !important;
+    width: 100%;
+    padding: 16px 24px;
+    background-color: #f8fafc;
+    gap: 16px;
+    border-bottom: 1px solid #f1f5f9;
+    border-radius: 12px 12px 0 0;
+}
+
+/* FIX: when closed, header rounds all four corners — card looks sealed */
+.ae-days-card .card-header-enhanced.header-closed {
+    border-radius: 12px !important;
+    border-bottom: none !important;
+}
+
+/* Icon badge — dark, smooth, no rotate/jump */
+.ae-days-card .card-icon-badge {
+    background-color: #1e293b !important;
+    color: white !important;
+    min-width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.25s ease, color 0.25s ease !important;
+    transform: none !important;
+}
+
+/* Title group */
+.ae-days-card .card-title-group {
+    flex: 0 1 auto;  
+    min-width: 0;
+}
+
+/* Dropdown wrapper — z-index above header, below AppHeader */
+.ae-days-card .vessel-filter-wrapper {
+    margin-right: 16px;
+    margin-left: 0;        /* ADD */
+    flex-shrink: 0;
+    position: relative;
+    z-index: 40 !important;
+    order: 0;              /* ADD — keeps it between title and chevron */
+}
+
+/* Dropdown menu scoped to AE card */
+.ae-days-card .vessel-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0; width: 100%;
+    max-height: 200px; overflow-y: auto; overflow-x: hidden;
+    z-index: 40 !important;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    border-radius: 10px; border: 1px solid #cbd5e1; background: white;
+    animation: dropdownSlideDown 0.2s cubic-bezier(0.4,0,0.2,1) forwards;
+}
+
+/* Chevron button — margin-left: auto always pins it to far right */
+.ae-days-chevron-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    transition: background 0.2s ease;
+    margin-left: 8px;     /* KEEP — this is correct, pushes chevron to far right */
+    order: 1;              /* ADD — ensures chevron always comes after dropdown */
+}
+.ae-days-chevron-btn:hover { background-color: #f1f5f9; }
+
+/* Card body — overflow hidden clips collapsed content cleanly */
+.ae-days-card-body {
+    padding: 0;
+    overflow: hidden !important;
+    position: relative;
+    z-index: 1;
+    border-radius: 0 0 12px 12px;
+    width: 100%;
+    min-width: 0;
+}
+
+
+/* ==========================================================================
+   SECTION 2 — TABLE WRAPPER  +  EXPAND / COLLAPSE ANIMATION
+   ========================================================================== */
+.ae-table-wrapper {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    position: relative;
+    background: #fff;
+    border-radius: 0 0 12px 12px;
+}
+.ae-table-wrapper::-webkit-scrollbar        { height: 6px; width: 6px; }
+.ae-table-wrapper::-webkit-scrollbar-track  { background: #f1f5f9; }
+.ae-table-wrapper::-webkit-scrollbar-thumb  { background: #cbd5e1; border-radius: 4px; }
+.ae-table-wrapper::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Fast smooth open — ease-out feels snappy */
+.ae-table-wrapper.expanded {
+    max-height: 9999px;
+    overflow-x: auto;
+    transition: max-height 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Fast smooth close — slightly quicker than open */
+.ae-table-wrapper.collapsed {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ae-days-table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+}
+
+.ae-days-thead { position: sticky; top: 0; z-index: 50; }
+.ae-days-tfoot  { position: sticky; bottom: 0; z-index: 50; }
+
+
+/* ==========================================================================
+   SECTION 3 — STICKY HEADER CELLS  (desktop 1440px)
+   vessel=140  gen=50  lastReport=110  days=70  load=70  nav=40
+   offsets: gen=140  lastReport=190  days=300  load=370  nav=440
+   ========================================================================== */
+
+.ae-th-vessel,
+.ae-th-gen,
+.ae-th-lastReport,
+.ae-th-days,
+.ae-th-load,
+.ae-th-nav-left,
+.ae-th-nav-right {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 60 !important;
+    background-color: #fff !important;
+    border-bottom: 2px solid #f3f4f6 !important;
+    color: #6b7280 !important;
+    font-size: 0.7rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+    white-space: nowrap !important;
+}
+
+.ae-th-vessel     { left: 0 !important;     width: 130px !important; min-width: 130px !important; text-align: left !important;   padding: 10px 8px 10px 16px !important; }
+.ae-th-gen        { left: 130px !important;  width: 48px !important;  min-width: 48px !important;  text-align: center !important; padding: 10px 4px !important; }
+.ae-th-lastReport { left: 178px !important;  width: 100px !important; min-width: 100px !important; text-align: center !important; padding: 10px 6px !important; }
+.ae-th-days       { left: 278px !important;  width: 64px !important;  min-width: 64px !important;  text-align: center !important; padding: 10px 4px !important; cursor: pointer !important; user-select: none !important; }
+.ae-th-days--sorted { color: #1e3a8a !important; }
+.ae-th-load       { left: 342px !important;  width: 64px !important;  min-width: 64px !important;  text-align: center !important; padding: 10px 4px !important; }
+.ae-th-nav-left   { left: 406px !important;  width: 38px !important;  min-width: 38px !important;  padding: 0 !important; box-shadow: 4px 0 4px -4px rgba(0,0,0,0.1) !important; }
+.ae-th-nav-right  { right: 0 !important; left: auto !important; width: 38px !important; min-width: 38px !important; padding: 0 !important; border-left: 1px solid #f3f4f6 !important; }
+
+/* Month columns — 73px, same font style as sticky cols */
+.ae-th-month {
+    width: 66px !important;
+    min-width: 66px !important;
+    text-align: center !important;
+    font-size: 0.65rem !important;
+    color: #6b7280 !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+    padding: 16px 0 !important;
+    background-color: #fff !important;
+    border-left: 1px solid #f3f4f6 !important;
+    border-bottom: 2px solid #f3f4f6 !important;
+    white-space: nowrap !important;
+}
+.ae-th-month--current {
+    color: #1e3a8a !important;
+    background-color: #eff6ff !important;
+}
+
+/* Nav buttons */
+.ae-nav-btn {
+    width: 100%; height: 100%;
+    background: transparent; border: none; cursor: pointer;
+    opacity: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.2s ease;
+}
+.ae-nav-btn svg { width: 16px !important; height: 16px !important; stroke-width: 2 !important; }
+.ae-nav-btn--disabled { opacity: 0.1; cursor: default; pointer-events: none; }
+
+/* Sort arrows */
+.ae-sort-header-inner { display: flex; align-items: center; justify-content: center; gap: 3px; }
+.ae-sort-arrows       { display: flex; flex-direction: column; line-height: 1; }
+.ae-sort-arrow--active   { opacity: 1; }
+.ae-sort-arrow--inactive { opacity: 0.2; }
+
+
+/* ==========================================================================
+   SECTION 4 — BODY ROWS
+   AE uses rowspan for vessel name — last gen row (AE3) needs a stronger border
+   ========================================================================== */
+
+.ae-days-tr { border-bottom: 1px solid #f3f4f6; }
+.ae-days-tr:hover { background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%); }
+.ae-days-tr--last-gen td { border-bottom: 1px solid #cbd5e1 !important; }
+
+
+/* ==========================================================================
+   SECTION 5 — STICKY BODY CELLS
+   Left offsets mirror header exactly.
+   ========================================================================== */
+
+.ae-td-vessel,
+.ae-td-gen,
+.ae-td-lastReport,
+.ae-td-days,
+.ae-td-load,
+.ae-td-spacer {
+    position: sticky !important;
+    z-index: 10 !important;
+    background-color: #fff !important;
+    border-bottom: 1px solid #f3f4f6 !important;
+    vertical-align: middle !important;
+}
+
+.ae-td-vessel     { left: 0 !important;     padding: 12px 8px 12px 16px !important; cursor: pointer !important; }
+.ae-td-gen        { left: 130px !important;  padding: 10px 4px !important; text-align: center !important;
+                    background-color: #f9fafb !important; font-weight: 600 !important; color: #4b5563 !important; font-size: 0.8rem !important; cursor: pointer !important; }
+.ae-td-lastReport { left: 178px !important;  padding: 10px 6px !important; text-align: center !important;
+                    color: #4b5563 !important; font-size: 0.8rem !important; white-space: nowrap !important; }
+.ae-td-days       { left: 278px !important;  padding: 10px 4px !important; text-align: center !important; height: 48px !important; }
+.ae-td-load       { left: 342px !important;  padding: 10px 4px !important; text-align: center !important; }
+.ae-td-spacer     { left: 406px !important;  box-shadow: 4px 0 4px -4px rgba(0,0,0,0.1) !important;
+                    min-width: 38px !important; width: 38px !important; }
+
+/* Vessel name row internals */
+.ae-vessel-name-inner { display: flex; align-items: center; gap: 8px; }
+.ae-vessel-name-text  { font-weight: 600; color: #374151; font-size: 0.85rem; white-space: nowrap; }
+
+/* Blinking dot */
+.ae-blinking-dot { animation: ae-blink 2s infinite; }
+@keyframes ae-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+}
+
+/* Month body cells */
+.ae-td-month {
+    padding: 12px 0;
+    text-align: center;
+    vertical-align: middle;
+    border-left: 1px solid #f3f4f6;
+    border-bottom: 1px solid #f3f4f6;
+    background-color: transparent;
+}
+.ae-td-month--current { background-color: #eff6ff !important; }
+.ae-days-tr:hover .ae-td-month--current { background-color: #eff6ff !important; }
+.ae-td-tail { background-color: #fff; border-bottom: 1px solid #f3f4f6; }
+
+/* Days badge */
+.ae-days-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 6px;  
+    border-radius: 4px;
+    font-size: clamp(0.72rem, 0.95vw, 0.9rem);
+    font-weight: 700;
+    font-size: 0.75rem;
+    color: inherit;
+    transition: all 0.3s ease;
+}
+.ae-days-success  { background: #dcfce7; color: #16a34a !important; }
+.ae-days-warning  { background: #fef9c3; color: #ca8a04 !important; }
+.ae-days-critical { background: #fee2e2; color: #991b1b !important; }
+/* Load badge */
+.ae-load-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 0.75rem;
+    display: inline-flex;
+    justify-content: center; 
+    min-width: 46px;
+    text-align: center;
+}
+
+
+/* ==========================================================================
+   SECTION 6 — FOOTER CELLS
+   frozen sum = 140+50+110+70+70 = 440  |  spacer left = 440
+   ========================================================================== */
+
+.ae-tfoot-th-sticky {
+    position: sticky !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    z-index: 60 !important;
+    background-color: #fff !important;
+    border-top: 2px solid #e5e7eb !important;
+    height: 36px !important;
+    min-width: 406px !important; /* 130+48+100+64+64 */
+}
+
+.ae-tfoot-th-spacer {
+    position: sticky !important;
+    left: 406px !important;
+    bottom: 0 !important;
+    z-index: 60 !important;
+    background-color: #fff !important;
+    border-top: 2px solid #e5e7eb !important;
+    box-shadow: 4px 0 4px -4px rgba(0,0,0,0.1) !important;
+    min-width: 38px !important;
+    width: 38px !important;
+}
+
+.ae-tfoot-th-month {
+    width: 66px !important;
+    min-width: 66px !important;
+    text-align: center !important;
+    font-size: 0.65rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+    padding: 10px 0 !important;
+    border-top: 2px solid #e5e7eb !important;
+    border-left: 1px solid #f3f4f6 !important;
+    color: #6b7280 !important;
+    background-color: #fff !important;
+    white-space: nowrap !important;
+}
+.ae-tfoot-th-month--current { color: #1e3a8a !important; background-color: #eff6ff !important; }
+.ae-tfoot-th-tail { border-top: 2px solid #e5e7eb !important; background-color: #fff !important; }
+
+/* Empty state */
+.ae-days-empty-state { padding: 72px 24px; text-align: center; color: #94a3af; }
+.ae-days-empty-state p { margin: 0; font-size: 1.1rem; }
+
+
+/* ==========================================================================
+   SECTION 7 — RESPONSIVE BREAKPOINTS
+   Each breakpoint recalculates:
+     - Column widths
+     - Left offsets (always cumulative sums — must be exact)
+     - ae-tfoot-th-sticky min-width (sum of all frozen cols excl. nav)
+     - ae-tfoot-th-spacer left (= nav-left offset)
+     - Month column widths
+
+   visibleMonthCount in JSX must match these breakpoints:
+     ≤480px  → 3 months
+     ≤768px  → 5 months
+     ≤1024px → 5 months
+     ≤1250px → 10 months
+     default → 12 months
+   ========================================================================== */
+
+/* ── 1250px ──────────────────────────────────────────────────────────────────
+   vessel=130  gen=46  lastReport=100  days=64  load=64  nav=38
+   offsets: gen=130  lastReport=176  days=276  load=340  nav=404
+   frozen sum = 130+46+100+64+64 = 404
+   visibleMonths=10  |  10 × 66px = 660px  |  total ≈ 1102px  ✓ fits 1250px
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 1250px) {
+    .ae-days-card .card-header-enhanced   { flex-wrap: wrap; gap: 10px; padding: 12px 16px !important; align-items: center; }
+    .ae-days-card .card-title-group       { flex: 1 1 auto !important; min-width: 0; margin-right: 0 !important; }
+    .ae-days-card .vessel-filter-wrapper  { flex: 1 1 auto; justify-content: flex-start; margin-left: 0 !important; }
+    .ae-days-card .vessel-dropdown-btn    { width: 280px !important; max-width: 280px !important; font-size: 0.85rem; }
+    /* At 1250px header wraps so chevron sits in natural flow; reset margin-left to 0 */
+    .ae-days-chevron-btn                  { margin-left: 0; flex-shrink: 0; }
+    .ae-table-wrapper                     { overflow-x: auto; }
+
+    .ae-th-vessel,     .ae-td-vessel     { width: 130px !important; min-width: 130px !important; }
+    .ae-th-gen,        .ae-td-gen        { left: 130px !important; width: 46px !important;  min-width: 46px !important; }
+    .ae-th-lastReport, .ae-td-lastReport { left: 176px !important; width: 100px !important; min-width: 100px !important; }
+    .ae-th-days,       .ae-td-days       { left: 276px !important; width: 64px !important;  min-width: 64px !important; }
+    .ae-th-load,       .ae-td-load       { left: 340px !important; width: 64px !important;  min-width: 64px !important; }
+    .ae-th-nav-left,   .ae-td-spacer, .ae-tfoot-th-spacer { left: 404px !important; width: 38px !important; min-width: 38px !important; }
+    .ae-tfoot-th-sticky { min-width: 404px !important; }
+
+    /* 10 months × 66px = 660px — fits comfortably in remaining ~850px */
+    .ae-th-month, .ae-tfoot-th-month { width: 66px !important; min-width: 66px !important; font-size: 0.63rem !important; }
+}
+
+/* ── 1024px ──────────────────────────────────────────────────────────────────
+   vessel=120  gen=42  lastReport=90  days=58  load=58  nav=36
+   offsets: gen=120  lastReport=162  days=252  load=310  nav=368
+   frozen sum = 120+42+90+58+58 = 368
+   visibleMonths=5  |  5 × 60px = 300px  |  total ≈ 704px  ✓ fits 1024px
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+    .ae-days-card .vessel-dropdown-btn    { width: 280px !important; max-width: 280px !important; }
+    .ae-days-card .vessel-dropdown-scroll { max-height: 120px !important; overflow-y: auto !important; }
+
+    .ae-th-vessel,     .ae-td-vessel     { width: 120px !important; min-width: 120px !important; }
+    .ae-th-gen,        .ae-td-gen        { left: 120px !important; width: 42px !important; min-width: 42px !important; }
+    .ae-th-lastReport, .ae-td-lastReport { left: 162px !important; width: 90px !important;  min-width: 90px !important; font-size: 0.75rem !important; }
+    .ae-th-days,       .ae-td-days       { left: 252px !important; width: 58px !important;  min-width: 58px !important; }
+    .ae-th-load,       .ae-td-load       { left: 310px !important; width: 58px !important;  min-width: 58px !important; }
+    .ae-th-nav-left,   .ae-td-spacer, .ae-tfoot-th-spacer { left: 368px !important; width: 36px !important; min-width: 36px !important; }
+    .ae-tfoot-th-sticky { min-width: 368px !important; }
+
+    /* 5 months × 60px = 300px — fits in remaining ~656px after frozen+nav */
+    .ae-th-month, .ae-tfoot-th-month { width: 60px !important; min-width: 60px !important; font-size: 0.6rem !important; padding: 10px 0 !important; }
+
+    .ae-td-vessel     { padding: 10px 8px 10px 12px !important; }
+    .ae-vessel-name-text { font-size: 0.8rem; }
+}
+
+/* ── 768px ───────────────────────────────────────────────────────────────────
+   vessel=110  gen=38  lastReport=86  days=54  load=54  nav=34
+   offsets: gen=110  lastReport=148  days=234  load=288  nav=342
+   frozen sum = 110+38+86+54+54 = 342
+   visibleMonths=5  |  5 × 54px = 270px  |  total ≈ 646px  ✓ fits 768px
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .ae-days-card { scroll-margin-top: 80px; }
+    .ae-days-card .card-header-enhanced   { display: flex !important; flex-direction: row !important; align-items: center !important; flex-wrap: nowrap !important; gap: 8px; padding: 10px 12px !important; position: static !important; }
+    .ae-days-card .card-icon-badge        { flex: 0 0 auto; min-width: 36px !important; height: 36px !important; }
+    .ae-days-card .card-title-group       { flex: 0 1 auto !important; min-width: 0; margin-right: 0 !important; }
+    .ae-days-card .card-title-performance { font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ae-days-card .card-description       { display: none; }
+    .ae-days-card .vessel-filter-wrapper  { flex: 1 1 auto !important; margin: 0 !important; justify-content: center !important; display: flex !important; width: auto !important; }
+    .ae-days-card .vessel-dropdown-btn    { width: 150px !important; max-width: 150px !important; font-size: 0.75rem; padding: 5px 8px; }
+    .ae-days-card .vessel-dropdown-scroll { max-height: 120px !important; overflow-y: auto !important; }
+    /* Restore margin-left: auto so chevron stays right-pinned on tablet */
+    .ae-days-chevron-btn                  { position: static !important; flex: 0 0 auto; margin-left: auto; width: 36px !important; height: 36px !important; }
+
+    .ae-th-vessel,     .ae-td-vessel     { width: 110px !important; min-width: 110px !important; }
+    .ae-th-gen,        .ae-td-gen        { left: 110px !important; width: 38px !important; min-width: 38px !important; }
+    .ae-th-lastReport, .ae-td-lastReport { left: 148px !important; width: 86px !important;  min-width: 86px !important; }
+    .ae-th-days,       .ae-td-days       { left: 234px !important; width: 54px !important;  min-width: 54px !important; }
+    .ae-th-load,       .ae-td-load       { left: 288px !important; width: 54px !important;  min-width: 54px !important; }
+    .ae-th-nav-left,   .ae-td-spacer, .ae-tfoot-th-spacer { left: 342px !important; width: 34px !important; min-width: 34px !important; }
+    .ae-tfoot-th-sticky { min-width: 342px !important; }
+
+    /* 5 months × 54px = 270px — total ~646px fits inside 768px card */
+    .ae-th-month, .ae-tfoot-th-month { width: 54px !important; min-width: 54px !important; font-size: 0.58rem !important; padding: 10px 0 !important; }
+
+    /* Uniform font reduction across table */
+    .ae-th-vessel, .ae-th-gen, .ae-th-lastReport,
+    .ae-th-days, .ae-th-load, .ae-th-nav-left, .ae-th-nav-right { font-size: 0.6rem !important; letter-spacing: 0.02em !important; }
+    .ae-vessel-name-text  { font-size: 0.76rem !important; }
+    .ae-td-lastReport     { font-size: 0.7rem !important; }
+    .ae-td-gen            { font-size: 0.72rem !important; }
+    .ae-load-badge        { font-size: 0.68rem !important; padding: 1px 4px !important; }
+    .ae-days-badge        { font-size: 0.7rem !important; height: 22px !important; padding: 0 8px !important; }
+
+    .ae-days-empty-state   { padding: 40px 16px; }
+    .ae-days-empty-state p { font-size: 0.9rem; }
+}
+
+/* ── 480px — hide Last Report ─────────────────────────────────────────────────
+   vessel=96  gen=34  days=50  load=50  nav=30
+   offsets: gen=96  days=130  load=180  nav=230
+   frozen sum = 96+34+50+50 = 230
+   visibleMonths=3  |  3 × 46px = 138px  |  total ≈ 398px  ✓ fits 480px
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+    .ae-days-card .card-header-enhanced   { display: flex !important; flex-direction: row !important; align-items: center !important; flex-wrap: nowrap !important; padding: 10px 12px !important; gap: 8px; position: static !important; }
+    .ae-days-card .card-description       { display: none; }
+    .ae-days-card .card-icon-badge        { flex: 0 0 auto; min-width: 32px !important; height: 32px !important; }
+    .ae-days-card .card-title-group       { flex: 0 1 auto !important; min-width: 0; }
+    .ae-days-card .card-title-performance { font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ae-days-card .vessel-filter-wrapper  { flex: 1 1 auto !important; width: auto !important; margin: 0 !important; justify-content: center !important; display: flex !important; }
+    .ae-days-card .vessel-dropdown-btn    { width: 130px !important; max-width: 130px !important; font-size: 0.72rem; padding: 5px 8px; }
+    /* Keep chevron right-pinned on mobile */
+    .ae-days-chevron-btn                  { position: static !important; flex: 0 0 auto; margin-left: auto; width: 32px !important; height: 32px !important; }
+
+    /* Hide Last Report column at mobile */
+    .ae-th-lastReport, .ae-td-lastReport  { display: none !important; }
+
+    .ae-th-vessel,   .ae-td-vessel   { width: 96px !important;  min-width: 96px !important;  padding-left: 10px !important; }
+    .ae-th-gen,      .ae-td-gen      { left: 96px !important;   width: 34px !important;  min-width: 34px !important; }
+    .ae-th-days,     .ae-td-days     { left: 130px !important;  width: 50px !important;  min-width: 50px !important; }
+    .ae-th-load,     .ae-td-load     { left: 180px !important;  width: 50px !important;  min-width: 50px !important; }
+    .ae-th-nav-left, .ae-td-spacer, .ae-tfoot-th-spacer { left: 230px !important; width: 30px !important; min-width: 30px !important; }
+    .ae-tfoot-th-sticky { min-width: 230px !important; width: 230px !important; }
+
+    /* 3 months × 46px = 138px — total ~398px fits inside 480px */
+    .ae-th-month, .ae-tfoot-th-month { width: 46px !important; min-width: 46px !important; font-size: 0.54rem !important; padding: 8px 0 !important; }
+    .ae-vessel-name-text { font-size: 0.74rem; }
+    .ae-load-badge       { font-size: 0.66rem; padding: 1px 4px; min-width: 36px; }
+    .ae-days-badge       { min-width: 32px !important; padding: 0 6px !important; }
+
+    .ae-days-empty-state   { padding: 32px 12px; }
+    .ae-days-empty-state p { font-size: 0.85rem; }
+}
+
+/* ── 360px ───────────────────────────────────────────────────────────────────
+   vessel=82  gen=30  days=44  load=44  nav=26
+   offsets: gen=82  days=112  load=156  nav=200
+   frozen sum = 82+30+44+44 = 200
+   visibleMonths=3  |  3 × 38px = 114px  |  total ≈ 340px  ✓ fits 360px
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 360px) {
+    .ae-th-vessel,   .ae-td-vessel   { width: 82px !important;  min-width: 82px !important; }
+    .ae-th-gen,      .ae-td-gen      { left: 82px !important;   width: 30px !important;  min-width: 30px !important; }
+    .ae-th-days,     .ae-td-days     { left: 112px !important;  width: 44px !important;  min-width: 44px !important; }
+    .ae-th-load,     .ae-td-load     { left: 156px !important;  width: 44px !important;  min-width: 44px !important; }
+    .ae-th-nav-left, .ae-td-spacer, .ae-tfoot-th-spacer { left: 200px !important; width: 26px !important; min-width: 26px !important; }
+    .ae-tfoot-th-sticky { width: 200px !important; min-width: 200px !important; }
+
+    /* 3 months × 38px = 114px — total ~340px fits inside 360px */
+    .ae-th-month, .ae-tfoot-th-month { width: 38px !important; min-width: 38px !important; font-size: 0.5rem !important; padding: 8px 0 !important; }
+    .ae-vessel-name-text { font-size: 0.7rem; }
+
+    .ae-days-card .vessel-filter-wrapper { flex: 0 0 100%; order: 4; width: 100%; margin-left: 0 !important; justify-content: center; display: flex; }
+    .ae-days-card .vessel-dropdown-btn   { width: 180px !important; max-width: 180px !important; font-size: 0.72rem; }
+}
+
+/* ── 2560px (4K) ─────────────────────────────────────────────────────────────
+   vessel=190  gen=60  lastReport=140  days=88  load=88  nav=52
+   offsets: gen=190  lastReport=250  days=390  load=478  nav=566
+   frozen sum = 190+60+140+88+88 = 566
+   visibleMonths=12  |  12 × 90px = 1080px  |  total ≈ 1698px  ✓ fits 2560px
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 2560px) {
+    .ae-days-card { margin-top: 24px; }
+
+    .ae-th-vessel,     .ae-td-vessel     { width: 190px !important; min-width: 190px !important; }
+    .ae-th-gen,        .ae-td-gen        { left: 190px !important; width: 60px !important;  min-width: 60px !important; }
+    .ae-th-lastReport, .ae-td-lastReport { left: 250px !important; width: 140px !important; min-width: 140px !important; }
+    .ae-th-days,       .ae-td-days       { left: 390px !important; width: 88px !important;  min-width: 88px !important; }
+    .ae-th-load,       .ae-td-load       { left: 478px !important; width: 88px !important;  min-width: 88px !important; }
+    .ae-th-nav-left,   .ae-td-spacer, .ae-tfoot-th-spacer { left: 566px !important; width: 52px !important; min-width: 52px !important; }
+    .ae-tfoot-th-sticky { min-width: 566px !important; width: 566px !important; }
+
+    .ae-th-month, .ae-tfoot-th-month { width: 90px !important; min-width: 90px !important; font-size: 0.72rem !important; padding: 16px 0 !important; }
+    .ae-vessel-name-text { font-size: 0.95rem; }
+    .ae-td-lastReport    { font-size: 0.9rem !important; }
+    .ae-load-badge       { font-size: 0.85rem; padding: 3px 10px; min-width: 50px; }
+}
+
+
+/* ==========================================================================
+   AE DETAILED HISTORY SECTION — append to Aeresponsiveness.css
+
+   RULE: No columns are ever hidden at any breakpoint.
+   All 6 sticky cols always visible: GEN | REPORT DATE | LOAD % | STATUS | RAW REP | ANA REP
+   Scrollable cols: PMAX | FIPI | SCAV AIR | TC INLET | TC OUTLET | TC CYL OUT
+
+   At small viewports the sticky section itself shrinks via font-size + width
+   reduction. The param columns scroll horizontally as always.
+
+   Desktop 1440px base:
+     gen=72  date=120  load=84  status=120  raw=84  ana=84
+     offsets: date@72  load@192  status@276  raw@396  ana@480
+     frozen = 564px  |  6 params × 96px = 576px  |  total = 1140px
+   ========================================================================== */
+
+
+/* ==========================================================================
+   SECTION 1 — OUTER CARD
+   ========================================================================== */
+
+.ae-detail-card {
+    width: 100%;
+    margin-top: 16px;
+    border-top: 4px solid #111827 !important;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+    animation: ae-detail-fadeIn 0.5s ease;
+    overflow: hidden;
+}
+
+@keyframes ae-detail-fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+
+/* ==========================================================================
+   SECTION 2 — HEADER
+   ========================================================================== */
+
+.ae-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 16px 24px;
+    background-color: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+/* Icon badge — dark, scoped so Days card icon is unaffected */
+.ae-detail-header .card-icon-badge {
+    background-color: #111827 !important;
+    color: white !important;
+    padding: 8px !important;
+    border-radius: 8px !important;
+    margin-right: 12px !important;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: auto !important;
+    height: auto !important;
+}
+
+/* Title text */
+.ae-detail-header .card-title-performance {
+    font-size: 1.25rem !important;
+    font-weight: 700 !important;
+    color: #1f2937 !important;
+    margin: 0 !important;
+}
+
+.ae-detail-header .card-description {
+    color: #6b7280 !important;
+    font-size: 0.875rem !important;
+    margin-top: 4px !important;
+}
+
+/* Close button */
+.ae-detail-close-btn {
+    margin-left: auto;
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 6px;
+    color: #6b7280;
+    transition: background 0.2s ease;
+}
+.ae-detail-close-btn:hover { background: #f3f4f6; }
+
+
+/* ==========================================================================
+   SECTION 3 — BODY / SCROLL CONTAINER
+   ========================================================================== */
+
+.ae-detail-card .card-body-enhanced {
+    padding: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+}
+
+.ae-detail-card .card-body-enhanced::-webkit-scrollbar        { height: 6px; }
+.ae-detail-card .card-body-enhanced::-webkit-scrollbar-track  { background: #f1f5f9; }
+.ae-detail-card .card-body-enhanced::-webkit-scrollbar-thumb  { background: #cbd5e1; border-radius: 4px; }
+.ae-detail-card .card-body-enhanced::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Loading state */
+.ae-detail-loading {
+    padding: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 12px;
+    color: #6b7280;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+
+/* ==========================================================================
+   SECTION 4 — TABLE
+   ========================================================================== */
+
+.ae-detail-table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    text-align: center;
+    table-layout: fixed;
+}
+
+
+/* ==========================================================================
+   SECTION 5 — THEAD
+   ========================================================================== */
+
+.ae-detail-thead {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background-color: #f3f4f6;
+}
+
+.ae-detail-thead tr {
+    font-size: 0.7rem;
+    color: #4b5563;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+/* ── Shared sticky header ── */
+.ae-dth-gen,
+.ae-dth-date,
+.ae-dth-load,
+.ae-dth-status,
+.ae-dth-raw,
+.ae-dth-ana {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 60 !important;
+    background-color: #f3f4f6 !important;
+    color: #4b5563 !important;
+    font-size: 0.7rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.02em !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    white-space: nowrap !important;
+    padding: 14px 4px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+/* ── Scrollable param header ── */
+.ae-dth-param {
+    background-color: #f3f4f6 !important;
+    color: #4b5563 !important;
+    font-size: 0.7rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.02em !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    white-space: nowrap !important;
+    padding: 14px 4px !important;
+    width: 96px !important;
+    min-width: 96px !important;
+    text-align: center !important;
+}
+
+/* ── Base (1440px) sticky header widths + offsets ── */
+.ae-dth-gen    { left: 0 !important;    width: 72px !important;  min-width: 72px !important;  text-align: left !important; padding-left: 24px !important; }
+.ae-dth-date   { left: 72px !important; width: 120px !important; min-width: 120px !important; text-align: center !important; }
+.ae-dth-load   { left: 192px !important; width: 84px !important;  min-width: 84px !important;  text-align: center !important; }
+.ae-dth-status { left: 276px !important; width: 120px !important; min-width: 120px !important; text-align: center !important; }
+.ae-dth-raw    { left: 396px !important; width: 84px !important;  min-width: 84px !important;  text-align: center !important; }
+.ae-dth-ana    { left: 480px !important; width: 84px !important;  min-width: 84px !important;  text-align: center !important;
+                 border-right: 2px solid #e5e7eb !important;
+                 box-shadow: 4px 0 8px -2px rgba(0,0,0,0.10) !important; }
+
+
+/* ==========================================================================
+   SECTION 6 — TBODY CELLS
+   ========================================================================== */
+
+/* ── Shared sticky body cell ── */
+.ae-dtd-gen,
+.ae-dtd-date,
+.ae-dtd-load,
+.ae-dtd-status,
+.ae-dtd-raw,
+.ae-dtd-ana {
+    position: sticky !important;
+    z-index: 10 !important;
+    background-color: inherit !important;
+    border-bottom: 1px solid #f3f4f6 !important;
+    vertical-align: middle !important;
+    padding: 12px 4px !important;
+    font-size: 0.8rem !important;
+    color: #374151 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+/* ── Scrollable param body cell ── */
+.ae-dtd-param {
+    padding: 12px 2px !important;
+    border-bottom: 1px solid #f3f4f6 !important;
+    font-size: 0.8rem !important;
+    color: #374151 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    vertical-align: middle !important;
+    text-align: center !important;
+    width: 96px !important;
+    min-width: 96px !important;
+}
+
+/* ── Base (1440px) sticky body widths + offsets ── */
+.ae-dtd-gen    { left: 0 !important;    width: 72px !important;  min-width: 72px !important;  font-weight: bold !important; text-align: left !important; padding-left: 24px !important; }
+.ae-dtd-date   { left: 72px !important; width: 120px !important; min-width: 120px !important; text-align: center !important; }
+.ae-dtd-load   { left: 192px !important; width: 84px !important;  min-width: 84px !important;  text-align: center !important; font-family: monospace !important; font-weight: 600 !important; }
+.ae-dtd-status { left: 276px !important; width: 120px !important; min-width: 120px !important; text-align: center !important; }
+.ae-dtd-raw    { left: 396px !important; width: 84px !important;  min-width: 84px !important;  text-align: center !important; }
+.ae-dtd-ana    { left: 480px !important; width: 84px !important;  min-width: 84px !important;  text-align: center !important;
+                 border-right: 2px solid #e5e7eb !important;
+                 box-shadow: 4px 0 8px -2px rgba(0,0,0,0.10) !important; }
+
+/* ── Row zebra ── */
+.ae-detail-row-even { background-color: #ffffff; }
+.ae-detail-row-odd  { background-color: #fafafa; }
+.ae-detail-row-even:hover,
+.ae-detail-row-odd:hover { background-color: #f1f5f9; }
+
+
+/* ==========================================================================
+   SECTION 7 — INNER CELL COMPONENTS
+   ========================================================================== */
+
+.ae-detail-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.ae-detail-status-badge__dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.ae-status--critical { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+.ae-status--critical .ae-detail-status-badge__dot { background: #991b1b; }
+.ae-status--warning  { background-color: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+.ae-status--warning  .ae-detail-status-badge__dot { background: #854d0e; }
+.ae-status--normal   { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+.ae-status--normal   .ae-detail-status-badge__dot { background: #166534; }
+
+.ae-detail-icon-wrap {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+}
+.ae-detail-icon-btn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #4b5563;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.18s ease, transform 0.18s ease;
+}
+.ae-detail-icon-btn:hover { color: #111827; transform: scale(1.15); }
+
+.ae-detail-param-dot-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+.ae-detail-param-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    cursor: help;
+    flex-shrink: 0;
+    /* backgroundColor stays inline — runtime JS value */
+}
+
+.ae-detail-empty { color: #d1d5db; }
+
+.ae-detail-no-reports td {
+    padding: 30px;
+    text-align: center;
+    color: #9ca3af;
+}
+
+
+/* ==========================================================================
+   SECTION 8 — RESPONSIVE BREAKPOINTS
+   NO COLUMNS ARE HIDDEN AT ANY BREAKPOINT.
+   Only widths, offsets, and font-sizes change.
+   All left offsets are mathematically exact cumulative sums.
+
+   Pattern per breakpoint:
+     gen | date@gen | load@(gen+date) | status@(gen+date+load)
+     raw@(gen+date+load+status) | ana@(gen+date+load+status+raw)
+   ========================================================================== */
+
+/* ── 1250px ──────────────────────────────────────────────────────────────────
+   gen=60  date@60  load@166  status@240  raw@346  ana@416
+   frozen=486  |  param=82px  |  6×82=492
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 1250px) {
+    .ae-dth-gen,   .ae-dtd-gen    { width: 60px !important;  min-width: 60px !important; }
+    .ae-dth-date,  .ae-dtd-date   { left: 60px !important;   width: 106px !important; min-width: 106px !important; }
+    .ae-dth-load,  .ae-dtd-load   { left: 166px !important;  width: 74px !important;  min-width: 74px !important; }
+    .ae-dth-status,.ae-dtd-status { left: 240px !important;  width: 106px !important; min-width: 106px !important; }
+    .ae-dth-raw,   .ae-dtd-raw    { left: 346px !important;  width: 70px !important;  min-width: 70px !important; }
+    .ae-dth-ana,   .ae-dtd-ana    { left: 416px !important;  width: 70px !important;  min-width: 70px !important; }
+    .ae-dth-param, .ae-dtd-param  { width: 82px !important;  min-width: 82px !important; }
+}
+
+/* ── 1024px ──────────────────────────────────────────────────────────────────
+   gen=52  date@52  load@148  status@214  raw@310  ana@372
+   frozen=434  |  param=72px  |  6×72=432
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+    .ae-dth-gen,   .ae-dtd-gen    { width: 52px !important;  min-width: 52px !important; }
+    .ae-dth-date,  .ae-dtd-date   { left: 52px !important;   width: 96px !important;  min-width: 96px !important; }
+    .ae-dth-load,  .ae-dtd-load   { left: 148px !important;  width: 66px !important;  min-width: 66px !important; }
+    .ae-dth-status,.ae-dtd-status { left: 214px !important;  width: 96px !important;  min-width: 96px !important; }
+    .ae-dth-raw,   .ae-dtd-raw    { left: 310px !important;  width: 62px !important;  min-width: 62px !important; }
+    .ae-dth-ana,   .ae-dtd-ana    { left: 372px !important;  width: 62px !important;  min-width: 62px !important; }
+    .ae-dth-param, .ae-dtd-param  { width: 72px !important;  min-width: 72px !important; }
+
+    /* Reduce font sizes to compensate for narrower columns */
+    .ae-dth-gen,.ae-dth-date,.ae-dth-load,.ae-dth-status,
+    .ae-dth-raw,.ae-dth-ana                             { font-size: 0.62rem !important; }
+    .ae-dtd-gen,.ae-dtd-date,.ae-dtd-load,.ae-dtd-status,
+    .ae-dtd-raw,.ae-dtd-ana                             { font-size: 0.75rem !important; }
+    .ae-dth-param                                        { font-size: 0.62rem !important; }
+    .ae-dtd-param                                        { font-size: 0.75rem !important; }
+
+    .ae-detail-status-badge { font-size: 0.6rem !important; padding: 2px 5px !important; }
+    .ae-detail-header .card-title-performance { font-size: 1.05rem !important; }
+    .ae-detail-header .card-description       { font-size: 0.8rem !important; }
+}
+
+/* ── 768px ───────────────────────────────────────────────────────────────────
+   gen=48  date@48  load@136  status@198  raw@286  ana@342
+   frozen=398  |  param=60px  |  6×60=360
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .ae-dth-gen,   .ae-dtd-gen    { width: 48px !important;  min-width: 48px !important; padding-left: 10px !important; }
+    .ae-dth-date,  .ae-dtd-date   { left: 48px !important;   width: 100px !important;  min-width: 88px !important; }
+    .ae-dth-load,  .ae-dtd-load   { left: 136px !important;  width: 62px !important;  min-width: 62px !important; }
+    .ae-dth-status,.ae-dtd-status { left: 198px !important;  width: 88px !important;  min-width: 88px !important; }
+    .ae-dth-raw,   .ae-dtd-raw    { left: 286px !important;  width: 64px !important;  min-width: 56px !important; }
+    .ae-dth-ana,   .ae-dtd-ana    { left: 342px !important;  width: 64px !important;  min-width: 56px !important; }
+    .ae-dth-param, .ae-dtd-param  { width: 60px !important;  min-width: 60px !important; }
+
+    .ae-dth-gen,.ae-dth-date,.ae-dth-load,.ae-dth-status,
+    .ae-dth-raw,.ae-dth-ana,.ae-dth-param                { font-size: 0.58rem !important; letter-spacing: 0.01em !important; }
+    .ae-dtd-gen,.ae-dtd-date,.ae-dtd-load,.ae-dtd-status,
+    .ae-dtd-raw,.ae-dtd-ana,.ae-dtd-param                { font-size: 0.72rem !important; }
+
+    .ae-detail-status-badge { font-size: 0.56rem !important; padding: 2px 5px !important; gap: 3px !important; }
+    .ae-detail-param-dot    { width: 9px !important; height: 9px !important; }
+
+    .ae-detail-header { padding: 12px 16px; }
+    .ae-detail-header .card-icon-badge        { min-width: 36px !important; width: 36px !important; height: 36px !important; padding: 6px !important; }
+    .ae-detail-header .card-title-performance { font-size: 0.92rem !important; }
+    .ae-detail-header .card-description       { font-size: 0.75rem !important; }
+}
+
+/* ── 480px ───────────────────────────────────────────────────────────────────
+   gen=38  date@38  load@112  status@164  raw@240  ana@286
+   frozen=332  |  param=50px  |  6×50=300
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+    .ae-dth-gen,   .ae-dtd-gen    { width: 38px !important;  min-width: 38px !important; padding-left: 8px !important; }
+    .ae-dth-date,  .ae-dtd-date   { left: 38px !important;   width: 74px !important;  min-width: 74px !important; }
+    .ae-dth-load,  .ae-dtd-load   { left: 112px !important;  width: 52px !important;  min-width: 52px !important; }
+    .ae-dth-status,.ae-dtd-status { left: 164px !important;  width: 76px !important;  min-width: 76px !important; }
+    .ae-dth-raw,   .ae-dtd-raw    { left: 240px !important;  width: 46px !important;  min-width: 46px !important; }
+    .ae-dth-ana,   .ae-dtd-ana    { left: 286px !important;  width: 46px !important;  min-width: 46px !important; }
+    .ae-dth-param, .ae-dtd-param  { width: 50px !important;  min-width: 50px !important; }
+
+    .ae-dth-gen,.ae-dth-date,.ae-dth-load,.ae-dth-status,
+    .ae-dth-raw,.ae-dth-ana,.ae-dth-param                { font-size: 0.52rem !important; letter-spacing: 0 !important; padding: 10px 2px !important; }
+    .ae-dtd-gen,.ae-dtd-date,.ae-dtd-load,.ae-dtd-status,
+    .ae-dtd-raw,.ae-dtd-ana,.ae-dtd-param                { font-size: 0.66rem !important; padding: 10px 2px !important; }
+
+    .ae-detail-status-badge { font-size: 0.5rem !important; padding: 2px 4px !important; gap: 2px !important; }
+    .ae-detail-status-badge__dot { width: 4px !important; height: 4px !important; }
+    .ae-detail-param-dot    { width: 8px !important; height: 8px !important; }
+
+    .ae-detail-header { padding: 10px 12px; }
+    .ae-detail-header .card-icon-badge        { min-width: 32px !important; width: 32px !important; height: 32px !important; padding: 5px !important; }
+    .ae-detail-header .card-title-performance { font-size: 0.82rem !important; }
+    .ae-detail-header .card-description       { font-size: 0.7rem !important; }
+}
+
+/* ── 360px ───────────────────────────────────────────────────────────────────
+   gen=32  date@32  load@94  status@138  raw@204  ana@242
+   frozen=280  |  param=42px  |  6×42=252
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 360px) {
+    .ae-dth-gen,   .ae-dtd-gen    { width: 32px !important;  min-width: 32px !important; padding-left: 6px !important; }
+    .ae-dth-date,  .ae-dtd-date   { left: 32px !important;   width: 62px !important;  min-width: 62px !important; }
+    .ae-dth-load,  .ae-dtd-load   { left: 94px !important;   width: 44px !important;  min-width: 44px !important; }
+    .ae-dth-status,.ae-dtd-status { left: 138px !important;  width: 66px !important;  min-width: 66px !important; }
+    .ae-dth-raw,   .ae-dtd-raw    { left: 204px !important;  width: 38px !important;  min-width: 38px !important; }
+    .ae-dth-ana,   .ae-dtd-ana    { left: 242px !important;  width: 38px !important;  min-width: 38px !important; }
+    .ae-dth-param, .ae-dtd-param  { width: 42px !important;  min-width: 42px !important; }
+
+    .ae-dth-gen,.ae-dth-date,.ae-dth-load,.ae-dth-status,
+    .ae-dth-raw,.ae-dth-ana,.ae-dth-param                { font-size: 0.48rem !important; letter-spacing: 0 !important; padding: 8px 2px !important; }
+    .ae-dtd-gen,.ae-dtd-date,.ae-dtd-load,.ae-dtd-status,
+    .ae-dtd-raw,.ae-dtd-ana,.ae-dtd-param                { font-size: 0.62rem !important; padding: 8px 2px !important; }
+
+    .ae-detail-status-badge { font-size: 0.46rem !important; padding: 1px 3px !important; }
+    .ae-detail-param-dot    { width: 7px !important; height: 7px !important; }
+    .ae-detail-header .card-title-performance { font-size: 0.76rem !important; }
+    .ae-detail-header .card-description       { font-size: 0.66rem !important; }
+}
+
+/* ── 2560px (4K) ─────────────────────────────────────────────────────────────
+   gen=90  date@90  load@240  status@340  raw@490  ana@590
+   frozen=690  |  param=120px  |  6×120=720
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 2560px) {
+    .ae-dth-gen,   .ae-dtd-gen    { width: 90px !important;  min-width: 90px !important; padding-left: 32px !important; }
+    .ae-dth-date,  .ae-dtd-date   { left: 90px !important;   width: 150px !important; min-width: 150px !important; }
+    .ae-dth-load,  .ae-dtd-load   { left: 240px !important;  width: 100px !important; min-width: 100px !important; }
+    .ae-dth-status,.ae-dtd-status { left: 340px !important;  width: 150px !important; min-width: 150px !important; }
+    .ae-dth-raw,   .ae-dtd-raw    { left: 490px !important;  width: 100px !important; min-width: 100px !important; }
+    .ae-dth-ana,   .ae-dtd-ana    { left: 590px !important;  width: 100px !important; min-width: 100px !important; }
+    .ae-dth-param, .ae-dtd-param  { width: 120px !important; min-width: 120px !important; }
+
+    .ae-dth-gen,.ae-dth-date,.ae-dth-load,.ae-dth-status,
+    .ae-dth-raw,.ae-dth-ana,.ae-dth-param                { font-size: 0.8rem !important; }
+    .ae-dtd-gen,.ae-dtd-date,.ae-dtd-load,.ae-dtd-status,
+    .ae-dtd-raw,.ae-dtd-ana,.ae-dtd-param                { font-size: 0.95rem !important; }
+
+    .ae-detail-status-badge { font-size: 0.78rem !important; padding: 4px 12px !important; }
+    .ae-detail-param-dot    { width: 12px !important; height: 12px !important; }
+    .ae-detail-header .card-title-performance { font-size: 1.35rem !important; }
+    .ae-detail-header .card-description       { font-size: 1rem !important; }
+}

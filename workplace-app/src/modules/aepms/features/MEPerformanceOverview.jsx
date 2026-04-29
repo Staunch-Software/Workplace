@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
-import axiosAepms from '../api/axiosAepms';
+import axiosAepms from "../api/axiosAepms";
 import {
   Ship,
   Anchor,
@@ -22,8 +22,9 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import AppHeader from '../components/AppHeader';
+import AppHeader from "../components/AppHeader";
 import "../styles/MEPerformanceOverview.css";
+import "../styles/MeResponsiveness.css";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 // import ozellarLogo from "../assets/250714_OzellarMarine-Logo-Final.png";
@@ -115,17 +116,20 @@ const PropellerTrendChart = ({ history }) => {
     return buckets;
   }, []);
 
-  const getY = React.useCallback((val) => {
-    const clampedVal = Math.max(Y_MIN, Math.min(val, Y_MAX));
-    const pct = (clampedVal - Y_MIN) / Y_RANGE;
-    const drawingHeight = height - padding.bottom - padding.top;
-    return height - padding.bottom - pct * drawingHeight;
-  },[Y_MIN, Y_MAX, Y_RANGE]);
+  const getY = React.useCallback(
+    (val) => {
+      const clampedVal = Math.max(Y_MIN, Math.min(val, Y_MAX));
+      const pct = (clampedVal - Y_MIN) / Y_RANGE;
+      const drawingHeight = height - padding.bottom - padding.top;
+      return height - padding.bottom - pct * drawingHeight;
+    },
+    [Y_MIN, Y_MAX, Y_RANGE],
+  );
 
   const getX = React.useCallback((index) => {
     const step = (width - padding.left - padding.right) / 11;
     return padding.left + index * step;
-  },[]);
+  }, []);
 
   // --- UPDATED COLOR LOGIC ---
   // > 5     : Critical (Red)
@@ -163,7 +167,7 @@ const PropellerTrendChart = ({ history }) => {
       })
       .filter(Boolean)
       .sort((a, b) => a.x - b.x);
-  },[history, monthBuckets, Y_MIN, Y_MAX, Y_RANGE, getX, getY]);
+  }, [history, monthBuckets, Y_MIN, Y_MAX, Y_RANGE, getX, getY]);
 
   // --- NEW: Quadratic Polynomial Regression (y = ax^2 + bx + c) ---
   const curveCoeffs = useMemo(() => {
@@ -173,8 +177,13 @@ const PropellerTrendChart = ({ history }) => {
     const x = chartPoints.map((p) => p.index);
     const y = chartPoints.map((p) => p.value);
 
-    let sumX = 0, sumX2 = 0, sumX3 = 0, sumX4 = 0;
-    let sumY = 0, sumXY = 0, sumX2Y = 0;
+    let sumX = 0,
+      sumX2 = 0,
+      sumX3 = 0,
+      sumX4 = 0;
+    let sumY = 0,
+      sumXY = 0,
+      sumX2Y = 0;
 
     for (let i = 0; i < n; i++) {
       sumX += x[i];
@@ -187,7 +196,8 @@ const PropellerTrendChart = ({ history }) => {
     }
 
     const A = [
-      [n, sumX, sumX2],[sumX, sumX2, sumX3],
+      [n, sumX, sumX2],
+      [sumX, sumX2, sumX3],
       [sumX2, sumX3, sumX4],
     ];
     const B = [sumY, sumXY, sumX2Y];
@@ -220,16 +230,18 @@ const PropellerTrendChart = ({ history }) => {
     let pointsStr = "";
     // Step by 0.25 on the X-axis to create a smooth curve
     for (let idx = minIdx; idx <= maxIdx; idx += 0.25) {
-      const curveVal = curveCoeffs[0] + curveCoeffs[1] * idx + curveCoeffs[2] * (idx ** 2);
+      const curveVal =
+        curveCoeffs[0] + curveCoeffs[1] * idx + curveCoeffs[2] * idx ** 2;
       pointsStr += `${getX(idx)},${getY(curveVal)} `;
     }
-    
+
     // Cap exactly at the final point
-    const lastVal = curveCoeffs[0] + curveCoeffs[1] * maxIdx + curveCoeffs[2] * (maxIdx ** 2);
+    const lastVal =
+      curveCoeffs[0] + curveCoeffs[1] * maxIdx + curveCoeffs[2] * maxIdx ** 2;
     pointsStr += `${getX(maxIdx)},${getY(lastVal)}`;
 
     return pointsStr.trim();
-  },[curveCoeffs, chartPoints, getX, getY]);
+  }, [curveCoeffs, chartPoints, getX, getY]);
 
   const polylinePoints = chartPoints.map((p) => `${p.x},${p.y}`).join(" ");
   const showEmptyMessage = chartPoints.length === 0;
@@ -276,15 +288,7 @@ const PropellerTrendChart = ({ history }) => {
   }
 
   return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: "660px",
-        height: "130px",
-        position: "relative",
-        margin: "0 auto",
-      }}
-    >
+    <div className="propeller-svg-wrapper">
       <svg
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
@@ -514,31 +518,18 @@ const PropellerTrendChart = ({ history }) => {
 
       {hoveredPoint && (
         <div
+          className="propeller-tooltip"
           style={{
-            position: "absolute",
             left: tooltipStyle.left,
             top: tooltipStyle.top,
             transform: tooltipStyle.transform,
-            backgroundColor: "#1e293b",
-            color: "white",
-            padding: "6px 12px",
-            borderRadius: "8px",
-            fontSize: "0.75rem",
-            pointerEvents: "none",
-            whiteSpace: "nowrap",
-            zIndex: 50,
-            boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3)",
-            textAlign: "center",
-            border: "1px solid #334155",
           }}
         >
-          <div style={{ fontWeight: "700", fontSize: "0.9rem" }}>
+          <div className="propeller-tooltip-value">
             {hoveredPoint.value > 0 ? "+" : ""}
             {hoveredPoint.value.toFixed(1)}%
           </div>
-          <div
-            style={{ fontSize: "0.7rem", color: "#cbd5e1", marginTop: "1px" }}
-          >
+          <div className="propeller-tooltip-date">
             {hoveredPoint.dateObj.toLocaleDateString("en-US", {
               day: "numeric",
               month: "short",
@@ -553,8 +544,10 @@ const PropellerTrendChart = ({ history }) => {
               width: 0,
               height: 0,
               borderLeft: "6px solid transparent",
-              borderRight: "6px solid transparent",[tooltipStyle.arrowClass === "arrow-up" ? "bottom" : "top"]:
-                "100%",[tooltipStyle.arrowClass === "arrow-up"
+              borderRight: "6px solid transparent",
+              [tooltipStyle.arrowClass === "arrow-up" ? "bottom" : "top"]:
+                "100%",
+              [tooltipStyle.arrowClass === "arrow-up"
                 ? "borderBottom"
                 : "borderTop"]: "6px solid #1e293b",
             }}
@@ -672,6 +665,22 @@ const getParamStatus = (paramName, deviationPct, absoluteDiff, value) => {
 export default function MEPerformanceOverview({ embeddedMode = false }) {
   const [loading, setLoading] = useState(true);
   const [viewOffset, setViewOffset] = useState(0);
+
+  // ── Responsive visible month count — declared FIRST before maxOffset uses it ──
+  const getVisibleMonthCount = () => {
+    const w = window.innerWidth;
+    if (w <= 480)  return 3;
+    if (w <= 768)  return 5;
+    if (w <= 1024) return 7;
+    if (w <= 1250) return 10;
+    return 12;
+  };
+  const [visibleMonthCount, setVisibleMonthCount] = useState(getVisibleMonthCount);
+  useEffect(() => {
+    const handleResize = () => setVisibleMonthCount(getVisibleMonthCount());
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   const maxOffset = useMemo(() => {
     const today = new Date();
     const startYear = 2025;
@@ -681,22 +690,18 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
     const totalMonthsSinceStart =
       (today.getFullYear() - startYear) * 12 + today.getMonth();
 
-    // We want to stop scrolling when Jan 2025 is the 12th column
-    // If you always display 12 columns, use: totalMonthsSinceStart - 11
-    // If you want to stop as soon as Jan 2025 is visible at all, use totalMonthsSinceStart
-    const limit = Math.max(0, totalMonthsSinceStart - 11);
+    const limit = Math.max(0, totalMonthsSinceStart - (visibleMonthCount - 1));
     return limit;
-  }, []);
+  }, [visibleMonthCount]);
 
   const visibleMonths = useMemo(() => {
     const months = [];
     const today = new Date();
 
-    // We only loop up to 12 times to maintain the UI width
-    for (let i = viewOffset; i < viewOffset + 12; i++) {
+    for (let i = viewOffset; i < viewOffset + visibleMonthCount; i++) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
 
-      // 🔥 STOP generating months if we hit 2024
+      // STOP generating months if we hit 2024
       if (d.getFullYear() < 2025) break;
 
       months.push({
@@ -708,7 +713,7 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
       });
     }
     return months;
-  }, [viewOffset]);
+  }, [viewOffset, visibleMonthCount]);
 
   const [daysElapsedData, setDaysElapsedData] = useState([]);
   const [propellerTrendData, setPropellerTrendData] = useState([]);
@@ -738,10 +743,11 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
   );
   const [isDaysDropdownOpen, setIsDaysDropdownOpen] = useState(false);
   const daysDropdownRef = useRef(null);
-  const [daysSortConfig, setDaysSortConfig] = useState({
-    key: "vessel_name",
-    direction: "asc",
-  });
+const [daysSortConfig, setDaysSortConfig] = useState({
+  key: "vessel_name",
+  direction: "asc",
+});
+
 
   // ===== NEW: Download State =====
   const handleDownloadClick = (url) => {
@@ -798,21 +804,23 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
       }, 150); // Slightly longer timeout to allow chart rendering
     }
   }, [isPropellerCardOpen, selectedVesselsFilter]); // Added selectedVesselsFilter here
-  
-   useEffect(() => {
-  if (consoleShipId) {
-    const vessel = daysElapsedData.find(v => String(v.imo_number) === String(consoleShipId));
-    if (vessel) {
-      // Automatically set the multi-select filter to this vessel
-      setSelectedDaysVesselsFilter([vessel]);
-      // Also ensure the card expands
-      setIsReportStatusOpen(true);
+
+  useEffect(() => {
+    if (consoleShipId) {
+      const vessel = daysElapsedData.find(
+        (v) => String(v.imo_number) === String(consoleShipId),
+      );
+      if (vessel) {
+        // Automatically set the multi-select filter to this vessel
+        setSelectedDaysVesselsFilter([vessel]);
+        // Also ensure the card expands
+        setIsReportStatusOpen(true);
+      }
+    } else {
+      // Clear if console is cleared
+      setSelectedDaysVesselsFilter([]);
     }
-  } else {
-    // Clear if console is cleared
-    setSelectedDaysVesselsFilter([]);
-  }
-}, [consoleShipId, daysElapsedData]);
+  }, [consoleShipId, daysElapsedData]);
   // Auto-scroll for Report Status Card
   useEffect(() => {
     if (isReportStatusOpen && daysElapsedCardRef.current) {
@@ -874,7 +882,7 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
 
       const logoWidth = 35;
       const logoHeight = 14;
-    // try {
+      // try {
       //   pdf.addImage(
       //     ozellarLogo,
       //     "PNG",
@@ -1614,514 +1622,77 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
     );
 
   return (
-     <>
+    <>
       {/* <PerformanceNav /> */}
       <AppHeader />
       <div
-    className="me-performance-container aepms-engine-console"
-    style={{ 
-        width: "100%", 
-        paddingTop: embeddedMode ? "0" : "80px",   /* clears fixed header */
-        paddingLeft: embeddedMode ? "0" : "50px",
-        paddingRight: embeddedMode ? "0" : "50px",
-        paddingBottom: embeddedMode ? "0" : "50px",
-    }}
->
-      <div className="performance-cards-grid">
-        {/* CARD 1: Propeller Margin */}
-        <div
-          ref={propellerCardRef}
-          className="performance-data-card enhanced-card"
-          style={{
-            width: "100%",
-            borderRadius: "12px",
-            overflow: "hidden",
-            border: "1px solid #e2e8f0",
-            scrollMarginTop: "100px",
-            boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
-            animationDelay: "0.2s"
-          }}
-        >
+        className="me-performance-container aepms-engine-console"
+        style={{
+          width: "100%",
+          paddingTop: embeddedMode ? "0" : "80px" /* clears fixed header */,
+          paddingLeft: embeddedMode ? "0" : "50px",
+          paddingRight: embeddedMode ? "0" : "50px",
+          paddingBottom: embeddedMode ? "0" : "50px",
+        }}
+      >
+        <div className="performance-cards-grid">
+          {/* CARD 1: Propeller Margin */}
           <div
-              className={`card-header-enhanced ${!isPropellerCardOpen ? 'header-closed' : ''}`}
+            ref={propellerCardRef}
+            className="performance-data-card enhanced-card propeller-card"
+          >
+            <div
+              className={`card-header-enhanced ${!isPropellerCardOpen ? "header-closed" : ""}`}
               style={{ cursor: "pointer" }}
               onClick={() => setIsPropellerCardOpen(!isPropellerCardOpen)}
             >
-            {/* Icon */}
-            <div className="card-icon-badge pulsing-icon">
-              <Anchor size={16} />
-            </div>
-
-            {/* Title Group */}
-            <div className="card-title-group">
-              <h2 className="card-title-performance">
-                Propeller Margin Performance
-              </h2>
-              <p className="card-description">
-                Current margin status & 12-month trend
-              </p>
-            </div>
-
-            {/* Dropdown Filter - Right Side */}
-            <div
-              className="vessel-filter-wrapper"
-              ref={vesselDropdownRef}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div style={{ position: "relative" }}>
-                <button
-                  className={`vessel-dropdown-btn ${isVesselDropdownOpen ? "active" : ""}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsPropellerCardOpen(true);
-                    setIsVesselDropdownOpen(!isVesselDropdownOpen);
-                  }}
-                >
-                  <div className="vessel-dropdown-icon">
-                    <span>
-                      {selectedVesselsFilter.length === 0
-                        ? "Select the vessel"
-                        : selectedVesselsFilter.length ===
-                            propellerTrendData.length
-                          ? "✓ All"
-                          : selectedVesselsFilter.length === 1
-                            ? `✓ ${selectedVesselsFilter[0]?.vessel_name || "1 Vessel Selected"}`
-                            : `✓ ${selectedVesselsFilter.length} Vessels Selected`}
-                    </span>
-                  </div>
-                  <ChevronDown size={18} color="#64748b" />
-                </button>
-
-                {/* Dropdown Menu */}
-                {isVesselDropdownOpen && (
-                  <div
-                    className="vessel-dropdown-menu"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="vessel-dropdown-sticky">
-                      <div
-                        className="vessel-select-all-item"
-                        onClick={handleSelectAllVessels}
-                      >
-                        {/* Added pointerEvents: none to label */}
-                        <label
-                          className="vessel-select-all-label"
-                          style={{ pointerEvents: "none" }}
-                        >
-                          <input
-                            type="checkbox"
-                            className="vessel-checkbox"
-                            checked={
-                              selectedVesselsFilter.length ===
-                                propellerTrendData.length &&
-                              propellerTrendData.length > 0
-                            }
-                            readOnly // Changed to readOnly
-                          />
-                          Select All
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="vessel-dropdown-scroll" style={{ maxHeight: "144px", overflowY: "auto" }}>
-                      {propellerTrendData.map((vessel) => (
-                        <div
-                          key={vessel.imo_number}
-                          className={`vessel-item ${selectedVesselsFilter.some((v) => v.imo_number === vessel.imo_number) ? "selected" : ""}`}
-                          onClick={() => handleVesselToggle(vessel)}
-                        >
-                          {/* Added pointerEvents: none to label so the parent DIV handles the click */}
-                          <label
-                            style={{
-                              pointerEvents: "none",
-                              width: "100%",
-                              height: "100%",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "10px",
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              className="vessel-checkbox"
-                              checked={selectedVesselsFilter.some(
-                                (v) => v.imo_number === vessel.imo_number,
-                              )}
-                              readOnly // Changed to readOnly
-                            />
-                            <span>{vessel.vessel_name}</span>
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* --- FIXED BIG CHEVRON BUTTON --- */}
-            <div
-              style={{
-                marginLeft: "auto",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                padding: "8px" /* Increased Padding */,
-                borderRadius: "50%",
-                transition: "background 0.2s",
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsPropellerCardOpen(!isPropellerCardOpen);
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "#f1f5f9")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "transparent")
-              }
-            >
-              {isPropellerCardOpen ? (
-                <ChevronUp
-                  size={25}
-                  color="#475569"
-                  strokeWidth={2.5}
-                /> /* Increased Size & Stroke */
-              ) : (
-                <ChevronDown size={25} color="#475569" strokeWidth={2.5} />
-              )}
-            </div>
-          </div>
-          {/* ... Body content remains the same ... */}
-
-          {isPropellerCardOpen && (
-            <div
-              className="card-body-enhanced"
-              style={{ padding: 0, overflow: "visible" }}
-            >
-              {selectedVesselsFilter.length > 0 ? (
-                <div
-                  className="performance-grid-wrapper"
-                  style={{
-                    padding: "20px",
-                    backgroundColor: "#f8fafc",
-                    maxHeight: "510px",
-                    overflowY: "auto",
-                    scrollbarGutter: "stable",
-                  }}
-                >
-                  {/* GRID CONTAINER: 2 Columns (50% each) */}
-                  <div className="propeller-responsive-grid">
-                    {filteredPropellerData.map((vessel, index) => {
-                      const margin = vessel.current_margin;
-
-                      // --- Color Logic ---
-                      let marginColor = "#dcfce7";
-                      let textColor = "#166534";
-                      let borderColor = "#bbf7d0";
-                      let dotColor = "#22c55e";
-                      let cardBg = "#ffffff";
-                      let cardBorderColor = "#e2e8f0";
-
-                      if (margin > 5.0) {
-                        // CRITICAL (Red) - Above +5.0
-                        marginColor = "#fee2e2";
-                        textColor = "#991b1b";
-                        borderColor = "#fecaca";
-                        dotColor = "#ef4444";
-                      } else if (margin > 0.0) {
-                        // WARNING (Amber) - Between 0.0 and 5.0
-                        marginColor = "#fef9c3";
-                        textColor = "#854d0e";
-                        borderColor = "#fde047";
-                        dotColor = "#eab308";
-                      }
-
-                      // --- Chart Data Logic ---
-                      let graphHistory = [];
-                      const vesselAlerts = alertHistory[vessel.imo_number];
-
-                      const getPropellerDeviation = (val) => {
-                        if (val === null || val === undefined) return null;
-                        const num = Number(val);
-                        return Math.abs(num) > 50 ? num - 100 : num;
-                      };
-
-                      if (
-                        vesselAlerts &&
-                        vesselAlerts.flatReports &&
-                        vesselAlerts.flatReports.length > 0
-                      ) {
-                        graphHistory = vesselAlerts.flatReports
-                          .map((r) => {
-                            const rawValue =
-                              r.propeller_margin_actual ??
-                              r.parameters?.find(
-                                (p) => p.parameter === "propeller",
-                              )?.actual ??
-                              null;
-                            return {
-                              date: r.report_date,
-                              value: getPropellerDeviation(rawValue),
-                            };
-                          })
-                          .filter((item) => item.value !== null);
-                      } else {
-                        graphHistory = (vessel.history || [])
-                          .map((h) => ({
-                            date: h.date,
-                            value: getPropellerDeviation(h.value),
-                          }))
-                          .filter((item) => item.value !== null);
-                      }
-
-                      // --- CARD RENDER ---
-                      return (
-                        <div
-                          key={vessel.imo_number}
-                          style={{
-                            backgroundColor: cardBg,
-                            border: `1px solid ${cardBorderColor}`,
-                            borderRadius: "12px",
-                            padding: "16px 20px",
-                            boxShadow: "0 2px 4px rgba(0,0,0,0.03)",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "12px",
-                            animation: `fadeIn 0.3s ease forwards ${index * 0.05}s`,
-                            // opacity: 0,
-                            position: "relative",
-                            transition: "transform 0.2s, box-shadow 0.2s",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                            e.currentTarget.style.boxShadow =
-                              "0 8px 12px -3px rgba(0,0,0,0.08)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = "translateY(0)";
-                            e.currentTarget.style.boxShadow =
-                              "0 2px 4px rgba(0,0,0,0.03)";
-                          }}
-                        >
-                          {/* HEADER: Name & Value */}
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "flex-start",
-                            }}
-                          >
-                            {/* Left: Vessel Name */}
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "10px",
-                                marginTop: "4px",
-                              }}
-                            >
-                              <div
-                                className="status-dot blinking-dot"
-                                style={{
-                                  background: dotColor,
-                                  width: "10px",
-                                  height: "10px",
-                                }}
-                              />
-                              <span
-                                style={{
-                                  fontWeight: "700",
-                                  color: "#1f2937",
-                                  fontSize: "1rem",
-                                  letterSpacing: "-0.01em",
-                                }}
-                              >
-                                {vessel.vessel_name}
-                              </span>
-                            </div>
-
-                            {/* Right: Label + Badge (Replaces Table Header) */}
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "flex-end",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: "0.7rem",
-                                  color: "#64748b",
-                                  fontWeight: "600",
-                                  textTransform: "uppercase",
-                                  marginBottom: "4px",
-                                  letterSpacing: "0.05em",
-                                }}
-                              >
-                                Latest Power Margin (%)
-                              </span>
-                              <span
-                                style={{
-                                  backgroundColor: marginColor,
-                                  color: textColor,
-                                  padding: "4px 12px",
-                                  borderRadius: "6px",
-                                  fontWeight: "700",
-                                  fontSize: "0.95rem",
-                                  border: `1px solid ${borderColor}`,
-                                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                                }}
-                              >
-                                {margin !== null
-                                  ? `${margin > 0 ? "+" : ""}${margin.toFixed(1)}%`
-                                  : "N/A"}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* BODY: Chart */}
-                          <div style={{ marginTop: "4px" }}>
-                            {/* Optional Chart Label */}
-                            {/* <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginBottom: '4px', textAlign: 'right' }}>12-Month Trend</div> */}
-
-                            <div
-                              style={{
-                                width: "100%",
-                                height: "130px",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <PropellerTrendChart history={graphHistory} />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {filteredPropellerData.length === 0 && (
-                    <div
-                      style={{
-                        padding: "40px",
-                        textAlign: "center",
-                        color: "#9ca3af",
-                        width: "100%",
-                      }}
-                    >
-                      <p>No propeller data available matching criteria</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div
-                  style={{
-                    padding: "72px 24px",
-                    textAlign: "center",
-                    color: "#94a3af",
-                  }}
-                >
-                  <p style={{ margin: 0, fontSize: "1.1rem" }}>
-                    👆 Select one or more vessels above to view their propeller
-                    margin performance
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* ===== UNIFIED PERFORMANCE CARD ===== */}
-        <div style={{ width: "100%", minWidth: 0 }}>
-          <Performance
-            embeddedMode={true}
-            onEngineTypeChange={(type) => {
-              setUnifiedEngineType(type);
-              // CHANGE 1: This closes the history table when switching ME <-> AE
-              setSelectedVesselDetails(null); 
-              setSelectedDaysVesselsFilter([]); 
-            }}
-            onShipChange={(id) => {
-              setConsoleShipId(id);
-              // CHANGE 2: This closes the table if you change to a different vessel
-              setSelectedVesselDetails(null); 
-              setSelectedDaysVesselsFilter([]);
-            }}
-          />
-        </div>
-
-        {/* Alert Summary Card */}
-        {/* Alert Summary Card */}
-        {/* Alert Summary Card */}
-        {consoleShipId && (
-          unifiedEngineType === "mainEngine" ? (
-          <div
-            ref={daysElapsedCardRef}
-            className="performance-data-card enhanced-card"
-            style={{
-              width: "100%",
-              borderRadius: "12px",
-              overflow: "hidden",
-              border: "1px solid #e2e8f0",
-              scrollMarginTop: "100px",
-              boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
-            }}
-          >
-            <div
-                className={`card-header-enhanced ${!isReportStatusOpen ? 'header-closed' : ''}`}
-                style={{ cursor: "pointer" }}
-                onClick={() => setIsReportStatusOpen(!isReportStatusOpen)}
-              >
+              {/* Icon */}
               <div className="card-icon-badge pulsing-icon">
-                <Clock size={24} />
+                <Anchor size={16} />
               </div>
 
+              {/* Title Group */}
               <div className="card-title-group">
                 <h2 className="card-title-performance">
-                  Report Status - Days Elapsed
+                  Propeller Margin Performance
                 </h2>
                 <p className="card-description">
-                  Time since last report & 12-Month Alert History
+                  Current margin status & 12-month trend
                 </p>
               </div>
 
-              {/* Dropdown Filter - Report Status */}
+              {/* Dropdown Filter - Right Side */}
               <div
                 className="vessel-filter-wrapper"
-                ref={daysDropdownRef}
+                ref={vesselDropdownRef}
                 onClick={(e) => e.stopPropagation()}
               >
                 <div style={{ position: "relative" }}>
                   <button
-                    className={`vessel-dropdown-btn ${isDaysDropdownOpen ? "active" : ""}`}
-                    disabled={!consoleShipId}
+                    className={`vessel-dropdown-btn ${isVesselDropdownOpen ? "active" : ""}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setIsReportStatusOpen(true);
-                      setIsDaysDropdownOpen(!isDaysDropdownOpen);
+                      setIsPropellerCardOpen(true);
+                      setIsVesselDropdownOpen(!isVesselDropdownOpen);
                     }}
                   >
                     <div className="vessel-dropdown-icon">
                       <span>
-                        {selectedDaysVesselsFilter.length === 0
+                        {selectedVesselsFilter.length === 0
                           ? "Select the vessel"
-                          : selectedDaysVesselsFilter.length ===
-                              daysElapsedData.length
+                          : selectedVesselsFilter.length ===
+                              propellerTrendData.length
                             ? "✓ All"
-                            : selectedDaysVesselsFilter.length === 1
-                              ? `✓ ${selectedDaysVesselsFilter[0]?.vessel_name || "1 Vessel Selected"}`
-                              : `✓ ${selectedDaysVesselsFilter.length} Vessels Selected`}
+                            : selectedVesselsFilter.length === 1
+                              ? `✓ ${selectedVesselsFilter[0]?.vessel_name || "1 Vessel Selected"}`
+                              : `✓ ${selectedVesselsFilter.length} Vessels Selected`}
                       </span>
                     </div>
                     <ChevronDown size={18} color="#64748b" />
                   </button>
 
                   {/* Dropdown Menu */}
-                  {isDaysDropdownOpen && (
+                  {isVesselDropdownOpen && (
                     <div
                       className="vessel-dropdown-menu"
                       onClick={(e) => e.stopPropagation()}
@@ -2129,9 +1700,9 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
                       <div className="vessel-dropdown-sticky">
                         <div
                           className="vessel-select-all-item"
-                          onClick={handleSelectAllDaysVessels}
+                          onClick={handleSelectAllVessels}
                         >
-                          {/* Added pointerEvents: none */}
+                          {/* Added pointerEvents: none to label */}
                           <label
                             className="vessel-select-all-label"
                             style={{ pointerEvents: "none" }}
@@ -2140,25 +1711,28 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
                               type="checkbox"
                               className="vessel-checkbox"
                               checked={
-                                selectedDaysVesselsFilter.length ===
-                                  daysElapsedData.length &&
-                                daysElapsedData.length > 0
+                                selectedVesselsFilter.length ===
+                                  propellerTrendData.length &&
+                                propellerTrendData.length > 0
                               }
-                              readOnly
+                              readOnly // Changed to readOnly
                             />
                             Select All
                           </label>
                         </div>
                       </div>
 
-                      <div className="vessel-dropdown-scroll">
-                        {daysElapsedData.map((vessel) => (
+                      <div
+                        className="vessel-dropdown-scroll"
+                        style={{ maxHeight: "144px", overflowY: "auto" }}
+                      >
+                        {propellerTrendData.map((vessel) => (
                           <div
                             key={vessel.imo_number}
-                            className={`vessel-item ${selectedDaysVesselsFilter.some((v) => v.imo_number === vessel.imo_number) ? "selected" : ""}`}
-                            onClick={() => handleDaysVesselToggle(vessel)}
+                            className={`vessel-item ${selectedVesselsFilter.some((v) => v.imo_number === vessel.imo_number) ? "selected" : ""}`}
+                            onClick={() => handleVesselToggle(vessel)}
                           >
-                            {/* Added pointerEvents: none so the parent DIV handles the click */}
+                            {/* Added pointerEvents: none to label so the parent DIV handles the click */}
                             <label
                               style={{
                                 pointerEvents: "none",
@@ -2172,10 +1746,10 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
                               <input
                                 type="checkbox"
                                 className="vessel-checkbox"
-                                checked={selectedDaysVesselsFilter.some(
+                                checked={selectedVesselsFilter.some(
                                   (v) => v.imo_number === vessel.imo_number,
                                 )}
-                                readOnly
+                                readOnly // Changed to readOnly
                               />
                               <span>{vessel.vessel_name}</span>
                             </label>
@@ -2189,1684 +1763,1256 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
 
               {/* --- FIXED BIG CHEVRON BUTTON --- */}
               <div
-                style={{
-                  marginLeft: "auto",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  padding: "8px" /* Increased Padding */,
-                  borderRadius: "50%",
-                  transition: "background 0.2s",
-                }}
+                className="propeller-chevron-btn"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsReportStatusOpen(!isReportStatusOpen);
+                  setIsPropellerCardOpen(!isPropellerCardOpen);
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor = "#f1f5f9")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = "transparent")
-                }
               >
-                {isReportStatusOpen ? (
+                {isPropellerCardOpen ? (
                   <ChevronUp
-                    size={32}
+                    size={25}
                     color="#475569"
                     strokeWidth={2.5}
                   /> /* Increased Size & Stroke */
                 ) : (
-                  <ChevronDown size={32} color="#475569" strokeWidth={2.5} />
+                  <ChevronDown size={25} color="#475569" strokeWidth={2.5} />
                 )}
               </div>
             </div>
             {/* ... Body content remains the same ... */}
 
-            {isReportStatusOpen && (
-  <div
-    className="card-body-enhanced"
-    style={{ padding: "0", overflow: "visible", position: "relative", zIndex: 1 }}
-  >
-                {consoleShipId && selectedDaysVesselsFilter.length > 0 ? (
-                  /* 1. WRAPPER: Height set to approx 380px to show ~6 vessels cleanly */
-                  <div
-                    className="performance-table-wrapper"
-                    style={{
-                      overflowX: "auto",
-                      maxWidth: "100%",
-                      position: "relative",
-                      background: "#fff",
-                    }}
-                  >
-                    <table
-                      className="performance-table-modern"
-                      style={{
-                        width: "max-content",
-                        minWidth: "100%",
-                        borderCollapse: "separate",
-                        borderSpacing: 0,
-                        tableLayout: "fixed",
-                      }}
-                    >
-                      <thead style={{ position: "sticky", top: 0, zIndex: 50 }}>
-                        <tr style={{ backgroundColor: "#fff" }}>
-                          {/* STICKY 1: Vessel Name (Width 160) */}
-                          <th
-                            style={{
-                              position: "sticky",
-                              left: 0,
-                              top: 0,
-                              zIndex: 60,
-                              backgroundColor: "#fff",
-                              width: "160px",
-                              minWidth: "160px",
-                              textAlign: "left",
-                              padding: "16px 12px 16px 24px",
-                              color: "#6b7280",
-                              fontSize: "0.75rem",
-                              fontWeight: "700",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                              borderBottom: "2px solid #f3f4f6",
-                            }}
-                          >
-                            Vessel Name
-                          </th>
+            {isPropellerCardOpen && (
+              <div
+                className="card-body-enhanced"
+                style={{ padding: 0, overflow: "visible" }}
+              >
+                {selectedVesselsFilter.length > 0 ? (
+                  <div className="performance-grid-wrapper propeller-grid-wrapper">
+                    {/* GRID CONTAINER: 2 Columns (50% each) */}
+                    <div className="propeller-responsive-grid">
+                      {filteredPropellerData.map((vessel, index) => {
+                        const margin = vessel.current_margin;
 
-                          {/* STICKY 2: Last Report (Width 100) */}
-                          <th
-                            style={{
-                              position: "sticky",
-                              left: "160px",
-                              top: 0,
-                              zIndex: 60,
-                              backgroundColor: "#fff",
-                              width: "100px",
-                              minWidth: "100px",
-                              textAlign: "left",
-                              padding: "16px 12px",
-                              color: "#6b7280",
-                              fontSize: "0.75rem",
-                              fontWeight: "700",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                              borderBottom: "2px solid #f3f4f6",
-                            }}
-                          >
-                            Last Report
-                          </th>
+                        // --- Color Logic ---
+                        let marginColor = "#dcfce7";
+                        let textColor = "#166534";
+                        let borderColor = "#bbf7d0";
+                        let dotColor = "#22c55e";
+                        let cardBg = "#ffffff";
+                        let cardBorderColor = "#e2e8f0";
 
-                          {/* STICKY 3: Days (Width 65) */}
-                          {/* STICKY 3: Days (Width 65) with Sort Arrows */}
-                          <th
-                            className="text-center"
-                            onClick={handleDaysSort}
+                        if (margin > 5.0) {
+                          // CRITICAL (Red) - Above +5.0
+                          marginColor = "#fee2e2";
+                          textColor = "#991b1b";
+                          borderColor = "#fecaca";
+                          dotColor = "#ef4444";
+                        } else if (margin > 0.0) {
+                          // WARNING (Amber) - Between 0.0 and 5.0
+                          marginColor = "#fef9c3";
+                          textColor = "#854d0e";
+                          borderColor = "#fde047";
+                          dotColor = "#eab308";
+                        }
+
+                        // --- Chart Data Logic ---
+                        let graphHistory = [];
+                        const vesselAlerts = alertHistory[vessel.imo_number];
+
+                        const getPropellerDeviation = (val) => {
+                          if (val === null || val === undefined) return null;
+                          const num = Number(val);
+                          return Math.abs(num) > 50 ? num - 100 : num;
+                        };
+
+                        if (
+                          vesselAlerts &&
+                          vesselAlerts.flatReports &&
+                          vesselAlerts.flatReports.length > 0
+                        ) {
+                          graphHistory = vesselAlerts.flatReports
+                            .map((r) => {
+                              const rawValue =
+                                r.propeller_margin_actual ??
+                                r.parameters?.find(
+                                  (p) => p.parameter === "propeller",
+                                )?.actual ??
+                                null;
+                              return {
+                                date: r.report_date,
+                                value: getPropellerDeviation(rawValue),
+                              };
+                            })
+                            .filter((item) => item.value !== null);
+                        } else {
+                          graphHistory = (vessel.history || [])
+                            .map((h) => ({
+                              date: h.date,
+                              value: getPropellerDeviation(h.value),
+                            }))
+                            .filter((item) => item.value !== null);
+                        }
+
+                        // --- CARD RENDER ---
+                        return (
+                          <div
+                            key={vessel.imo_number}
+                            className="propeller-vessel-card"
                             style={{
-                              position: "sticky",
-                              left: "260px",
-                              top: 0,
-                              zIndex: 60,
-                              backgroundColor: "#fff",
-                              width: "65px",
-                              minWidth: "65px",
-                              padding: "16px 4px",
-                              color:
-                                daysSortConfig.key === "days_elapsed"
-                                  ? "#1e3a8a"
-                                  : "#6b7280",
-                              fontSize: "0.75rem",
-                              fontWeight: "700",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                              borderBottom: "2px solid #f3f4f6",
-                              cursor: "pointer",
-                              userSelect: "none",
+                              backgroundColor: cardBg,
+                              border: `1px solid ${cardBorderColor}`,
+                              animationDelay: `${index * 0.05}s`,
                             }}
                           >
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: "3px",
-                              }}
-                            >
-                              Days
-                              <div
-                                style={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  lineHeight: 1,
-                                }}
-                              >
-                                <ChevronUp
-                                  size={10}
-                                  style={{
-                                    opacity:
-                                      daysSortConfig.key === "days_elapsed" &&
-                                      daysSortConfig.direction === "asc"
-                                        ? 1
-                                        : 0.2,
-                                  }}
+                            {/* HEADER: Name & Value */}
+                            <div className="propeller-vessel-header">
+                              {/* Left: Vessel Name */}
+                              <div className="propeller-vessel-name-block">
+                                <div
+                                  className="propeller-vessel-dot blinking-dot"
+                                  style={{ background: dotColor }}
                                 />
-                                <ChevronDown
-                                  size={10}
+                                <span className="propeller-vessel-name">
+                                  {vessel.vessel_name}
+                                </span>
+                              </div>
+
+                              {/* Right: Label + Badge (Replaces Table Header) */}
+                              <div className="propeller-badge-col">
+                                <span className="propeller-badge-label">
+                                  Latest Power Margin (%)
+                                </span>
+                                <span
+                                  className="propeller-margin-badge"
                                   style={{
-                                    opacity:
-                                      daysSortConfig.key === "days_elapsed" &&
-                                      daysSortConfig.direction === "desc"
-                                        ? 1
-                                        : 0.2,
-                                    marginTop: "-3px",
+                                    backgroundColor: marginColor,
+                                    color: textColor,
+                                    border: `1px solid ${borderColor}`,
                                   }}
-                                />
+                                >
+                                  {margin !== null
+                                    ? `${margin > 0 ? "+" : ""}${margin.toFixed(1)}%`
+                                    : "N/A"}
+                                </span>
                               </div>
                             </div>
-                          </th>
 
-                          {/* STICKY 4: Load % (Width 70) */}
-                          <th
-                            className="text-center"
-                            style={{
-                              position: "sticky",
-                              left: "325px",
-                              top: 0,
-                              zIndex: 60,
-                              backgroundColor: "#fff",
-                              width: "70px",
-                              minWidth: "70px",
-                              padding: "16px 4px",
-                              color: "#6b7280",
-                              fontSize: "0.75rem",
-                              fontWeight: "700",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                              borderBottom: "2px solid #f3f4f6",
-                            }}
-                          >
-                            Load %
-                          </th>
+                            {/* BODY: Chart */}
+                            <div className="propeller-chart-area">
+                              <div className="propeller-chart-container">
+                                <PropellerTrendChart history={graphHistory} />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
 
-                          {/* STICKY 5: Nav Button Left (Width 45) */}
-                          <th
-                            style={{
-                              position: "sticky",
-                              top: 0,
-                              left: "395px",
-                              zIndex: 60,
-                              backgroundColor: "#fff",
-                              width: "45px",
-                              minWidth: "45px",
-                              padding: "0",
-                              boxShadow: "4px 0 4px -4px rgba(0,0,0,0.1)",
-                              borderBottom: "2px solid #f3f4f6",
-                            }}
-                          >
-                            <button
-                              onClick={() =>
-                                setViewOffset((curr) => Math.max(0, curr - 1))
-                              }
-                              disabled={viewOffset === 0}
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                background: "transparent",
-                                border: "none",
-                                cursor:
-                                  viewOffset === 0 ? "default" : "pointer",
-                                opacity: viewOffset === 0 ? 0.1 : 1,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <ChevronLeft
-                                size={30}
-                                strokeWidth={3}
-                                color="#374151"
-                              />
-                            </button>
-                          </th>
-
-                          {/* SCROLLABLE MONTHS (Width 75 for professional expansion) */}
-                          {visibleMonths.map((m, i) => {
-                            const isLatestMonth = i === 0 && viewOffset === 0;
-                            return (
-                              <th
-                                key={i}
-                                style={{
-                                  width: "75px",
-                                  minWidth: "75px",
-                                  textAlign: "center",
-                                  fontSize: "0.7rem",
-                                  color: isLatestMonth ? "#1e3a8a" : "#6b7280",
-                                  fontWeight: "700",
-                                  textTransform: "uppercase",
-                                  padding: "16px 0",
-                                  backgroundColor: isLatestMonth
-                                    ? "#eff6ff"
-                                    : "#fff",
-                                  borderLeft: "1px solid #f3f4f6",
-                                  borderBottom: "2px solid #f3f4f6",
-                                }}
-                              >
-                                {m.label}
-                              </th>
-                            );
-                          })}
-
-                          {/* NAV BUTTON RIGHT */}
-                          <th
-                            style={{
-                              position: "sticky",
-                              top: 0,
-                              right: 0,
-                              zIndex: 60,
-                              backgroundColor: "#fff",
-                              width: "45px",
-                              minWidth: "45px",
-                              padding: "0",
-                              borderBottom: "2px solid #f3f4f6",
-                              borderLeft: "1px solid #f3f4f6",
-                            }}
-                          >
-                            <button
-                              onClick={() =>
-                                setViewOffset((curr) =>
-                                  Math.min(maxOffset, curr + 1),
-                                )
-                              }
-                              disabled={viewOffset >= maxOffset}
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                background: "transparent",
-                                border: "none",
-                                cursor:
-                                  viewOffset >= maxOffset
-                                    ? "default"
-                                    : "pointer",
-                                opacity: viewOffset >= maxOffset ? 0.1 : 1,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <ChevronRight
-                                size={30}
-                                strokeWidth={3}
-                                color="#374151"
-                              />
-                            </button>
-                          </th>
-                        </tr>
-                      </thead>
-
-                      <tbody>
-                        {filteredDaysElapsedData.map((vessel) => {
-                          const colors = getDaysColor(vessel.days_elapsed);
-                          return (
-                            <tr
-                              key={vessel.imo_number}
-                              className="table-row-enhanced"
-                              style={{ borderBottom: "1px solid #f3f4f6" }}
-                            >
-                              {/* 1. VESSEL NAME: No width change needed here, just the sticky logic */}
-                              {/* 1. VESSEL NAME (left: 0) */}
-                              <td
-                                onClick={() => handleVesselNameClick(vessel)}
-                                style={{
-                                  position: "sticky",
-                                  left: 0,
-                                  zIndex: 10,
-                                  backgroundColor: "#fff",
-                                  padding: "12px 12px 12px 24px",
-                                  verticalAlign: "middle",
-                                  cursor: "pointer",
-                                  borderBottom: "1px solid #f3f4f6",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "10px",
-                                  }}
-                                >
-                                  <div
-                                    className="status-dot blinking-dot"
-                                    style={{
-                                      background: colors.dot,
-                                      width: "8px",
-                                      height: "8px",
-                                      flexShrink: 0,
-                                    }}
-                                  />
-                                  <span
-                                    style={{
-                                      fontWeight: "600",
-                                      color: "#374151",
-                                      fontSize: "0.85rem",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
-                                    {vessel.vessel_name}
-                                  </span>
-                                </div>
-                              </td>
-
-                              {/* 2. LAST REPORT (left: 160) */}
-                              <td
-                                style={{
-                                  position: "sticky",
-                                  left: "160px",
-                                  zIndex: 10,
-                                  backgroundColor: "#fff",
-                                  padding: "12px 12px",
-                                  verticalAlign: "middle",
-                                  color: "#4b5563",
-                                  fontSize: "0.8rem",
-                                  borderBottom: "1px solid #f3f4f6",
-                                }}
-                              >
-                                {formatDate(vessel.report_date)}
-                              </td>
-
-                              {/* 3. DAYS (left: 260) */}
-                              <td
-                                className="text-center"
-                                style={{
-                                  position: "sticky",
-                                  left: "260px",
-                                  zIndex: 10,
-                                  backgroundColor: "#fff",
-                                  padding: "12px 4px",
-                                  verticalAlign: "middle",
-                                  borderBottom: "1px solid #f3f4f6",
-                                }}
-                              >
-                                <span
-                                  className={`days-badge ${vessel.days_elapsed > 60 ? "days-critical" : vessel.days_elapsed > 45 ? "days-warning" : "days-success"}`}
-                                  style={{
-                                    minWidth: "32px",
-                                    padding: "2px 6px",
-                                    fontSize: "0.75rem",
-                                  }}
-                                >
-                                  {vessel.days_elapsed}
-                                </span>
-                              </td>
-
-                              {/* 4. LOAD % (left: 325) */}
-                              <td
-                                className="text-center"
-                                style={{
-                                  position: "sticky",
-                                  left: "325px",
-                                  zIndex: 10,
-                                  backgroundColor: "#fff",
-                                  padding: "12px 4px",
-                                  verticalAlign: "middle",
-                                  borderBottom: "1px solid #f3f4f6",
-                                }}
-                              >
-                                {(() => {
-                                  const loadVal =
-                                    vessel.load_percentage ||
-                                    alertHistory[vessel.imo_number]
-                                      ?.flatReports[0]?.load_percentage;
-                                  const loadNum = parseFloat(loadVal);
-                                  let bgColor = "#f3f4f6";
-                                  let textColor = "#6b7280";
-                                  if (!isNaN(loadNum)) {
-                                    if (loadNum < 60) {
-                                      bgColor = "#fee2e2";
-                                      textColor = "#dc2626";
-                                    } else if (loadNum <= 75) {
-                                      bgColor = "#fef3c7";
-                                      textColor = "#ca8a04";
-                                    } else {
-                                      bgColor = "#d1fae5";
-                                      textColor = "#16a34a";
-                                    }
-                                  }
-                                  return (
-                                    <span
-                                      style={{
-                                        backgroundColor: bgColor,
-                                        color: textColor,
-                                        padding: "2px 6px",
-                                        borderRadius: "4px",
-                                        fontWeight: "700",
-                                        fontSize: "0.75rem",
-                                        display: "inline-block",
-                                        minWidth: "42px",
-                                      }}
-                                    >
-                                      {loadNum
-                                        ? `${loadNum.toFixed(1)}%`
-                                        : "N/A"}
-                                    </span>
-                                  );
-                                })()}
-                              </td>
-
-                              {/* 5. SPACER UNDER NAV BUTTON (left: 395) */}
-                              <td
-                                style={{
-                                  position: "sticky",
-                                  left: "395px",
-                                  zIndex: 10,
-                                  backgroundColor: "#fff",
-                                  borderBottom: "1px solid #f3f4f6",
-                                  boxShadow: "4px 0 4px -4px rgba(0,0,0,0.1)",
-                                }}
-                              ></td>
-                              {visibleMonths.map((bucket, i) => {
-                                // 1. Define if this is the latest month (matches Header logic)
-                                const isLatestMonth =
-                                  i === 0 && viewOffset === 0;
-
-                                const vesselReports =
-                                  alertHistory[vessel.imo_number]
-                                    ?.flatReports || [];
-                                const reportsForMonth = vesselReports.filter(
-                                  (r) => r.monthKey === bucket.key,
-                                );
-                                const hasData = reportsForMonth.length > 0;
-
-                                return (
-                                  <td
-                                    key={bucket.key}
-                                    style={{
-                                      padding: "12px 0",
-                                      textAlign: "center",
-                                      verticalAlign: "middle",
-                                      borderLeft: "1px solid #f3f4f6",
-                                      borderBottom: "1px solid #f3f4f6",
-                                      // 2. Apply the Blue Background if it is the latest month
-                                      backgroundColor: isLatestMonth
-                                        ? "#eff6ff"
-                                        : "transparent",
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        display: "flex",
-                                        gap: "4px",
-                                        justifyContent: "center",
-                                        flexWrap: "wrap",
-                                        alignItems: "center",
-                                        minHeight: "20px",
-                                      }}
-                                    >
-                                      {hasData ? (
-                                        reportsForMonth.map(
-                                          (report, rIndex) => (
-                                            <div
-                                              key={rIndex}
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDotClick(
-                                                  vessel.vessel_name,
-                                                  report,
-                                                );
-                                              }}
-                                              style={{
-                                                width: "9px",
-                                                height: "9px",
-                                                borderRadius: "50%", // Reduced from 11px to 9px
-                                                backgroundColor:
-                                                  report?.color || "#e5e7eb",
-                                                cursor: "pointer",
-                                                transition: "transform 0.2s",
-                                                boxShadow:
-                                                  "0 1px 2px rgba(0,0,0,0.1)",
-                                              }}
-                                            />
-                                          ),
-                                        )
-                                      ) : (
-                                        <div
-                                          style={{
-                                            width: "6px",
-                                            height: "6px",
-                                            borderRadius: "50%",
-                                            backgroundColor: "#e5e7eb",
-                                          }}
-                                        />
-                                      )}
-                                    </div>
-                                  </td>
-                                );
-                              })}
-                              <td
-                                style={{
-                                  backgroundColor: "#fff",
-                                  borderBottom: "1px solid #f3f4f6",
-                                }}
-                              ></td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-
-                      {/* --- FOOTER (Fixed to BOTTOM) --- */}
-                      <tfoot style={{ position: "sticky", bottom: 0, zIndex: 50 }}>
-  <tr style={{ backgroundColor: "#fff" }}>
-                          <td
-                            colSpan="4"
-                            style={{
-                              position: "sticky",
-                              left: 0,
-                              bottom: 0,
-                              zIndex: 60,
-                              backgroundColor: "#fff",
-                              borderTop: "2px solid #e5e7eb",
-                              height: "40px",
-                            }}
-                          ></td>
-
-                          {/* Footer Spacer matched to 395px */}
-                          <td
-                            style={{
-                              position: "sticky",
-                              left: "395px",
-                              bottom: 0,
-                              zIndex: 60,
-                              backgroundColor: "#fff",
-                              borderTop: "2px solid #e5e7eb",
-                              boxShadow: "4px 0 4px -4px rgba(0,0,0,0.1)",
-                            }}
-                          ></td>
-
-                          {visibleMonths.map((m, i) => {
-                            const isLatestMonth = i === 0 && viewOffset === 0;
-                            return (
-                              <td
-                                key={i}
-                                style={{
-                                  width: "75px",
-                                  minWidth: "75px",
-                                  textAlign: "center",
-                                  fontSize: "0.7rem",
-                                  fontWeight: "700",
-                                  textTransform: "uppercase",
-                                  padding: "12px 0",
-                                  borderTop: "2px solid #e5e7eb",
-                                  borderLeft: "1px solid #f3f4f6",
-                                  color: isLatestMonth ? "#1e3a8a" : "#6b7280",
-                                  backgroundColor: isLatestMonth
-                                    ? "#eff6ff"
-                                    : "#fff",
-                                }}
-                              >
-                                {m.label}
-                              </td>
-                            );
-                          })}
-                          <td
-  style={{
-    borderTop: "2px solid #e5e7eb",
-    backgroundColor: "#fff",
-  }}
-></td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                    {filteredPropellerData.length === 0 && (
+                      <div className="propeller-no-data">
+                        <p>No propeller data available matching criteria</p>
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div
-                    style={{
-                      padding: "72px 24px",
-                      textAlign: "center",
-                      color: "#94a3af",
-                    }}
-                  >
-                    <p style={{ margin: 0, fontSize: "1.1rem" }}>
-                      👆 Select one or more vessels above to view Report Status
+                  <div className="propeller-empty-state">
+                    <p>
+                      👆 Select one or more vessels above to view their
+                      propeller margin performance
                     </p>
                   </div>
                 )}
               </div>
             )}
           </div>
-        ) : (
-          <AEPerformanceOverview 
-            embeddedMode={true} 
-            externalVesselId={consoleShipId} 
-          />
-        ))}
 
-        {/* DETAILED ANALYSIS */}
-        {/* DETAILED ANALYSIS */}
-        {selectedVesselDetails && unifiedEngineType === "mainEngine" && (
-          <div
-            ref={detailsSectionRef}
-            className="performance-data-card enhanced-card"
-            style={{
-              width: "100%",
-              marginTop: "16px",
-              borderTop: "4px solid #111827",
-            }}
-          >
-            <div
-              className="card-header-enhanced"
-              style={{ backgroundColor: "#f9fafb" }}
-            >
+          {/* ===== UNIFIED PERFORMANCE CARD ===== */}
+          <div style={{ width: "100%", minWidth: 0 }}>
+            <Performance
+              embeddedMode={true}
+              onEngineTypeChange={(type) => {
+                setUnifiedEngineType(type);
+                // CHANGE 1: This closes the history table when switching ME <-> AE
+                setSelectedVesselDetails(null);
+                setSelectedDaysVesselsFilter([]);
+              }}
+              onShipChange={(id) => {
+                setConsoleShipId(id);
+                // CHANGE 2: This closes the table if you change to a different vessel
+                setSelectedVesselDetails(null);
+                setSelectedDaysVesselsFilter([]);
+              }}
+            />
+          </div>
+
+          {/* Alert Summary Card */}
+          {/* Alert Summary Card */}
+          {/* Alert Summary Card */}
+          {consoleShipId &&
+            (unifiedEngineType === "mainEngine" ? (
               <div
-                className="card-icon-badge"
-                style={{ backgroundColor: "#111827", color: "white" }}
+                ref={daysElapsedCardRef}
+                className="performance-data-card enhanced-card days-card"
               >
-                <LayoutDashboard size={24} />
-              </div>
-              <div className="card-title-group">
-                <h2 className="card-title-performance">
-                  {selectedVesselDetails.name} — Detailed History
-                </h2>
-                <p className="card-description">
-                  {isDetailLoading
-                    ? "Fetching detailed ISO corrected data..."
-                    : "Complete historical performance data."}
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedVesselDetails(null)}
-                style={{
-                  marginLeft: "auto",
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                }}
-              >
-                <X size={24} color="#6b7280" />
-              </button>
-            </div>
-
-            <div
-              className="card-body-enhanced"
-              style={{ padding: "0", overflowX: "hidden" }}
-            >
-              {isDetailLoading ? (
                 <div
-                  style={{
-                    padding: "40px",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    flexDirection: "column",
-                    gap: "10px",
-                  }}
+                  className={`card-header-enhanced ${!isReportStatusOpen ? "header-closed" : ""}`}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setIsReportStatusOpen(!isReportStatusOpen)}
                 >
-                  <Loader2 className="animate-spin" size={32} color="#111827" />
-                  <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>
-                    Loading report details...
-                  </p>
-                </div>
-              ) : (
-                /* FIX 1: tableLayout: 'fixed' ensures strict column widths */
-                <table
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    textAlign: "center",
-                    tableLayout: "fixed",
-                  }}
-                >
-                  <thead
-                    style={{
-                      backgroundColor: "#f3f4f6",
-                      position: "sticky",
-                      top: 0,
-                      zIndex: 40,
+                  <div className="card-icon-badge pulsing-icon">
+                    <Clock size={24} />
+                  </div>
+
+                  <div className="card-title-group">
+                    <h2 className="card-title-performance">
+                      Report Status - Days Elapsed
+                    </h2>
+                    <p className="card-description">
+                      Time since last report & 12-Month Alert History
+                    </p>
+                  </div>
+
+                  {/* Dropdown Filter - Report Status */}
+                  <div
+                    className="vessel-filter-wrapper"
+                    ref={daysDropdownRef}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ position: "relative" }}>
+                      <button
+                        className={`vessel-dropdown-btn ${isDaysDropdownOpen ? "active" : ""}`}
+                        disabled={!consoleShipId}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsReportStatusOpen(true);
+                          setIsDaysDropdownOpen(!isDaysDropdownOpen);
+                        }}
+                      >
+                        <div className="vessel-dropdown-icon">
+                          <span>
+                            {selectedDaysVesselsFilter.length === 0
+                              ? "Select the vessel"
+                              : selectedDaysVesselsFilter.length ===
+                                  daysElapsedData.length
+                                ? "✓ All"
+                                : selectedDaysVesselsFilter.length === 1
+                                  ? `✓ ${selectedDaysVesselsFilter[0]?.vessel_name || "1 Vessel Selected"}`
+                                  : `✓ ${selectedDaysVesselsFilter.length} Vessels Selected`}
+                          </span>
+                        </div>
+                        <ChevronDown size={18} color="#64748b" />
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {isDaysDropdownOpen && (
+                        <div
+                          className="vessel-dropdown-menu"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="vessel-dropdown-sticky">
+                            <div
+                              className="vessel-select-all-item"
+                              onClick={handleSelectAllDaysVessels}
+                            >
+                              {/* Added pointerEvents: none */}
+                              <label
+                                className="vessel-select-all-label"
+                                style={{ pointerEvents: "none" }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="vessel-checkbox"
+                                  checked={
+                                    selectedDaysVesselsFilter.length ===
+                                      daysElapsedData.length &&
+                                    daysElapsedData.length > 0
+                                  }
+                                  readOnly
+                                />
+                                Select All
+                              </label>
+                            </div>
+                          </div>
+
+                          <div className="vessel-dropdown-scroll">
+                            {daysElapsedData.map((vessel) => (
+                              <div
+                                key={vessel.imo_number}
+                                className={`vessel-item ${selectedDaysVesselsFilter.some((v) => v.imo_number === vessel.imo_number) ? "selected" : ""}`}
+                                onClick={() => handleDaysVesselToggle(vessel)}
+                              >
+                                {/* Added pointerEvents: none so the parent DIV handles the click */}
+                                <label
+                                  style={{
+                                    pointerEvents: "none",
+                                    width: "100%",
+                                    height: "100%",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "10px",
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="vessel-checkbox"
+                                    checked={selectedDaysVesselsFilter.some(
+                                      (v) => v.imo_number === vessel.imo_number,
+                                    )}
+                                    readOnly
+                                  />
+                                  <span>{vessel.vessel_name}</span>
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* --- FIXED BIG CHEVRON BUTTON --- */}
+                  <div
+                    className="days-chevron-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsReportStatusOpen(!isReportStatusOpen);
                     }}
                   >
-                    <tr
-                      style={{
-                        fontSize: "0.7rem",
-                        color: "#4b5563",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.02em",
-                      }}
-                    >
-                      {/* Metadata Columns */}
-                      <th
-                        title="Report Date"
-                        style={{
-                          width: "9%",
-                          padding: "10px 4px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          textAlign: "left",
-                          paddingLeft: "16px",
-                          cursor: "help",
-                        }}
-                      >
-                        Date
-                      </th>
-                      <th
-                        title="Engine Power (kW)"
-                        style={{
-                          width: "6%",
-                          padding: "10px 4px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          cursor: "help",
-                        }}
-                      >
-                        Power
-                      </th>
-                      <th
-                        title="MCR Power Limit (kW)"
-                        style={{
-                          width: "6%",
-                          padding: "10px 4px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                        }}
-                      >
-                        MCR Lim
-                      </th>
-                      <th
-                        title="Engine Load Percentage"
-                        style={{
-                          width: "5%",
-                          padding: "10px 4px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          cursor: "help",
-                        }}
-                      >
-                        Load%
-                      </th>
-                      <th
-                        title="Report Status (Critical/Warning/Normal)"
-                        style={{
-                          width: "4%",
-                          padding: "10px 4px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          cursor: "help",
-                        }}
-                      >
-                        Sts
-                      </th>
-                      <th
-                        title="Raw Report"
-                        style={{
-                          width: "5%",
-                          padding: "10px 4px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          cursor: "help",
-                        }}
-                      >
-                        Raw
-                      </th>
-                      <th
-                        title="Analytical Report"
-                        style={{
-                          width: "5%",
-                          padding: "10px 4px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          borderRight: "1px solid #e5e7eb",
-                          cursor: "help",
-                        }}
-                      >
-                        Ana
-                      </th>
+                    {isReportStatusOpen ? (
+                      <ChevronUp size={20} color="#475569" strokeWidth={2.5} /> /* Increased Size & Stroke */
+                    ) : (
+                      <ChevronDown size={20} color="#475569" strokeWidth={2.5} />
+                    )}
+                  </div>
+                </div>
+                {/* ... Body content remains the same ... */}
 
-                      {/* Parameter Columns */}
-                      {/* <th title="Engine Speed (RPM)" style={{ width: '5.25%', padding: '10px 2px', borderBottom: '1px solid #e5e7eb', fontWeight: '700', cursor: 'help' }}>RPM</th> */}
-                      <th
-                        title="Power Margin"
-                        style={{
-                          width: "5.25%",
-                          padding: "10px 2px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          cursor: "help",
-                        }}
-                      >
-                        power
-                      </th>
-                      <th
-                        title="Turbocharger Speed"
-                        style={{
-                          width: "5.25%",
-                          padding: "10px 2px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          cursor: "help",
-                        }}
-                      >
-                        T/C
-                      </th>
-                      <th
-                        title="Fuel Index Pump Indicator"
-                        style={{
-                          width: "5.25%",
-                          padding: "10px 2px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          cursor: "help",
-                        }}
-                      >
-                        FIPI
-                      </th>
-                      <th
-                        title="Maximum Pressure (Pmax)"
-                        style={{
-                          width: "5.25%",
-                          padding: "10px 2px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          cursor: "help",
-                        }}
-                      >
-                        Pmax
-                      </th>
-                      <th
-                        title="Pmax Deviation"
-                        style={{
-                          width: "5.25%",
-                          padding: "10px 2px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          cursor: "help",
-                        }}
-                      >
-                        ΔPmx
-                      </th>
-                      <th
-                        title="Compression Pressure (Pcomp)"
-                        style={{
-                          width: "5.25%",
-                          padding: "10px 2px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          cursor: "help",
-                        }}
-                      >
-                        Pcomp
-                      </th>
-                      <th
-                        title="Pcomp Deviation"
-                        style={{
-                          width: "5.25%",
-                          padding: "10px 2px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          cursor: "help",
-                        }}
-                      >
-                        ΔPcp
-                      </th>
-                      <th
-                        title="Scavenge Air Pressure"
-                        style={{
-                          width: "5.25%",
-                          padding: "10px 2px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          cursor: "help",
-                        }}
-                      >
-                        Scav
-                      </th>
-                      <th
-                        title="Exhaust Gas Temp - T/C Inlet"
-                        style={{
-                          width: "5.25%",
-                          padding: "10px 2px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          cursor: "help",
-                        }}
-                      >
-                        TC In
-                      </th>
-                      <th
-                        title="Exhaust Gas Temp - T/C Outlet"
-                        style={{
-                          width: "5.25%",
-                          padding: "10px 2px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          cursor: "help",
-                        }}
-                      >
-                        TC Out
-                      </th>
-                      <th
-                        title="Exhaust Gas Temp - Cylinder Outlet"
-                        style={{
-                          width: "5.25%",
-                          padding: "10px 2px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          cursor: "help",
-                        }}
-                      >
-                        Cyl Out
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedVesselDetails.reports.map((r, i) => {
-                      const details = r.formatted_actuals || {};
-                      const power =
-                        details.power || r.shaft_power_kw || r.power_kw;
-                      const load = details.load_percentage || r.load_percentage;
-                      const powerValue = power ? Number(power) : null;
-                      const mcrLimit = r.mcr_limit_kw
-                        ? Number(r.mcr_limit_kw)
-                        : null;
+                {isReportStatusOpen && (
+                  <div className="card-body-enhanced days-card-body">
+                    {consoleShipId && selectedDaysVesselsFilter.length > 0 ? (
+                      /* 1. WRAPPER: Height set to approx 380px to show ~6 vessels cleanly */
+                      <div className="performance-table-wrapper days-table-wrapper">
+                        <table className="performance-table-modern days-table">
+                          <thead className="days-thead">
+                            <tr>
+                              {/* STICKY 1: Vessel Name (Width 160) */}
+                              <th className="days-th-vessel">Vessel Name</th>
 
-                      const rowBg = i % 2 === 0 ? "#fff" : "#fafafa";
-                      let isRedAlert = false;
-                      if (powerValue !== null && mcrLimit !== null) {
-                        const diff = mcrLimit - powerValue;
-                        const tenPercentThreshold = mcrLimit * 0.1;
+                              {/* STICKY 2: Last Report (Width 100) */}
+                              <th className="days-th-lastReport">
+                                Last Report
+                              </th>
 
-                        // Only triggers if Power is LOWER than the limit by more than 10%
-                        if (diff > tenPercentThreshold) {
-                          isRedAlert = true;
+                              {/* STICKY 3: Days (Width 65) */}
+                              {/* STICKY 3: Days (Width 65) with Sort Arrows */}
+                              <th
+                                className={`days-th-days ${daysSortConfig.key === "days_elapsed" ? "days-th-days--sorted" : ""}`}
+                                onClick={handleDaysSort}
+                              >
+                                <div className="days-sort-header-inner">
+                                  Days
+                                  <div className="days-sort-arrows">
+                                    <ChevronUp
+                                      size={10}
+                                      className={
+                                        daysSortConfig.key === "days_elapsed" &&
+                                        daysSortConfig.direction === "asc"
+                                          ? "days-sort-arrow--active"
+                                          : "days-sort-arrow--inactive"
+                                      }
+                                    />
+                                    <ChevronDown
+                                      size={10}
+                                      className={
+                                        daysSortConfig.key === "days_elapsed" &&
+                                        daysSortConfig.direction === "desc"
+                                          ? "days-sort-arrow--active"
+                                          : "days-sort-arrow--inactive"
+                                      }
+                                    />
+                                  </div>
+                                </div>
+                              </th>
+
+                              {/* STICKY 4: Load % (Width 70) */}
+                              <th className="days-th-load">Load %</th>
+
+                              {/* STICKY 5: Nav Button Left (Width 45) */}
+                              <th className="days-th-nav-left">
+                                <button
+                                  className={`days-nav-btn ${viewOffset === 0 ? "days-nav-btn--disabled" : ""}`}
+                                  onClick={() =>
+                                    setViewOffset((curr) =>
+                                      Math.max(0, curr - 1),
+                                    )
+                                  }
+                                  disabled={viewOffset === 0}
+                                >
+                                  <ChevronLeft size={16} strokeWidth={2} color="#374151" />
+                                </button>
+                              </th>
+
+                              {/* SCROLLABLE MONTHS (Width 75 for professional expansion) */}
+                              {visibleMonths.map((m, i) => {
+                                const isLatestMonth =
+                                  i === 0 && viewOffset === 0;
+                                return (
+                                  <th
+                                    key={i}
+                                    className={`days-th-month ${isLatestMonth ? "days-th-month--current" : ""}`}
+                                  >
+                                    {m.label}
+                                  </th>
+                                );
+                              })}
+
+                              {/* NAV BUTTON RIGHT */}
+                              <th className="days-th-nav-right">
+                                <button
+                                  className={`days-nav-btn ${viewOffset >= maxOffset ? "days-nav-btn--disabled" : ""}`}
+                                  onClick={() =>
+                                    setViewOffset((curr) =>
+                                      Math.min(maxOffset, curr + 1),
+                                    )
+                                  }
+                                  disabled={viewOffset >= maxOffset}
+                                >
+                                  <ChevronRight size={16} strokeWidth={2} color="#374151" />
+                                </button>
+                              </th>
+                            </tr>
+                          </thead>
+
+                          <tbody>
+                            {filteredDaysElapsedData.map((vessel) => {
+                              const colors = getDaysColor(vessel.days_elapsed);
+                              return (
+                                <tr
+                                  key={vessel.imo_number}
+                                  className="table-row-enhanced days-tr"
+                                >
+                                  {/* 1. VESSEL NAME: No width change needed here, just the sticky logic */}
+                                  {/* 1. VESSEL NAME (left: 0) */}
+                                  <td
+                                    className="days-td-vessel"
+                                    onClick={() =>
+                                      handleVesselNameClick(vessel)
+                                    }
+                                  >
+                                    <div className="days-vessel-name-inner">
+                                      <div
+                                        className="status-dot blinking-dot"
+                                        style={{ background: colors.dot }}
+                                      />
+                                      <span className="days-vessel-name-text">
+                                        {vessel.vessel_name}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* 2. LAST REPORT (left: 160) */}
+                                  <td className="days-td-lastReport">
+                                    {formatDate(vessel.report_date)}
+                                  </td>
+
+                                  {/* 3. DAYS (left: 260) */}
+                                  <td className="days-td-days">
+                                    <span
+                                      className={`days-badge ${vessel.days_elapsed > 60 ? "days-critical" : vessel.days_elapsed > 45 ? "days-warning" : "days-success"}`}
+                                    >
+                                      {vessel.days_elapsed}
+                                    </span>
+                                  </td>
+
+                                  {/* 4. LOAD % (left: 325) */}
+                                  <td className="days-td-load">
+                                    {(() => {
+                                      const loadVal =
+                                        vessel.load_percentage ||
+                                        alertHistory[vessel.imo_number]
+                                          ?.flatReports[0]?.load_percentage;
+                                      const loadNum = parseFloat(loadVal);
+                                      let bgColor = "#f3f4f6";
+                                      let textColor = "#6b7280";
+                                      if (!isNaN(loadNum)) {
+                                        if (loadNum < 60) {
+                                          bgColor = "#fee2e2";
+                                          textColor = "#dc2626";
+                                        } else if (loadNum <= 75) {
+                                          bgColor = "#fef3c7";
+                                          textColor = "#ca8a04";
+                                        } else {
+                                          bgColor = "#d1fae5";
+                                          textColor = "#16a34a";
+                                        }
+                                      }
+                                      return (
+                                        <span
+                                          className="days-load-badge"
+                                          style={{
+                                            backgroundColor: bgColor,
+                                            color: textColor,
+                                          }}
+                                        >
+                                          {loadNum
+                                            ? `${loadNum.toFixed(1)}%`
+                                            : "N/A"}
+                                        </span>
+                                      );
+                                    })()}
+                                  </td>
+
+                                  {/* 5. SPACER UNDER NAV BUTTON (left: 395) */}
+                                  <td className="days-td-spacer"></td>
+                                  {visibleMonths.map((bucket, i) => {
+                                    // 1. Define if this is the latest month (matches Header logic)
+                                    const isLatestMonth =
+                                      i === 0 && viewOffset === 0;
+
+                                    const vesselReports =
+                                      alertHistory[vessel.imo_number]
+                                        ?.flatReports || [];
+                                    const reportsForMonth =
+                                      vesselReports.filter(
+                                        (r) => r.monthKey === bucket.key,
+                                      );
+                                    const hasData = reportsForMonth.length > 0;
+
+                                    return (
+                                      <td
+                                        key={bucket.key}
+                                        className={`days-td-month ${isLatestMonth ? "days-td-month--current" : ""}`}
+                                      >
+                                        <div className="days-dots-wrapper">
+                                          {hasData ? (
+                                            reportsForMonth.map(
+                                              (report, rIndex) => (
+                                                <div
+                                                  key={rIndex}
+                                                  className="days-dot"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDotClick(
+                                                      vessel.vessel_name,
+                                                      report,
+                                                    );
+                                                  }}
+                                                  style={{
+                                                    backgroundColor:
+                                                      report?.color ||
+                                                      "#e5e7eb",
+                                                  }}
+                                                />
+                                              ),
+                                            )
+                                          ) : (
+                                            <div className="days-dot--empty" />
+                                          )}
+                                        </div>
+                                      </td>
+                                    );
+                                  })}
+                                  <td className="days-td-tail"></td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+
+                          {/* --- FOOTER (Fixed to BOTTOM) --- */}
+                          <tfoot className="days-tfoot">
+                            <tr>
+                              <td
+                                colSpan="4"
+                                className="days-tfoot-th-sticky"
+                              ></td>
+
+                              {/* Footer Spacer matched to 395px */}
+                              <td className="days-tfoot-th-spacer"></td>
+
+                              {visibleMonths.map((m, i) => {
+                                const isLatestMonth =
+                                  i === 0 && viewOffset === 0;
+                                return (
+                                  <td
+                                    key={i}
+                                    className={`days-tfoot-th-month ${isLatestMonth ? "days-tfoot-th-month--current" : ""}`}
+                                  >
+                                    {m.label}
+                                  </td>
+                                );
+                              })}
+                              <td className="days-tfoot-th-tail"></td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="days-empty-state">
+                        <p>
+                          👆 Select one or more vessels above to view Report
+                          Status
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <AEPerformanceOverview
+                embeddedMode={true}
+                externalVesselId={consoleShipId}
+              />
+            ))}
+
+          {/* DETAILED ANALYSIS */}
+          {/* DETAILED ANALYSIS */}
+          {selectedVesselDetails && unifiedEngineType === "mainEngine" && (
+            <div ref={detailsSectionRef} className="performance-data-card enhanced-card detail-card">
+              <div className="card-header-enhanced">
+                <div className="card-icon-badge">
+                  <LayoutDashboard size={24} />
+                </div>
+                <div className="card-title-group">
+                  <h2 className="card-title-performance">
+                    {selectedVesselDetails.name} — Detailed History
+                  </h2>
+                  <p className="card-description">
+                    {isDetailLoading
+                      ? "Fetching detailed ISO corrected data..."
+                      : "Complete historical performance data."}
+                  </p>
+                </div>
+                <button onClick={() => setSelectedVesselDetails(null)} className="detail-close-btn">
+                  <X size={24} color="#6b7280" />
+                </button>
+              </div>
+
+              <div className="card-body-enhanced">
+                {isDetailLoading ? (
+                  <div className="detail-loading-wrapper">
+                    <Loader2
+                      className="animate-spin"
+                      size={32}
+                      color="#111827"
+                    />
+                    <p className="detail-loading-text">Loading report details...</p>
+                  </div>
+                ) : (
+                  /* FIX 1: tableLayout: 'fixed' ensures strict column widths */
+                  <div className="detail-table-wrapper">
+                  <table className="detail-table">
+                    <thead>
+                      <tr>
+                        {/* Metadata Columns */}
+                        <th title="Report Date" className="detail-th-date">Date</th>
+                        <th title="Engine Power (kW)" className="detail-th-power">Power</th>
+                        <th title="MCR Power Limit (kW)" className="detail-th-mcr">MCR Lim</th>
+                        <th title="Engine Load Percentage" className="detail-th-load">Load%</th>
+                        <th title="Report Status (Critical/Warning/Normal)" className="detail-th-status">Sts</th>
+                        <th title="Raw Report" className="detail-th-raw">Raw</th>
+                        <th title="Analytical Report" className="detail-th-ana">Ana</th>
+
+                        {/* Parameter Columns */}
+                        {/* <th title="Engine Speed (RPM)" style={{ width: '5.25%', padding: '10px 2px', borderBottom: '1px solid #e5e7eb', fontWeight: '700', cursor: 'help' }}>RPM</th> */}
+                        <th title="Power Margin"                      className="detail-th-param">Power</th>
+                        <th title="Turbocharger Speed"                className="detail-th-param">T/C</th>
+                        <th title="Fuel Index Pump Indicator"         className="detail-th-param">FIPI</th>
+                        <th title="Maximum Pressure (Pmax)"           className="detail-th-param">Pmax</th>
+                        <th title="Pmax Deviation"                    className="detail-th-param">ΔPmx</th>
+                        <th title="Compression Pressure (Pcomp)"      className="detail-th-param">Pcomp</th>
+                        <th title="Pcomp Deviation"                   className="detail-th-param">ΔPcp</th>
+                        <th title="Scavenge Air Pressure"             className="detail-th-param">Scav</th>
+                        <th title="Exhaust Gas Temp - T/C Inlet"      className="detail-th-param">TC In</th>
+                        <th title="Exhaust Gas Temp - T/C Outlet"     className="detail-th-param">TC Out</th>
+                        <th title="Exhaust Gas Temp - Cylinder Outlet" className="detail-th-param">Cyl Out</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedVesselDetails.reports.map((r, i) => {
+                        const details = r.formatted_actuals || {};
+                        const power =
+                          details.power || r.shaft_power_kw || r.power_kw;
+                        const load =
+                          details.load_percentage || r.load_percentage;
+                        const powerValue = power ? Number(power) : null;
+                        const mcrLimit = r.mcr_limit_kw
+                          ? Number(r.mcr_limit_kw)
+                          : null;
+
+                        const rowBg = i % 2 === 0 ? "#fff" : "#fafafa";
+                        let isRedAlert = false;
+                        if (powerValue !== null && mcrLimit !== null) {
+                          const diff = mcrLimit - powerValue;
+                          const tenPercentThreshold = mcrLimit * 0.1;
+
+                          // Only triggers if Power is LOWER than the limit by more than 10%
+                          if (diff > tenPercentThreshold) {
+                            isRedAlert = true;
+                          }
                         }
-                      }
 
-                      const renderParamCell = (paramKey) => {
-                        const actualVal = details[paramKey];
-                        if (actualVal === null || actualVal === undefined) {
-                          return <span style={{ color: "#d1d5db" }}>-</span>;
-                        }
+                        const renderParamCell = (paramKey) => {
+                          const actualVal = details[paramKey];
+                          if (actualVal === null || actualVal === undefined) {
+                            return <span className="detail-null">-</span>;
+                          }
 
-                        const actualNum = Number(actualVal);
-                        const currentLoad = load ? Number(load) : 0;
-                        let status = "Normal";
-                        let tooltipText = "";
+                          const actualNum = Number(actualVal);
+                          const currentLoad = load ? Number(load) : 0;
+                          let status = "Normal";
+                          let tooltipText = "";
 
-                        // --- 1. SET REFERENCE KEY FOR STATUS LOGIC ---
-                        // If the key is a Delta column, we point the logic to the Parent parameter
-                        let referenceKey = paramKey;
-                        if (paramKey === "pmax_dev") referenceKey = "pmax";
-                        if (paramKey === "pcomp_dev") referenceKey = "pcomp";
+                          // --- 1. SET REFERENCE KEY FOR STATUS LOGIC ---
+                          // If the key is a Delta column, we point the logic to the Parent parameter
+                          let referenceKey = paramKey;
+                          if (paramKey === "pmax_dev") referenceKey = "pmax";
+                          if (paramKey === "pcomp_dev") referenceKey = "pcomp";
 
-                        // --- 2. CALCULATE STATUS & TOOLTIP ---
+                          // --- 2. CALCULATE STATUS & TOOLTIP ---
 
-                        // Special Logic for Power Margin (Propeller)
-                        if (paramKey === "propeller") {
-                          const baseline = 100.0;
-                          const diff = actualNum;
-                          const devPct = actualNum;
-                          status = getParamStatus(
-                            paramKey,
-                            devPct,
-                            diff,
-                            actualNum,
-                          );
-
-                          tooltipText = `Actual: ${(100 + actualNum).toFixed(2)} (Dev: ${actualNum >= 0 ? "+" : ""}${actualNum.toFixed(1)}%) - ${status}`;
-                        }
-                        // Logic for Standard Metrics AND Deviation Columns
-                        else {
-                          // We always fetch the baseline for the referenceKey (e.g., Shop Trial Pmax)
-                          const baseline = getInterpolatedBaseline(
-                            selectedVesselDetails.baselineData,
-                            referenceKey,
-                            currentLoad,
-                          );
-
-                          if (baseline !== null && baseline !== 0) {
-                            // For Delta columns, the 'diff' is the actualNum (e.g., +9.0 Bar).
-                            // For Main columns, we calculate diff as Actual - Baseline.
-                            const diff =
-                              paramKey === "pmax_dev" ||
-                              paramKey === "pcomp_dev"
-                                ? actualNum
-                                : actualNum - baseline;
-
-                            const devPct = (diff / baseline) * 100;
-
-                            // We pass referenceKey to getParamStatus so Pmax and ΔPMX run the exact same logic
+                          // Special Logic for Power Margin (Propeller)
+                          if (paramKey === "propeller") {
+                            const baseline = 100.0;
+                            const diff = actualNum;
+                            const devPct = actualNum;
                             status = getParamStatus(
-                              referenceKey,
+                              paramKey,
                               devPct,
                               diff,
                               actualNum,
                             );
 
-                            if (
-                              paramKey === "pmax_dev" ||
-                              paramKey === "pcomp_dev"
-                            ) {
-                              tooltipText = `${actualNum >= 0 ? "+" : ""}${actualNum.toFixed(2)} Bar (${status})`;
-                            } else {
-                              tooltipText = `${actualNum.toFixed(2)} (Dev: ${devPct >= 0 ? "+" : ""}${devPct.toFixed(1)}%) - ${status}`;
-                            }
-                          } else {
-                            tooltipText = `${actualNum.toFixed(2)} - No Baseline`;
+                            tooltipText = `Actual: ${(100 + actualNum).toFixed(2)} (Dev: ${actualNum >= 0 ? "+" : ""}${actualNum.toFixed(1)}%) - ${status}`;
                           }
-                        }
+                          // Logic for Standard Metrics AND Deviation Columns
+                          else {
+                            // We always fetch the baseline for the referenceKey (e.g., Shop Trial Pmax)
+                            const baseline = getInterpolatedBaseline(
+                              selectedVesselDetails.baselineData,
+                              referenceKey,
+                              currentLoad,
+                            );
 
-                        // --- 3. RENDER DOT ---
-                        let dotColor = "#10b981"; // Green
-                        if (status === "Critical")
-                          dotColor = "#ef4444"; // Red
-                        else if (status === "Warning") dotColor = "#f59e0b"; // Amber
+                            if (baseline !== null && baseline !== 0) {
+                              // For Delta columns, the 'diff' is the actualNum (e.g., +9.0 Bar).
+                              // For Main columns, we calculate diff as Actual - Baseline.
+                              const diff =
+                                paramKey === "pmax_dev" ||
+                                paramKey === "pcomp_dev"
+                                  ? actualNum
+                                  : actualNum - baseline;
+
+                              const devPct = (diff / baseline) * 100;
+
+                              // We pass referenceKey to getParamStatus so Pmax and ΔPMX run the exact same logic
+                              status = getParamStatus(
+                                referenceKey,
+                                devPct,
+                                diff,
+                                actualNum,
+                              );
+
+                              if (
+                                paramKey === "pmax_dev" ||
+                                paramKey === "pcomp_dev"
+                              ) {
+                                tooltipText = `${actualNum >= 0 ? "+" : ""}${actualNum.toFixed(2)} Bar (${status})`;
+                              } else {
+                                tooltipText = `${actualNum.toFixed(2)} (Dev: ${devPct >= 0 ? "+" : ""}${devPct.toFixed(1)}%) - ${status}`;
+                              }
+                            } else {
+                              tooltipText = `${actualNum.toFixed(2)} - No Baseline`;
+                            }
+                          }
+
+                          // --- 3. RENDER DOT ---
+                          let dotColor = "#10b981"; // Green
+                          if (status === "Critical")
+                            dotColor = "#ef4444"; // Red
+                          else if (status === "Warning") dotColor = "#f59e0b"; // Amber
+
+                          return (
+  <div className="detail-param-dot-wrapper">
+    <div title={tooltipText} className="detail-param-dot" style={{ backgroundColor: dotColor }} />
+  </div>
+);
+                        };
+
+
+                        let overallColor = "green";
+                        if (r.status === "Critical") overallColor = "red";
+                        else if (r.status === "Warning")
+                          overallColor = "yellow";
+
+                        const getStatusIcon = (c) => {
+                          if (c === "red")
+                            return <AlertCircle size={16} color="#dc2626" />;
+                          if (c === "yellow")
+                            return <AlertCircle size={16} color="#d97706" />;
+                          return <CheckCircle size={16} color="#16a34a" />;
+                        };
 
                         return (
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "center",
-                              alignItems: "center",
-                              height: "100%",
-                            }}
-                          >
-                            <div
-                              title={tooltipText}
-                              style={{
-                                width: "10px",
-                                height: "10px",
-                                borderRadius: "50%",
-                                backgroundColor: dotColor,
-                                cursor: "help",
-                              }}
-                            />
-                          </div>
+                          <tr key={i} style={{ backgroundColor: rowBg }}>
+                            <td className="detail-td--date">{formatDate(r.report_date)}</td>
+                            <td className={`detail-td--num detail-td--power${isRedAlert ? " detail-td--alert" : ""}`}>
+  {powerValue !== null ? powerValue.toLocaleString() : "-"}
+</td>
+
+                            <td className="detail-td--num detail-td--mcr" title={r.mcr_limit_percentage != null ? `MCR Limit Percentage: ${r.mcr_limit_percentage}%` : "No percentage data"}>
+  {r.mcr_limit_kw != null ? Number(r.mcr_limit_kw).toLocaleString() : "-"}
+</td>
+                            <td className="detail-td--num detail-td--load">{load ? Number(load).toFixed(1) + "%" : "-"}</td>
+
+                            <td className="detail-td detail-td--status">
+  <div className="detail-status-icon" title={r.status}>
+    {getStatusIcon(overallColor)}
+  </div>
+</td>
+
+                            <td className="detail-td detail-td--raw">
+  {r.raw_report_view_url ? (
+    <div className="detail-report-btns">
+      <button onClick={() => window.open(r.raw_report_view_url, "_blank")} title="View Raw" className="detail-report-btn">
+        <FileText size={14} />
+      </button>
+    </div>
+  ) : (
+    <span className="detail-null">-</span>
+  )}
+</td>
+
+                            <td className="detail-td detail-td--ana">
+  {r.generated_report_view_url ? (
+    <div className="detail-report-btns">
+      <button onClick={() => window.open(r.generated_report_view_url, "_blank")} title="View Analytical" className="detail-report-btn">
+        <FileText size={14} />
+      </button>
+    </div>
+  ) : (
+    <span className="detail-null">-</span>
+  )}
+</td>
+
+                            {/* <td style={cellStyle}>{renderParamCell('engspeed')}</td> */}
+                            <td className="detail-td--param">{renderParamCell("propeller")}</td>
+                            <td className="detail-td--param">{renderParamCell("turbospeed")}</td>
+                            <td className="detail-td--param">{renderParamCell("fipi")}</td>
+                            <td className="detail-td--param">{renderParamCell("pmax")}</td>
+                            <td className="detail-td--param">{renderParamCell("pmax_dev")}</td>
+                            <td className="detail-td--param">{renderParamCell("pcomp")}</td>
+                            <td className="detail-td--param">{renderParamCell("pcomp_dev")}</td>
+                            <td className="detail-td--param">{renderParamCell("scavair")}</td>
+                            <td className="detail-td--param">{renderParamCell("exh_t/c_inlet")}</td>
+                            <td className="detail-td--param">{renderParamCell("exh_t/c_outlet")}</td>
+                            <td className="detail-td--param">{renderParamCell("exh_cylinder_outlet")}</td>
+                          </tr>
                         );
-                      };
-
-                      const cellStyle = {
-                        padding: "8px 2px",
-                        borderBottom: "1px solid #f3f4f6",
-                        fontSize: "0.8rem",
-                        color: "#374151",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      };
-                      const numStyle = {
-                        ...cellStyle,
-                        fontFamily: "monospace",
-                        fontWeight: "600",
-                      };
-
-                      let overallColor = "green";
-                      if (r.status === "Critical") overallColor = "red";
-                      else if (r.status === "Warning") overallColor = "yellow";
-
-                      const getStatusIcon = (c) => {
-                        if (c === "red")
-                          return <AlertCircle size={16} color="#dc2626" />;
-                        if (c === "yellow")
-                          return <AlertCircle size={16} color="#d97706" />;
-                        return <CheckCircle size={16} color="#16a34a" />;
-                      };
-
-                      return (
-                        <tr key={i} style={{ backgroundColor: rowBg }}>
-                          <td
-                            style={{
-                              ...cellStyle,
-                              fontWeight: "600",
-                              textAlign: "left",
-                              paddingLeft: "16px",
-                            }}
-                          >
-                            {formatDate(r.report_date)}
-                          </td>
-                          <td
-                            style={{
-                              ...numStyle,
-                              backgroundColor: isRedAlert
-                                ? "#fee2e2"
-                                : "transparent",
-                              color: isRedAlert ? "#dc2626" : "#374151",
-                              fontWeight: isRedAlert ? "800" : "600",
-                            }}
-                          >
-                            {powerValue !== null
-                              ? powerValue.toLocaleString()
-                              : "-"}
-                          </td>
-
-                          <td
-                            style={{ ...numStyle, cursor: "help" }}
-                            title={
-                              r.mcr_limit_percentage != null
-                                ? `MCR Limit Percentage: ${r.mcr_limit_percentage}%`
-                                : "No percentage data"
-                            }
-                          >
-                            {r.mcr_limit_kw != null
-                              ? Number(r.mcr_limit_kw).toLocaleString()
-                              : "-"}
-                          </td>
-                          <td style={numStyle}>
-                            {load ? Number(load).toFixed(1) + "%" : "-"}
-                          </td>
-
-                          <td style={{ ...cellStyle }}>
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent: "center",
-                              }}
-                              title={r.status}
-                            >
-                              {getStatusIcon(overallColor)}
-                            </div>
-                          </td>
-
-                          <td style={{ ...cellStyle }}>
-                            {r.raw_report_view_url ? (
-                              <div
-                                style={{
-                                  display: "flex",
-                                  gap: "4px",
-                                  justifyContent: "center",
-                                }}
-                              >
-                                <button
-                                  onClick={() =>
-                                    window.open(r.raw_report_view_url, "_blank")
-                                  }
-                                  title="View Raw"
-                                  style={{
-                                    border: "none",
-                                    background: "transparent",
-                                    cursor: "pointer",
-                                    color: "#4b5563",
-                                    padding: 0,
-                                  }}
-                                >
-                                  <FileText size={14} />
-                                </button>
-                                {/* <button onClick={() => handleDownloadClick(r.raw_report_download_url)} title="Download Raw" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#2563eb', padding: 0 }}>
-                                                                    <ArrowDownCircle size={14} />
-                                                                </button> */}
-                              </div>
-                            ) : (
-                              <span style={{ color: "#d1d5db" }}>-</span>
-                            )}
-                          </td>
-
-                          <td
-                            style={{
-                              ...cellStyle,
-                              borderRight: "1px solid #e5e7eb",
-                            }}
-                          >
-                            {r.generated_report_view_url ? (
-                              <div
-                                style={{
-                                  display: "flex",
-                                  gap: "4px",
-                                  justifyContent: "center",
-                                }}
-                              >
-                                <button
-                                  onClick={() =>
-                                    window.open(
-                                      r.generated_report_view_url,
-                                      "_blank",
-                                    )
-                                  }
-                                  title="View Analytical"
-                                  style={{
-                                    border: "none",
-                                    background: "transparent",
-                                    cursor: "pointer",
-                                    color: "#4b5563",
-                                    padding: 0,
-                                  }}
-                                >
-                                  <FileText size={14} />
-                                </button>
-                                {/* <button onClick={() => handleDownloadClick(r.generated_report_download_url)} title="Download Analytical" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#2563eb', padding: 0 }}>
-                                                                    <ArrowDownCircle size={14} />
-                                                                </button> */}
-                              </div>
-                            ) : (
-                              <span style={{ color: "#d1d5db" }}>-</span>
-                            )}
-                          </td>
-
-                          {/* <td style={cellStyle}>{renderParamCell('engspeed')}</td> */}
-                          <td style={cellStyle}>
-                            {renderParamCell("propeller")}
-                          </td>
-                          <td style={cellStyle}>
-                            {renderParamCell("turbospeed")}
-                          </td>
-                          <td style={cellStyle}>{renderParamCell("fipi")}</td>
-                          <td style={cellStyle}>{renderParamCell("pmax")}</td>
-                          <td style={cellStyle}>
-                            {renderParamCell("pmax_dev")}
-                          </td>
-                          <td style={cellStyle}>{renderParamCell("pcomp")}</td>
-                          <td style={cellStyle}>
-                            {renderParamCell("pcomp_dev")}
-                          </td>
-                          <td style={cellStyle}>
-                            {renderParamCell("scavair")}
-                          </td>
-                          <td style={cellStyle}>
-                            {renderParamCell("exh_t/c_inlet")}
-                          </td>
-                          <td style={cellStyle}>
-                            {renderParamCell("exh_t/c_outlet")}
-                          </td>
-                          <td style={cellStyle}>
-                            {renderParamCell("exh_cylinder_outlet")}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
+                      })}
+                    </tbody>
+                  </table>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
 
-      {/* ===== MODAL ===== */}
-      {isModalOpen &&
-        (() => {
-          if (!modalData || !Array.isArray(modalData)) return null;
+        {/* ===== MODAL ===== */}
+        {isModalOpen &&
+          (() => {
+            if (!modalData || !Array.isArray(modalData)) return null;
 
-          const currentFilter = (filterStatus || "ALL").toUpperCase();
+            const currentFilter = (filterStatus || "ALL").toUpperCase();
 
-          let visibleRows = modalData.filter((row) => {
-            const rowColor = (row.color || "gray").toLowerCase();
-            if (currentFilter === "CRITICAL") return rowColor === "red";
-            if (currentFilter === "WARNING") return rowColor === "yellow";
-            if (currentFilter === "NORMAL")
-              return rowColor === "green" || rowColor === "gray";
-            return true;
-          });
+            let visibleRows = modalData.filter((row) => {
+              const rowColor = (row.color || "gray").toLowerCase();
+              if (currentFilter === "CRITICAL") return rowColor === "red";
+              if (currentFilter === "WARNING") return rowColor === "yellow";
+              if (currentFilter === "NORMAL")
+                return rowColor === "green" || rowColor === "gray";
+              return true;
+            });
 
-          visibleRows.sort((a, b) => Math.abs(b.devPct) - Math.abs(a.devPct));
+            visibleRows.sort((a, b) => Math.abs(b.devPct) - Math.abs(a.devPct));
 
-          let headerColor = "#10b981";
-          if (currentFilter === "CRITICAL") headerColor = "#ef4444";
-          if (currentFilter === "WARNING") headerColor = "#f59e0b";
+            let headerColor = "#10b981";
+            if (currentFilter === "CRITICAL") headerColor = "#ef4444";
+            if (currentFilter === "WARNING") headerColor = "#f59e0b";
 
-          const getRowStyle = (color) => {
-            switch (color) {
-              case "red":
-                return {
-                  borderLeft: "4px solid #ef4444",
-                  bg: "#fef2f2",
-                  text: "#b91c1c",
-                };
-              case "yellow":
-                return {
-                  borderLeft: "4px solid #f59e0b",
-                  bg: "#fffbeb",
-                  text: "#b45309",
-                };
-              case "green":
-                return {
-                  borderLeft: "4px solid #10b981",
-                  bg: "#f0fdf4",
-                  text: "#15803d",
-                };
-              default:
-                return {
-                  borderLeft: "4px solid #d1d5db",
-                  bg: "#ffffff",
-                  text: "#374151",
-                };
-            }
-          };
+            const getRowStyle = (color) => {
+              switch (color) {
+                case "red":
+                  return {
+                    borderLeft: "4px solid #ef4444",
+                    bg: "#fef2f2",
+                    text: "#b91c1c",
+                  };
+                case "yellow":
+                  return {
+                    borderLeft: "4px solid #f59e0b",
+                    bg: "#fffbeb",
+                    text: "#b45309",
+                  };
+                case "green":
+                  return {
+                    borderLeft: "4px solid #10b981",
+                    bg: "#f0fdf4",
+                    text: "#15803d",
+                  };
+                default:
+                  return {
+                    borderLeft: "4px solid #d1d5db",
+                    bg: "#ffffff",
+                    text: "#374151",
+                  };
+              }
+            };
 
-          return (
-            <div
-              className="modal-overlay"
-              onClick={() => setIsModalOpen(false)}
-              style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "rgba(0, 0, 0, 0.6)",
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                zIndex: 9999,
-                backdropFilter: "blur(3px)",
-              }}
-            >
+            return (
               <div
-                className="modal-content"
-                onClick={(e) => e.stopPropagation()}
+                className="modal-overlay"
+                onClick={() => setIsModalOpen(false)}
                 style={{
-                  width: "900px",
-                  maxHeight: "85vh",
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: "rgba(0, 0, 0, 0.6)",
                   display: "flex",
-                  flexDirection: "column",
-                  backgroundColor: "white",
-                  borderRadius: "12px",
-                  boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
-                  overflow: "hidden",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  zIndex: 9999,
+                  backdropFilter: "blur(3px)",
                 }}
               >
                 <div
-                  id="pdf-content"
+                  className="modal-content"
+                  onClick={(e) => e.stopPropagation()}
                   style={{
+                    width: "900px",
+                    maxHeight: "85vh",
                     display: "flex",
                     flexDirection: "column",
-                    height: "100%",
+                    backgroundColor: "white",
+                    borderRadius: "12px",
+                    boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
                     overflow: "hidden",
                   }}
                 >
                   <div
+                    id="pdf-content"
                     style={{
-                      padding: "16px 24px",
-                      borderBottom: "1px solid #e5e7eb",
                       display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      backgroundColor: "#f9fafb",
-                      flexShrink: 0,
+                      flexDirection: "column",
+                      height: "100%",
+                      overflow: "hidden",
                     }}
                   >
                     <div
                       style={{
+                        padding: "16px 24px",
+                        borderBottom: "1px solid #e5e7eb",
                         display: "flex",
+                        justifyContent: "space-between",
                         alignItems: "center",
-                        gap: "12px",
+                        backgroundColor: "#f9fafb",
+                        flexShrink: 0,
                       }}
                     >
-                      <h2
-                        style={{
-                          fontSize: "1.15rem",
-                          fontWeight: "700",
-                          color: "#111827",
-                          margin: 0,
-                        }}
-                      >
-                        {modalHeader}
-                      </h2>
                       <div
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: "6px",
-                          fontSize: "0.9rem",
-                          color: "#374151",
-                          backgroundColor: "#fff",
-                          padding: "4px 10px",
-                          borderRadius: "20px",
-                          border: "1px solid #e5e7eb",
+                          gap: "12px",
                         }}
                       >
-                        <span
+                        <h2
                           style={{
-                            height: "10px",
-                            width: "10px",
-                            borderRadius: "50%",
-                            backgroundColor: headerColor,
-                            display: "inline-block",
-                          }}
-                        ></span>
-                        <span
-                          style={{
-                            fontWeight: "600",
-                            textTransform: "uppercase",
-                            fontSize: "0.8rem",
+                            fontSize: "1.15rem",
+                            fontWeight: "700",
+                            color: "#111827",
+                            margin: 0,
                           }}
                         >
-                          Status: {filterStatus}
-                        </span>
+                          {modalHeader}
+                        </h2>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            fontSize: "0.9rem",
+                            color: "#374151",
+                            backgroundColor: "#fff",
+                            padding: "4px 10px",
+                            borderRadius: "20px",
+                            border: "1px solid #e5e7eb",
+                          }}
+                        >
+                          <span
+                            style={{
+                              height: "10px",
+                              width: "10px",
+                              borderRadius: "50%",
+                              backgroundColor: headerColor,
+                              display: "inline-block",
+                            }}
+                          ></span>
+                          <span
+                            style={{
+                              fontWeight: "600",
+                              textTransform: "uppercase",
+                              fontSize: "0.8rem",
+                            }}
+                          >
+                            Status: {filterStatus}
+                          </span>
+                        </div>
                       </div>
+                      <button
+                        className="modal-close-btn"
+                        onClick={() => setIsModalOpen(false)}
+                        style={{
+                          border: "none",
+                          background: "#e5e7eb",
+                          borderRadius: "4px",
+                          cursor: "pointer",
+                          padding: "4px",
+                          display: "flex",
+                        }}
+                      >
+                        <X size={20} color="#4b5563" />
+                      </button>
                     </div>
-                    <button
-                      className="modal-close-btn"
-                      onClick={() => setIsModalOpen(false)}
-                      style={{
-                        border: "none",
-                        background: "#e5e7eb",
-                        borderRadius: "4px",
-                        cursor: "pointer",
-                        padding: "4px",
-                        display: "flex",
-                      }}
-                    >
-                      <X size={20} color="#4b5563" />
-                    </button>
-                  </div>
 
-                  <div
-                    className="modal-scroll-area"
-                    style={{
-                      padding: "0",
-                      overflowY: "auto",
-                      backgroundColor: "#ffffff",
-                    }}
-                  >
-                    <table
+                    <div
+                      className="modal-scroll-area"
                       style={{
-                        width: "100%",
-                        borderCollapse: "collapse",
-                        fontSize: "0.9rem",
+                        padding: "0",
+                        overflowY: "auto",
+                        backgroundColor: "#ffffff",
                       }}
                     >
-                      <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
-                        <tr
-                          style={{
-                            backgroundColor: "#f8fafc",
-                            color: "#64748b",
-                            textTransform: "uppercase",
-                            fontSize: "0.75rem",
-                            letterSpacing: "0.05em",
-                            boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                          }}
+                      <table
+                        style={{
+                          width: "100%",
+                          borderCollapse: "collapse",
+                          fontSize: "0.9rem",
+                        }}
+                      >
+                        <thead
+                          style={{ position: "sticky", top: 0, zIndex: 10 }}
                         >
-                          <th
+                          <tr
                             style={{
-                              padding: "10px 24px",
-                              textAlign: "left",
-                              fontWeight: "600",
+                              backgroundColor: "#f8fafc",
+                              color: "#64748b",
+                              textTransform: "uppercase",
+                              fontSize: "0.75rem",
+                              letterSpacing: "0.05em",
+                              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
                             }}
                           >
-                            Parameter
-                          </th>
-                          <th
-                            style={{
-                              padding: "10px 24px",
-                              textAlign: "right",
-                              fontWeight: "600",
-                            }}
-                          >
-                            Baseline
-                          </th>
-                          <th
-                            style={{
-                              padding: "10px 24px",
-                              textAlign: "right",
-                              fontWeight: "600",
-                            }}
-                          >
-                            Actual
-                          </th>
-                          <th
-                            style={{
-                              padding: "10px 24px",
-                              textAlign: "right",
-                              fontWeight: "600",
-                            }}
-                          >
-                            Δ (Diff)
-                          </th>
-                          <th
-                            style={{
-                              padding: "10px 24px",
-                              textAlign: "right",
-                              fontWeight: "600",
-                            }}
-                          >
-                            Deviation %
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {visibleRows.length > 0 ? (
-                          visibleRows.map((row, index) => {
-                            const style = getRowStyle(row.color || "gray");
-                            const diffPrefix = row.diff >= 0 ? "+" : "";
-                            const pctPrefix = row.devPct >= 0 ? "+" : "";
-
-                            return (
-                              <tr
-                                key={index}
-                                style={{
-                                  borderBottom: "1px solid #f1f5f9",
-                                  backgroundColor: style.bg,
-                                }}
-                              >
-                                <td
-                                  style={{
-                                    padding: "10px 24px",
-                                    borderLeft: style.borderLeft,
-                                    fontWeight: "600",
-                                    color: "#1f2937",
-                                  }}
-                                >
-                                  {row.parameter}
-                                  {/* 🔥 ADD THE UNIT DISPLAY HERE */}
-                                  <span
-                                    style={{
-                                      fontSize: "0.75rem",
-                                      color: "#94a3b8",
-                                      marginLeft: "6px",
-                                      fontWeight: "500",
-                                    }}
-                                  >
-                                    ({row.unit})
-                                  </span>
-                                </td>
-                                <td
-                                  style={{
-                                    padding: "10px 24px",
-                                    textAlign: "right",
-                                    fontFamily: "monospace",
-                                    color: "#6b7280",
-                                  }}
-                                >
-                                  {safeFixed(row.baseline)}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: "10px 24px",
-                                    textAlign: "right",
-                                    fontFamily: "monospace",
-                                    color: "#111827",
-                                    fontWeight: "700",
-                                  }}
-                                >
-                                  {safeFixed(row.actual)}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: "10px 24px",
-                                    textAlign: "right",
-                                    fontFamily: "monospace",
-                                    color: style.text,
-                                    fontWeight: "700",
-                                  }}
-                                >
-                                  {diffPrefix}
-                                  {safeFixed(row.diff)}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: "10px 24px",
-                                    textAlign: "right",
-                                    fontFamily: "monospace",
-                                    color: style.text,
-                                    fontWeight: "700",
-                                  }}
-                                >
-                                  {row.baseline
-                                    ? `${pctPrefix}${safeFixed(row.devPct, 1)}%`
-                                    : "-"}
-                                </td>
-                              </tr>
-                            );
-                          })
-                        ) : (
-                          <tr>
-                            <td
-                              colSpan="5"
+                            <th
                               style={{
-                                padding: "40px",
-                                textAlign: "center",
-                                color: "#9ca3af",
-                                fontStyle: "italic",
+                                padding: "10px 24px",
+                                textAlign: "left",
+                                fontWeight: "600",
                               }}
                             >
-                              No {filterStatus.toLowerCase()} parameters found
-                              in this report.
-                            </td>
+                              Parameter
+                            </th>
+                            <th
+                              style={{
+                                padding: "10px 24px",
+                                textAlign: "right",
+                                fontWeight: "600",
+                              }}
+                            >
+                              Baseline
+                            </th>
+                            <th
+                              style={{
+                                padding: "10px 24px",
+                                textAlign: "right",
+                                fontWeight: "600",
+                              }}
+                            >
+                              Actual
+                            </th>
+                            <th
+                              style={{
+                                padding: "10px 24px",
+                                textAlign: "right",
+                                fontWeight: "600",
+                              }}
+                            >
+                              Δ (Diff)
+                            </th>
+                            <th
+                              style={{
+                                padding: "10px 24px",
+                                textAlign: "right",
+                                fontWeight: "600",
+                              }}
+                            >
+                              Deviation %
+                            </th>
                           </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {visibleRows.length > 0 ? (
+                            visibleRows.map((row, index) => {
+                              const style = getRowStyle(row.color || "gray");
+                              const diffPrefix = row.diff >= 0 ? "+" : "";
+                              const pctPrefix = row.devPct >= 0 ? "+" : "";
 
-                  <div
-                    data-html2canvas-ignore="true"
-                    style={{
-                      padding: "16px 24px",
-                      borderTop: "1px solid #e5e7eb",
-                      display: "flex",
-                      gap: "12px",
-                      flexShrink: 0,
-                      backgroundColor: "#fff",
-                      justifyContent: "flex-end",
-                    }}
-                  >
-                    {/* <button onClick={() => handlePdfAction('preview')} disabled={isDownloading} style={{ backgroundColor: '#fff', color: '#374151', border: '1px solid #d1d5db', padding: '8px 16px', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', cursor: isDownloading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', opacity: isDownloading ? 0.7 : 1 }}>{isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Eye size={16} />} Preview PDF</button> */}
-                    <button
-                      onClick={() => handlePdfAction("download")}
-                      disabled={isDownloading}
+                              return (
+                                <tr
+                                  key={index}
+                                  style={{
+                                    borderBottom: "1px solid #f1f5f9",
+                                    backgroundColor: style.bg,
+                                  }}
+                                >
+                                  <td
+                                    style={{
+                                      padding: "10px 24px",
+                                      borderLeft: style.borderLeft,
+                                      fontWeight: "600",
+                                      color: "#1f2937",
+                                    }}
+                                  >
+                                    {row.parameter}
+                                    {/* 🔥 ADD THE UNIT DISPLAY HERE */}
+                                    <span
+                                      style={{
+                                        fontSize: "0.75rem",
+                                        color: "#94a3b8",
+                                        marginLeft: "6px",
+                                        fontWeight: "500",
+                                      }}
+                                    >
+                                      ({row.unit})
+                                    </span>
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "10px 24px",
+                                      textAlign: "right",
+                                      fontFamily: "monospace",
+                                      color: "#6b7280",
+                                    }}
+                                  >
+                                    {safeFixed(row.baseline)}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "10px 24px",
+                                      textAlign: "right",
+                                      fontFamily: "monospace",
+                                      color: "#111827",
+                                      fontWeight: "700",
+                                    }}
+                                  >
+                                    {safeFixed(row.actual)}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "10px 24px",
+                                      textAlign: "right",
+                                      fontFamily: "monospace",
+                                      color: style.text,
+                                      fontWeight: "700",
+                                    }}
+                                  >
+                                    {diffPrefix}
+                                    {safeFixed(row.diff)}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "10px 24px",
+                                      textAlign: "right",
+                                      fontFamily: "monospace",
+                                      color: style.text,
+                                      fontWeight: "700",
+                                    }}
+                                  >
+                                    {row.baseline
+                                      ? `${pctPrefix}${safeFixed(row.devPct, 1)}%`
+                                      : "-"}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          ) : (
+                            <tr>
+                              <td
+                                colSpan="5"
+                                style={{
+                                  padding: "40px",
+                                  textAlign: "center",
+                                  color: "#9ca3af",
+                                  fontStyle: "italic",
+                                }}
+                              >
+                                No {filterStatus.toLowerCase()} parameters found
+                                in this report.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div
+                      data-html2canvas-ignore="true"
                       style={{
-                        backgroundColor: "#111827",
-                        color: "white",
-                        border: "none",
-                        padding: "8px 16px",
-                        borderRadius: "6px",
-                        fontSize: "0.875rem",
-                        fontWeight: "500",
-                        cursor: isDownloading ? "wait" : "pointer",
+                        padding: "16px 24px",
+                        borderTop: "1px solid #e5e7eb",
                         display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        opacity: isDownloading ? 0.7 : 1,
+                        gap: "12px",
+                        flexShrink: 0,
+                        backgroundColor: "#fff",
+                        justifyContent: "flex-end",
                       }}
                     >
-                      {isDownloading ? (
-                        <Loader2 size={16} className="animate-spin" />
-                      ) : (
-                        <Download size={16} />
-                      )}{" "}
-                      Export PDF
-                    </button>
+                      {/* <button onClick={() => handlePdfAction('preview')} disabled={isDownloading} style={{ backgroundColor: '#fff', color: '#374151', border: '1px solid #d1d5db', padding: '8px 16px', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', cursor: isDownloading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', opacity: isDownloading ? 0.7 : 1 }}>{isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Eye size={16} />} Preview PDF</button> */}
+                      <button
+                        onClick={() => handlePdfAction("download")}
+                        disabled={isDownloading}
+                        style={{
+                          backgroundColor: "#111827",
+                          color: "white",
+                          border: "none",
+                          padding: "8px 16px",
+                          borderRadius: "6px",
+                          fontSize: "0.875rem",
+                          fontWeight: "500",
+                          cursor: isDownloading ? "wait" : "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          opacity: isDownloading ? 0.7 : 1,
+                        }}
+                      >
+                        {isDownloading ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Download size={16} />
+                        )}{" "}
+                        Export PDF
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          );
-        })()}
-    </div>
+            );
+          })()}
+      </div>
     </>
   );
 }

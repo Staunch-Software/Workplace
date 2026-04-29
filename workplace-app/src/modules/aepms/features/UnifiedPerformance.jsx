@@ -34,6 +34,7 @@ import {
 
 import axiosAepms from "../api/axiosAepms";
 import "../styles/performance.css";
+import "../styles/performance-responsive.css";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import html2canvas from "html2canvas";
@@ -653,7 +654,7 @@ const SingleSelectDropdown = ({
             border: "1px solid #e2e8f0",
             borderRadius: "6px",
             boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
-            zIndex: 250,
+            zIndex: 10,
             padding: "12px 0",
           }}
         >
@@ -2521,9 +2522,10 @@ export default function Performance({
       baselineSource === "upload" ||
       !shipId ||
       !fleet.length
-    ) return;
+    )
+      return;
 
-    if (displayedReportIds.length > 0) return;  // ADD THIS LINE ONLY
+    if (displayedReportIds.length > 0) return; // ADD THIS LINE ONLY
 
     const ship = fleet.find((s) => s.id === shipId);
     if (!ship) return;
@@ -2568,7 +2570,14 @@ export default function Performance({
         console.error("Failed to load auxiliary baseline:", error);
       })
       .finally(() => setLoading(false));
-  }, [selectedGeneratorId, shipId, fleet, baselineSource, analysisMode, displayedReportIds]);
+  }, [
+    selectedGeneratorId,
+    shipId,
+    fleet,
+    baselineSource,
+    analysisMode,
+    displayedReportIds,
+  ]);
   // 🔥 NEW FUNCTION: Fetch last report dates
   // --- REPLACE YOUR EXISTING fetchLastReportDates FUNCTION WITH THIS ---
 
@@ -3383,8 +3392,10 @@ export default function Performance({
     setDownloadGenId(null); // Clear selected generator
     setDownloadableReports([]); // Clear the dropdown list momentarily
     // -------------------------
-    const selectedShip = fleet.find(s => String(s.id) === String(newShipId));
-    const imoToPass = selectedShip ? (selectedShip.imo || selectedShip.imo_number) : newShipId;
+    const selectedShip = fleet.find((s) => String(s.id) === String(newShipId));
+    const imoToPass = selectedShip
+      ? selectedShip.imo || selectedShip.imo_number
+      : newShipId;
     if (onShipChange) onShipChange(imoToPass);
   };
 
@@ -4522,68 +4533,35 @@ export default function Performance({
     ];
 
     return (
-      <div className="enhanced-card load-diagram-enhanced load-diagram-card">
+      <div className="enhanced-card load-diag-card">
         <div
-  className={`card-header-enhanced ${!isLoadDiagramExpanded ? 'header-closed' : ''}`}
-  onClick={() => setIsLoadDiagramExpanded(!isLoadDiagramExpanded)}
-  style={{
-    cursor: "pointer",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    userSelect: "none",
-  }}
->
-          <div>
-            <h3
-              className="card-title-enhanced"
-              style={{ margin: 0, fontSize: "1rem" }}
-            >
+          className={`load-diag-header ${!isLoadDiagramExpanded ? "header-closed" : ""}`}
+          onClick={() => setIsLoadDiagramExpanded(!isLoadDiagramExpanded)}
+        >
+          <div className="load-diag-title-group">
+            <h3 className="load-diag-title">
               Engine Load Diagram (% SMCR)
             </h3>
-            <p
-              className="card-description-enhanced"
-              style={{ margin: 0, fontSize: "0.78rem" }}
-            >
+            <p className="load-diag-subtitle">
               Logarithmic Scale normalized to SMCR (Point M)
             </p>
           </div>
 
           {/* Animated Chevron Icon */}
           <span
+            className="load-diag-chevron"
             style={{
-              fontSize: "1.1rem",
-              color: "#94a3b8",
-              transition: "transform 0.3s ease",
-              transform: isLoadDiagramExpanded
-                ? "rotate(180deg)"
-                : "rotate(0deg)",
+              transform: isLoadDiagramExpanded ? "rotate(180deg)" : "rotate(0deg)",
             }}
           >
             ▼
           </span>
         </div>
         {isLoadDiagramExpanded && (
-          <div className="card-content-enhanced">
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "15px",
-                justifyContent: "center",
-                marginBottom: "20px",
-                fontSize: "0.8rem",
-                padding: "10px",
-                backgroundColor: "#f8fafc",
-                borderRadius: "8px",
-                border: "1px solid #e2e8f0",
-              }}
-            >
+          <div className="load-diag-content">
+            <div className="load-diag-legend">
               {legendPayload.map((item, idx) => (
-                <div
-                  key={idx}
-                  style={{ display: "flex", alignItems: "center", gap: "6px" }}
-                >
+                <div key={idx} className="load-diag-legend-item">
                   {item.type === "line" && (
                     <div
                       style={{
@@ -4618,14 +4596,14 @@ export default function Performance({
                       ×
                     </div>
                   )}
-                  <span style={{ color: "#475569", fontWeight: 600 }}>
+                  <span className="load-diag-legend-text">
                     {item.value}
                   </span>
                 </div>
               ))}
             </div>
 
-            <div style={{ width: "100%", height: "550px" }}>
+            <div className="load-diag-chart-wrap">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
                   data={chartData}
@@ -5198,87 +5176,49 @@ export default function Performance({
         : `${safeFixed(loadPct, 2)}% Load`;
 
       return (
-        <div
-          className="enhanced-card summary-table-card"
-          style={{ marginBottom: "32px" }}
-        >
+        <div className="enhanced-card summary-table-card">
           <div
-            className={`card-header-enhanced ${!isSummaryExpanded ? 'header-closed' : ''}`}
-            onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              cursor: "pointer",
-              userSelect: "none",
-            }}
-          >
+  className={`card-header-enhanced summary-header ${!isSummaryExpanded ? "header-closed" : ""}`}
+  onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
+>
             <div>
-              <h3
-                className="card-title-enhanced"
-                style={{ margin: 0, fontSize: "1rem", fontWeight: "600" }}
-              >
+              <h3 className="card-title-enhanced summary-card-title">
                 {allMonthlyReports.length === 1
                   ? `Performance Summary @ ${loadDisplay}`
                   : `Performance Matrix (${allMonthlyReports.length} Reports)`}
               </h3>
-              <p
-                className="card-description-enhanced"
-                style={{ margin: 0, fontSize: "0.78rem" }}
-              >
+              <p className="card-description-enhanced summary-card-desc">
                 {allMonthlyReports.length === 1
                   ? `Baseline vs Actual - ${currentMonthReport.displayName}`
                   : "Comparison across multiple dates vs Baseline"}
               </p>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <div className="summary-header-right">
               {/* Professional Bookmark - preserved exactly from source */}
-              <div
-                style={{
-                  fontSize: "0.7rem",
-                  fontWeight: "700",
-                  color: "#94a3b8",
-                  textTransform: "uppercase",
-                  backgroundColor: "#f8fafc",
-                  padding: "4px 10px",
-                  borderRadius: "4px",
-                  border: "1px solid #e2e8f0",
-                  letterSpacing: "0.025em",
-                }}
-              >
-                {bookmarkLabel}
-              </div>
+              <div className="summary-bookmark-label">
+  {bookmarkLabel}
+</div>
 
               {/* Animated Chevron Icon */}
               <span
-                style={{
-                  fontSize: "1.1rem",
-                  color: "#94a3b8",
-                  transition: "transform 0.3s ease",
-                  transform: isSummaryExpanded
-                    ? "rotate(180deg)"
-                    : "rotate(0deg)",
-                }}
-              >
-                ▼
-              </span>
+  className="summary-chevron"
+  style={{ transform: isSummaryExpanded ? "rotate(180deg)" : "rotate(0deg)" }}
+>
+  ▼
+</span>
             </div>
           </div>
           {isSummaryExpanded && (
-            <div className="card-content-enhanced" style={{ overflowX: "auto", maxWidth: "100%" }}>
-              <table className="summary-table-enhanced" style={{ minWidth: "700px" }}>
+            <div className="card-content-enhanced summary-table-scroll">
+              <table className="summary-table-enhanced summary-table-single">
                 <thead>
                   <tr>
-                    <th style={{ width: "35%", textAlign: "left" }}>
-                      Parameter
-                    </th>
-                    <th style={{ width: "15%" }}>Shop Trial</th>
-                    <th style={{ width: "15%" }}>Actual</th>
-                    <th style={{ width: "15%" }}>Δ</th>
-                    <th style={{ width: "20%", textAlign: "right" }}>
-                      Deviation %
-                    </th>
+                    <th className="summary-th-param">Parameter</th>
+<th className="summary-th-right">Shop Trial</th>
+<th className="summary-th-right">Actual</th>
+<th className="summary-th-right">Δ</th>
+<th className="summary-th-right">Deviation %</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -5358,41 +5298,29 @@ export default function Performance({
 
                       return (
                         <tr key={metricKey} className={devClass}>
-                          <td style={{ textAlign: "left", fontWeight: "600" }}>
-                            Power Margin
-                          </td>
+                          <td className="summary-td-param">
+  Power Margin
+</td>
 
                           {/* Baseline is always 100.00 for Propeller Margin */}
-                          <td style={{ textAlign: "right" }}>100.00</td>
+                          <td className="summary-td-right">100.00</td>
 
                           {/* Actual Value (Now correctly shows 100 + deviation) */}
-                          <td style={{ textAlign: "right" }}>
-                            {safeFixed(displayActual, 2)}
-                          </td>
+                          <td className="summary-td-right summary-td-actual">
+  {safeFixed(displayActual, 2)}
+</td>
 
                           {/* Delta (The deviation amount) */}
-                          <td
-                            style={{
-                              textAlign: "right",
-                              color: txtColor,
-                              fontWeight: "bold",
-                            }}
-                          >
-                            {displayDelta >= 0 ? "+" : ""}
-                            {safeFixed(displayDelta, 2)}
-                          </td>
+                          <td className="summary-td-right summary-td-delta" style={{ color: txtColor }}>
+  {displayDelta >= 0 ? "+" : ""}
+  {safeFixed(displayDelta, 2)}
+</td>
 
                           {/* % Display */}
-                          <td
-                            style={{
-                              textAlign: "right",
-                              color: txtColor,
-                              fontWeight: "bold",
-                            }}
-                          >
-                            {displayDelta >= 0 ? "+" : ""}
-                            {safeFixed(displayDelta, 1)}%
-                          </td>
+                          <td className="summary-td-right summary-td-dev" style={{ color: txtColor }}>
+  {displayDelta >= 0 ? "+" : ""}
+  {safeFixed(displayDelta, 1)}%
+</td>
                         </tr>
                       );
                     }
@@ -5501,48 +5429,25 @@ export default function Performance({
 
                     return (
                       <tr key={metricKey} className={devClass}>
-                        <td style={{ textAlign: "left", fontWeight: "600" }}>
-                          {metricDisplayNames[metricKey] || metricKey}
-                          <span style={{ color: "#1e293b", fontWeight: "800" }}>
-                            {labelSuffix}
-                          </span>
-                          <span
-                            style={{
-                              color: "#64748b",
-                              fontWeight: "500",
-                              marginLeft: "4px",
-                              fontSize: "0.85rem",
-                            }}
-                          >
-                            ({unit})
-                          </span>
-                        </td>
-                        <td style={{ textAlign: "right" }}>
-                          {safeFixed(baselineValue, 2)}
-                        </td>
-                        <td style={{ textAlign: "right", color: "#1e293b" }}>
-                          {safeFixed(actualValue, 2)}
-                        </td>
-                        <td
-                          style={{
-                            textAlign: "right",
-                            color: txtColor,
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {delta >= 0 ? "+" : ""}
-                          {safeFixed(delta, 2)}
-                        </td>
-                        <td
-                          style={{
-                            textAlign: "right",
-                            color: txtColor,
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {devPct >= 0 ? "+" : ""}
-                          {safeFixed(devPct, 1)}%
-                        </td>
+                        <td className="summary-td-param">
+  {metricDisplayNames[metricKey] || metricKey}
+  <span className="summary-iso-label">{labelSuffix}</span>
+  <span className="summary-unit-label">({unit})</span>
+</td>
+                        <td className="summary-td-right">
+  {safeFixed(baselineValue, 2)}
+</td>
+                        <td className="summary-td-right summary-td-actual">
+  {safeFixed(actualValue, 2)}
+</td>
+                        <td className="summary-td-right summary-td-delta" style={{ color: txtColor }}>
+  {delta >= 0 ? "+" : ""}
+  {safeFixed(delta, 2)}
+</td>
+                        <td className="summary-td-right summary-td-dev" style={{ color: txtColor }}>
+  {devPct >= 0 ? "+" : ""}
+  {safeFixed(devPct, 1)}%
+</td>
                       </tr>
                     );
                   })}
@@ -5558,16 +5463,9 @@ export default function Performance({
     // LAYOUT 2: MULTI-REPORT MATRIX VIEW (UPDATED FOR MERGED COLUMNS)
     // =================================================================================
     const numReports = allMonthlyReports.length;
-    const tableWidthStyle = numReports > 3 
-      ? `calc(240px + ${numReports} * ((100% - 240px) / 3))` 
-      : "100%";
-    const minTableWidth = `${240 + (numReports * 280)}px`; // Mobile protection
 
     return (
-      <div
-        className="enhanced-card summary-table-card"
-        style={{ marginBottom: "32px" }}
-      >
+      <div className="enhanced-card summary-table-card">
         <div className="card-header-enhanced">
           <h3 className="card-title-enhanced">
             Performance Matrix ({numReports} Reports)
@@ -5577,14 +5475,17 @@ export default function Performance({
           </p>
         </div>
 
-        <div className="card-content-enhanced" style={{ padding: 0, maxWidth: "100%", minWidth: 0, overflow: "hidden" }}>
+        <div className="card-content-enhanced summary-matrix-content">
           {/* 🔥 ADDED scrollSnapType to make scrolling feel like a carousel */}
-          <div className="matrix-scroll-container" style={{ width: "100%", overflowX: "auto", display: "block", scrollSnapType: "x proximity", scrollBehavior: "smooth", scrollPaddingLeft: "240px" }}>
+          <div className="matrix-scroll-container">
             {/* 🔥 ADDED tableLayout: "fixed" and our mathematical width */}
-            <table className="matrix-table" style={{ tableLayout: "fixed", width: tableWidthStyle, minWidth: minTableWidth }}>
+            <table
+  className="matrix-table"
+  style={{ "--total-reports": numReports }}
+>
               <thead>
                 {/* 1. Date Group Header */}
-                <tr style={{ height: "55px" }}>
+                <tr className="matrix-group-header-row">
                   <th className="matrix-sticky-col-1">PARAMETER</th>
 
                   {allMonthlyReports.map((report) => {
@@ -5607,35 +5508,19 @@ export default function Performance({
 
                     return (
                       <th
-                        key={report.report_id}
-                        colSpan={3}
-                        className="matrix-group-header"
-                        style={{ scrollSnapAlign: "start" }}
-                      >
-                        {report.displayName}
-                        {/* --- ADDED LOAD % AND POWER INFO HERE --- */}
-                        <div
-                          style={{
-                            fontSize: "0.75rem",
-                            fontWeight: "700",
-                            color: "#0f172a",
-                            marginTop: "2px",
-                          }}
-                        >
-                          {safeFixed(loadPct, 2)}%{" "}
-                          {powerLabel ? `(${powerLabel})` : ""}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "0.7rem",
-                            fontWeight: "500",
-                            color: "#64748b",
-                            marginTop: "1px",
-                          }}
-                        >
-                          {report.report_date}
-                        </div>
-                      </th>
+  key={report.report_id}
+  colSpan={3}
+  className="matrix-group-header"
+>
+  {report.displayName}
+  <div className="matrix-header-load">
+    {safeFixed(loadPct, 2)}%{" "}
+    {powerLabel ? `(${powerLabel})` : ""}
+  </div>
+  <div className="matrix-header-date">
+    {report.report_date}
+  </div>
+</th>
                     );
                   })}
                 </tr>
@@ -5643,43 +5528,21 @@ export default function Performance({
                 {/* 2. Sub-headers */}
                 {/* 2. Sub-headers */}
                 <tr>
-                  <th
-                    className="matrix-sticky-col-1"
-                    style={{
-                      color: "#64748b",
-                      fontSize: "0.75rem",
-                      fontWeight: "600",
-                      textTransform: "none",
-                    }}
-                  >
-                    Unit
-                  </th>
+                  <th className="matrix-sticky-col-1 matrix-unit-header">
+  Unit
+</th>
 
                   {allMonthlyReports.map((report) => (
                     <React.Fragment key={`sub-${report.report_id}`}>
-                      <th
-                        className="matrix-sub-header"
-                        style={{
-                          borderLeft: "1px solid #cbd5e1",
-                          textAlign: "center",
-                          color: "#475569",
-                          minWidth: "90px", // <--- Reduced to allow math to work
-                        }}
-                      >
-                        Shop Trial
-                      </th>
-                      <th
-                        className="matrix-sub-header"
-                        style={{ textAlign: "center", minWidth: "90px" }} // <--- Reduced
-                      >
-                        Actual
-                      </th>
-                      <th
-                        className="matrix-sub-header"
-                        style={{ textAlign: "center", minWidth: "100px" }} // <--- Reduced
-                      >
-                        Δ (%)
-                      </th>
+                      <th className="matrix-sub-header matrix-sub-shop">
+  Shop Trial
+</th>
+                      <th className="matrix-sub-header matrix-sub-actual">
+  Actual
+</th>
+                      <th className="matrix-sub-header matrix-sub-delta">
+  Δ (%)
+</th>
                     </React.Fragment>
                   ))}
                 </tr>
@@ -5704,34 +5567,17 @@ export default function Performance({
                   return (
                     <tr key={metricKey}>
                       {/* Column 1: Parameter Label */}
-                      <td
-                        className="matrix-sticky-col-1"
-                        style={{
-                          textAlign: "left",
-                          paddingLeft: "16px",
-                          fontWeight: "600",
-                          color: "#334155",
-                        }}
-                      >
-                        {isProp
-                          ? "Power Margin"
-                          : metricDisplayNames[metricKey] || metricKey}
-                        {labelSuffix && (
-                          <span style={{ color: "#1e293b", fontWeight: "700" }}>
-                            {labelSuffix}
-                          </span>
-                        )}
-                        <span
-                          style={{
-                            fontSize: "0.75rem",
-                            color: "#94a3b8",
-                            marginLeft: "4px",
-                            fontWeight: "500",
-                          }}
-                        >
-                          ({isProp ? "%" : unit})
-                        </span>
-                      </td>
+                      <td className="matrix-sticky-col-1 matrix-param-cell">
+  {isProp
+    ? "Power Margin"
+    : metricDisplayNames[metricKey] || metricKey}
+  {labelSuffix && (
+    <span className="summary-iso-label">{labelSuffix}</span>
+  )}
+  <span className="matrix-unit-label">
+    ({isProp ? "%" : unit})
+  </span>
+</td>
 
                       {/* Dynamic Columns for Each Report */}
                       {allMonthlyReports.map((report) => {
@@ -5909,14 +5755,9 @@ export default function Performance({
                         if (val === 0 && base === 0) {
                           return (
                             <React.Fragment key={report.report_id}>
-                              <td
-                                className="matrix-data-cell"
-                                style={{ borderLeft: "1px solid #cbd5e1" }}
-                              >
-                                -
-                              </td>
-                              <td className="matrix-data-cell">-</td>
-                              <td className="matrix-data-cell">-</td>
+                              <td className="matrix-data-cell matrix-data-cell--first">-</td>
+<td className="matrix-data-cell">-</td>
+<td className="matrix-data-cell">-</td>
                             </React.Fragment>
                           );
                         }
@@ -5931,52 +5772,27 @@ export default function Performance({
                           <React.Fragment key={report.report_id}>
                             {/* 1. Trial (Baseline) Column */}
                             <td
-                              className="matrix-data-cell"
-                              style={{
-                                borderLeft: "1px solid #cbd5e1",
-                                textAlign: "center",
-                                color: "#475569",
-                                backgroundColor: bg,
-                              }}
-                            >
-                              {safeFixed(base, 2)}
-                            </td>
+  className="matrix-data-cell matrix-data-cell--first matrix-data-cell--trial"
+  style={{ backgroundColor: bg }}
+>
+  {safeFixed(base, 2)}
+</td>
 
                             {/* 2. Actual Column */}
                             <td
-                              className="matrix-data-cell"
-                              style={{
-                                backgroundColor: bg,
-                                textAlign: "center",
-                                fontWeight: "600",
-                                color: "#334155",
-                              }}
-                            >
-                              {safeFixed(val, 2)}
-                            </td>
-
+  className="matrix-data-cell matrix-data-cell--actual"
+  style={{ backgroundColor: bg }}
+>
+  {safeFixed(val, 2)}
+</td>
                             {/* 3. Merged Delta (%) Column */}
                             <td
-                              className="matrix-data-cell"
-                              style={{
-                                color: color,
-                                fontWeight: "bold",
-                                backgroundColor: bg,
-                                textAlign: "center",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {formattedDelta}{" "}
-                              <span
-                                style={{
-                                  fontSize: "0.8rem",
-                                  fontWeight: "600",
-                                  opacity: 0.9,
-                                }}
-                              >
-                                ({formattedPct})
-                              </span>
-                            </td>
+  className="matrix-data-cell matrix-data-cell--delta"
+  style={{ color: color, backgroundColor: bg }}
+>
+  {formattedDelta}{" "}
+  <span className="matrix-delta-pct">({formattedPct})</span>
+</td>
                           </React.Fragment>
                         );
                       })}
@@ -6379,88 +6195,40 @@ export default function Performance({
     ];
 
     return (
-      <div
-        className="enhanced-card history-table-card"
-        style={{ marginTop: "32px", marginBottom: "40px" }}
-      >
+      <div className="hist-card">
         <div
-  className={`card-header-enhanced ${!isHistoryExpanded ? 'header-closed' : ''}`}
+  className={`hist-header ${!isHistoryExpanded ? "hist-header--closed" : ""}`}
   onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    cursor: "pointer",
-    userSelect: "none",
-  }}
 >
-          <div>
-            <h3
-              className="card-title-enhanced"
-              style={{ margin: 0, fontSize: "1rem", fontWeight: "600" }}
-            >
-              Historical Deviation Analysis (Last 6 Reports)
-            </h3>
-            <p
-              className="card-description-enhanced"
-              style={{ margin: 0, fontSize: "0.78rem" }}
-            >
-              Comparison across recent reports (Actual vs Deviation %)
-            </p>
-          </div>
+          <div className="hist-header__left">
+  <h3 className="hist-header__title">
+    Historical Deviation Analysis (Last 6 Reports)
+  </h3>
+  <p className="hist-header__subtitle">
+    AE Engine — Actual vs Deviation %
+  </p>
+</div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            {/* Professional Bookmark - Preserved exactly from your source */}
-            <div
-              style={{
-                fontSize: "0.7rem",
-                fontWeight: "700",
-                color: "#94a3b8",
-                textTransform: "uppercase",
-                backgroundColor: "#f8fafc",
-                padding: "4px 10px",
-                borderRadius: "4px",
-                border: "1px solid #e2e8f0",
-                letterSpacing: "0.025em",
-              }}
-            >
-              {bookmarkLabel}
-            </div>
-
-            {/* Animated Chevron Icon */}
-            <span
-              style={{
-                fontSize: "1.1rem",
-                color: "#94a3b8",
-                transition: "transform 0.3s ease",
-                transform: isHistoryExpanded
-                  ? "rotate(180deg)"
-                  : "rotate(0deg)",
-              }}
-            >
-              ▼
-            </span>
-          </div>
+          <div className="hist-header__right">
+  <div className="hist-header__bookmark">{bookmarkLabel}</div>
+  <span
+    className="hist-header__chevron"
+    style={{
+      transform: isHistoryExpanded ? "rotate(180deg)" : "rotate(0deg)",
+    }}
+  >
+    ▼
+  </span>
+</div>
         </div>
         {isHistoryExpanded && (
-          <div className="card-content-enhanced" style={{ overflowX: "auto", maxWidth: "100%" }}>
-            <table
-              className="summary-table-enhanced"
-              style={{ width: "100%", tableLayout: "fixed" }}
-            >
+          <div className="hist-body">
+  <div className="hist-scroll">
+            <table className="hist-table">
               {/* 1. THE HEADER ROW (Dates) */}
               <thead>
-                <tr style={{ backgroundColor: "#f8fafc" }}>
-                  <th
-                    style={{
-                      width: "180px",
-                      padding: "12px",
-                      textAlign: "left",
-                      color: "#64748b",
-                    }}
-                  >
-                    PARAMETER
-                  </th>
+                <tr>
+                  <th className="hist-th-param">PARAMETER</th>
                   {/* Sort descending by date */}
                   {[...aeDeviationHistory]
                     .sort(
@@ -6468,27 +6236,12 @@ export default function Performance({
                         new Date(b.report_date) - new Date(a.report_date),
                     )
                     .map((report, index) => (
-                      <th
-                        key={index}
-                        style={{
-                          padding: "12px",
-                          textAlign: "center",
-                          minWidth: "120px",
-                        }}
-                      >
-                        <div style={{ fontSize: "0.9rem", color: "#1e293b" }}>
-                          {getMonthDisplayName(report.report_month)}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "0.7rem",
-                            color: "#64748b",
-                            fontWeight: "normal",
-                          }}
-                        >
-                          {report.report_date}
-                        </div>
-                      </th>
+                      <th key={index} className="hist-th-date">
+  <span className="hist-th-date__month">
+    {getMonthDisplayName(report.report_month)}
+  </span>
+  <span className="hist-th-date__raw">{report.report_date}</span>
+</th>
                     ))}
                 </tr>
               </thead>
@@ -6496,51 +6249,24 @@ export default function Performance({
               {/* 2. THE BODY ROWS */}
               <tbody>
                 {parameterRows.map((param) => (
-                  <tr
-                    key={param.key}
-                    style={{ borderBottom: "1px solid #f1f5f9" }}
-                  >
+                  <tr key={param.key}>
                     {/* Row Header */}
-                    <td
-                      style={{
-                        padding: "12px",
-                        textAlign: "left",
-                        fontWeight: "600",
-                        backgroundColor: "#fcfcfc",
-                      }}
-                    >
-                      {param.label}{" "}
-                      <span
-                        style={{
-                          color: "#94a3b8",
-                          fontWeight: "normal",
-                          fontSize: "0.8rem",
-                        }}
-                      >
-                        ({param.unit})
-                      </span>
-                    </td>
+                    <td className="hist-td-param">
+  {param.label}
+  <span className="hist-td-param__unit">({param.unit})</span>
+</td>
 
                     {/* Row Data */}
                     {aeDeviationHistory.map((report, index) => {
                       // A. Handle Load Row
                       if (param.isLoad) {
                         return (
-                          <td
-                            key={index}
-                            style={{ textAlign: "center", padding: "10px" }}
-                          >
-                            <div
-                              style={{ fontWeight: "bold", fontSize: "0.9rem" }}
-                            >
-                              {report.load_percentage?.toFixed(2)}%
-                            </div>
-                            <div
-                              style={{ fontSize: "0.75rem", color: "#64748b" }}
-                            >
-                              {report.load_kw} kW
-                            </div>
-                          </td>
+                          <td key={index} className="hist-td-load">
+  <span className="hist-td-load__pct">
+    {report.load_percentage?.toFixed(2)}%
+  </span>
+  <span className="hist-td-load__kw">{report.load_kw} kW</span>
+</td>
                         );
                       }
 
@@ -6605,36 +6331,30 @@ export default function Performance({
                       }
 
                       return (
-                        <td
-                          key={index}
-                          style={{
-                            textAlign: "center",
-                            padding: "10px",
-                            borderLeft: "1px solid #f1f5f9",
-                          }}
-                        >
-                          <div style={{ fontWeight: "600", color: "#334155" }}>
-                            {actualVal !== null && actualVal !== undefined
-                              ? actualVal.toFixed(1)
-                              : "-"}
-                          </div>
-                          {/* Calculated Percentage Deviation */}
-                          <div
-                            style={{
-                              color: devColor,
-                              fontWeight: "bold",
-                              fontSize: "0.75rem",
-                            }}
-                          >
-                            {displayDev}
-                          </div>
-                        </td>
-                      );
+  <td key={index} className="hist-td-data">
+    <span className="hist-td-data__val">
+      {actualVal !== null && actualVal !== undefined
+        ? actualVal.toFixed(1)
+        : "-"}
+    </span>
+    <span
+      className={`hist-td-data__dev ${
+        devColor === "#dc2626" ? "hist-dev--red"
+        : devColor === "#ca8a04" ? "hist-dev--amber"
+        : devColor === "#16a34a" ? "hist-dev--green"
+        : "hist-dev--grey"
+      }`}
+    >
+      {displayDev}
+    </span>
+  </td>
+);
                     })}
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
           </div>
         )}
       </div>
@@ -6684,100 +6404,51 @@ export default function Performance({
     ];
 
     return (
-      <div
-        className="enhanced-card history-table-card"
-        style={{ marginTop: "32px", marginBottom: "40px" }}
-      >
+      <div className="hist-card">
         <div
-  className={`card-header-enhanced ${!isHistoryExpanded ? 'header-closed' : ''}`}
+  className={`hist-header ${!isHistoryExpanded ? "hist-header--closed" : ""}`}
   onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    cursor: "pointer",
-    userSelect: "none",
-  }}
 >
-          <div>
-            <h3
-              className="card-title-enhanced"
-              style={{ margin: 0, fontSize: "1rem", fontWeight: "600" }}
-            >
-              Historical Deviation Analysis (Last 6 Reports)
-            </h3>
-            <p
-              className="card-description-enhanced"
-              style={{ margin: 0, fontSize: "0.78rem" }}
-            >
-              Main Engine — Actual vs Deviation %
-            </p>
-          </div>
+          <div className="hist-header__left">
+  <h3 className="hist-header__title">
+    Historical Deviation Analysis (Last 6 Reports)
+  </h3>
+  <p className="hist-header__subtitle">
+    Main Engine — Actual vs Deviation %
+  </p>
+</div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            {/* Professional Bookmark - Preserved exactly from your source */}
-            <div
-              style={{
-                fontSize: "0.7rem",
-                fontWeight: "700",
-                color: "#94a3b8",
-                textTransform: "uppercase",
-                backgroundColor: "#f8fafc",
-                padding: "4px 10px",
-                borderRadius: "4px",
-                border: "1px solid #e2e8f0",
-              }}
-            >
-              {bookmarkLabel}
-            </div>
-
-            {/* Animated Chevron Icon */}
-            <span
-              style={{
-                fontSize: "1.1rem",
-                color: "#94a3b8",
-                transition: "transform 0.3s ease",
-                transform: isHistoryExpanded
-                  ? "rotate(180deg)"
-                  : "rotate(0deg)",
-              }}
-            >
-              ▼
-            </span>
-          </div>
+          <div className="hist-header__right">
+  <div className="hist-header__bookmark">{bookmarkLabel}</div>
+  <span
+    className="hist-header__chevron"
+    style={{
+      transform: isHistoryExpanded ? "rotate(180deg)" : "rotate(0deg)",
+    }}
+  >
+    ▼
+  </span>
+</div>
         </div>
         {isHistoryExpanded && (
-          <div className="card-content-enhanced" style={{ overflowX: "auto", maxWidth: "100%" }}>
-            <table
-              className="summary-table-enhanced"
-              style={{ width: "100%", tableLayout: "fixed" }}
-            >
+          <div className="hist-body">
+  <div className="hist-scroll">
+            <table className="hist-table">
               <thead>
                 <tr>
-                  <th
-                    style={{
-                      textAlign: "left",
-                      padding: "12px",
-                      width: "200px",
-                    }}
-                  >
-                    PARAMETER
-                  </th>
+                  <th className="hist-th-param">PARAMETER</th>
                   {[...meDeviationHistory]
                     .sort(
                       (a, b) =>
                         new Date(b.report_date) - new Date(a.report_date),
                     )
                     .map((r, idx) => (
-                      <th
-                        key={idx}
-                        style={{ padding: "8px", textAlign: "center" }}
-                      >
-                        {getMonthDisplayName(r.report_month)}
-                        <div style={{ fontSize: "0.75rem", color: "#64748b" }}>
-                          {r.report_date}
-                        </div>
-                      </th>
+                      <th key={idx} className="hist-th-date">
+  <span className="hist-th-date__month">
+    {getMonthDisplayName(r.report_month)}
+  </span>
+  <span className="hist-th-date__raw">{r.report_date}</span>
+</th>
                     ))}
                 </tr>
               </thead>
@@ -6785,32 +6456,21 @@ export default function Performance({
               <tbody>
                 {parameters.map((p) => (
                   <tr key={p.key}>
-                    <td
-                      style={{
-                        fontWeight: "600",
-                        padding: "10px",
-                        backgroundColor: "#f8fafc",
-                      }}
-                    >
-                      {p.label}{" "}
-                      <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>
-                        ({p.unit})
-                      </span>
-                    </td>
+                    <td className="hist-td-param">
+  {p.label}
+  <span className="hist-td-param__unit">({p.unit})</span>
+</td>
                     {meDeviationHistory.map((r, index) => {
                       // ---------------------------
                       // A. Handle Load Row
                       // ---------------------------
                       if (p.isLoad) {
                         return (
-                          <td
-                            key={index}
-                            style={{ textAlign: "center", padding: "10px" }}
-                          >
-                            <div style={{ fontWeight: "bold" }}>
-                              {r.load_percentage?.toFixed(2)}%
-                            </div>
-                          </td>
+                          <td key={index} className="hist-td-load">
+  <span className="hist-td-load__pct">
+    {r.load_percentage?.toFixed(2)}%
+  </span>
+</td>
                         );
                       }
 
@@ -6929,37 +6589,28 @@ export default function Performance({
                       }
 
                       return (
-                        <td
-                          key={index}
-                          style={{
-                            textAlign: "center",
-                            padding: "10px",
-                            borderLeft: "1px solid #f1f5f9",
-                          }}
-                        >
-                          {/* Display the Calculated Actual Value */}
-                          <div style={{ fontWeight: "600", color: "#334155" }}>
-                            {displayVal}
-                          </div>
-                          {/* Display the Deviation % */}
-                          {p.key !== "engine_rpm" && (
-                            <div
-                              style={{
-                                color: devColor,
-                                fontWeight: "bold",
-                                fontSize: "0.8rem",
-                              }}
-                            >
-                              {displayDev}
-                            </div>
-                          )}
-                        </td>
+                        <td key={index} className="hist-td-data">
+  <span className="hist-td-data__val">{displayVal}</span>
+  {p.key !== "engine_rpm" && (
+    <span
+      className={`hist-td-data__dev ${
+        devColor === "#dc2626" ? "hist-dev--red"
+        : devColor === "#ca8a04" ? "hist-dev--amber"
+        : devColor === "#16a34a" ? "hist-dev--green"
+        : "hist-dev--grey"
+      }`}
+    >
+      {displayDev}
+    </span>
+  )}
+</td>
                       );
                     })}
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
           </div>
         )}
       </div>
@@ -9997,57 +9648,13 @@ export default function Performance({
       {/* --- START OF NEW 3-CARD LAYOUT --- */}
       {/* --- START OF NEW MASTER CONTROL CARD --- */}
       {/* --- PERFORMANCE CONTROL CONSOLE --- */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "12px",
-          marginBottom: embeddedMode ? "16px" : "32px",
-          width: "100%",
-        }}
-      >
+      <div className={`perf-console-wrapper ${embeddedMode ? "perf-console-wrapper--embedded" : ""}`}>
         {/* --- UNIFIED CONTROL PANEL (Your Preferred Layout) --- */}
         {/* --- RESTRUCTURED PERFORMANCE CONTROL CONSOLE --- */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "flex-end",
-            gap: "8px",
-            background: "white",
-            padding: "10px 16px",
-            borderRadius: "12px",
-            border: "1px solid #e2e8f0",
-            boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)",
-            width: "100%",
-            boxSizing: "border-box",
-            flexWrap: "wrap",
-            overflow: "visible",
-            // zIndex: 100,
-          }}
-        >
+        <div className="perf-control-bar">
           {/* 1. VESSEL SELECTOR */}
-          <div
-            style={{
-              flex: "1",
-              minWidth: "180px",
-              scrollbarWidth: "thin",
-              scrollbarColor: "#94a3b8 transparent",
-            }}
-          >
-            <label
-              style={{
-                fontSize: "0.65rem",
-                fontWeight: "800",
-                color: "#475569",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                display: "block",
-                marginBottom: "6px",
-              }}
-            >
-              Vessel
-            </label>
+          <div className="perf-vessel-field">
+            <label className="perf-field-label">Vessel</label>
             <SingleSelectDropdown
               value={shipId}
               onChange={(val) => handleShipChange(val)}
@@ -10060,73 +9667,18 @@ export default function Performance({
           </div>
 
           {/* 2. ENGINE TYPE TOGGLE (Preserving handleModeChange logic) */}
-          <div style={{ width: "150px" }}>
-            <label
-              style={{
-                fontSize: "0.65rem",
-                fontWeight: "800",
-                color: "#475569",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                display: "block",
-                marginBottom: "6px",
-              }}
-            >
-              Engine Type
-            </label>
-            <div
-              style={{
-                display: "flex",
-                background: "#f1f5f9",
-                padding: "3px",
-                borderRadius: "8px",
-                border: "1px solid #e2e8f0",
-                height: "42px",
-                boxSizing: "border-box",
-              }}
-            >
+          <div className="perf-engine-type-field">
+            <label className="perf-field-label">Engine Type</label>
+            <div className="perf-engine-toggle">
               <button
                 onClick={() => handleModeChange("mainEngine")}
-                style={{
-                  flex: 1,
-                  borderRadius: "6px",
-                  fontSize: "0.75rem",
-                  fontWeight: "800",
-                  border: "none",
-                  cursor: "pointer",
-                  backgroundColor:
-                    analysisMode === "mainEngine" ? "white" : "transparent",
-                  color: analysisMode === "mainEngine" ? "#0f172a" : "#94a3b8",
-                  boxShadow:
-                    analysisMode === "mainEngine"
-                      ? "0 2px 4px rgba(0,0,0,0.1)"
-                      : "none",
-                  transition: "all 0.2s",
-                }}
+                className={`perf-engine-btn ${analysisMode === "mainEngine" ? "active" : ""}`}
               >
                 ME
               </button>
               <button
                 onClick={() => handleModeChange("auxiliaryEngine")}
-                style={{
-                  flex: 1,
-                  borderRadius: "6px",
-                  fontSize: "0.75rem",
-                  fontWeight: "800",
-                  border: "none",
-                  cursor: "pointer",
-                  backgroundColor:
-                    analysisMode === "auxiliaryEngine"
-                      ? "white"
-                      : "transparent",
-                  color:
-                    analysisMode === "auxiliaryEngine" ? "#0f172a" : "#94a3b8",
-                  boxShadow:
-                    analysisMode === "auxiliaryEngine"
-                      ? "0 2px 4px rgba(0,0,0,0.1)"
-                      : "none",
-                  transition: "all 0.2s",
-                }}
+                className={`perf-engine-btn ${analysisMode === "auxiliaryEngine" ? "active" : ""}`}
               >
                 AE
               </button>
@@ -10135,20 +9687,8 @@ export default function Performance({
 
           {/* 3. UNIT SELECTOR (Conditional AE Logic) */}
           {analysisMode === "auxiliaryEngine" && (
-            <div style={{ width: "180px", animation: "fadeIn 0.2s ease" }}>
-              <label
-                style={{
-                  fontSize: "0.65rem",
-                  fontWeight: "800",
-                  color: "#475569",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  display: "block",
-                  marginBottom: "6px",
-                }}
-              >
-                Unit
-              </label>
+            <div className="perf-unit-field">
+              <label className="perf-field-label">Unit</label>
               <SingleSelectDropdown
                 value={selectedGeneratorId}
                 disabled={!shipId || (loading && generators.length === 0)}
@@ -10167,7 +9707,7 @@ export default function Performance({
           )}
 
           {/* 4. DIRECT + UPLOAD ACTION */}
-          <div style={{ width: "auto" }}>
+          <div className="perf-upload-field">
             <input
               type="file"
               accept=".pdf"
@@ -10176,40 +9716,17 @@ export default function Performance({
               onChange={handleFileUpload}
             />
             <Button
-              onClick={() =>
-                document.getElementById("direct-upload-input").click()
-              }
-              disabled={
-                !shipId ||
-                (analysisMode === "auxiliaryEngine" && !selectedGeneratorId)
-              }
-              style={{
-                backgroundColor: "#0f172a", // Sky blue for primary action
-                color: "white",
-                height: "42px",
-                padding: "0 16px",
-                fontWeight: "800",
-                fontSize: "0.75rem",
-                whiteSpace: "nowrap",
-              }}
+              onClick={() => document.getElementById("direct-upload-input").click()}
+              disabled={!shipId || (analysisMode === "auxiliaryEngine" && !selectedGeneratorId)}
+              className="perf-upload-btn"
             >
               + UPLOAD
             </Button>
           </div>
 
           {/* 5. SELECT REPORTS (Preserving MultiSelect and availableReports connection) */}
-          <div style={{ flex: "2", minWidth: "250px" }}>
-            <label
-              style={{
-                fontSize: "0.65rem",
-                fontWeight: "800",
-                color: "#475569",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                display: "block",
-                marginBottom: "6px",
-              }}
-            >
+          <div className="perf-select-reports-field">
+            <label className="perf-field-label">
               Select Reports to Analyze
             </label>
             <MultiSelectDropdown
@@ -10226,18 +9743,11 @@ export default function Performance({
             onClick={handleViewReport}
             disabled={
               !shipId ||
-              loading || // 🔥 Logic Cross-check: Prevents click while fetching
+              loading ||
               selectedReportIds.length === 0 ||
               (analysisMode === "auxiliaryEngine" && !selectedGeneratorId)
             }
-            style={{
-              backgroundColor: "#0f172a",
-              color: "white",
-              height: "42px",
-              padding: "0 20px",
-              fontWeight: "800",
-              fontSize: "0.8rem",
-            }}
+            className="perf-analyze-btn"
           >
             {loading ? "..." : "ANALYZE"}
           </Button>
@@ -10247,14 +9757,7 @@ export default function Performance({
             variant="secondary"
             onClick={handleDirectDownloadClick}
             disabled={isGeneratingPDF || selectedReportIds.length === 0}
-            style={{
-              height: "42px",
-              width: "42px",
-              padding: "0",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+            className="perf-download-btn"
           >
             {isGeneratingPDF ? "..." : <Download size={18} />}
           </Button>
@@ -10262,71 +9765,32 @@ export default function Performance({
 
         {/* --- ROW 2: INFO BAR (FIXED: Restored original Fallback Strings) --- */}
         {shipId && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              background: "#f8fafc",
-              padding: "10px 20px",
-              borderRadius: "10px",
-              border: "1px solid #e2e8f0",
-              animation: "fadeIn 0.3s ease",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <span style={{ fontSize: "1.2rem" }}>📜</span>
-              <div
-                style={{
-                  display: "flex",
-                  gap: "8px",
-                  alignItems: "baseline",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: "0.7rem",
-                    fontWeight: "800",
-                    color: "#64748b",
-                    textTransform: "uppercase",
-                  }}
-                >
+          <div className="perf-info-bar">
+            <div className="perf-info-bar__left">
+              <span className="perf-info-bar__icon">📜</span>
+              <div className="perf-info-bar__text-group">
+                <span className="perf-info-bar__label">
                   Last Report Received:
                 </span>
-                <span
-                  style={{
-                    fontSize: "0.9rem",
-                    fontWeight: "700",
-                    color: "#0f172a",
-                  }}
-                >
+                <span className="perf-info-bar__value">
                   {(() => {
                     if (analysisMode === "mainEngine") {
-                      return formatReportDate(lastReportDates.mainEngine); // Fixed Logic Point 3: Removed explicit "No records" fallback as per source
+                      return formatReportDate(lastReportDates.mainEngine);
                     }
                     const activeGen = generators.find(
                       (g) => g.generator_id === selectedGeneratorId,
                     );
                     if (activeGen) {
-                      // Fetch the date using the generator_id instead of the text label
                       return formatReportDate(
                         lastReportDates.auxiliaryEngine[activeGen.generator_id],
                       );
                     }
-                    return "Select Unit Above"; // Fixed Logic Point 3: Restored original string
+                    return "Select Unit Above";
                   })()}
                 </span>
               </div>
             </div>
-
-            <div
-              style={{
-                fontSize: "0.65rem",
-                fontWeight: "600",
-                color: "#94a3b8",
-                textTransform: "uppercase",
-              }}
-            >
+            <div className="perf-info-bar__status">
               Status:{" "}
               {activeTab === "view" ? "Analysis Mode" : "Raw Data Management"}
             </div>
@@ -10427,72 +9891,26 @@ export default function Performance({
                 };
 
                 return (
-                  <div
-                    className="enhanced-card"
-                    style={{
-                      marginBottom: "24px",
-                      border: "1px solid #e2e8f0",
-                      overflow: "hidden",
-                    }}
-                  >
+                  <div className="enhanced-card uwd-card">
                     <div
                       onClick={() =>
                         setIsCylinderCardExpanded(!isCylinderCardExpanded)
                       }
-                      style={{
-                        padding: "14px 24px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        cursor: "pointer",
-                        backgroundColor: "#f8fafc",
-                        borderBottom: isCylinderCardExpanded
-                          ? "1px solid #e2e8f0"
-                          : "none",
-                      }}
+                      className={`uwd-collapse-header ${isCylinderCardExpanded ? "uwd-collapse-header--open" : ""}`}
                     >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                        }}
-                      >
-                        <span style={{ fontSize: "1.2rem" }}>📊</span>
-                        <h3
-                          style={{
-                            margin: 0,
-                            fontSize: "1rem",
-                            fontWeight: "700",
-                            color: "#1e293b",
-                          }}
-                        >
+                      <div className="uwd-header-left">
+                        <span className="uwd-header-icon">📊</span>
+                        <h3 className="uwd-header-title">
                           {isAE
                             ? `Unit-Wise Deviation Analysis - ${bookmarkLabel}`
                             : "Unit-Wise Deviation Analysis (Main Engine)"}
                         </h3>
                       </div>
-                      <span
-                        style={{
-                          transform: isCylinderCardExpanded
-                            ? "rotate(180deg)"
-                            : "rotate(0deg)",
-                          transition: "0.3s",
-                        }}
-                      >
-                        ▼
-                      </span>
+                      <span className={`uwd-collapse-chevron ${isCylinderCardExpanded ? "uwd-collapse-chevron--open" : "uwd-collapse-chevron--closed"}`}>▼</span>
                     </div>
 
                     {isCylinderCardExpanded && (
-                      <div
-                        style={{
-                          padding: "24px",
-                          display: "grid",
-                          gridTemplateColumns: "repeat(2, 1fr)",
-                          gap: "12px",
-                        }}
-                      >
+                      <div className="uwd-charts-grid">
                         {params.map((p) => {
                           const isoAvg = Number(p.avgValue || 0);
 
@@ -10624,63 +10042,24 @@ export default function Performance({
                                 { color: "#ca8a04", label: "3–5% Warning" },
                                 { color: "#dc2626", label: ">5% Critical" },
                               ];
+                          const barSize = window.innerWidth <= 1024 ? 10 : 16;
+                          const barRadius = window.innerWidth <= 1024
+                            ? [2, 2, 0, 0]
+                            : [4, 4, 0, 0];
 
                           return (
-                            <div
-                              key={p.key}
-                              style={{
-                                backgroundColor: "white",
-                                padding: "10px 14px",
-                                borderRadius: "12px",
-                                border: "1px solid #f1f5f9",
-                                position: "relative",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  marginBottom: "6px",
-                                  alignItems: "flex-start",
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    fontSize: "0.75rem",
-                                    fontWeight: "800",
-                                    color: "#64748b",
-                                    textTransform: "uppercase",
-                                  }}
-                                >
+                            <div key={p.key} className="uwd-chart-cell">
+                              <div className="uwd-chart-toprow">
+                                <span className="uwd-chart-param-label">
                                   {p.label} Deviation{" "}
                                   {p.isPercent ? "(%)" : `(${p.unit})`}
                                 </span>
-                                <div
-                                  style={{
-                                    textAlign: "right",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "flex-end",
-                                    gap: "4px",
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      fontSize: "0.7rem",
-                                      color: "#94a3b8",
-                                      fontWeight: "700",
-                                    }}
-                                  >
+                                <div className="uwd-chart-stats">
+                                  <div className="uwd-avg-text">
                                     Avg: {isoAvg.toFixed(1)} {p.unit}
                                   </div>
                                   {shopTrialValue != null && (
-                                    <div
-                                      style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "5px",
-                                      }}
-                                    >
+                                    <div className="uwd-shop-trial-row">
                                       <span
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -10689,29 +10068,8 @@ export default function Performance({
                                             [p.key]: !prev[p.key],
                                           }));
                                         }}
-                                        style={{
-                                          width: "12px",
-                                          height: "12px",
-                                          borderRadius: "3px",
-                                          backgroundColor: showShopTrialMap[
-                                            p.key
-                                          ]
-                                            ? "#ca8a04"
-                                            : "transparent",
-                                          border: `1.5px solid ${showShopTrialMap[p.key] ? "#ca8a04" : "#cbd5e1"}`,
-                                          display: "inline-block",
-                                          cursor: "pointer",
-                                          transition: "all 0.2s ease",
-                                          flexShrink: 0,
-                                        }}
-                                      />
-                                      <div
-                                        style={{
-                                          fontSize: "0.7rem",
-                                          color: "#ca8a04",
-                                          fontWeight: "700",
-                                        }}
-                                      >
+                                        className={`uwd-shop-checkbox ${showShopTrialMap[p.key] ? "uwd-shop-checkbox--checked" : "uwd-shop-checkbox--unchecked"}`} />
+                                      <div className="uwd-shop-text">
                                         Shop Trial: {shopTrialValue.toFixed(1)}{" "}
                                         {p.unit}
                                       </div>
@@ -10720,69 +10078,23 @@ export default function Performance({
                                 </div>
                               </div>
 
-                              <div
-                                style={{
-                                  display: "flex",
-                                  gap: "10px",
-                                  marginBottom: "4px",
-                                  alignItems: "center",
-                                  flexWrap: "wrap",
-                                }}
-                              >
+                              <div className="uwd-legend-row">
                                 {legendZones.map((z) => (
-                                  <span
-                                    key={z.label}
-                                    style={{
-                                      fontSize: "0.6rem",
-                                      color: z.color,
-                                      fontWeight: "700",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "3px",
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        width: 7,
-                                        height: 7,
-                                        borderRadius: "50%",
-                                        backgroundColor: z.color,
-                                        display: "inline-block",
-                                        flexShrink: 0,
-                                      }}
-                                    />
+                                  <span key={z.label} className="uwd-legend-item" style={{ color: z.color }}>
+                                    <span className="uwd-legend-dot" style={{ backgroundColor: z.color }} />
                                     {z.label}
                                   </span>
                                 ))}
                                 {shopTrialValue != null &&
                                   showShopTrialMap[p.key] && (
-                                    <span
-                                      style={{
-                                        fontSize: "0.6rem",
-                                        color: "#ca8a04",
-                                        fontWeight: "700",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "3px",
-                                      }}
-                                    >
-                                      <span
-                                        style={{
-                                          width: 8,
-                                          height: 8,
-                                          borderRadius: "2px",
-                                          backgroundColor: "#ca8a04",
-                                          opacity: 0.6,
-                                          display: "inline-block",
-                                          flexShrink: 0,
-                                        }}
-                                      />
+                                    <span className="uwd-legend-item uwd-legend-item--shop">
+                                      <span className="uwd-legend-shop-box" />
                                       Vs Shop Trial
                                     </span>
                                   )}
                               </div>
 
-                              <div style={{ width: "100%", height: "180px" }}>
+                              <div className="uwd-chart-wrapper">
                                 <ResponsiveContainer width="100%" height="100%">
                                   <BarChart
                                     data={chartData}
@@ -11095,8 +10407,8 @@ export default function Performance({
 
                                     <Bar
                                       dataKey="deviation"
-                                      radius={[4, 4, 0, 0]}
-                                      barSize={16}
+                                      radius={barRadius}
+                                      barSize={barSize}
                                     >
                                       {chartData.map((entry, index) => (
                                         <Cell
@@ -11110,8 +10422,8 @@ export default function Performance({
                                       showShopTrialMap[p.key] && (
                                         <Bar
                                           dataKey="shopRange"
-                                          radius={[4, 4, 0, 0]}
-                                          barSize={16}
+                                          radius={barRadius}
+                                          barSize={barSize}
                                         >
                                           {chartData.map((entry, index) => (
                                             <Cell
@@ -11523,56 +10835,24 @@ export default function Performance({
                 })();
 
                 return (
-                  <div
-                    className="enhanced-card"
-                    style={{
-                      marginBottom: "24px",
-                      border: "1px solid #e2e8f0",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {/* COLLAPSIBLE HEADER — unchanged */}
+                  <div className="trend-time-card">
+                    {/* COLLAPSIBLE HEADER */}
                     <div
-  className={`card-header-enhanced ${!isTrendCardExpanded ? 'header-closed' : ''}`}
-  onClick={() => setIsTrendCardExpanded((p) => !p)}
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    cursor: "pointer",
-    userSelect: "none",
-  }}
->
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                        }}
-                      >
-                        <span style={{ fontSize: "1.2rem" }}>📈</span>
+                      className={`trend-time-header ${!isTrendCardExpanded ? "header-closed" : ""}`}
+                      onClick={() => setIsTrendCardExpanded((p) => !p)}
+                    >
+                      <div className="trend-time-title-group">
+                        <span className="trend-time-title-icon">📈</span>
                         <div>
-                          <h3
-                            style={{
-                              margin: 0,
-                              fontSize: "1rem",
-                              fontWeight: "700",
-                              color: "#1e293b",
-                            }}
-                          >
+                          <h3 className="trend-time-title">
                             Deviation Trend Over Time Based
                           </h3>
                         </div>
                       </div>
                       <span
+                        className="trend-time-chevron"
                         style={{
-                          fontSize: "0.9rem",
-                          color: "#94a3b8",
-                          transition: "transform 0.3s",
-                          transform: isTrendCardExpanded
-                            ? "rotate(180deg)"
-                            : "rotate(0deg)",
-                          display: "inline-block",
+                          transform: isTrendCardExpanded ? "rotate(180deg)" : "rotate(0deg)",
                         }}
                       >
                         ▼
@@ -11580,42 +10860,19 @@ export default function Performance({
                     </div>
 
                     {isTrendCardExpanded && (
-                      <div
-                        style={{
-                          padding: "20px 24px",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "16px",
-                        }}
-                      >
+                      <div className="trend-time-content">
                         {/* PARAMETER PILLS — unchanged */}
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "0.65rem",
-                              fontWeight: "800",
-                              color: "#64748b",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
+                        {/* PARAMETER PILLS */}
+                        <div className="trend-time-pills-wrap">
+                          <span className="trend-time-pill-label">
                             PARAMETER:
                           </span>
                           {PARAM_LIST.map((param, i) => {
-                            const isActive = selectedTrendParams.includes(
-                              param.key,
-                            );
+                            const isActive = selectedTrendParams.includes(param.key);
                             return (
                               <button
                                 key={param.key}
+                                className="trend-time-pill-btn"
                                 onClick={() =>
                                   setSelectedTrendParams((prev) =>
                                     isActive
@@ -11624,17 +10881,9 @@ export default function Performance({
                                   )
                                 }
                                 style={{
-                                  padding: "4px 11px",
-                                  borderRadius: "20px",
                                   border: `2px solid ${isActive ? COLORS[i % COLORS.length] : "#e2e8f0"}`,
-                                  backgroundColor: isActive
-                                    ? COLORS[i % COLORS.length]
-                                    : "white",
+                                  backgroundColor: isActive ? COLORS[i % COLORS.length] : "white",
                                   color: isActive ? "white" : "#64748b",
-                                  fontSize: "0.72rem",
-                                  fontWeight: "700",
-                                  cursor: "pointer",
-                                  transition: "all 0.18s",
                                 }}
                               >
                                 {param.label}
@@ -11643,17 +10892,8 @@ export default function Performance({
                           })}
                           {selectedTrendParams.length > 0 && (
                             <button
+                              className="trend-time-clear-btn"
                               onClick={() => setSelectedTrendParams([])}
-                              style={{
-                                padding: "4px 10px",
-                                borderRadius: "20px",
-                                border: "1.5px dashed #cbd5e1",
-                                backgroundColor: "transparent",
-                                color: "#94a3b8",
-                                fontSize: "0.68rem",
-                                fontWeight: "700",
-                                cursor: "pointer",
-                              }}
                             >
                               Clear
                             </button>
@@ -11662,38 +10902,19 @@ export default function Performance({
 
                         {/* CHART */}
                         {activeTrendData.length < 2 ? (
-                          <div
-                            style={{
-                              height: 380,
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "#94a3b8",
-                              gap: "8px",
-                              backgroundColor: "#fafafa",
-                              borderRadius: "10px",
-                              border: "1px dashed #e2e8f0",
-                            }}
-                          >
-                            <span style={{ fontSize: "2rem" }}>📊</span>
-                            <span
-                              style={{ fontSize: "0.88rem", fontWeight: "600" }}
-                            >
+                          <div className="trend-time-empty">
+                            <span className="trend-time-empty-icon">📊</span>
+                            <span className="trend-time-empty-text">
                               Need 2 or more reports to show trend
                             </span>
-                            <span style={{ fontSize: "0.75rem" }}>
-                              {availableReports.length} report(s) available for
-                              this vessel
+                            <span className="trend-time-empty-sub">
+                              {availableReports.length} report(s) available for this vessel
                             </span>
                           </div>
                         ) : (
                           <>
-                            <ResponsiveContainer
-                              width="100%"
-                              height={400}
-                              minHeight={400}
-                            >
+                            <div className="trend-time-chart-wrap">
+                              <ResponsiveContainer width="100%" height="100%">
                               <LineChart
                                 data={mergedTrendData}
                                 margin={{
@@ -11968,6 +11189,7 @@ export default function Performance({
                                 })}
                               </LineChart>
                             </ResponsiveContainer>
+                          </div>
 
                             {/* DELTA INSIGHT BOX */}
                             {(() => {
@@ -11985,34 +11207,11 @@ export default function Performance({
                                 .filter(Boolean);
                               if (insights.length === 0) return null;
                               return (
-                                <div
-                                  style={{
-                                    padding: "12px 16px",
-                                    backgroundColor: "#f8fafc",
-                                    borderRadius: "10px",
-                                    border: "1px solid #e2e8f0",
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      fontSize: "0.62rem",
-                                      fontWeight: "800",
-                                      color: "#64748b",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.05em",
-                                      marginBottom: "8px",
-                                    }}
-                                  >
-                                    Latest vs Previous · {previous.date} →{" "}
-                                    {latest.date}
-                                  </div>
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      flexWrap: "wrap",
-                                      gap: "8px",
-                                    }}
-                                  >
+                                  <div className="trend-time-insight-box">
+                                    <div className="trend-time-insight-title">
+                                      Latest vs Previous · {previous.date} → {latest.date}
+                                    </div>
+                                    <div className="trend-time-insight-pills">
                                     {insights.map(({ key, curr, change }) => {
                                       const found = PARAM_LIST.find(
                                         (p) => p.key === key,
@@ -12063,34 +11262,22 @@ export default function Performance({
                                             : `${sign}${change.toFixed(2)}%`;
 
                                       return (
-                                        <div
-                                          key={key}
-                                          style={{
-                                            padding: "5px 11px",
-                                            borderRadius: "8px",
-                                            backgroundColor: "white",
-                                            border: `1.5px solid ${color}35`,
-                                            fontSize: "0.76rem",
-                                            display: "flex",
-                                            gap: "6px",
-                                            alignItems: "center",
-                                          }}
-                                        >
-                                          <span
-                                            style={{
-                                              fontWeight: "700",
-                                              color: "#334155",
-                                            }}
+                                          <div
+                                            key={key}
+                                            className="trend-time-insight-pill"
+                                            style={{ border: `1.5px solid ${color}35` }}
                                           >
-                                            {label}:
-                                          </span>
-                                          <span
-                                            style={{ fontWeight: "800", color }}
-                                          >
-                                            {formatted}
-                                          </span>
-                                        </div>
-                                      );
+                                            <span className="trend-time-insight-pill-label">
+                                              {label}:
+                                            </span>
+                                            <span
+                                              className="trend-time-insight-pill-value"
+                                              style={{ color }}
+                                            >
+                                              {formatted}
+                                            </span>
+                                          </div>
+                                        );
                                     })}
                                   </div>
                                 </div>
@@ -12218,56 +11405,24 @@ export default function Performance({
                         : "#dc2626";
 
                 return (
-                  <div
-                    className="enhanced-card"
-                    style={{
-                      marginBottom: "24px",
-                      border: "1px solid #e2e8f0",
-                      overflow: "hidden",
-                    }}
-                  >
+                  <div className="trend-load-card">
                     {/* COLLAPSIBLE HEADER */}
                     <div
-  className={`card-header-enhanced ${!isEnvelopeCardExpanded ? 'header-closed' : ''}`}
-  onClick={() => setIsEnvelopeCardExpanded((p) => !p)}
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    cursor: "pointer",
-    userSelect: "none",
-  }}
->
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                        }}
-                      >
-                        <span style={{ fontSize: "1.2rem" }}>🎯</span>
+                      className={`trend-load-header ${!isEnvelopeCardExpanded ? "header-closed" : ""}`}
+                      onClick={() => setIsEnvelopeCardExpanded((p) => !p)}
+                    >
+                      <div className="trend-load-title-group">
+                        <span className="trend-load-title-icon">🎯</span>
                         <div>
-                          <h3
-                            style={{
-                              margin: 0,
-                              fontSize: "1rem",
-                              fontWeight: "700",
-                              color: "#1e293b",
-                            }}
-                          >
+                          <h3 className="trend-load-title">
                             Trend Over Load Based
                           </h3>
                         </div>
                       </div>
                       <span
+                        className="trend-load-chevron"
                         style={{
-                          fontSize: "0.9rem",
-                          color: "#94a3b8",
-                          transition: "transform 0.3s",
-                          transform: isEnvelopeCardExpanded
-                            ? "rotate(180deg)"
-                            : "rotate(0deg)",
-                          display: "inline-block",
+                          transform: isEnvelopeCardExpanded ? "rotate(180deg)" : "rotate(0deg)",
                         }}
                       >
                         ▼
@@ -12275,33 +11430,11 @@ export default function Performance({
                     </div>
 
                     {isEnvelopeCardExpanded && (
-                      <div
-                        style={{
-                          padding: "20px 24px",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "16px",
-                        }}
-                      >
+                      <div className="trend-load-content">
                         {/* PARAMETER PILLS */}
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "0.65rem",
-                              fontWeight: "800",
-                              color: "#64748b",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
+                        {/* PARAMETER PILLS */}
+                        <div className="trend-load-pills-wrap">
+                          <span className="trend-load-pill-label">
                             Parameter:
                           </span>
                           {PARAM_LIST.map((param) => {
@@ -12309,22 +11442,15 @@ export default function Performance({
                             return (
                               <button
                                 key={param.key}
+                                className="trend-load-pill-btn"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setEnvelopeParam(param.key);
                                 }}
                                 style={{
-                                  padding: "4px 11px",
-                                  borderRadius: "20px",
                                   border: `2px solid ${isActive ? "#7c3aed" : "#e2e8f0"}`,
-                                  backgroundColor: isActive
-                                    ? "#7c3aed"
-                                    : "white",
+                                  backgroundColor: isActive ? "#7c3aed" : "white",
                                   color: isActive ? "white" : "#64748b",
-                                  fontSize: "0.72rem",
-                                  fontWeight: "700",
-                                  cursor: "pointer",
-                                  transition: "all 0.18s",
                                 }}
                               >
                                 {param.label}
@@ -12335,13 +11461,7 @@ export default function Performance({
 
                         {/* STATS ROW */}
                         {avgDev !== null && (
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: "12px",
-                              flexWrap: "wrap",
-                            }}
-                          >
+                          <div className="trend-load-stats-wrap">
                             {[
                               {
                                 label: "Reports plotted",
@@ -12349,34 +11469,13 @@ export default function Performance({
                                 color: "#334155",
                               },
                             ].map((stat) => (
-                              <div
-                                key={stat.label}
-                                style={{
-                                  padding: "8px 14px",
-                                  backgroundColor: "#f8fafc",
-                                  borderRadius: "8px",
-                                  border: "1px solid #e2e8f0",
-                                  minWidth: "90px",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    fontSize: "0.62rem",
-                                    color: "#94a3b8",
-                                    fontWeight: "700",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.04em",
-                                  }}
-                                >
+                              <div key={stat.label} className="trend-load-stat-box">
+                                <div className="trend-load-stat-label">
                                   {stat.label}
                                 </div>
                                 <div
-                                  style={{
-                                    fontSize: "0.95rem",
-                                    fontWeight: "800",
-                                    color: stat.color,
-                                    marginTop: "2px",
-                                  }}
+                                  className="trend-load-stat-value"
+                                  style={{ color: stat.color }}
                                 >
                                   {stat.value}
                                 </div>
@@ -12387,30 +11486,16 @@ export default function Performance({
 
                         {/* CHART */}
                         {!baseline[activeKey] ? (
-                          <div
-                            style={{
-                              height: 420,
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "#94a3b8",
-                              gap: "8px",
-                              backgroundColor: "#fafafa",
-                              borderRadius: "10px",
-                              border: "1px dashed #e2e8f0",
-                            }}
-                          >
-                            <span style={{ fontSize: "2rem" }}>🔍</span>
-                            <span
-                              style={{ fontSize: "0.88rem", fontWeight: "600" }}
-                            >
+                          <div className="trend-load-empty">
+                            <span className="trend-load-empty-icon">🔍</span>
+                            <span className="trend-load-empty-text">
                               No baseline data for "{activeKey}"
                             </span>
                           </div>
                         ) : (
                           <>
-                            <ResponsiveContainer width="100%" height={360}>
+                            <div className="trend-load-chart-wrap">
+                              <ResponsiveContainer width="100%" height="100%">
                               <ComposedChart
                                 margin={{
                                   left: 16,
@@ -12571,91 +11656,38 @@ export default function Performance({
                                 ))}
                               </ComposedChart>
                             </ResponsiveContainer>
-
+                          </div>
                             {/* MANUAL LEGEND — outside SVG, zero collision risk */}
-                            <div
-                              style={{
-                                display: "flex",
-                                flexWrap: "wrap",
-                                justifyContent: "center",
-                                gap: "6px 14px",
-                                padding: "10px 8px 4px",
-                                borderTop: "1px solid #f1f5f9",
-                              }}
-                            >
+                            <div className="trend-load-legend-wrap">
                               {/* Baseline legend item */}
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "5px",
-                                }}
-                              >
+                              <div className="trend-load-legend-item">
                                 <svg width="22" height="10">
                                   <line
-                                    x1="0"
-                                    y1="5"
-                                    x2="22"
-                                    y2="5"
-                                    stroke="#ca8a04"
-                                    strokeWidth="2.5"
-                                    strokeDasharray="6 4"
+                                    x1="0" y1="5" x2="22" y2="5"
+                                    stroke="#ca8a04" strokeWidth="2.5" strokeDasharray="6 4"
                                   />
                                 </svg>
-                                <span
-                                  style={{
-                                    fontSize: "10px",
-                                    color: "#64748b",
-                                    fontWeight: 600,
-                                  }}
-                                >
+                                <span className="trend-load-legend-text">
                                   Shop Trial (Baseline)
                                 </span>
                               </div>
 
                               {/* One entry per scatter point */}
                               {scatterPoints.map((pt, idx) => (
-                                <div
-                                  key={`leg-${idx}`}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "5px",
-                                  }}
-                                >
+                                <div key={`leg-${idx}`} className="trend-load-legend-item">
                                   <svg width="12" height="12">
                                     <line
-                                      x1="1"
-                                      y1="1"
-                                      x2="11"
-                                      y2="11"
-                                      stroke={
-                                        SCATTER_COLORS[
-                                          idx % SCATTER_COLORS.length
-                                        ]
-                                      }
+                                      x1="1" y1="1" x2="11" y2="11"
+                                      stroke={SCATTER_COLORS[idx % SCATTER_COLORS.length]}
                                       strokeWidth="2.5"
                                     />
                                     <line
-                                      x1="1"
-                                      y1="11"
-                                      x2="11"
-                                      y2="1"
-                                      stroke={
-                                        SCATTER_COLORS[
-                                          idx % SCATTER_COLORS.length
-                                        ]
-                                      }
+                                      x1="1" y1="11" x2="11" y2="1"
+                                      stroke={SCATTER_COLORS[idx % SCATTER_COLORS.length]}
                                       strokeWidth="2.5"
                                     />
                                   </svg>
-                                  <span
-                                    style={{
-                                      fontSize: "10px",
-                                      color: "#64748b",
-                                      fontWeight: 600,
-                                    }}
-                                  >
+                                  <span className="trend-load-legend-text">
                                     {pt.name}
                                   </span>
                                 </div>
