@@ -2517,554 +2517,460 @@ thead .matrix-sticky-col-2 {
 
 
 /* ============================================================
-   HISTORICAL DEVIATION ANALYSIS TABLE
-   Covers: renderMEDeviationHistoryTable() &
-           renderAEDeviationHistoryTable()
-
-   COLUMN VISIBILITY TARGETS (from screenshots):
-   ≥ 1440px  → 6 columns, table fills full card width (no wasted space)
-   1025–1279px → 5 columns visible, 6th scrolls off
-   769–1024px  → 5 columns visible, 6th scrolls off  ← was showing 6
-   481–768px   → 3 columns visible, 4th scrolls off  ← was showing 4
-   ≤ 480px     → 2 columns visible, rest scroll
-
-   APPROACH:
-   • ≥ 1440px: table width:100% so columns stretch to fill.
-     Column widths are auto / proportional — no fixed px needed.
-   • < 1440px: table is fixed-layout with a min-width that is
-     WIDER than the scroll container, forcing overflow+scroll.
-     The scroll container is set to exactly
-       (param_width + N_visible × col_width)
-     so the (N+1)th column is fully hidden until scrolled.
+   HISTORICAL DEVIATION ANALYSIS TABLE (FULLY UPDATED)
    ============================================================ */
-
 
 /* ============================================================
    OUTER CARD
    ============================================================ */
 .hist-card {
-  background: white;
-  border-radius: 16px;
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px  6px -2px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e2e8f0;
-  position: relative;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow: hidden;
-  margin-top: 32px;
-  margin-bottom: 40px;
+  background: white !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid #e2e8f0 !important;
+  position: relative !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  margin-top: 32px !important;
+  margin-bottom: 40px !important;
 }
-
 
 /* ============================================================
    COLLAPSIBLE HEADER
    ============================================================ */
 .hist-header {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-  user-select: none;
-  padding: 16px 24px;
-  background-color: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-  gap: 12px;
-  flex-wrap: nowrap;
-  min-width: 0;
-  box-sizing: border-box;
-  transition:
-    border-bottom 0.2s ease,
-    border-radius  0.2s ease;
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  padding: 16px 24px !important;
+  background-color: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  gap: 12px !important;
+  flex-wrap: nowrap !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  transition: border-bottom 0.2s ease, border-radius 0.2s ease !important;
 }
 
 .hist-header--closed {
-  border-bottom: none;
-  border-radius: 16px;
+  border-bottom: none !important;
+  border-radius: 16px !important;
 }
 
-/* ── Left group ── */
 .hist-header__left {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
 }
 
 .hist-header__title {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-  color: #1e293b;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  letter-spacing: -0.01em;
+  margin: 0 !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  letter-spacing: -0.01em !important;
 }
 
 .hist-header__subtitle {
-  margin: 0;
-  font-size: 0.78rem;
-  color: #64748b;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin: 0 !important;
+  font-size: 0.78rem !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
-/* ── Right group ── */
 .hist-header__right {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-  flex-wrap: nowrap;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 12px !important;
+  flex-shrink: 0 !important;
+  flex-wrap: nowrap !important;
 }
 
 .hist-header__bookmark {
-  font-size: 0.65rem;
-  font-weight: 700;
-  color: #94a3b8;
-  text-transform: uppercase;
-  background-color: #f8fafc;
-  padding: 4px 10px;
-  border-radius: 4px;
-  border: 1px solid #e2e8f0;
-  letter-spacing: 0.025em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 180px;
-  flex-shrink: 0;
+  font-size: 0.65rem !important;
+  font-weight: 700 !important;
+  color: #94a3b8 !important;
+  text-transform: uppercase !important;
+  background-color: #f8fafc !important;
+  padding: 4px 10px !important;
+  border-radius: 4px !important;
+  border: 1px solid #e2e8f0 !important;
+  letter-spacing: 0.025em !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 180px !important;
+  flex-shrink: 0 !important;
 }
 
 .hist-header__chevron {
-  font-size: 1.1rem;
-  color: #94a3b8;
-  transition: transform 0.3s ease;
-  display: inline-block;
-  line-height: 1;
-  flex-shrink: 0;
+  font-size: 1.1rem !important;
+  color: #94a3b8 !important;
+  transition: transform 0.3s ease !important;
+  display: inline-block !important;
+  line-height: 1 !important;
+  flex-shrink: 0 !important;
 }
-
 
 /* ============================================================
    CARD BODY
    ============================================================ */
 .hist-body {
-  padding: 20px 24px;
-  box-sizing: border-box;
-  width: 100%;
+  /* padding: 20px 24px !important; */
+  box-sizing: border-box !important;
+  width: 100% !important;
 }
-
 
 /* ============================================================
    HORIZONTAL SCROLL CONTAINER
-   Default (base): full width, scrolls when table overflows.
-   Specific breakpoints override width to clip to N columns.
    ============================================================ */
 .hist-scroll {
-  width: 100%;
-  overflow-x: auto;
-  overflow-y: visible;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 #f8fafc;
-  border-radius: 6px;
-  box-sizing: border-box;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #cbd5e1 #f8fafc !important;
+  border-radius: 6px !important;
+  box-sizing: border-box !important;
 }
 
-.hist-scroll::-webkit-scrollbar        { height: 5px; }
-.hist-scroll::-webkit-scrollbar-track  { background: #f8fafc; border-radius: 10px; }
-.hist-scroll::-webkit-scrollbar-thumb  { background: #cbd5e1; border-radius: 10px; }
-.hist-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
+.hist-scroll::-webkit-scrollbar { height: 6px !important; }
+.hist-scroll::-webkit-scrollbar-track { background: #f8fafc !important; border-radius: 10px !important; }
+.hist-scroll::-webkit-scrollbar-thumb { background: #cbd5e1 !important; border-radius: 10px !important; }
+.hist-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8 !important; }
 
 /* ============================================================
-   TABLE — base (< 1440px): fixed layout with explicit widths.
-   At ≥ 1440px this is overridden to width:100% so it fills the card.
-
-   Base column sizes used in scroll breakpoints below:
-     param = 220px
-     month = 140px
-     6 cols total min-width = 220 + 6×140 = 1060px
+   TABLE
    ============================================================ */
 .hist-table {
-  table-layout: fixed;
-  border-collapse: separate;
-  border-spacing: 0;
-  /* wide enough for 6 cols — container clips to show N at a time */
-  min-width: 1060px;
-  width: max-content;
+  table-layout: fixed !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  min-width: max-content !important; 
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
-
 /* ============================================================
-   HEADER CELLS  (base — used at < 1440px)
+   HEADER CELLS
    ============================================================ */
-
 .hist-th-param {
-  position: sticky;
-  left: 0;
-  z-index: 10;
-  text-align: left;
-  padding: 12px 16px;
-  width: 220px;
-  min-width: 220px;
-  max-width: 220px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background-color: #f8fafc;
-  border-bottom: 2px solid #e2e8f0;
-  box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.08);
-  white-space: nowrap;
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 20 !important; /* Forces it above moving columns */
+  text-align: left !important;
+  padding: 12px 16px !important;
+  width: 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  color: #64748b !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  background-color: #f8fafc !important; /* Opaque background stops collision visibility */
+  border-bottom: 2px solid #e2e8f0 !important;
+  box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.08) !important;
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
 }
 
 .hist-th-date {
-  padding: 10px 8px;
-  text-align: center;
-  width: 140px;
-  min-width: 140px;
-  max-width: 140px;
-  background-color: #f8fafc;
-  border-bottom: 2px solid #e2e8f0;
-  border-left: 1px solid #f1f5f9;
-  vertical-align: middle;
+  padding: 10px 8px !important;
+  text-align: center !important;
+  width: 140px !important;
+  min-width: 140px !important;
+  max-width: 140px !important;
+  background-color: #f8fafc !important;
+  border-bottom: 2px solid #e2e8f0 !important;
+  border-left: 1px solid #f1f5f9 !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
 }
 
 .hist-th-date__month {
-  display: block;
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: #1e293b;
-  white-space: nowrap;
+  display: block !important;
+  font-size: 0.88rem !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+  white-space: nowrap !important;
 }
 
 .hist-th-date__raw {
-  display: block;
-  font-size: 0.68rem;
-  color: #64748b;
-  font-weight: 500;
-  margin-top: 2px;
-  white-space: nowrap;
+  display: block !important;
+  font-size: 0.68rem !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
+  margin-top: 2px !important;
+  white-space: nowrap !important;
 }
 
-
 /* ============================================================
-   BODY CELLS  (base — used at < 1440px)
+   BODY CELLS
    ============================================================ */
-
 .hist-td-param {
-  position: sticky;
-  left: 0;
-  z-index: 5;
-  padding: 10px 16px;
-  text-align: left;
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: #334155;
-  background-color: #f8fafc;
-  border-bottom: 1px solid #f1f5f9;
-  white-space: nowrap;
-  width: 220px;
-  min-width: 220px;
-  max-width: 220px;
-  box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.06);
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 10 !important; /* Stays above data but below header */
+  padding: 10px 16px !important;
+  text-align: left !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  color: #334155 !important;
+  background-color: #f8fafc !important; /* Crucial to prevent bleed-through collision */
+  border-bottom: 1px solid #f1f5f9 !important;
+  white-space: nowrap !important;
+  width: 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
+  box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.06) !important;
+  box-sizing: border-box !important;
 }
 
 .hist-td-param__unit {
-  color: #94a3b8;
-  font-weight: 500;
-  font-size: 0.75rem;
-  margin-left: 4px;
+  color: #94a3b8 !important;
+  font-weight: 500 !important;
+  font-size: 0.75rem !important;
+  margin-left: 4px !important;
 }
 
 .hist-td-data {
-  text-align: center;
-  padding: 10px 8px;
-  border-bottom: 1px solid #f1f5f9;
-  border-left: 1px solid #f1f5f9;
-  vertical-align: middle;
-  width: 140px;
-  min-width: 140px;
-  max-width: 140px;
+  text-align: center !important;
+  padding: 10px 8px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  border-left: 1px solid #f1f5f9 !important;
+  vertical-align: middle !important;
+  width: 140px !important;
+  min-width: 140px !important;
+  max-width: 140px !important;
+  box-sizing: border-box !important;
 }
 
 .hist-td-data__val {
-  display: block;
-  font-weight: 600;
-  font-size: 0.88rem;
-  color: #334155;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  display: block !important;
+  font-weight: 600 !important;
+  font-size: 0.88rem !important;
+  color: #334155 !important;
+  font-variant-numeric: tabular-nums !important;
+  white-space: nowrap !important;
 }
 
 .hist-td-data__dev {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 700;
-  margin-top: 2px;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+  display: block !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  margin-top: 2px !important;
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums !important;
 }
 
 .hist-td-load {
-  text-align: center;
-  padding: 10px 8px;
-  border-bottom: 1px solid #f1f5f9;
-  border-left: 1px solid #f1f5f9;
-  vertical-align: middle;
-  width: 140px;
-  min-width: 140px;
-  max-width: 140px;
+  text-align: center !important;
+  padding: 10px 8px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  border-left: 1px solid #f1f5f9 !important;
+  vertical-align: middle !important;
+  width: 140px !important;
+  min-width: 140px !important;
+  max-width: 140px !important;
+  box-sizing: border-box !important;
 }
 
 .hist-td-load__pct {
-  display: block;
-  font-weight: 700;
-  font-size: 0.9rem;
-  color: #1e293b;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+  display: block !important;
+  font-weight: 700 !important;
+  font-size: 0.9rem !important;
+  color: #1e293b !important;
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums !important;
 }
 
 .hist-td-load__kw {
-  display: block;
-  font-size: 0.72rem;
-  color: #64748b;
-  font-weight: 500;
-  margin-top: 2px;
-  white-space: nowrap;
+  display: block !important;
+  font-size: 0.72rem !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
+  margin-top: 2px !important;
+  white-space: nowrap !important;
 }
-
 
 /* ============================================================
    DEVIATION COLOR UTILITIES
    ============================================================ */
-.hist-dev--green { color: #16a34a; }
-.hist-dev--amber { color: #ca8a04; }
-.hist-dev--red   { color: #dc2626; }
-.hist-dev--grey  { color: #64748b; }
-
+.hist-dev--green { color: #16a34a !important; }
+.hist-dev--amber { color: #ca8a04 !important; }
+.hist-dev--red   { color: #dc2626 !important; }
+.hist-dev--grey  { color: #64748b !important; }
 
 /* ============================================================
-   RESPONSIVE BREAKPOINTS
-   ============================================================
-
-   KEY FORMULA for scroll-clip breakpoints:
-     .hist-scroll max-width = param_col + (N_visible × data_col)
-     .hist-table  min-width = param_col + (6       × data_col)
-   The table is always 6-columns wide; the scroll container
-   determines how many are visible before the user scrolls.
-
-   ≥ 1440px  → table fills 100% width, no scroll needed
-   1025–1279 → show 5, clip at 220 + 5×140 = 920px
-   769–1024  → show 5, clip at 220 + 5×140 = 920px  (fixed: was 6)
-   481–768   → show 3, clip at 180 + 3×120 = 540px  (fixed: was 4)
-   ≤ 480px   → show 2, clip at 150 + 2×110 = 370px
+   RESPONSIVE BREAKPOINTS (Fluid width logic applied)
    ============================================================ */
 
-
-/* ── ≥ 1440px : table stretches to fill card width ── */
+/* ── ≥ 1440px ── */
 @media (min-width: 1440px) {
-  .hist-card             { margin-top: 32px; margin-bottom: 40px; }
-  .hist-header           { padding: 18px 28px; }
-  .hist-header__title    { font-size: 1.05rem; }
-  .hist-header__subtitle { font-size: 0.82rem; }
-  .hist-header__bookmark { max-width: 200px; font-size: 0.68rem; }
-  .hist-body             { padding: 24px 28px; }
+  .hist-card             { margin-top: 32px !important; margin-bottom: 40px !important; }
+  .hist-header           { padding: 18px 28px !important; }
+  .hist-header__title    { font-size: 1.05rem !important; }
+  .hist-header__subtitle { font-size: 0.82rem !important; }
+  .hist-header__bookmark { max-width: 200px !important; font-size: 0.68rem !important; }
+  /* .hist-body             { padding: 24px 28px !important; } */
 
-  /* Override: table fills container width at 1440px+ */
-  .hist-scroll { width: 100%; max-width: none; }
-  .hist-table  { width: 100%; min-width: unset; table-layout: fixed; }
+  .hist-scroll { width: 100% !important; max-width: 100% !important; }
+  .hist-table  { width: 100% !important; min-width: 100% !important; table-layout: fixed !important; }
 
-  /* Param col fixed, month cols share remaining space equally */
-  .hist-th-param,
-  .hist-td-param {
-    width: 240px;
-    min-width: 240px;
-    max-width: 240px;
+  .hist-th-param, .hist-td-param {
+    width: 240px !important; min-width: 240px !important; max-width: 240px !important;
+  }
+  .hist-th-date, .hist-td-data, .hist-td-load {
+    width: auto !important; min-width: 120px !important; max-width: none !important;
   }
 
-  /* month col: let browser distribute remaining width */
-  .hist-th-date,
-  .hist-td-data,
-  .hist-td-load {
-    width: auto;
-    min-width: 120px;
-    max-width: none;
-  }
-
-  .hist-th-param         { padding: 14px 18px; font-size: 0.74rem; }
-  .hist-th-date          { padding: 12px 10px; }
-  .hist-th-date__month   { font-size: 0.9rem; }
-  .hist-th-date__raw     { font-size: 0.7rem; }
-
-  .hist-td-param         { padding: 12px 18px; font-size: 0.88rem; }
-  .hist-td-param__unit   { font-size: 0.77rem; }
-  .hist-td-data          { padding: 12px 10px; }
-  .hist-td-data__val     { font-size: 0.9rem; }
-  .hist-td-data__dev     { font-size: 0.77rem; }
-  .hist-td-load          { padding: 12px 10px; }
-  .hist-td-load__pct     { font-size: 0.92rem; }
-  .hist-td-load__kw      { font-size: 0.74rem; }
+  .hist-th-param         { padding: 14px 18px !important; font-size: 0.74rem !important; }
+  .hist-th-date          { padding: 12px 10px !important; }
+  .hist-th-date__month   { font-size: 0.9rem !important; }
+  .hist-th-date__raw     { font-size: 0.7rem !important; }
+  .hist-td-param         { padding: 12px 18px !important; font-size: 0.88rem !important; }
+  .hist-td-param__unit   { font-size: 0.77rem !important; }
+  .hist-td-data          { padding: 12px 10px !important; }
+  .hist-td-data__val     { font-size: 0.9rem !important; }
+  .hist-td-data__dev     { font-size: 0.77rem !important; }
+  .hist-td-load          { padding: 12px 10px !important; }
+  .hist-td-load__pct     { font-size: 0.92rem !important; }
+  .hist-td-load__kw      { font-size: 0.74rem !important; }
 }
 
-
-/* ── 1280px → 1439px : 5 visible, 6th scrolls ── */
-/* param=220 + 5×140 = 920px visible; table=220+6×140=1060px total */
+/* ── 1280px → 1439px ── */
 @media (min-width: 1280px) and (max-width: 1439px) {
-  .hist-header           { padding: 16px 24px; }
-  .hist-header__title    { font-size: 1rem; }
-  .hist-header__bookmark { max-width: 180px; }
-  .hist-body             { padding: 20px 24px; }
-
-  .hist-scroll { max-width: 920px; box-shadow: inset -10px 0 12px -8px rgba(0,0,0,0.08); }
-  .hist-table  { min-width: 1060px; width: max-content; }
-
-  .hist-th-param         { width: 220px; min-width: 220px; max-width: 220px; padding: 12px 16px; font-size: 0.72rem; }
-  .hist-th-date          { width: 140px; min-width: 140px; max-width: 140px; }
-  .hist-th-date__month   { font-size: 0.86rem; }
-  .hist-th-date__raw     { font-size: 0.68rem; }
-
-  .hist-td-param         { width: 220px; min-width: 220px; max-width: 220px; padding: 10px 16px; font-size: 0.85rem; }
-  .hist-td-data          { width: 140px; min-width: 140px; max-width: 140px; }
-  .hist-td-data__val     { font-size: 0.86rem; }
-  .hist-td-data__dev     { font-size: 0.74rem; }
-  .hist-td-load          { width: 140px; min-width: 140px; max-width: 140px; }
-  .hist-td-load__pct     { font-size: 0.88rem; }
-  .hist-td-load__kw      { font-size: 0.72rem; }
+  .hist-header           { padding: 16px 24px !important; }
+  .hist-header__title    { font-size: 1rem !important; }
+  .hist-header__bookmark { max-width: 180px !important; }
+  /* .hist-body             { padding: 20px 24px !important; } */
+  .hist-scroll           { width: 100% !important; max-width: 100% !important; }
+  
+  .hist-th-param         { width: 220px !important; min-width: 220px !important; max-width: 220px !important; padding: 12px 16px !important; font-size: 0.72rem !important; }
+  .hist-th-date          { width: 140px !important; min-width: 140px !important; max-width: 140px !important; }
+  .hist-th-date__month   { font-size: 0.86rem !important; }
+  .hist-th-date__raw     { font-size: 0.68rem !important; }
+  .hist-td-param         { width: 220px !important; min-width: 220px !important; max-width: 220px !important; padding: 10px 16px !important; font-size: 0.85rem !important; }
+  .hist-td-data          { width: 140px !important; min-width: 140px !important; max-width: 140px !important; }
+  .hist-td-data__val     { font-size: 0.86rem !important; }
+  .hist-td-data__dev     { font-size: 0.74rem !important; }
+  .hist-td-load          { width: 140px !important; min-width: 140px !important; max-width: 140px !important; }
+  .hist-td-load__pct     { font-size: 0.88rem !important; }
+  .hist-td-load__kw      { font-size: 0.72rem !important; }
 }
 
-
-/* ── 1025px → 1279px : 5 visible, 6th scrolls ── */
-/* param=220 + 5×140 = 920px visible; table=220+6×140=1060px total */
+/* ── 1025px → 1279px ── */
 @media (min-width: 1025px) and (max-width: 1279px) {
-  .hist-header           { padding: 14px 20px; }
-  .hist-header__title    { font-size: 0.95rem; }
-  .hist-header__subtitle { font-size: 0.75rem; }
-  .hist-header__bookmark { max-width: 150px; font-size: 0.62rem; }
-  .hist-body             { padding: 16px 20px; }
-
-  .hist-scroll { max-width: 920px; box-shadow: inset -10px 0 12px -8px rgba(0,0,0,0.08); }
-  .hist-table  { min-width: 1060px; width: max-content; }
-
-  .hist-th-param         { width: 220px; min-width: 220px; max-width: 220px; padding: 11px 14px; font-size: 0.7rem; }
-  .hist-th-date          { width: 140px; min-width: 140px; max-width: 140px; padding: 10px 7px; }
-  .hist-th-date__month   { font-size: 0.82rem; }
-  .hist-th-date__raw     { font-size: 0.65rem; }
-
-  .hist-td-param         { width: 220px; min-width: 220px; max-width: 220px; padding: 10px 14px; font-size: 0.82rem; }
-  .hist-td-param__unit   { font-size: 0.72rem; }
-  .hist-td-data          { width: 140px; min-width: 140px; max-width: 140px; padding: 10px 7px; }
-  .hist-td-data__val     { font-size: 0.83rem; }
-  .hist-td-data__dev     { font-size: 0.71rem; }
-  .hist-td-load          { width: 140px; min-width: 140px; max-width: 140px; padding: 10px 7px; }
-  .hist-td-load__pct     { font-size: 0.85rem; }
-  .hist-td-load__kw      { font-size: 0.7rem; }
+  .hist-header           { padding: 14px 20px !important; }
+  .hist-header__title    { font-size: 0.95rem !important; }
+  .hist-header__subtitle { font-size: 0.75rem !important; }
+  .hist-header__bookmark { max-width: 150px !important; font-size: 0.62rem !important; }
+  /* .hist-body             { padding: 16px 20px !important; } */
+  .hist-scroll           { width: 100% !important; max-width: 100% !important; }
+  
+  .hist-th-param         { width: 220px !important; min-width: 220px !important; max-width: 220px !important; padding: 11px 14px !important; font-size: 0.7rem !important; }
+  .hist-th-date          { width: 140px !important; min-width: 140px !important; max-width: 140px !important; padding: 10px 7px !important; }
+  .hist-th-date__month   { font-size: 0.82rem !important; }
+  .hist-th-date__raw     { font-size: 0.65rem !important; }
+  .hist-td-param         { width: 220px !important; min-width: 220px !important; max-width: 220px !important; padding: 10px 14px !important; font-size: 0.82rem !important; }
+  .hist-td-param__unit   { font-size: 0.72rem !important; }
+  .hist-td-data          { width: 140px !important; min-width: 140px !important; max-width: 140px !important; padding: 10px 7px !important; }
+  .hist-td-data__val     { font-size: 0.83rem !important; }
+  .hist-td-data__dev     { font-size: 0.71rem !important; }
+  .hist-td-load          { width: 140px !important; min-width: 140px !important; max-width: 140px !important; padding: 10px 7px !important; }
+  .hist-td-load__pct     { font-size: 0.85rem !important; }
+  .hist-td-load__kw      { font-size: 0.7rem !important; }
 }
 
-
-/* ── 769px → 1024px : 5 visible (FIXED — was showing 6), 6th scrolls ── */
-/* param=180 + 5×120 = 780px visible; table=180+6×120=900px total       */
+/* ── 769px → 1024px ── */
 @media (min-width: 769px) and (max-width: 1024px) {
-  .hist-card             { margin-top: 24px; margin-bottom: 32px; }
-  .hist-header           { padding: 12px 16px; gap: 8px; }
-  .hist-header__title    { font-size: 0.9rem; }
-  .hist-header__subtitle { font-size: 0.7rem; }
-  .hist-header__bookmark { max-width: 120px; font-size: 0.6rem; padding: 3px 8px; }
-  .hist-header__chevron  { font-size: 1rem; }
-  .hist-body             { padding: 12px 16px; }
-
-  /* 780px clip: param(180) + 5 × col(120) = 780 */
-  .hist-scroll { max-width: 780px; box-shadow: inset -10px 0 12px -8px rgba(0,0,0,0.1); }
-  /* 900px table: param(180) + 6 × col(120) = 900 → 6th peeks off-screen */
-  .hist-table  { min-width: 900px; width: max-content; }
-
-  .hist-th-param         { width: 180px; min-width: 180px; max-width: 180px; padding: 10px 12px; font-size: 0.66rem; }
-  .hist-th-date          { width: 120px; min-width: 120px; max-width: 120px; padding: 9px 6px; }
-  .hist-th-date__month   { font-size: 0.78rem; }
-  .hist-th-date__raw     { font-size: 0.62rem; }
-
-  .hist-td-param         { width: 180px; min-width: 180px; max-width: 180px; padding: 9px 12px; font-size: 0.78rem; }
-  .hist-td-param__unit   { font-size: 0.68rem; }
-  .hist-td-data          { width: 120px; min-width: 120px; max-width: 120px; padding: 9px 6px; }
-  .hist-td-data__val     { font-size: 0.8rem; }
-  .hist-td-data__dev     { font-size: 0.68rem; }
-  .hist-td-load          { width: 120px; min-width: 120px; max-width: 120px; padding: 9px 6px; }
-  .hist-td-load__pct     { font-size: 0.82rem; }
-  .hist-td-load__kw      { font-size: 0.66rem; }
+  .hist-card             { margin-top: 24px !important; margin-bottom: 32px !important; }
+  .hist-header           { padding: 12px 16px !important; gap: 8px !important; }
+  .hist-header__title    { font-size: 0.9rem !important; }
+  .hist-header__subtitle { font-size: 0.7rem !important; }
+  .hist-header__bookmark { max-width: 120px !important; font-size: 0.6rem !important; padding: 3px 8px !important; }
+  .hist-header__chevron  { font-size: 1rem !important; }
+  /* .hist-body             { padding: 12px 16px !important; } */
+  .hist-scroll           { width: 100% !important; max-width: 100% !important; }
+  
+  .hist-th-param         { width: 230px !important; min-width: 230px !important; max-width: 230px !important; padding: 10px 12px !important; font-size: 0.66rem !important; }
+  .hist-th-date          { width: 132px !important; min-width: 132px !important; max-width: 132px !important; padding: 9px 6px !important; }
+  .hist-th-date__month   { font-size: 0.78rem !important; }
+  .hist-th-date__raw     { font-size: 0.62rem !important; }
+  .hist-td-param         { width: 180px !important; min-width: 180px !important; max-width: 180px !important; padding: 9px 12px !important; font-size: 0.78rem !important; }
+  .hist-td-param__unit   { font-size: 0.68rem !important; }
+  .hist-td-data          { width: 120px !important; min-width: 120px !important; max-width: 120px !important; padding: 9px 6px !important; }
+  .hist-td-data__val     { font-size: 0.8rem !important; }
+  .hist-td-data__dev     { font-size: 0.68rem !important; }
+  .hist-td-load          { width: 120px !important; min-width: 120px !important; max-width: 120px !important; padding: 9px 6px !important; }
+  .hist-td-load__pct     { font-size: 0.82rem !important; }
+  .hist-td-load__kw      { font-size: 0.66rem !important; }
 }
 
-
-/* ── 481px → 768px : 3 visible (FIXED — was showing 4), 4th+ scrolls ── */
-/* param=160 + 3×110 = 490px visible; table=160+6×110=820px total        */
+/* ── 481px → 768px ── */
 @media (min-width: 481px) and (max-width: 768px) {
-  .hist-card             { margin-top: 20px; margin-bottom: 28px; border-radius: 12px; }
-  .hist-header           { padding: 10px 14px; gap: 6px; }
-  .hist-header__title    { font-size: 0.84rem; }
-  .hist-header__subtitle { font-size: 0.66rem; }
-  .hist-header__bookmark { max-width: 90px; font-size: 0.58rem; padding: 2px 6px; }
-  .hist-header__chevron  { font-size: 0.9rem; }
-  .hist-body             { padding: 10px 12px; }
-
-  /* 490px clip: param(160) + 3 × col(110) = 490 */
-  .hist-scroll { max-width: 490px; box-shadow: inset -10px 0 12px -8px rgba(0,0,0,0.1); }
-  /* 820px table: param(160) + 6 × col(110) = 820 */
-  .hist-table  { min-width: 820px; width: max-content; }
-
-  .hist-th-param         { width: 160px; min-width: 160px; max-width: 160px; padding: 9px 10px; font-size: 0.62rem; }
-  .hist-th-date          { width: 110px; min-width: 110px; max-width: 110px; padding: 8px 5px; }
-  .hist-th-date__month   { font-size: 0.72rem; }
-  .hist-th-date__raw     { font-size: 0.58rem; }
-
-  .hist-td-param         { width: 160px; min-width: 160px; max-width: 160px; padding: 8px 10px; font-size: 0.73rem; }
-  .hist-td-param__unit   { font-size: 0.63rem; }
-  .hist-td-data          { width: 110px; min-width: 110px; max-width: 110px; padding: 8px 5px; }
-  .hist-td-data__val     { font-size: 0.75rem; }
-  .hist-td-data__dev     { font-size: 0.64rem; }
-  .hist-td-load          { width: 110px; min-width: 110px; max-width: 110px; padding: 8px 5px; }
-  .hist-td-load__pct     { font-size: 0.76rem; }
-  .hist-td-load__kw      { font-size: 0.62rem; }
+  .hist-card             { margin-top: 20px !important; margin-bottom: 28px !important; border-radius: 12px !important; }
+  .hist-header           { padding: 10px 14px !important; gap: 6px !important; }
+  .hist-header__title    { font-size: 0.84rem !important; }
+  .hist-header__subtitle { font-size: 0.66rem !important; }
+  .hist-header__bookmark { max-width: 90px !important; font-size: 0.58rem !important; padding: 2px 6px !important; }
+  .hist-header__chevron  { font-size: 0.9rem !important; }
+  /* .hist-body             { padding: 10px 12px !important; } */
+  .hist-scroll           { width: 100% !important; max-width: 100% !important; }
+  
+  .hist-th-param         { width: 210px !important; min-width: 210px !important; max-width: 210px !important; padding: 9px 10px !important; font-size: 0.62rem !important; }
+  .hist-th-date          { width: 110px !important; min-width: 110px !important; max-width: 110px !important; padding: 8px 5px !important; }
+  .hist-th-date__month   { font-size: 0.72rem !important; }
+  .hist-th-date__raw     { font-size: 0.58rem !important; }
+  .hist-td-param         { width: 160px !important; min-width: 160px !important; max-width: 160px !important; padding: 8px 10px !important; font-size: 0.73rem !important; }
+  .hist-td-param__unit   { font-size: 0.63rem !important; }
+  .hist-td-data          { width: 110px !important; min-width: 110px !important; max-width: 110px !important; padding: 8px 5px !important; }
+  .hist-td-data__val     { font-size: 0.75rem !important; }
+  .hist-td-data__dev     { font-size: 0.64rem !important; }
+  .hist-td-load          { width: 110px !important; min-width: 110px !important; max-width: 110px !important; padding: 8px 5px !important; }
+  .hist-td-load__pct     { font-size: 0.76rem !important; }
+  .hist-td-load__kw      { font-size: 0.62rem !important; }
 }
 
-
-/* ── ≤ 480px : 2 visible, rest scroll ── */
-/* param=140 + 2×100 = 340px visible; table=140+6×100=740px total */
+/* ── ≤ 480px ── */
 @media (max-width: 480px) {
-  .hist-card             { margin-top: 16px; margin-bottom: 20px; border-radius: 10px; }
-  .hist-header           { padding: 9px 12px; gap: 4px; }
-  .hist-header__title    { font-size: 0.78rem; }
-  .hist-header__subtitle { font-size: 0.6rem; }
-  .hist-header__bookmark { display: none; }
-  .hist-header__chevron  { font-size: 0.85rem; }
-  .hist-body             { padding: 8px 10px; }
-
-  /* 340px clip: param(140) + 2 × col(100) = 340 */
-  .hist-scroll { max-width: 340px; box-shadow: inset -8px 0 10px -6px rgba(0,0,0,0.1); }
-  /* 740px table: param(140) + 6 × col(100) = 740 */
-  .hist-table  { min-width: 740px; width: max-content; }
-
-  .hist-th-param         { width: 140px; min-width: 140px; max-width: 140px; padding: 8px 8px; font-size: 0.58rem; }
-  .hist-th-date          { width: 100px; min-width: 100px; max-width: 100px; padding: 7px 4px; }
-  .hist-th-date__month   { font-size: 0.66rem; }
-  .hist-th-date__raw     { font-size: 0.54rem; }
-
-  .hist-td-param         { width: 140px; min-width: 140px; max-width: 140px; padding: 7px 8px; font-size: 0.66rem; }
-  .hist-td-param__unit   { font-size: 0.57rem; margin-left: 2px; }
-  .hist-td-data          { width: 100px; min-width: 100px; max-width: 100px; padding: 7px 4px; }
-  .hist-td-data__val     { font-size: 0.68rem; }
-  .hist-td-data__dev     { font-size: 0.58rem; margin-top: 1px; }
-  .hist-td-load          { width: 100px; min-width: 100px; max-width: 100px; padding: 7px 4px; }
-  .hist-td-load__pct     { font-size: 0.7rem; }
-  .hist-td-load__kw      { font-size: 0.57rem; }
+  .hist-card             { margin-top: 16px !important; margin-bottom: 20px !important; border-radius: 10px !important; }
+  .hist-header           { padding: 9px 12px !important; gap: 4px !important; }
+  .hist-header__title    { font-size: 0.78rem !important; }
+  .hist-header__subtitle { font-size: 0.6rem !important; }
+  .hist-header__bookmark { display: none !important; }
+  .hist-header__chevron  { font-size: 0.85rem !important; }
+  .hist-body             { padding: 8px 10px !important; }
+  .hist-scroll           { width: 100% !important; max-width: 100% !important; }
+  
+  .hist-th-param         { width: 140px !important; min-width: 140px !important; max-width: 140px !important; padding: 8px 8px !important; font-size: 0.58rem !important; }
+  .hist-th-date          { width: 100px !important; min-width: 100px !important; max-width: 100px !important; padding: 7px 4px !important; }
+  .hist-th-date__month   { font-size: 0.66rem !important; }
+  .hist-th-date__raw     { font-size: 0.54rem !important; }
+  .hist-td-param         { width: 140px !important; min-width: 140px !important; max-width: 140px !important; padding: 7px 8px !important; font-size: 0.66rem !important; }
+  .hist-td-param__unit   { font-size: 0.57rem !important; margin-left: 2px !important; }
+  .hist-td-data          { width: 100px !important; min-width: 100px !important; max-width: 100px !important; padding: 7px 4px !important; }
+  .hist-td-data__val     { font-size: 0.68rem !important; }
+  .hist-td-data__dev     { font-size: 0.58rem !important; margin-top: 1px !important; }
+  .hist-td-load          { width: 100px !important; min-width: 100px !important; max-width: 100px !important; padding: 7px 4px !important; }
+  .hist-td-load__pct     { font-size: 0.7rem !important; }
+  .hist-td-load__kw      { font-size: 0.57rem !important; }
 }
