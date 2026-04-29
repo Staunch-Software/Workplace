@@ -11,7 +11,7 @@
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import text, update as sql_update
+from sqlalchemy import func, text, update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -116,7 +116,7 @@ async def sync_to_pr_entries() -> dict:
                 # Find matching pr_entry by pr_number
                 pr_result = await db.execute(
                     select(PrEntry).where(
-                        PrEntry.pr_number == cache_row.requisition_no,
+                        func.trim(PrEntry.pr_number) == cache_row.requisition_no.strip(),
                         PrEntry.is_deleted == False
                     )
                 )
@@ -138,10 +138,15 @@ async def sync_to_pr_entries() -> dict:
                 )
                 # Use explicit SQL UPDATE (not ORM attribute) to avoid session
                 # tracking other dirty objects that may have defect_id = NULL
+                now = datetime.now(timezone.utc)
                 await db.execute(
                     sql_update(PrEntry)
                     .where(PrEntry.id == pr_entry.id)
-                    .values(mariapps_pr_status=cache_row.status)
+                    .values(
+                        mariapps_pr_status=cache_row.status,
+                        updated_at=now,
+                        version=PrEntry.version + 1,
+                    )
                     .execution_options(synchronize_session=False)
                 )
                 synced += 1

@@ -324,7 +324,7 @@ class SyncService:
                             continue
                         # Never overwrite a NOT NULL column with a falsy value
                         col = model_class.__table__.columns.get(key)
-                        if col is not None and not col.nullable and not value:
+                        if col is not None and not col.nullable and value is None:
                             continue
                         setattr(existing_entity, key, value)
                 elif incoming_version == current_version and hasattr(model_class, 'version'):

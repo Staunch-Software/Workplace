@@ -167,11 +167,18 @@ const Home = () => {
               style={{ animationDelay: app.delay }}
               onClick={() => handleAppClick(app.id)}
             >
-              <div className="hm-icon-container">
-                {app.icon}
+              {/* TOP AREA: Locked position for Icon */}
+              <div className="hm-card-icon-zone">
+                <div className="hm-icon-container">
+                  {app.icon}
+                </div>
               </div>
-              <h3>{app.name}</h3>
-              <p className="hm-app-description">{app.desc}</p>
+
+              {/* BOTTOM AREA: Space for Text */}
+              <div className="hm-card-text-zone">
+                <h3>{app.name}</h3>
+                <p className="hm-app-description">{app.desc}</p>
+              </div>
             </div>
           ))}
         </div>

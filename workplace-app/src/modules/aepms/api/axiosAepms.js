@@ -1,6 +1,7 @@
 // lib/api.js - Updated API Client with Report-based Filtering and URL Parameter Cleansing
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8005';
-// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/aepms/api';
+// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8005';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/aepms/api';
+import { handleExpiredSession } from '../../../utils/authGuard';
 
 class ApiService {
   constructor() {
@@ -38,11 +39,8 @@ class ApiService {
       console.log(`📡 Response Status: ${response.status} ${response.statusText}`);
       
       if (response.status === 401) {
-        console.warn('⚠️ 401 Unauthorized - Clearing auth data');
-        localStorage.removeItem('app_token');
-        localStorage.removeItem('user');
-        window.dispatchEvent(new CustomEvent('auth:logout'));
-        throw new Error('Unauthorized - please login again');
+        handleExpiredSession();
+        throw new Error('Session expired');
       }
 
       const contentType = response.headers.get('content-type');

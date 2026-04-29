@@ -2,9 +2,12 @@
   max-width: 1400px;
   margin: 0 auto;
   padding: 2.5rem 1.5rem;
+  background-color: #f8f9fa;
 }
 
-.hm-welcome-header { margin-bottom: 2rem; }
+.hm-welcome-header {
+  margin-bottom: 2rem;
+}
 
 .hm-welcome-header h1 {
   font-size: 1.5rem;
@@ -26,19 +29,64 @@
   gap: 1.5rem;
 }
 
-@media (min-width: 640px)  { .hm-app-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 1024px) { .hm-app-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 1280px) { .hm-app-grid { grid-template-columns: repeat(5, 1fr); } }
+@media (min-width: 640px) {
+  .hm-app-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1280px) {
+  .hm-app-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1rem;
+  }
+
+  .hm-app-card {
+    aspect-ratio: 1 / 1.1;
+  }
+
+  /* Target the text zone padding instead of the card */
+  .hm-card-text-zone {
+    padding: 0 0.5rem;
+  }
+
+  .hm-app-card h3 {
+    font-size: 0.85rem !important;
+    /* Smaller font to prevent 3-line wraps */
+  }
+
+  .hm-icon-container {
+    width: 50px;
+    height: 50px;
+  }
+
+  .hm-icon-container svg {
+    transform: scale(0.7);
+  }
+}
+
+@media (min-width: 1280px) {
+  .hm-app-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
 
 @keyframes hmCardEntrance {
-  from { opacity: 0; transform: scale(0.97) translateY(16px); }
-  to   { opacity: 1; transform: scale(1)    translateY(0);    }
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .hm-app-card {
   background: var(--white);
   border-radius: 1rem;
-  padding: 1.5rem;
+  padding: 0;
   border: 1px solid var(--gray-100);
   box-shadow: var(--shadow-sm);
   display: flex;
@@ -51,6 +99,7 @@
   transition: box-shadow 0.3s, border-color 0.3s, transform 0.3s;
   animation: hmCardEntrance 0.5s ease-out forwards;
   opacity: 0;
+  overflow: hidden;
 }
 
 .hm-app-card:hover {
@@ -59,15 +108,38 @@
 }
 
 .hm-icon-container {
+  flex-shrink: 0;
   width: 64px;
   height: 64px;
   border-radius: 1rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 1rem;
+  /* margin-bottom removed - handled by hm-card-icon-zone padding */
   box-shadow: var(--shadow-sm);
   transition: transform 0.3s, background 0.3s, color 0.3s;
+}
+
+.hm-card-icon-zone {
+  flex: 0 0 55%;
+  display: flex;
+  align-items: flex-end;
+  /* Keeps icon on the same "shelf" */
+  justify-content: center;
+  padding-bottom: 12px;
+  /* This is the gap between icon and title */
+  width: 100%;
+}
+
+.hm-card-text-zone {
+  flex: 0 0 45%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  /* Title starts at the top of the text zone */
+  padding: 0 1rem;
+  width: 100%;
 }
 
 .hm-app-card:hover .hm-icon-container {
@@ -80,6 +152,12 @@
   font-weight: 600;
   color: var(--gray-900);
   margin: 0;
+  line-height: 1.2;
+  /* Allow max 2 lines, then truncate if it ever goes to 3 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .hm-app-description {
@@ -96,22 +174,238 @@
   transform: translateY(0);
 }
 
-.hm-card-drs .hm-icon-container { background: #eff6ff; color: #2563eb; }
-.hm-card-drs:hover { border-color: rgba(37, 99, 235, 0.3); }
-.hm-card-drs:hover .hm-icon-container { background: #2563eb; }
+.hm-card-drs .hm-icon-container {
+  background: #eff6ff;
+  color: #2563eb;
+}
 
-.hm-card-jira .hm-icon-container { background: rgba(0, 82, 204, 0.1); color: #0052cc; }
-.hm-card-jira:hover { border-color: rgba(0, 82, 204, 0.3); }
-.hm-card-jira:hover .hm-icon-container { background: #0052cc; }
+.hm-card-drs:hover {
+  border-color: rgba(37, 99, 235, 0.3);
+}
 
-.hm-card-voyage .hm-icon-container { background: #ecfeff; color: #0891b2; }
-.hm-card-voyage:hover { border-color: rgba(8, 145, 178, 0.3); }
-.hm-card-voyage:hover .hm-icon-container { background: #0891b2; }
+.hm-card-drs:hover .hm-icon-container {
+  background: #2563eb;
+}
 
-.hm-card-lube .hm-icon-container { background: #fffbeb; color: #d97706; }
-.hm-card-lube:hover { border-color: rgba(217, 119, 6, 0.3); }
-.hm-card-lube:hover .hm-icon-container { background: #d97706; }
+.hm-card-jira .hm-icon-container {
+  background: rgba(0, 82, 204, 0.1);
+  color: #0052cc;
+}
 
-.hm-card-engine .hm-icon-container { background: #ecfdf5; color: #059669; }
-.hm-card-engine:hover { border-color: rgba(5, 150, 105, 0.3); }
-.hm-card-engine:hover .hm-icon-container { background: #059669; }
+.hm-card-jira:hover {
+  border-color: rgba(0, 82, 204, 0.3);
+}
+
+.hm-card-jira:hover .hm-icon-container {
+  background: #0052cc;
+}
+
+.hm-card-voyage .hm-icon-container {
+  background: #ecfeff;
+  color: #0891b2;
+}
+
+.hm-card-voyage:hover {
+  border-color: rgba(8, 145, 178, 0.3);
+}
+
+.hm-card-voyage:hover .hm-icon-container {
+  background: #0891b2;
+}
+
+.hm-card-lube .hm-icon-container {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.hm-card-lube:hover {
+  border-color: rgba(217, 119, 6, 0.3);
+}
+
+.hm-card-lube:hover .hm-icon-container {
+  background: #d97706;
+}
+
+.hm-card-engine .hm-icon-container {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.hm-card-engine:hover {
+  border-color: rgba(5, 150, 105, 0.3);
+}
+
+.hm-card-engine:hover .hm-icon-container {
+  background: #059669;
+}
+
+/* ============================================================
+   1. LARGE LAPTOPS & SMALL DESKTOPS (1500px to 1899px)
+   ============================================================ */
+@media (min-width: 1600px) and (max-width: 1899px) {
+  .hm-container {
+    max-width: 1450px !important;
+    padding: 3rem 2rem;
+  }
+
+  .hm-welcome-header h1 {
+    font-size: 2rem;
+  }
+
+  .hm-welcome-header p {
+    font-size: 1.1rem;
+  }
+
+  .hm-app-grid {
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 2rem !important;
+  }
+
+  .hm-app-card {
+    padding: 2rem;
+    border-radius: 1.25rem;
+  }
+
+  .hm-icon-container {
+    width: 80px;
+    height: 80px;
+    border-radius: 1.15rem;
+  }
+
+  .hm-icon-container svg {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  .hm-app-card h3 {
+    font-size: 1.25rem;
+  }
+
+  .hm-card-icon-zone {
+    padding-bottom: 20px; /* More gap for larger screens */
+  }
+}
+
+/* ============================================================
+   2. 2K MONITORS & WIDE DESKTOPS (1900px to 2299px)
+   ============================================================ */
+@media (min-width: 1900px) and (max-width: 2299px) {
+  .hm-container {
+    max-width: 1800px !important;
+    padding: 4rem 3rem;
+  }
+
+  .hm-welcome-header {
+    margin-bottom: 3rem;
+  }
+
+  .hm-welcome-header h1 {
+    font-size: 2.5rem;
+  }
+
+  .hm-welcome-header p {
+    font-size: 1.25rem;
+  }
+
+  .hm-app-grid {
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 2.5rem !important;
+  }
+
+  .hm-app-card {
+    padding: 2.5rem;
+    border-radius: 1.75rem;
+  }
+
+  .hm-icon-container {
+    width: 100px;
+    height: 100px;
+    border-radius: 1.25rem;
+  }
+
+  .hm-icon-container svg {
+    width: 42px !important;
+    height: 42px !important;
+  }
+
+  .hm-app-card h3 {
+    font-size: 1.75rem;
+  }
+
+  .hm-app-description {
+    font-size: 1rem;
+  }
+
+  .hm-card-icon-zone {
+    padding-bottom: 30px; /* Proportional spacing for 4K */
+  }
+}
+
+/* ============================================================
+   3. ULTRA-WIDE & 4K SCREENS (2300px+)
+   ============================================================ */
+@media (min-width: 2300px) {
+  .hm-container {
+    max-width: 90% !important;
+    padding: 5rem 4rem;
+  }
+
+  .hm-welcome-header {
+    margin-bottom: 4rem;
+  }
+
+  .hm-welcome-header h1 {
+    font-size: 3.5rem;
+  }
+
+  .hm-welcome-header p {
+    font-size: 1.5rem;
+  }
+
+  .hm-app-grid {
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 3.5rem !important;
+  }
+
+  .hm-app-card {
+    padding: 3.5rem;
+    border-radius: 2.5rem;
+  }
+
+  .hm-icon-container {
+    width: 130px;
+    height: 130px;
+    border-radius: 2rem;
+  }
+
+  .hm-icon-container svg {
+    width: 52px !important;
+    height: 52px !important;
+  }
+
+  .hm-app-card h3 {
+    font-size: 2.25rem;
+  }
+
+  .hm-app-description {
+    font-size: 1.2rem;
+  }
+}
+
+/* ============================================================
+   TABLET POLISH (Optimization)
+   ============================================================ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .hm-app-card {
+    aspect-ratio: auto;
+    /* Remove 1/1 on tablets to prevent extreme height */
+    min-height: 220px;
+    padding: 2rem 1.5rem;
+  }
+
+  .hm-app-description {
+    opacity: 1;
+    /* Always show description on tablets (no hover needed) */
+    transform: translateY(0);
+  }
+}

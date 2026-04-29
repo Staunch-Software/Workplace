@@ -45,8 +45,8 @@ SQLALCHEMY_DATABASE_URL = (
 # ------------------------------------------------------------------------------
 engine = create_async_engine(
     SQLALCHEMY_DATABASE_URL,
-    pool_size=30,
-    max_overflow=40,
+    pool_size=5,
+    max_overflow=5,
     pool_timeout=10,
     pool_recycle=1800,
     pool_pre_ping=True,

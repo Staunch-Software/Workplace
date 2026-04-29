@@ -9,8 +9,14 @@
     padding: 0 40px !important;
   }
 
-  .defect-nav-title { font-size: 24px !important; }
-  .defect-nav-badge { font-size: 14px !important; padding: 4px 12px !important; }
+  .defect-nav-title {
+    font-size: 24px !important;
+  }
+
+  .defect-nav-badge {
+    font-size: 14px !important;
+    padding: 4px 12px !important;
+  }
 
   .nav-item {
     font-size: 18px !important;
@@ -20,7 +26,8 @@
 }
 
 /* --- 2. MOBILE DRAWER TRANSITION (Under 1024px) --- */
-@media (max-width: 1024px) {
+@media (max-width: 1023px) {
+
   /* Hide standard desktop elements */
   .defect-desktop-nav, .defect-nav-divider, .defect-nav-badge {
     display: none !important;
@@ -29,43 +36,77 @@
   /* Show Hamburger in Left */
   .defect-hamburger-btn {
     display: flex !important;
-    background: transparent; border: none; color: white;
-    cursor: pointer; padding: 8px; margin-right: 10px;
-    align-items: center; justify-content: center;
+    background: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 8px;
+    margin-right: 10px;
+    align-items: center;
+    justify-content: center;
   }
 
   /* Sidebar Drawer (Right Aligned) */
   .defect-mobile-sidebar-right {
-    display: flex !important; flex-direction: column;
-    position: fixed; top: 0; right: -300px;
-    width: 300px; height: 100vh; background: #0f172a;
-    z-index: 4000; transition: right 0.3s ease;
-    padding: 30px 20px; box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+    display: flex !important;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    right: -300px;
+    width: 300px;
+    height: 100vh;
+    background: #0f172a;
+    z-index: 4000;
+    transition: right 0.3s ease;
+    padding: 30px 20px;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
   }
 
-  .defect-mobile-sidebar-right.open { right: 0; }
+  .defect-mobile-sidebar-right.open {
+    right: 0;
+  }
 
   /* Overlay */
   .defect-mobile-overlay {
-    display: block !important; position: fixed;
-    top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 3999;
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 3999;
   }
 
   /* Menu Items */
   .side-nav-item {
-    display: flex; align-items: center; gap: 15px;
-    padding: 16px; color: #cbd5e1; background: transparent;
-    border: none; font-size: 16px; font-weight: 600; width: 100%;
-    text-align: left; border-radius: 10px; margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 16px;
+    color: #cbd5e1;
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    font-weight: 600;
+    width: 100%;
+    text-align: left;
+    border-radius: 10px;
+    margin-bottom: 8px;
   }
-  .side-nav-item.active { background: rgba(234, 88, 12, 0.1); color: #ea580c; }
+
+  .side-nav-item.active {
+    background: rgba(234, 88, 12, 0.1);
+    color: #ea580c;
+  }
 }
 
 /* --- 3. SMALL MOBILE PHONES (Under 480px) --- */
 @media (max-width: 480px) {
   .defect-nav-vessel-info {
-    display: none !important; /* Hide Ship name to make room for Notif/User icons */
+    display: none !important;
+    /* Hide Ship name to make room for Notif/User icons */
   }
 
   .defect-top-navbar {
@@ -87,36 +128,61 @@
    ============================================================ */
 
 /* --- 1. BASE VISIBILITY --- */
-.defect-hamburger-btn, 
-.defect-mobile-sidebar-right, 
+.defect-hamburger-btn,
+.defect-mobile-sidebar-right,
 .defect-mobile-overlay {
   display: none;
 }
 
 /* --- 2. BIG SCREEN SCALING (2560px+) --- */
 @media (min-width: 2500px) {
-  .defect-top-navbar { height: 95px !important; padding: 0 40px !important; }
-  .defect-nav-title { font-size: 24px !important; }
-  .defect-nav-badge { font-size: 13px !important; padding: 4px 12px !important; }
-  .nav-item { font-size: 18px !important; padding: 12px 20px !important; }
-  .avatar-circle { width: 52px !important; height: 52px !important; font-size: 20px !important; }
+  .defect-top-navbar {
+    height: 95px !important;
+    padding: 0 40px !important;
+  }
+
+  .defect-nav-title {
+    font-size: 24px !important;
+  }
+
+  .defect-nav-badge {
+    font-size: 13px !important;
+    padding: 4px 12px !important;
+  }
+
+  .nav-item {
+    font-size: 18px !important;
+    padding: 12px 20px !important;
+  }
+
+  .avatar-circle {
+    width: 52px !important;
+    height: 52px !important;
+    font-size: 20px !important;
+  }
 }
 
 /* --- 3. MOBILE DRAWER (Under 1024px) --- */
-@media (max-width: 1024px) {
+@media (max-width: 1023px) {
+
   /* Hide Desktop Nav and Divider */
-  .defect-desktop-nav, 
-  .defect-nav-divider, 
-  .defect-nav-badge { 
-    display: none !important; 
+  .defect-desktop-nav,
+  .defect-nav-divider,
+  .defect-nav-badge {
+    display: none !important;
   }
 
   /* Show Hamburger Button on Right */
   .defect-hamburger-btn {
     display: flex !important;
-    background: transparent; border: none; color: white;
-    cursor: pointer; padding: 8px; margin-left: 10px;
-    align-items: center; justify-content: center;
+    background: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 8px;
+    margin-left: 10px;
+    align-items: center;
+    justify-content: center;
   }
 
   /* Right-Side Sidebar Drawer */
@@ -125,49 +191,105 @@
     flex-direction: column;
     position: fixed;
     top: 0;
-    right: -300px; /* Start off-screen */
+    right: -300px;
+    /* Start off-screen */
     width: 300px;
     height: 100vh;
     background: #0f172a;
     z-index: 5000;
     transition: right 0.3s ease-in-out;
     padding: 30px 20px;
-    box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
   }
 
   .defect-mobile-sidebar-right.open {
-    right: 0; /* Slide In */
+    right: 0;
+    /* Slide In */
   }
 
   .defect-mobile-overlay {
     display: block !important;
     position: fixed;
-    top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 4999;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 4999;
   }
 
   /* Drawer Navigation Items */
   .side-nav-item {
-    display: flex; align-items: center; gap: 15px;
-    padding: 16px; color: #cbd5e1; background: transparent;
-    border: none; font-size: 16px; font-weight: 600; width: 100%;
-    text-align: left; border-radius: 10px; margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 16px;
+    color: #cbd5e1;
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    font-weight: 600;
+    width: 100%;
+    text-align: left;
+    border-radius: 10px;
+    margin-bottom: 10px;
   }
-  .side-nav-item.active { background: rgba(234, 88, 12, 0.15); color: #ea580c; }
+
+  .side-nav-item.active {
+    background: rgba(234, 88, 12, 0.15);
+    color: #ea580c;
+  }
 }
 
 /* --- 4. SMALL MOBILE PHONES (Under 500px) --- */
 @media (max-width: 500px) {
+
   /* Hide Ship Name text to save space for Icons */
-  .defect-nav-vessel-info { 
-    display: none !important; 
+  .defect-nav-vessel-info {
+    display: none !important;
   }
 
   /* Hide User text labels */
-  .defect-user-text-hide { 
-    display: none !important; 
+  .defect-user-text-hide {
+    display: none !important;
   }
 
-  .defect-top-navbar { padding: 0 10px !important; height: 56px !important; }
-  .nav-right { gap: 4px !important; }
+  .defect-top-navbar {
+    padding: 0 10px !important;
+    height: 56px !important;
+  }
+
+  .nav-right {
+    gap: 4px !important;
+  }
+}
+
+.defect-notif-title-text {
+  font-size: 13px;
+}
+
+.defect-notif-msg-text {
+  font-size: 12px;
+}
+
+.defect-notif-badge-text{
+  font-size: 10px;
+}
+
+@media (min-width: 1900px) {
+  .defect-notif-icon-box svg {
+    transform: scale(1.3);
+  }
+
+  .defect-notif-title-text {
+    font-size: 15px;
+  }
+  .defect-notif-msg-text{
+  font-size: 14px;
+}
+
+.defect-notif-badge-text{
+  font-size: 12px;
+}
 }

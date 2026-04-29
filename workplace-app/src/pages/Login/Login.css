@@ -474,3 +474,117 @@ body, html {
   font-size: 0.875rem; color: #475569;
   margin: 0 0 20px; line-height: 1.55;
 }
+
+
+/* ════════════════════════════════════════
+   ULTRA-WIDE & 4K RESPONSIVE (1900px+)
+════════════════════════════════════════ */
+@media (min-width: 1900px) {
+  /* Scale the Left Panel content */
+  .left-panel {
+    padding: 6rem; /* More breathing room */
+  }
+
+  .brand-header {
+    font-size: 2.5rem;
+    gap: 1.5rem;
+  }
+
+  .brand-icon {
+    width: 60px;
+    height: 60px;
+  }
+
+  .hero-title {
+    font-size: 5rem; /* Large impact title */
+    max-width: 900px;
+    margin-bottom: 4rem;
+  }
+
+  .features-list {
+    gap: 2.5rem;
+  }
+
+  .feature-item {
+    font-size: 1.75rem;
+    gap: 1.5rem;
+  }
+
+  .feature-icon-wrapper {
+    width: 72px;
+    height: 72px;
+    border-radius: 18px;
+  }
+
+  .feature-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  /* Scale the Right Panel (Login Form) */
+  .login-card {
+    max-width: 550px; /* Wider card for better readability */
+    padding: 4rem;
+  }
+
+  .brand-logo {
+    height: 90px; /* Larger logo */
+    margin-bottom: 2rem;
+  }
+
+  .login-title {
+    font-size: 2.5rem;
+  }
+
+  .login-subtitle {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  /* Scale Form Elements */
+  .input-label {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .form-input {
+    padding: 1.25rem 1rem 1.25rem 3.5rem;
+    font-size: 1.2rem;
+    border-radius: 12px;
+  }
+
+  .input-icon {
+    left: 1.25rem;
+    width: 24px;
+    height: 24px;
+  }
+
+  .password-toggle {
+    right: 1.25rem;
+  }
+
+  .password-toggle svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .submit-btn {
+    height: 64px; /* Taller button for high-res */
+    font-size: 1.25rem;
+    border-radius: 12px;
+    margin-top: 1rem;
+  }
+
+  .form-options, .help-text, .error-message {
+    font-size: 1.1rem;
+  }
+
+  .checkbox-label input {
+    width: 20px; /* Scale checkbox size */
+    height: 20px;
+  }
+
+  .footer-text {
+    font-size: 1.1rem;
+  }
+}

@@ -1,11 +1,11 @@
 import axios from 'axios';
-import toast from 'react-hot-toast';
+import { handleExpiredSession } from '../utils/authGuard';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8003/api/v1', 
-  // baseURL: 'http://localhost:8000/api/v1', 
+  // baseURL: 'http://localhost:8003/api/v1',
+  // baseURL: 'http://localhost:8000/api/v1',
   // baseURL: 'http://52.172.91.85:8003/api/v1',
-  // baseURL: "/api/v1", 
+  baseURL: "/api/v1",
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -18,13 +18,8 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('platform_token');
-      localStorage.removeItem('platform_user');
-      sessionStorage.removeItem('platform_token');
-      sessionStorage.removeItem('platform_user');
-      toast.error('Session expired. Please login again.');
-      window.location.href = '/login';
+    if (err.response?.status === 401 && !err.config?.url?.includes('/login/access-token')) {
+      handleExpiredSession();
     }
     return Promise.reject(err);
   }

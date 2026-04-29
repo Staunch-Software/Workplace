@@ -152,7 +152,7 @@
 }
 
 /* --- MOBILE LOGIC (Under 950px) --- */
-@media (max-width: 950px) {
+@media (max-width: 1023px) {
   /* Show Hamburger Button */
   .defect-hamburger-btn {
     display: flex !important;
@@ -903,7 +903,7 @@
 }
 
 /* --- TABLETS (Under 1200px) --- */
-@media (max-width: 1200px) {
+@media (max-width: 1023px) {
   .defect-kpi-grid {
     /* On smaller tablets, switch to 3 columns (3x2 layout) */
     grid-template-columns: repeat(3, 1fr) !important;
@@ -913,6 +913,8 @@
   .defect-kpi-number {
     font-size: 1.8rem !important;
   }
+
+
 }
 
 /* --- MOBILE PHONES (Under 650px) --- */
@@ -933,4 +935,16 @@
     font-size: 1.3rem !important;
   }
 }
+
+@media (min-width: 1024px) and (max-width: 1200px) {
+  .kpi-icon {
+    width: 35px !important;
+    height: 35px !important;
+  }
+  .data-table th, .data-table td{
+    font-size: 10px !important;
+  }
+}
+
+
 

@@ -1299,7 +1299,7 @@ export const InlineDateEdit = ({ value, min, onSave, disabled }) => {
         title="Click to edit date"
         style={{
           cursor: disabled ? 'default' : 'pointer',
-          fontSize: '13px',
+          // fontSize: '13px',
           borderBottom: !disabled ? '1px dashed #cbd5e1' : 'none',
           paddingBottom: '1px',
           display: 'inline-block'
@@ -1363,7 +1363,7 @@ export const FloatingSelectText = ({
         title={value}
         style={{
           cursor: disabled ? 'default' : 'pointer',
-          fontSize: '13px',
+          // fontSize: '13px',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -1401,7 +1401,7 @@ export const FloatingSelectText = ({
               }}
               style={{
                 padding: '8px 12px',
-                fontSize: '12px',
+                // fontSize: '12px',
                 cursor: 'pointer',
                 fontWeight: opt === value ? 700 : 500
               }}

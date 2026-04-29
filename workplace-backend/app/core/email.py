@@ -194,7 +194,7 @@ async def send_welcome_email(
 
 async def send_password_reset_email(to_email: str, full_name: str, token: str):
     try:
-        reset_url = f"https://{settings.PLATFORM_URL}/reset-password?token={token}"
+        reset_url = f"{settings.PLATFORM_URL}/reset-password?token={token}"
         html_body = f"""
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
           <div style="background:white;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">

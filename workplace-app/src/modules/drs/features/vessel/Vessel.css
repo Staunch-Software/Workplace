@@ -24,6 +24,19 @@
   --table-header-height: 48px;
 }
 
+@media (min-width: 2500px) {
+  :root {
+    --action-bar-height: 60px; /* Larger bar for high res */
+  }
+}
+
+@media (max-width: 1023px) {
+  :root {
+    --action-bar-height: 140px;
+    --navbar-height: 65px;
+
+  }
+}
 
 * { box-sizing: border-box; }
 
@@ -220,7 +233,7 @@
   border: 1px solid var(--border-color);
   margin-bottom: 50px;
 }
-.data-table { width: 100%; border-collapse: collapse; table-layout: auto; }
+.data-table { width: 100%; border-collapse: separate; table-layout: auto;border-spacing: 0; }
 
 /* --- TABLE HEADER WITH FILTERS --- */
 .data-table th {
@@ -229,7 +242,7 @@
   text-align: left;
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-light);
+  color: #56585b;
   text-transform: uppercase;
   border-bottom: 2px solid var(--border-color);
   position: relative;
@@ -241,7 +254,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 5px;
+  gap: 3px;
 }
 
 .filter-icon {
@@ -760,7 +773,7 @@ label {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 3px;
 }
 
 .pag-btn:not(:disabled):hover {
@@ -778,6 +791,7 @@ label {
   /* max-height: calc(100vh - 200px); */
   overflow-y: visible;
   position: relative;
+  /* overflow-x: auto; */
 }
 
 .data-table thead th {
@@ -1042,4 +1056,35 @@ input[type="date"] {
 }
 .nine-dot-btn:hover .dot {
   transform: scale(1.2);
+}
+
+@media (min-width:1900px) {
+
+  .fsize-18{
+    font-size: 18px !important;
+  }
+  .fsize-17{
+    font-size: 17px !important;
+  }
+
+  .fsize-14{
+    font-size: 14px !important;
+  }
+
+  .fsize-15{
+    font-size: 15px !important;
+  }
+
+  .fsize-19{
+    font-size: 19px !important;
+  }
+  .width-450{
+    width: 450px !important;
+  }
+  .btn-create-defect-main{
+    max-width: 500px !important;
+  }
+  .data-table.vessel th, .data-table.vessel td {
+        --action-bar-height: 57px;
+    }
 }

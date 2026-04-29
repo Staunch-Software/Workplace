@@ -1,0 +1,17 @@
+@media (min-width: 1900px) {
+    .closure-fsize-22 {
+        font-size: 22px !important;
+    }
+
+    .closure-fsize-16 {
+        font-size: 16px !important;
+    }
+
+    .closure-fsize-14 {
+        font-size: 14px !important;
+    }
+
+    .clousure-model{
+        max-width: 800px !important;
+    }
+}
