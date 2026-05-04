@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
+import { useState } from 'react';
 
 import Login from './pages/Login/Login';
 import ResetPassword from './pages/ResetPassword/ResetPassword';
@@ -17,6 +18,7 @@ const AepmsModule = lazy(() => import('./modules/aepms/AepmsModule'));
 const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
 
 function App() {
+  const [searchQuery, setSearchQuery] = useState('');
   return (
     <AuthProvider>
       <Toaster position="top-right" />
@@ -29,8 +31,8 @@ function App() {
           {/* ── WORKSPACE DASHBOARD ────────────────────── */}
           <Route path="/dashboard" element={
             <ProtectedRoute>
-              <Navbar />
-              <Home />
+              <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+              <Home searchQuery={searchQuery} />
             </ProtectedRoute>
           } />
 

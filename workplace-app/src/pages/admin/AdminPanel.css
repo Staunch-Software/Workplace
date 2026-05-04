@@ -775,7 +775,7 @@
    TABLET OPTIMIZATION (Sidebar remains visible)
    ============================================================ */
 
-@media (min-width: 768px) and (max-width: 1199px) {
+@media (min-width: 768px) and (max-width: 1023px) {
   :root {
     /* Reduce sidebar width to icons-only size */
     --ap-sidebar-width: 150px; 
@@ -1700,3 +1700,88 @@
   }
 }
 
+/* ============================================================
+   LAPTOP DENSITY OPTIMIZATION (1024px to 1440px)
+   Focus: Smaller font sizes and tighter spacing
+   ============================================================ */
+
+@media (min-width: 1024px) and (max-width: 1440px) {
+  :root {
+    --ap-sidebar-width: 240px; /* Slightly narrower sidebar */
+  }
+
+  /* 1. Global Sidebar Scaling (Smaller Text) */
+  .ap-sidebar-brand { font-size: 1rem !important; }
+  .ap-sidebar-section-label { font-size: 0.65rem !important; }
+  
+  .ap-sidebar-link { 
+    font-size: 0.8rem !important; 
+    padding: 6px 12px !important; 
+    gap: 10px !important;
+  }
+  
+  .ap-sidebar-footer { padding: 12px !important; }
+  .ap-sidebar-user-name { font-size: 0.8rem !important; }
+  .ap-sidebar-user-email { font-size: 0.7rem !important; }
+  .ap-back-btn { font-size: 0.8rem !important; padding: 6px 12px !important; }
+
+  /* 2. Main Page Header */
+  .ap-page-wrapper { padding: 24px !important; }
+  .ap-page-title { font-size: 1.25rem !important; }
+  .ap-page-subtitle { font-size: 0.8rem !important; }
+
+  /* 3. Filter Bar (Compact Layout) */
+  .ap-filters-bar { padding: 12px !important; gap: 12px !important; flex-direction: row;}
+  .ap-search-box { max-width: 320px !important; }
+  .ap-input, .ap-select { font-size: 0.8rem !important; }
+  .ap-filter-group { gap: 6px !important; }
+
+  /* 4. Table Scaling (High Density) */
+  .ap-table th { 
+    font-size: 0.62rem !important; 
+    padding: 8px 12px !important; 
+  }
+  
+  .ap-table td { 
+    padding: 8px 12px !important; 
+    font-size: 0.8rem !important; 
+  }
+
+  .ap-td-name { font-size: 0.85rem !important; }
+  .ap-td-email { font-size: 0.72rem !important; max-width: 150px; }
+  
+  /* Badges & Icons */
+  .ap-badge { font-size: 0.62rem !important; padding: 1px 6px !important; }
+  .ap-module-icon { padding: 3px !important; }
+  .ap-vessel-count { width: 22px !important; height: 22px !important; font-size: 0.7rem !important; }
+  .ap-action-btn { padding: 4px !important; }
+
+  /* 5. Create User / Vessel Forms (Compact 2-Column) */
+  .ap-create-layout { gap: 20px !important; }
+  .ap-card-body { padding: 20px !important; }
+  .ap-card-title { font-size: 1rem !important; margin-bottom: 12px !important; }
+  
+  .ap-form-grid-2 { gap: 12px !important; }
+  .ap-label { font-size: 0.78rem !important; }
+  
+  .ap-role-option { padding: 10px !important; font-size: 0.8rem !important; }
+  .ap-vessel-grid { max-height: 250px !important; }
+  .ap-vessel-option { padding: 8px !important; gap: 8px !important; }
+  .ap-vessel-option-name { font-size: 0.8rem !important; }
+
+  /* 6. Action Buttons */
+  .ap-btn { padding: 6px 16px !important; font-size: 0.8rem !important; }
+  .ap-btn-full { height: 38px !important; }
+
+  /* 7. Slide-over (Edit Panels) */
+  .ap-slideover-panel { width: 400px !important; }
+  .ap-slideover-header { padding: 16px 20px !important; }
+  .ap-slideover-body { padding: 16px 20px !important; }
+
+   .ap-filters-right {
+    display: flex !important;
+    width: auto !important;
+    gap: 10px !important;
+    align-items: center !important;
+  }
+}
