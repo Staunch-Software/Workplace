@@ -564,6 +564,11 @@ const safeFixed = (val, digits = 2) => {
   return Number(val).toFixed(digits);
 };
 
+const formatVesselDisplayName = (name) => {
+  if (!name) return "";
+  return name.toUpperCase().trim();
+};
+
 const getInterpolatedBaseline = (reference, paramKey, load) => {
   if (!reference || !paramKey || load == null) return null;
   if (paramKey === "propeller") return 100.0;
@@ -726,9 +731,12 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
   const [selectedVesselDetails, setSelectedVesselDetails] = useState(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const detailsSectionRef = useRef(null);
+  const tableRowRef = useRef(null);
+const [actualRowHeight, setActualRowHeight] = useState(48);
   const propellerCardRef = useRef(null); // Add this
   const [consoleShipId, setConsoleShipId] = useState("");
   const daysElapsedCardRef = useRef(null);
+  const controlBarRef = useRef(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalHeader, setModalHeader] = useState("");
   const [modalData, setModalData] = useState([]);
@@ -804,35 +812,41 @@ const [daysSortConfig, setDaysSortConfig] = useState({
       }, 150); // Slightly longer timeout to allow chart rendering
     }
   }, [isPropellerCardOpen, selectedVesselsFilter]); // Added selectedVesselsFilter here
-
+  
   useEffect(() => {
-    if (consoleShipId) {
+    if (unifiedEngineType === "mainEngine" && consoleShipId) {
       const vessel = daysElapsedData.find(
         (v) => String(v.imo_number) === String(consoleShipId),
       );
       if (vessel) {
-        // Automatically set the multi-select filter to this vessel
         setSelectedDaysVesselsFilter([vessel]);
-        // Also ensure the card expands
         setIsReportStatusOpen(true);
       }
+    } else if (unifiedEngineType !== "mainEngine") {
+      setSelectedDaysVesselsFilter([]);
     } else {
-      // Clear if console is cleared
       setSelectedDaysVesselsFilter([]);
     }
-  }, [consoleShipId, daysElapsedData]);
+  }, [consoleShipId, daysElapsedData, unifiedEngineType]);
   // Auto-scroll for Report Status Card
   useEffect(() => {
-    if (isReportStatusOpen && daysElapsedCardRef.current) {
+    if (isReportStatusOpen && selectedDaysVesselsFilter.length > 0 && daysElapsedCardRef.current) {
       setTimeout(() => {
-        daysElapsedCardRef.current.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }, 150);
+        if (isPropellerCardOpen && controlBarRef.current) {
+          controlBarRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        } else {
+          daysElapsedCardRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          });
+        }
+      }, 300);
     }
-  }, [isReportStatusOpen, selectedDaysVesselsFilter]); // Added selectedDaysVesselsFilter here
-
+  }, [selectedDaysVesselsFilter]);
+  
   // --- PDF GENERATION ---
   const handlePdfAction = async (actionType) => {
     try {
@@ -1154,6 +1168,15 @@ const [daysSortConfig, setDaysSortConfig] = useState({
     };
     fetchData();
   }, []);
+
+  useEffect(() => {
+  if (tableRowRef.current) {
+    const firstRow = tableRowRef.current.querySelector('tbody tr');
+    if (firstRow) {
+      setActualRowHeight(firstRow.getBoundingClientRect().height);
+    }
+  }
+}, [filteredDaysElapsedData]);
   // const fetchAlertHistory = async (vessels) => {
   //     const historyMap = {};
   //     const monthBuckets = getLast12Months();
@@ -1684,7 +1707,7 @@ const [daysSortConfig, setDaysSortConfig] = useState({
                               propellerTrendData.length
                             ? "✓ All"
                             : selectedVesselsFilter.length === 1
-                              ? `✓ ${selectedVesselsFilter[0]?.vessel_name || "1 Vessel Selected"}`
+                              ? `✓ ${selectedVesselsFilter[0]?.vessel_name?.toUpperCase() || "1 Vessel Selected"}`
                               : `✓ ${selectedVesselsFilter.length} Vessels Selected`}
                       </span>
                     </div>
@@ -1751,7 +1774,7 @@ const [daysSortConfig, setDaysSortConfig] = useState({
                                 )}
                                 readOnly // Changed to readOnly
                               />
-                              <span>{vessel.vessel_name}</span>
+                              <span>{formatVesselDisplayName(vessel.vessel_name)}</span>
                             </label>
                           </div>
                         ))}
@@ -1874,7 +1897,7 @@ const [daysSortConfig, setDaysSortConfig] = useState({
                                   style={{ background: dotColor }}
                                 />
                                 <span className="propeller-vessel-name">
-                                  {vessel.vessel_name}
+                                  {formatVesselDisplayName(vessel.vessel_name)}
                                 </span>
                               </div>
 
@@ -1928,7 +1951,7 @@ const [daysSortConfig, setDaysSortConfig] = useState({
           </div>
 
           {/* ===== UNIFIED PERFORMANCE CARD ===== */}
-          <div style={{ width: "100%", minWidth: 0 }}>
+          <div ref={controlBarRef} style={{ width: "100%", minWidth: 0 }}>
             <Performance
               embeddedMode={true}
               onEngineTypeChange={(type) => {
@@ -1997,7 +2020,7 @@ const [daysSortConfig, setDaysSortConfig] = useState({
                                   daysElapsedData.length
                                 ? "✓ All"
                                 : selectedDaysVesselsFilter.length === 1
-                                  ? `✓ ${selectedDaysVesselsFilter[0]?.vessel_name || "1 Vessel Selected"}`
+                                    ? `✓ ${selectedDaysVesselsFilter[0]?.vessel_name?.toUpperCase() || "1 Vessel Selected"}`
                                   : `✓ ${selectedDaysVesselsFilter.length} Vessels Selected`}
                           </span>
                         </div>
@@ -2061,7 +2084,7 @@ const [daysSortConfig, setDaysSortConfig] = useState({
                                     )}
                                     readOnly
                                   />
-                                  <span>{vessel.vessel_name}</span>
+                                  <span>{formatVesselDisplayName(vessel.vessel_name)}</span>
                                 </label>
                               </div>
                             ))}
@@ -2080,9 +2103,9 @@ const [daysSortConfig, setDaysSortConfig] = useState({
                     }}
                   >
                     {isReportStatusOpen ? (
-                      <ChevronUp size={20} color="#475569" strokeWidth={2.5} /> /* Increased Size & Stroke */
+                      <ChevronUp size={24} color="#475569" strokeWidth={2.5} /> /* Increased Size & Stroke */
                     ) : (
-                      <ChevronDown size={20} color="#475569" strokeWidth={2.5} />
+                      <ChevronDown size={24} color="#475569" strokeWidth={2.5} />
                     )}
                   </div>
                 </div>
@@ -2092,7 +2115,16 @@ const [daysSortConfig, setDaysSortConfig] = useState({
                   <div className="card-body-enhanced days-card-body">
                     {consoleShipId && selectedDaysVesselsFilter.length > 0 ? (
                       /* 1. WRAPPER: Height set to approx 380px to show ~6 vessels cleanly */
-                      <div className="performance-table-wrapper days-table-wrapper">
+                      <div
+  className="performance-table-wrapper days-table-wrapper"
+  ref={tableRowRef}
+  style={{
+    maxHeight: filteredDaysElapsedData.length > 6
+      ? `${(6 * actualRowHeight) + 42 + 36}px`
+      : 'none',
+    overflowY: filteredDaysElapsedData.length > 6 ? 'auto' : 'hidden'
+  }}
+>
                         <table className="performance-table-modern days-table">
                           <thead className="days-thead">
                             <tr>
@@ -2206,7 +2238,7 @@ const [daysSortConfig, setDaysSortConfig] = useState({
                                         style={{ background: colors.dot }}
                                       />
                                       <span className="days-vessel-name-text">
-                                        {vessel.vessel_name}
+                                        {formatVesselDisplayName(vessel.vessel_name)}
                                       </span>
                                     </div>
                                   </td>

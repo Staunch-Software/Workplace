@@ -96,8 +96,10 @@ const MultiSelectDropdown = ({
 
   // Auto-select first year
   React.useEffect(() => {
-    if (isOpen && !activeYear && sortedYears.length > 0) {
-      setActiveYear(sortedYears[0]);
+    if (isOpen && sortedYears.length > 0) {
+      if (!activeYear || !sortedYears.includes(activeYear)) {
+        setActiveYear(sortedYears[0]);
+      }
     }
   }, [isOpen, sortedYears]);
 
@@ -382,6 +384,10 @@ const SingleSelectDropdown = ({
         !containerRef.current.contains(event.target)
       ) {
         setIsOpen(false);
+        const meContainer = document.querySelector(".me-performance-container");
+        if (meContainer) {
+          meContainer.style.minHeight = "";
+        }
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -609,7 +615,39 @@ const SingleSelectDropdown = ({
       {/* TRIGGER AREA */}
       <div
         onClick={() => {
-          if (!disabled) setIsOpen(!isOpen);
+          if (!disabled) {
+            if (!isOpen) {
+              const meContainer = document.querySelector(
+                ".me-performance-container",
+              );
+              if (meContainer) {
+                meContainer.style.minHeight = `${meContainer.scrollHeight + 300}px`;
+              }
+              const rect = containerRef.current?.getBoundingClientRect();
+              if (rect) {
+                const scrollNeeded = rect.bottom + 260 - window.innerHeight;
+                if (scrollNeeded > 0) {
+                  window.scrollBy({
+                    top: scrollNeeded + 20,
+                    behavior: "smooth",
+                  });
+                  setTimeout(() => setIsOpen(true), 300);
+                } else {
+                  setIsOpen(true);
+                }
+              } else {
+                setIsOpen(true);
+              }
+            } else {
+              const meContainer = document.querySelector(
+                ".me-performance-container",
+              );
+              if (meContainer) {
+                meContainer.style.minHeight = "";
+              }
+              setIsOpen(false);
+            }
+          }
         }}
         style={{
           padding: "10px 12px",
@@ -654,7 +692,7 @@ const SingleSelectDropdown = ({
             border: "1px solid #e2e8f0",
             borderRadius: "6px",
             boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
-            zIndex: 10,
+            zIndex: 50,
             padding: "12px 0",
           }}
         >
@@ -664,6 +702,12 @@ const SingleSelectDropdown = ({
               onClick={() => {
                 onChange(option.value);
                 setIsOpen(false);
+                const meContainer = document.querySelector(
+                  ".me-performance-container",
+                );
+                if (meContainer) {
+                  meContainer.style.minHeight = "";
+                }
               }}
               style={{
                 padding: "10px 12px",
@@ -1049,7 +1093,7 @@ const styles = `
     }
 
     .card-content-enhanced {
-      padding: 28px;
+      padding: 14px;
     }
 
     .summary-table-enhanced {
@@ -4539,9 +4583,7 @@ export default function Performance({
           onClick={() => setIsLoadDiagramExpanded(!isLoadDiagramExpanded)}
         >
           <div className="load-diag-title-group">
-            <h3 className="load-diag-title">
-              Engine Load Diagram (% SMCR)
-            </h3>
+            <h3 className="load-diag-title">Engine Load Diagram (% SMCR)</h3>
             <p className="load-diag-subtitle">
               Logarithmic Scale normalized to SMCR (Point M)
             </p>
@@ -4551,7 +4593,9 @@ export default function Performance({
           <span
             className="load-diag-chevron"
             style={{
-              transform: isLoadDiagramExpanded ? "rotate(180deg)" : "rotate(0deg)",
+              transform: isLoadDiagramExpanded
+                ? "rotate(180deg)"
+                : "rotate(0deg)",
             }}
           >
             ▼
@@ -4596,9 +4640,7 @@ export default function Performance({
                       ×
                     </div>
                   )}
-                  <span className="load-diag-legend-text">
-                    {item.value}
-                  </span>
+                  <span className="load-diag-legend-text">{item.value}</span>
                 </div>
               ))}
             </div>
@@ -5178,9 +5220,9 @@ export default function Performance({
       return (
         <div className="enhanced-card summary-table-card">
           <div
-  className={`card-header-enhanced summary-header ${!isSummaryExpanded ? "header-closed" : ""}`}
-  onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
->
+            className={`card-header-enhanced summary-header ${!isSummaryExpanded ? "header-closed" : ""}`}
+            onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
+          >
             <div>
               <h3 className="card-title-enhanced summary-card-title">
                 {allMonthlyReports.length === 1
@@ -5196,17 +5238,19 @@ export default function Performance({
 
             <div className="summary-header-right">
               {/* Professional Bookmark - preserved exactly from source */}
-              <div className="summary-bookmark-label">
-  {bookmarkLabel}
-</div>
+              <div className="summary-bookmark-label">{bookmarkLabel}</div>
 
               {/* Animated Chevron Icon */}
               <span
-  className="summary-chevron"
-  style={{ transform: isSummaryExpanded ? "rotate(180deg)" : "rotate(0deg)" }}
->
-  ▼
-</span>
+                className="summary-chevron"
+                style={{
+                  transform: isSummaryExpanded
+                    ? "rotate(180deg)"
+                    : "rotate(0deg)",
+                }}
+              >
+                ▼
+              </span>
             </div>
           </div>
           {isSummaryExpanded && (
@@ -5215,10 +5259,10 @@ export default function Performance({
                 <thead>
                   <tr>
                     <th className="summary-th-param">Parameter</th>
-<th className="summary-th-right">Shop Trial</th>
-<th className="summary-th-right">Actual</th>
-<th className="summary-th-right">Δ</th>
-<th className="summary-th-right">Deviation %</th>
+                    <th className="summary-th-right">Shop Trial</th>
+                    <th className="summary-th-right">Actual</th>
+                    <th className="summary-th-right">Δ</th>
+                    <th className="summary-th-right">Deviation %</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -5298,29 +5342,33 @@ export default function Performance({
 
                       return (
                         <tr key={metricKey} className={devClass}>
-                          <td className="summary-td-param">
-  Power Margin
-</td>
+                          <td className="summary-td-param">Power Margin</td>
 
                           {/* Baseline is always 100.00 for Propeller Margin */}
                           <td className="summary-td-right">100.00</td>
 
                           {/* Actual Value (Now correctly shows 100 + deviation) */}
                           <td className="summary-td-right summary-td-actual">
-  {safeFixed(displayActual, 2)}
-</td>
+                            {safeFixed(displayActual, 2)}
+                          </td>
 
                           {/* Delta (The deviation amount) */}
-                          <td className="summary-td-right summary-td-delta" style={{ color: txtColor }}>
-  {displayDelta >= 0 ? "+" : ""}
-  {safeFixed(displayDelta, 2)}
-</td>
+                          <td
+                            className="summary-td-right summary-td-delta"
+                            style={{ color: txtColor }}
+                          >
+                            {displayDelta >= 0 ? "+" : ""}
+                            {safeFixed(displayDelta, 2)}
+                          </td>
 
                           {/* % Display */}
-                          <td className="summary-td-right summary-td-dev" style={{ color: txtColor }}>
-  {displayDelta >= 0 ? "+" : ""}
-  {safeFixed(displayDelta, 1)}%
-</td>
+                          <td
+                            className="summary-td-right summary-td-dev"
+                            style={{ color: txtColor }}
+                          >
+                            {displayDelta >= 0 ? "+" : ""}
+                            {safeFixed(displayDelta, 1)}%
+                          </td>
                         </tr>
                       );
                     }
@@ -5430,24 +5478,32 @@ export default function Performance({
                     return (
                       <tr key={metricKey} className={devClass}>
                         <td className="summary-td-param">
-  {metricDisplayNames[metricKey] || metricKey}
-  <span className="summary-iso-label">{labelSuffix}</span>
-  <span className="summary-unit-label">({unit})</span>
-</td>
+                          {metricDisplayNames[metricKey] || metricKey}
+                          <span className="summary-iso-label">
+                            {labelSuffix}
+                          </span>
+                          <span className="summary-unit-label">({unit})</span>
+                        </td>
                         <td className="summary-td-right">
-  {safeFixed(baselineValue, 2)}
-</td>
+                          {safeFixed(baselineValue, 2)}
+                        </td>
                         <td className="summary-td-right summary-td-actual">
-  {safeFixed(actualValue, 2)}
-</td>
-                        <td className="summary-td-right summary-td-delta" style={{ color: txtColor }}>
-  {delta >= 0 ? "+" : ""}
-  {safeFixed(delta, 2)}
-</td>
-                        <td className="summary-td-right summary-td-dev" style={{ color: txtColor }}>
-  {devPct >= 0 ? "+" : ""}
-  {safeFixed(devPct, 1)}%
-</td>
+                          {safeFixed(actualValue, 2)}
+                        </td>
+                        <td
+                          className="summary-td-right summary-td-delta"
+                          style={{ color: txtColor }}
+                        >
+                          {delta >= 0 ? "+" : ""}
+                          {safeFixed(delta, 2)}
+                        </td>
+                        <td
+                          className="summary-td-right summary-td-dev"
+                          style={{ color: txtColor }}
+                        >
+                          {devPct >= 0 ? "+" : ""}
+                          {safeFixed(devPct, 1)}%
+                        </td>
                       </tr>
                     );
                   })}
@@ -5480,9 +5536,9 @@ export default function Performance({
           <div className="matrix-scroll-container">
             {/* 🔥 ADDED tableLayout: "fixed" and our mathematical width */}
             <table
-  className="matrix-table"
-  style={{ "--total-reports": numReports }}
->
+              className="matrix-table"
+              style={{ "--total-reports": numReports }}
+            >
               <thead>
                 {/* 1. Date Group Header */}
                 <tr className="matrix-group-header-row">
@@ -5508,19 +5564,19 @@ export default function Performance({
 
                     return (
                       <th
-  key={report.report_id}
-  colSpan={3}
-  className="matrix-group-header"
->
-  {report.displayName}
-  <div className="matrix-header-load">
-    {safeFixed(loadPct, 2)}%{" "}
-    {powerLabel ? `(${powerLabel})` : ""}
-  </div>
-  <div className="matrix-header-date">
-    {report.report_date}
-  </div>
-</th>
+                        key={report.report_id}
+                        colSpan={3}
+                        className="matrix-group-header"
+                      >
+                        {report.displayName}
+                        <div className="matrix-header-load">
+                          {safeFixed(loadPct, 2)}%{" "}
+                          {powerLabel ? `(${powerLabel})` : ""}
+                        </div>
+                        <div className="matrix-header-date">
+                          {report.report_date}
+                        </div>
+                      </th>
                     );
                   })}
                 </tr>
@@ -5529,20 +5585,20 @@ export default function Performance({
                 {/* 2. Sub-headers */}
                 <tr>
                   <th className="matrix-sticky-col-1 matrix-unit-header">
-  Unit
-</th>
+                    Unit
+                  </th>
 
                   {allMonthlyReports.map((report) => (
                     <React.Fragment key={`sub-${report.report_id}`}>
                       <th className="matrix-sub-header matrix-sub-shop">
-  Shop Trial
-</th>
+                        Shop Trial
+                      </th>
                       <th className="matrix-sub-header matrix-sub-actual">
-  Actual
-</th>
+                        Actual
+                      </th>
                       <th className="matrix-sub-header matrix-sub-delta">
-  Δ (%)
-</th>
+                        Δ (%)
+                      </th>
                     </React.Fragment>
                   ))}
                 </tr>
@@ -5568,16 +5624,18 @@ export default function Performance({
                     <tr key={metricKey}>
                       {/* Column 1: Parameter Label */}
                       <td className="matrix-sticky-col-1 matrix-param-cell">
-  {isProp
-    ? "Power Margin"
-    : metricDisplayNames[metricKey] || metricKey}
-  {labelSuffix && (
-    <span className="summary-iso-label">{labelSuffix}</span>
-  )}
-  <span className="matrix-unit-label">
-    ({isProp ? "%" : unit})
-  </span>
-</td>
+                        {isProp
+                          ? "Power Margin"
+                          : metricDisplayNames[metricKey] || metricKey}
+                        {labelSuffix && (
+                          <span className="summary-iso-label">
+                            {labelSuffix}
+                          </span>
+                        )}
+                        <span className="matrix-unit-label">
+                          ({isProp ? "%" : unit})
+                        </span>
+                      </td>
 
                       {/* Dynamic Columns for Each Report */}
                       {allMonthlyReports.map((report) => {
@@ -5755,9 +5813,11 @@ export default function Performance({
                         if (val === 0 && base === 0) {
                           return (
                             <React.Fragment key={report.report_id}>
-                              <td className="matrix-data-cell matrix-data-cell--first">-</td>
-<td className="matrix-data-cell">-</td>
-<td className="matrix-data-cell">-</td>
+                              <td className="matrix-data-cell matrix-data-cell--first">
+                                -
+                              </td>
+                              <td className="matrix-data-cell">-</td>
+                              <td className="matrix-data-cell">-</td>
                             </React.Fragment>
                           );
                         }
@@ -5772,27 +5832,29 @@ export default function Performance({
                           <React.Fragment key={report.report_id}>
                             {/* 1. Trial (Baseline) Column */}
                             <td
-  className="matrix-data-cell matrix-data-cell--first matrix-data-cell--trial"
-  style={{ backgroundColor: bg }}
->
-  {safeFixed(base, 2)}
-</td>
+                              className="matrix-data-cell matrix-data-cell--first matrix-data-cell--trial"
+                              style={{ backgroundColor: bg }}
+                            >
+                              {safeFixed(base, 2)}
+                            </td>
 
                             {/* 2. Actual Column */}
                             <td
-  className="matrix-data-cell matrix-data-cell--actual"
-  style={{ backgroundColor: bg }}
->
-  {safeFixed(val, 2)}
-</td>
+                              className="matrix-data-cell matrix-data-cell--actual"
+                              style={{ backgroundColor: bg }}
+                            >
+                              {safeFixed(val, 2)}
+                            </td>
                             {/* 3. Merged Delta (%) Column */}
                             <td
-  className="matrix-data-cell matrix-data-cell--delta"
-  style={{ color: color, backgroundColor: bg }}
->
-  {formattedDelta}{" "}
-  <span className="matrix-delta-pct">({formattedPct})</span>
-</td>
+                              className="matrix-data-cell matrix-data-cell--delta"
+                              style={{ color: color, backgroundColor: bg }}
+                            >
+                              {formattedDelta}{" "}
+                              <span className="matrix-delta-pct">
+                                ({formattedPct})
+                              </span>
+                            </td>
                           </React.Fragment>
                         );
                       })}
@@ -6197,164 +6259,179 @@ export default function Performance({
     return (
       <div className="hist-card">
         <div
-  className={`hist-header ${!isHistoryExpanded ? "hist-header--closed" : ""}`}
-  onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
->
+          className={`hist-header ${!isHistoryExpanded ? "hist-header--closed" : ""}`}
+          onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+        >
           <div className="hist-header__left">
-  <h3 className="hist-header__title">
-    Historical Deviation Analysis (Last 6 Reports)
-  </h3>
-  <p className="hist-header__subtitle">
-    AE Engine — Actual vs Deviation %
-  </p>
-</div>
+            <h3 className="hist-header__title">
+              Historical Deviation Analysis (Last 6 Reports)
+            </h3>
+            <p className="hist-header__subtitle">
+              AE Engine — Actual vs Deviation %
+            </p>
+          </div>
 
           <div className="hist-header__right">
-  <div className="hist-header__bookmark">{bookmarkLabel}</div>
-  <span
-    className="hist-header__chevron"
-    style={{
-      transform: isHistoryExpanded ? "rotate(180deg)" : "rotate(0deg)",
-    }}
-  >
-    ▼
-  </span>
-</div>
+            <div className="hist-header__bookmark">{bookmarkLabel}</div>
+            <span
+              className="hist-header__chevron"
+              style={{
+                transform: isHistoryExpanded
+                  ? "rotate(180deg)"
+                  : "rotate(0deg)",
+              }}
+            >
+              ▼
+            </span>
+          </div>
         </div>
         {isHistoryExpanded && (
           <div className="hist-body">
-  <div className="hist-scroll">
-            <table className="hist-table">
-              {/* 1. THE HEADER ROW (Dates) */}
-              <thead>
-                <tr>
-                  <th className="hist-th-param">PARAMETER</th>
-                  {/* Sort descending by date */}
-                  {[...aeDeviationHistory]
-                    .sort(
-                      (a, b) =>
-                        new Date(b.report_date) - new Date(a.report_date),
-                    )
-                    .map((report, index) => (
-                      <th key={index} className="hist-th-date">
-  <span className="hist-th-date__month">
-    {getMonthDisplayName(report.report_month)}
-  </span>
-  <span className="hist-th-date__raw">{report.report_date}</span>
-</th>
-                    ))}
-                </tr>
-              </thead>
+            <div className="hist-scroll">
+              <table className="hist-table">
+                {/* 1. THE HEADER ROW (Dates) */}
+                <thead>
+                  <tr>
+                    <th className="hist-th-param">PARAMETER</th>
+                    {/* Sort descending by date */}
+                    {[...aeDeviationHistory]
+                      .sort(
+                        (a, b) =>
+                          new Date(b.report_date) - new Date(a.report_date),
+                      )
+                      .map((report, index) => (
+                        <th key={index} className="hist-th-date">
+                          <span className="hist-th-date__month">
+                            {getMonthDisplayName(report.report_month)}
+                          </span>
+                          <span className="hist-th-date__raw">
+                            {report.report_date}
+                          </span>
+                        </th>
+                      ))}
+                  </tr>
+                </thead>
 
-              {/* 2. THE BODY ROWS */}
-              <tbody>
-                {parameterRows.map((param) => (
-                  <tr key={param.key}>
-                    {/* Row Header */}
-                    <td className="hist-td-param">
-  {param.label}
-  <span className="hist-td-param__unit">({param.unit})</span>
-</td>
+                {/* 2. THE BODY ROWS */}
+                <tbody>
+                  {parameterRows.map((param) => (
+                    <tr key={param.key}>
+                      {/* Row Header */}
+                      <td className="hist-td-param">
+                        {param.label}
+                        <span className="hist-td-param__unit">
+                          ({param.unit})
+                        </span>
+                      </td>
 
-                    {/* Row Data */}
-                    {aeDeviationHistory.map((report, index) => {
-                      // A. Handle Load Row
-                      if (param.isLoad) {
-                        return (
-                          <td key={index} className="hist-td-load">
-  <span className="hist-td-load__pct">
-    {report.load_percentage?.toFixed(2)}%
-  </span>
-  <span className="hist-td-load__kw">{report.load_kw} kW</span>
-</td>
-                        );
-                      }
+                      {/* Row Data */}
+                      {aeDeviationHistory.map((report, index) => {
+                        // A. Handle Load Row
+                        if (param.isLoad) {
+                          return (
+                            <td key={index} className="hist-td-load">
+                              <span className="hist-td-load__pct">
+                                {report.load_percentage?.toFixed(2)}%
+                              </span>
+                              <span className="hist-td-load__kw">
+                                {report.load_kw} kW
+                              </span>
+                            </td>
+                          );
+                        }
 
-                      // B. Get Actual Value from History API
-                      const actualKey = `${param.key}_actual`;
-                      const actualVal = report[actualKey];
+                        // B. Get Actual Value from History API
+                        const actualKey = `${param.key}_actual`;
+                        const actualVal = report[actualKey];
 
-                      // C. DYNAMIC DEVIATION CALCULATION (Matches Summary Table)
-                      let displayDev = "-";
-                      let devColor = "#64748b"; // Default Grey
+                        // C. DYNAMIC DEVIATION CALCULATION (Matches Summary Table)
+                        let displayDev = "-";
+                        let devColor = "#64748b"; // Default Grey
 
-                      // Ensure we have actual value, baseline data, and a valid mapping key
-                      const baselineMetricKey = baselineKeyMap[param.key];
+                        // Ensure we have actual value, baseline data, and a valid mapping key
+                        const baselineMetricKey = baselineKeyMap[param.key];
 
-                      if (
-                        actualVal !== null &&
-                        actualVal !== undefined &&
-                        baseline &&
-                        Object.keys(baseline).length > 0 &&
-                        baselineMetricKey
-                      ) {
-                        // Interpolate Baseline at THIS report's specific load
-                        const computedBaseline = interpolateBaseline(
-                          baseline,
-                          report.load_percentage,
-                          baselineMetricKey,
-                          "load_percentage", // AE uses load_percentage for X-axis
-                        );
+                        if (
+                          actualVal !== null &&
+                          actualVal !== undefined &&
+                          baseline &&
+                          Object.keys(baseline).length > 0 &&
+                          baselineMetricKey
+                        ) {
+                          // Interpolate Baseline at THIS report's specific load
+                          const computedBaseline = interpolateBaseline(
+                            baseline,
+                            report.load_percentage,
+                            baselineMetricKey,
+                            "load_percentage", // AE uses load_percentage for X-axis
+                          );
 
-                        if (computedBaseline && computedBaseline !== 0) {
-                          const delta = actualVal - computedBaseline;
-                          const pct = (delta / computedBaseline) * 100;
+                          if (computedBaseline && computedBaseline !== 0) {
+                            const delta = actualVal - computedBaseline;
+                            const pct = (delta / computedBaseline) * 100;
 
-                          // Format: +5.4%
-                          displayDev = `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`;
+                            // Format: +5.4%
+                            displayDev = `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`;
 
-                          // --- NEW AE HISTORY COLOR LOGIC ---
-                          const absPct = Math.abs(pct);
-                          const absDelta = Math.abs(delta);
-                          const aeTempKeys = ["tc_in", "tc_out", "exh_cyl_out"];
-                          const aeGroupA = ["pmax", "pcomp", "turbo_rpm"]; // AE strict parameters
+                            // --- NEW AE HISTORY COLOR LOGIC ---
+                            const absPct = Math.abs(pct);
+                            const absDelta = Math.abs(delta);
+                            const aeTempKeys = [
+                              "tc_in",
+                              "tc_out",
+                              "exh_cyl_out",
+                            ];
+                            const aeGroupA = ["pmax", "pcomp", "turbo_rpm"]; // AE strict parameters
 
-                          if (param.key === "turbo_rpm") {
-                            // TURBO LOGIC: Absolute RPM
-                            if (absDelta >= 1000) devColor = "#dc2626";
-                            else if (absDelta >= 500) devColor = "#ca8a04";
-                            else devColor = "#16a34a";
-                          } else if (aeTempKeys.includes(param.key)) {
-                            if (absDelta > 60) devColor = "#dc2626";
-                            else if (absDelta >= 40) devColor = "#ca8a04";
-                            else devColor = "#16a34a";
-                          } else if (aeGroupA.includes(param.key)) {
-                            if (absPct > 5.0) devColor = "#dc2626";
-                            else if (absPct >= 3.0) devColor = "#ca8a04";
-                            else devColor = "#16a34a";
-                          } else {
-                            if (absPct > 10.0) devColor = "#dc2626";
-                            else if (absPct >= 5.0) devColor = "#ca8a04";
-                            else devColor = "#16a34a";
+                            if (param.key === "turbo_rpm") {
+                              // TURBO LOGIC: Absolute RPM
+                              if (absDelta >= 1000) devColor = "#dc2626";
+                              else if (absDelta >= 500) devColor = "#ca8a04";
+                              else devColor = "#16a34a";
+                            } else if (aeTempKeys.includes(param.key)) {
+                              if (absDelta > 60) devColor = "#dc2626";
+                              else if (absDelta >= 40) devColor = "#ca8a04";
+                              else devColor = "#16a34a";
+                            } else if (aeGroupA.includes(param.key)) {
+                              if (absPct > 5.0) devColor = "#dc2626";
+                              else if (absPct >= 3.0) devColor = "#ca8a04";
+                              else devColor = "#16a34a";
+                            } else {
+                              if (absPct > 10.0) devColor = "#dc2626";
+                              else if (absPct >= 5.0) devColor = "#ca8a04";
+                              else devColor = "#16a34a";
+                            }
                           }
                         }
-                      }
 
-                      return (
-  <td key={index} className="hist-td-data">
-    <span className="hist-td-data__val">
-      {actualVal !== null && actualVal !== undefined
-        ? actualVal.toFixed(1)
-        : "-"}
-    </span>
-    <span
-      className={`hist-td-data__dev ${
-        devColor === "#dc2626" ? "hist-dev--red"
-        : devColor === "#ca8a04" ? "hist-dev--amber"
-        : devColor === "#16a34a" ? "hist-dev--green"
-        : "hist-dev--grey"
-      }`}
-    >
-      {displayDev}
-    </span>
-  </td>
-);
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        return (
+                          <td key={index} className="hist-td-data">
+                            <span className="hist-td-data__val">
+                              {actualVal !== null && actualVal !== undefined
+                                ? actualVal.toFixed(1)
+                                : "-"}
+                            </span>
+                            <span
+                              className={`hist-td-data__dev ${
+                                devColor === "#dc2626"
+                                  ? "hist-dev--red"
+                                  : devColor === "#ca8a04"
+                                    ? "hist-dev--amber"
+                                    : devColor === "#16a34a"
+                                      ? "hist-dev--green"
+                                      : "hist-dev--grey"
+                              }`}
+                            >
+                              {displayDev}
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
@@ -6406,211 +6483,220 @@ export default function Performance({
     return (
       <div className="hist-card">
         <div
-  className={`hist-header ${!isHistoryExpanded ? "hist-header--closed" : ""}`}
-  onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
->
+          className={`hist-header ${!isHistoryExpanded ? "hist-header--closed" : ""}`}
+          onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+        >
           <div className="hist-header__left">
-  <h3 className="hist-header__title">
-    Historical Deviation Analysis (Last 6 Reports)
-  </h3>
-  <p className="hist-header__subtitle">
-    Main Engine — Actual vs Deviation %
-  </p>
-</div>
+            <h3 className="hist-header__title">
+              Historical Deviation Analysis (Last 6 Reports)
+            </h3>
+            <p className="hist-header__subtitle">
+              Main Engine — Actual vs Deviation %
+            </p>
+          </div>
 
           <div className="hist-header__right">
-  <div className="hist-header__bookmark">{bookmarkLabel}</div>
-  <span
-    className="hist-header__chevron"
-    style={{
-      transform: isHistoryExpanded ? "rotate(180deg)" : "rotate(0deg)",
-    }}
-  >
-    ▼
-  </span>
-</div>
+            <div className="hist-header__bookmark">{bookmarkLabel}</div>
+            <span
+              className="hist-header__chevron"
+              style={{
+                transform: isHistoryExpanded
+                  ? "rotate(180deg)"
+                  : "rotate(0deg)",
+              }}
+            >
+              ▼
+            </span>
+          </div>
         </div>
         {isHistoryExpanded && (
           <div className="hist-body">
-  <div className="hist-scroll">
-            <table className="hist-table">
-              <thead>
-                <tr>
-                  <th className="hist-th-param">PARAMETER</th>
-                  {[...meDeviationHistory]
-                    .sort(
-                      (a, b) =>
-                        new Date(b.report_date) - new Date(a.report_date),
-                    )
-                    .map((r, idx) => (
-                      <th key={idx} className="hist-th-date">
-  <span className="hist-th-date__month">
-    {getMonthDisplayName(r.report_month)}
-  </span>
-  <span className="hist-th-date__raw">{r.report_date}</span>
-</th>
-                    ))}
-                </tr>
-              </thead>
-
-              <tbody>
-                {parameters.map((p) => (
-                  <tr key={p.key}>
-                    <td className="hist-td-param">
-  {p.label}
-  <span className="hist-td-param__unit">({p.unit})</span>
-</td>
-                    {meDeviationHistory.map((r, index) => {
-                      // ---------------------------
-                      // A. Handle Load Row
-                      // ---------------------------
-                      if (p.isLoad) {
-                        return (
-                          <td key={index} className="hist-td-load">
-  <span className="hist-td-load__pct">
-    {r.load_percentage?.toFixed(2)}%
-  </span>
-</td>
-                        );
-                      }
-
-                      // ---------------------------
-                      // B. Get Actual Value from DB
-                      // ---------------------------
-                      const actualKey = `${p.key}_actual`;
-                      const actual = r[actualKey];
-
-                      // ---------------------------
-                      // C. Calculate Display Values & Deviation
-                      // ---------------------------
-                      let displayVal = "-"; // The top number (Actual)
-                      let displayDev = "-"; // The bottom number (Delta %)
-                      let devColor = "#64748b"; // Default Grey
-
-                      // Default display for standard metrics (unless overridden by Propeller logic)
-                      if (actual !== null && actual !== undefined) {
-                        displayVal = actual.toFixed(1);
-                      }
-
-                      // --- Case 1: Propeller Margin (Special Logic) ---
-                      if (p.isProp) {
-                        if (actual !== null && actual !== undefined) {
-                          let propActual = 0;
-                          let propDev = 0;
-
-                          // Heuristic Check:
-                          // If > 50 (e.g. 112.9), treat as Ratio.
-                          // If <= 50 (e.g. 12.9), treat as Deviation.
-                          if (Math.abs(actual) > 50) {
-                            propActual = actual;
-                            propDev = actual - 100;
-                          } else {
-                            propActual = 100 + actual;
-                            propDev = actual;
-                          }
-
-                          // Update the display variables
-                          displayVal = propActual.toFixed(1);
-                          displayDev = `${propDev > 0 ? "+" : ""}${propDev.toFixed(1)}%`;
-
-                          // Color Logic for Propeller
-                          if (propDev > 5.0) {
-                            devColor = "#dc2626"; // Red
-                          } else if (propDev >= 0) {
-                            devColor = "#ca8a04"; // Amber
-                          } else {
-                            devColor = "#16a34a"; // Green
-                          }
-                        }
-                      }
-                      // --- Case 2: Standard Metrics (Interpolation) ---
-                      else if (
-                        (actual !== null &&
-                          actual !== undefined &&
-                          baseline &&
-                          Object.keys(baseline).length > 0,
-                        p.key !== "engine_rpm")
-                      ) {
-                        const baselineMetricKey = baselineKeyMap[p.key];
-
-                        if (baselineMetricKey) {
-                          // Interpolate Baseline at the history report's specific load
-                          const computedBaseline = interpolateBaseline(
-                            baseline,
-                            r.load_percentage,
-                            baselineMetricKey,
-                            "load",
-                          );
-
-                          if (computedBaseline && computedBaseline !== 0) {
-                            const delta = actual - computedBaseline;
-                            const pct = (delta / computedBaseline) * 100;
-
-                            displayDev = `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`;
-
-                            const absPct = Math.abs(pct);
-                            const absDelta = Math.abs(delta);
-                            const tempKeys = [
-                              "exh_tc_in",
-                              "exh_tc_out",
-                              "exh_cyl_out",
-                            ];
-                            const groupAKeys = [
-                              "engine_rpm",
-                              "pmax",
-                              "pcomp",
-                              "turbo_rpm",
-                            ];
-
-                            if (p.key === "turbo_rpm") {
-                              // TURBO LOGIC: Absolute RPM
-                              if (absDelta >= 1000) devColor = "#dc2626";
-                              else if (absDelta >= 500) devColor = "#ca8a04";
-                              else devColor = "#16a34a";
-                            } else if (tempKeys.includes(p.key)) {
-                              // EXHAUST LOGIC: Absolute degrees
-                              if (absDelta > 60) devColor = "#dc2626";
-                              else if (absDelta >= 40) devColor = "#ca8a04";
-                              else devColor = "#16a34a";
-                            } else if (groupAKeys.includes(p.key)) {
-                              // GROUP A LOGIC: Strict % (3/5)
-                              if (absPct > 5.0) devColor = "#dc2626";
-                              else if (absPct >= 3.0) devColor = "#ca8a04";
-                              else devColor = "#16a34a";
-                            } else {
-                              // OTHERS (SFOC, Scav Air, Fuel Index): Standard % (5/10)
-                              if (absPct > 10.0) devColor = "#dc2626";
-                              else if (absPct >= 5.0) devColor = "#ca8a04";
-                              else devColor = "#16a34a";
-                            }
-                            // --- END OF NEW COLOR LOGIC ---
-                          }
-                        }
-                      }
-
-                      return (
-                        <td key={index} className="hist-td-data">
-  <span className="hist-td-data__val">{displayVal}</span>
-  {p.key !== "engine_rpm" && (
-    <span
-      className={`hist-td-data__dev ${
-        devColor === "#dc2626" ? "hist-dev--red"
-        : devColor === "#ca8a04" ? "hist-dev--amber"
-        : devColor === "#16a34a" ? "hist-dev--green"
-        : "hist-dev--grey"
-      }`}
-    >
-      {displayDev}
-    </span>
-  )}
-</td>
-                      );
-                    })}
+            <div className="hist-scroll">
+              <table className="hist-table">
+                <thead>
+                  <tr>
+                    <th className="hist-th-param">PARAMETER</th>
+                    {[...meDeviationHistory]
+                      .sort(
+                        (a, b) =>
+                          new Date(b.report_date) - new Date(a.report_date),
+                      )
+                      .map((r, idx) => (
+                        <th key={idx} className="hist-th-date">
+                          <span className="hist-th-date__month">
+                            {getMonthDisplayName(r.report_month)}
+                          </span>
+                          <span className="hist-th-date__raw">
+                            {r.report_date}
+                          </span>
+                        </th>
+                      ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+
+                <tbody>
+                  {parameters.map((p) => (
+                    <tr key={p.key}>
+                      <td className="hist-td-param">
+                        {p.label}
+                        <span className="hist-td-param__unit">({p.unit})</span>
+                      </td>
+                      {meDeviationHistory.map((r, index) => {
+                        // ---------------------------
+                        // A. Handle Load Row
+                        // ---------------------------
+                        if (p.isLoad) {
+                          return (
+                            <td key={index} className="hist-td-load">
+                              <span className="hist-td-load__pct">
+                                {r.load_percentage?.toFixed(2)}%
+                              </span>
+                            </td>
+                          );
+                        }
+
+                        // ---------------------------
+                        // B. Get Actual Value from DB
+                        // ---------------------------
+                        const actualKey = `${p.key}_actual`;
+                        const actual = r[actualKey];
+
+                        // ---------------------------
+                        // C. Calculate Display Values & Deviation
+                        // ---------------------------
+                        let displayVal = "-"; // The top number (Actual)
+                        let displayDev = "-"; // The bottom number (Delta %)
+                        let devColor = "#64748b"; // Default Grey
+
+                        // Default display for standard metrics (unless overridden by Propeller logic)
+                        if (actual !== null && actual !== undefined) {
+                          displayVal = actual.toFixed(1);
+                        }
+
+                        // --- Case 1: Propeller Margin (Special Logic) ---
+                        if (p.isProp) {
+                          if (actual !== null && actual !== undefined) {
+                            let propActual = 0;
+                            let propDev = 0;
+
+                            // Heuristic Check:
+                            // If > 50 (e.g. 112.9), treat as Ratio.
+                            // If <= 50 (e.g. 12.9), treat as Deviation.
+                            if (Math.abs(actual) > 50) {
+                              propActual = actual;
+                              propDev = actual - 100;
+                            } else {
+                              propActual = 100 + actual;
+                              propDev = actual;
+                            }
+
+                            // Update the display variables
+                            displayVal = propActual.toFixed(1);
+                            displayDev = `${propDev > 0 ? "+" : ""}${propDev.toFixed(1)}%`;
+
+                            // Color Logic for Propeller
+                            if (propDev > 5.0) {
+                              devColor = "#dc2626"; // Red
+                            } else if (propDev >= 0) {
+                              devColor = "#ca8a04"; // Amber
+                            } else {
+                              devColor = "#16a34a"; // Green
+                            }
+                          }
+                        }
+                        // --- Case 2: Standard Metrics (Interpolation) ---
+                        else if (
+                          (actual !== null &&
+                            actual !== undefined &&
+                            baseline &&
+                            Object.keys(baseline).length > 0,
+                          p.key !== "engine_rpm")
+                        ) {
+                          const baselineMetricKey = baselineKeyMap[p.key];
+
+                          if (baselineMetricKey) {
+                            // Interpolate Baseline at the history report's specific load
+                            const computedBaseline = interpolateBaseline(
+                              baseline,
+                              r.load_percentage,
+                              baselineMetricKey,
+                              "load",
+                            );
+
+                            if (computedBaseline && computedBaseline !== 0) {
+                              const delta = actual - computedBaseline;
+                              const pct = (delta / computedBaseline) * 100;
+
+                              displayDev = `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`;
+
+                              const absPct = Math.abs(pct);
+                              const absDelta = Math.abs(delta);
+                              const tempKeys = [
+                                "exh_tc_in",
+                                "exh_tc_out",
+                                "exh_cyl_out",
+                              ];
+                              const groupAKeys = [
+                                "engine_rpm",
+                                "pmax",
+                                "pcomp",
+                                "turbo_rpm",
+                              ];
+
+                              if (p.key === "turbo_rpm") {
+                                // TURBO LOGIC: Absolute RPM
+                                if (absDelta >= 1000) devColor = "#dc2626";
+                                else if (absDelta >= 500) devColor = "#ca8a04";
+                                else devColor = "#16a34a";
+                              } else if (tempKeys.includes(p.key)) {
+                                // EXHAUST LOGIC: Absolute degrees
+                                if (absDelta > 60) devColor = "#dc2626";
+                                else if (absDelta >= 40) devColor = "#ca8a04";
+                                else devColor = "#16a34a";
+                              } else if (groupAKeys.includes(p.key)) {
+                                // GROUP A LOGIC: Strict % (3/5)
+                                if (absPct > 5.0) devColor = "#dc2626";
+                                else if (absPct >= 3.0) devColor = "#ca8a04";
+                                else devColor = "#16a34a";
+                              } else {
+                                // OTHERS (SFOC, Scav Air, Fuel Index): Standard % (5/10)
+                                if (absPct > 10.0) devColor = "#dc2626";
+                                else if (absPct >= 5.0) devColor = "#ca8a04";
+                                else devColor = "#16a34a";
+                              }
+                              // --- END OF NEW COLOR LOGIC ---
+                            }
+                          }
+                        }
+
+                        return (
+                          <td key={index} className="hist-td-data">
+                            <span className="hist-td-data__val">
+                              {displayVal}
+                            </span>
+                            {p.key !== "engine_rpm" && (
+                              <span
+                                className={`hist-td-data__dev ${
+                                  devColor === "#dc2626"
+                                    ? "hist-dev--red"
+                                    : devColor === "#ca8a04"
+                                      ? "hist-dev--amber"
+                                      : devColor === "#16a34a"
+                                        ? "hist-dev--green"
+                                        : "hist-dev--grey"
+                                }`}
+                              >
+                                {displayDev}
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
@@ -7541,16 +7627,13 @@ export default function Performance({
                   : null;
 
               // ── 1. TITLE BAR ─────────────────────────────────────────────────
-              // Blue-grey gradient style matching UI card header
-              pdf.setFillColor(248, 250, 252);
-              pdf.setDrawColor(226, 232, 240);
+              pdf.setFillColor(240, 249, 255);
+              pdf.setDrawColor(186, 230, 253);
               pdf.setLineWidth(0.4);
               pdf.rect(margin, titleBarY, usableW, titleH, "FD");
-
-              // Left: param label + unit
               pdf.setFont("helvetica", "bold");
               pdf.setFontSize(9);
-              pdf.setTextColor(15, 23, 42);
+              pdf.setTextColor(3, 105, 161);
               pdf.text(
                 `${p.label.toUpperCase()} DEVIATION (${p.noAmber ? p.unit : "%"})`,
                 margin + 4,
@@ -7586,19 +7669,19 @@ export default function Performance({
               // ── Color bands (red outer → amber middle → green center) ────────
               if (p.noAmber) {
                 // Red full background
-                pdf.setFillColor(254, 226, 226);
+                pdf.setFillColor(255, 245, 245);
                 pdf.rect(plotX, plotTop, plotW, plotH, "F");
                 // Green center ±3
-                pdf.setFillColor(220, 252, 231);
+                pdf.setFillColor(240, 255, 245);
                 const gTop = clamp(zeroY - 3 * pxPerUnit);
                 const gBot = clamp(zeroY + 3 * pxPerUnit);
                 if (gBot > gTop) pdf.rect(plotX, gTop, plotW, gBot - gTop, "F");
               } else {
                 // Red full background
-                pdf.setFillColor(254, 226, 226);
+                pdf.setFillColor(255, 245, 245);
                 pdf.rect(plotX, plotTop, plotW, plotH, "F");
                 // Amber ±3 to ±5
-                pdf.setFillColor(254, 243, 199);
+                pdf.setFillColor(255, 250, 225);
                 const a1T = clamp(zeroY - 5 * pxPerUnit);
                 const a1B = clamp(zeroY - 3 * pxPerUnit);
                 if (a1B > a1T) pdf.rect(plotX, a1T, plotW, a1B - a1T, "F");
@@ -7606,7 +7689,7 @@ export default function Performance({
                 const a2B = clamp(zeroY + 5 * pxPerUnit);
                 if (a2B > a2T) pdf.rect(plotX, a2T, plotW, a2B - a2T, "F");
                 // Green center ±3
-                pdf.setFillColor(220, 252, 231);
+                pdf.setFillColor(240, 255, 245);
                 const gTop = clamp(zeroY - 3 * pxPerUnit);
                 const gBot = clamp(zeroY + 3 * pxPerUnit);
                 if (gBot > gTop) pdf.rect(plotX, gTop, plotW, gBot - gTop, "F");
@@ -7621,7 +7704,7 @@ export default function Performance({
                   220,
                   38,
                   38,
-                  0.5,
+                  0.25,
                 );
                 drawDashedH(
                   clamp(zeroY + 3 * pxPerUnit),
@@ -7630,7 +7713,7 @@ export default function Performance({
                   220,
                   38,
                   38,
-                  0.5,
+                  0.25,
                 );
               } else {
                 drawDashedH(
@@ -7640,7 +7723,7 @@ export default function Performance({
                   202,
                   138,
                   4,
-                  0.5,
+                  0.25,
                 );
                 drawDashedH(
                   clamp(zeroY + 3 * pxPerUnit),
@@ -7649,7 +7732,7 @@ export default function Performance({
                   202,
                   138,
                   4,
-                  0.5,
+                  0.25,
                 );
                 drawDashedH(
                   clamp(zeroY - 5 * pxPerUnit),
@@ -7658,7 +7741,7 @@ export default function Performance({
                   220,
                   38,
                   38,
-                  0.5,
+                  0.25,
                 );
                 drawDashedH(
                   clamp(zeroY + 5 * pxPerUnit),
@@ -7667,19 +7750,19 @@ export default function Performance({
                   220,
                   38,
                   38,
-                  0.5,
+                  0.25,
                 );
               }
 
               // ── Zero baseline (solid grey line + right label) ─────────────────
               pdf.setDrawColor(148, 163, 184);
-              pdf.setLineWidth(1.0);
+              pdf.setLineWidth(0.4);
               pdf.line(plotX, zeroY, plotX + plotW, zeroY);
               pdf.setFont("helvetica", "bold");
               pdf.setFontSize(5.5);
               pdf.setTextColor(148, 163, 184);
               pdf.text(
-                `Base ${isoAvg.toFixed(1)}`,
+                `Base ${isoAvg.toFixed(1)} ${p.unit}`,
                 plotX + plotW + 2,
                 zeroY + 1.5,
               );
@@ -7687,7 +7770,7 @@ export default function Performance({
               // ── Shop trial dashed amber line + right label ────────────────────
               if (shopDevY !== null) {
                 pdf.setDrawColor(202, 138, 4);
-                pdf.setLineWidth(1.0);
+                pdf.setLineWidth(0.4);
                 pdf.setLineDashPattern([3, 2], 0);
                 pdf.line(plotX, shopDevY, plotX + plotW, shopDevY);
                 pdf.setLineDashPattern([], 0);
@@ -7695,7 +7778,7 @@ export default function Performance({
                 pdf.setFontSize(5.5);
                 pdf.setTextColor(202, 138, 4);
                 pdf.text(
-                  `Shop ${shopVal.toFixed(1)}`,
+                  `Shop ${shopVal.toFixed(1)} ${p.unit}`,
                   plotX + plotW + 2,
                   shopDevY + 1.5,
                 );
@@ -7744,8 +7827,8 @@ export default function Performance({
                   const shopBarTop = Math.min(shopBarStartY, shopBarEndY);
                   const shopBarHeight = Math.abs(shopBarStartY - shopBarEndY);
                   if (shopBarHeight > 0.3) {
-                    pdf.setFillColor(202, 138, 4);
-                    pdf.setDrawColor(202, 138, 4);
+                    pdf.setFillColor(230, 175, 60);
+                    pdf.setDrawColor(230, 175, 60);
                     pdf.rect(
                       bx + barW + 1,
                       shopBarTop,
@@ -7820,7 +7903,7 @@ export default function Performance({
               legendItems.forEach((item) => {
                 const [r, g, b] = item.color;
                 if (item.isShop) {
-                  // Shop Trial: amber square + green square side by side
+                  // Shop Trial: amber square
                   pdf.setFillColor(202, 138, 4);
                   pdf.rect(legX, legendRowY - 2, 3, 3, "F");
                 } else {
@@ -7830,7 +7913,7 @@ export default function Performance({
                 }
                 pdf.setTextColor(71, 85, 105);
                 pdf.text(item.label, legX + 6, legendRowY);
-                legX += 6 + pdf.getTextWidth(item.label) + 4;
+                legX += 6 + pdf.getTextWidth(item.label) + 8;
               });
 
               currentY = chartBoxY + chartBoxH + slotGap;
@@ -9648,7 +9731,9 @@ export default function Performance({
       {/* --- START OF NEW 3-CARD LAYOUT --- */}
       {/* --- START OF NEW MASTER CONTROL CARD --- */}
       {/* --- PERFORMANCE CONTROL CONSOLE --- */}
-      <div className={`perf-console-wrapper ${embeddedMode ? "perf-console-wrapper--embedded" : ""}`}>
+      <div
+        className={`perf-console-wrapper ${embeddedMode ? "perf-console-wrapper--embedded" : ""}`}
+      >
         {/* --- UNIFIED CONTROL PANEL (Your Preferred Layout) --- */}
         {/* --- RESTRUCTURED PERFORMANCE CONTROL CONSOLE --- */}
         <div className="perf-control-bar">
@@ -9716,8 +9801,13 @@ export default function Performance({
               onChange={handleFileUpload}
             />
             <Button
-              onClick={() => document.getElementById("direct-upload-input").click()}
-              disabled={!shipId || (analysisMode === "auxiliaryEngine" && !selectedGeneratorId)}
+              onClick={() =>
+                document.getElementById("direct-upload-input").click()
+              }
+              disabled={
+                !shipId ||
+                (analysisMode === "auxiliaryEngine" && !selectedGeneratorId)
+              }
               className="perf-upload-btn"
             >
               + UPLOAD
@@ -9906,7 +9996,11 @@ export default function Performance({
                             : "Unit-Wise Deviation Analysis (Main Engine)"}
                         </h3>
                       </div>
-                      <span className={`uwd-collapse-chevron ${isCylinderCardExpanded ? "uwd-collapse-chevron--open" : "uwd-collapse-chevron--closed"}`}>▼</span>
+                      <span
+                        className={`uwd-collapse-chevron ${isCylinderCardExpanded ? "uwd-collapse-chevron--open" : "uwd-collapse-chevron--closed"}`}
+                      >
+                        ▼
+                      </span>
                     </div>
 
                     {isCylinderCardExpanded && (
@@ -10043,9 +10137,10 @@ export default function Performance({
                                 { color: "#dc2626", label: ">5% Critical" },
                               ];
                           const barSize = window.innerWidth <= 1024 ? 10 : 16;
-                          const barRadius = window.innerWidth <= 1024
-                            ? [2, 2, 0, 0]
-                            : [4, 4, 0, 0];
+                          const barRadius =
+                            window.innerWidth <= 1024
+                              ? [2, 2, 0, 0]
+                              : [4, 4, 0, 0];
 
                           return (
                             <div key={p.key} className="uwd-chart-cell">
@@ -10068,7 +10163,8 @@ export default function Performance({
                                             [p.key]: !prev[p.key],
                                           }));
                                         }}
-                                        className={`uwd-shop-checkbox ${showShopTrialMap[p.key] ? "uwd-shop-checkbox--checked" : "uwd-shop-checkbox--unchecked"}`} />
+                                        className={`uwd-shop-checkbox ${showShopTrialMap[p.key] ? "uwd-shop-checkbox--checked" : "uwd-shop-checkbox--unchecked"}`}
+                                      />
                                       <div className="uwd-shop-text">
                                         Shop Trial: {shopTrialValue.toFixed(1)}{" "}
                                         {p.unit}
@@ -10080,8 +10176,15 @@ export default function Performance({
 
                               <div className="uwd-legend-row">
                                 {legendZones.map((z) => (
-                                  <span key={z.label} className="uwd-legend-item" style={{ color: z.color }}>
-                                    <span className="uwd-legend-dot" style={{ backgroundColor: z.color }} />
+                                  <span
+                                    key={z.label}
+                                    className="uwd-legend-item"
+                                    style={{ color: z.color }}
+                                  >
+                                    <span
+                                      className="uwd-legend-dot"
+                                      style={{ backgroundColor: z.color }}
+                                    />
                                     {z.label}
                                   </span>
                                 ))}
@@ -10852,7 +10955,9 @@ export default function Performance({
                       <span
                         className="trend-time-chevron"
                         style={{
-                          transform: isTrendCardExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                          transform: isTrendCardExpanded
+                            ? "rotate(180deg)"
+                            : "rotate(0deg)",
                         }}
                       >
                         ▼
@@ -10868,7 +10973,9 @@ export default function Performance({
                             PARAMETER:
                           </span>
                           {PARAM_LIST.map((param, i) => {
-                            const isActive = selectedTrendParams.includes(param.key);
+                            const isActive = selectedTrendParams.includes(
+                              param.key,
+                            );
                             return (
                               <button
                                 key={param.key}
@@ -10882,7 +10989,9 @@ export default function Performance({
                                 }
                                 style={{
                                   border: `2px solid ${isActive ? COLORS[i % COLORS.length] : "#e2e8f0"}`,
-                                  backgroundColor: isActive ? COLORS[i % COLORS.length] : "white",
+                                  backgroundColor: isActive
+                                    ? COLORS[i % COLORS.length]
+                                    : "white",
                                   color: isActive ? "white" : "#64748b",
                                 }}
                               >
@@ -10908,288 +11017,292 @@ export default function Performance({
                               Need 2 or more reports to show trend
                             </span>
                             <span className="trend-time-empty-sub">
-                              {availableReports.length} report(s) available for this vessel
+                              {availableReports.length} report(s) available for
+                              this vessel
                             </span>
                           </div>
                         ) : (
                           <>
                             <div className="trend-time-chart-wrap">
                               <ResponsiveContainer width="100%" height="100%">
-                              <LineChart
-                                data={mergedTrendData}
-                                margin={{
-                                  left: 16,
-                                  right: 24,
-                                  top: 10,
-                                  bottom: 10,
-                                }}
-                              >
-                                <CartesianGrid
-                                  strokeDasharray="3 3"
-                                  vertical={true}
-                                  stroke="#e2e8f0"
-                                  strokeOpacity={0.8}
-                                />
-                                <XAxis
-                                  dataKey="date"
-                                  fontSize={10}
-                                  stroke="#e2e8f0"
-                                  tick={{ fill: "#64748b", fontWeight: 500 }}
-                                  tickLine={false}
-                                />
+                                <LineChart
+                                  data={mergedTrendData}
+                                  margin={{
+                                    left: 16,
+                                    right: 24,
+                                    top: 10,
+                                    bottom: 10,
+                                  }}
+                                >
+                                  <CartesianGrid
+                                    strokeDasharray="3 3"
+                                    vertical={true}
+                                    stroke="#e2e8f0"
+                                    strokeOpacity={0.8}
+                                  />
+                                  <XAxis
+                                    dataKey="date"
+                                    fontSize={10}
+                                    stroke="#e2e8f0"
+                                    tick={{ fill: "#64748b", fontWeight: 500 }}
+                                    tickLine={false}
+                                  />
 
-                                {/* Y-AXIS: unit / ticks / domain switch on mode */}
-                                <YAxis
-                                  unit={yUnit}
-                                  fontSize={10}
-                                  stroke="#e2e8f0"
-                                  tick={{ fill: "#64748b" }}
-                                  tickLine={false}
-                                  axisLine={false}
-                                  domain={[yMin, yMax]}
-                                  ticks={yTicks}
-                                  tickFormatter={(val) =>
-                                    `${val > 0 ? "+" : ""}${val}`
-                                  }
-                                  width={isAbsoluteMode ? 65 : 50}
-                                />
+                                  {/* Y-AXIS: unit / ticks / domain switch on mode */}
+                                  <YAxis
+                                    unit={yUnit}
+                                    fontSize={10}
+                                    stroke="#e2e8f0"
+                                    tick={{ fill: "#64748b" }}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    domain={[yMin, yMax]}
+                                    ticks={yTicks}
+                                    tickFormatter={(val) =>
+                                      `${val > 0 ? "+" : ""}${val}`
+                                    }
+                                    width={isAbsoluteMode ? 65 : 50}
+                                  />
 
-                                {/* TOOLTIP: correct unit per mode */}
-                                <Tooltip
-                                  formatter={(val, name) => {
-                                    if (val == null) return ["N/A", name];
-                                    const sign = val > 0 ? "+" : "";
-                                    if (activeTrendGroup === "ABS_TURBO")
+                                  {/* TOOLTIP: correct unit per mode */}
+                                  <Tooltip
+                                    formatter={(val, name) => {
+                                      if (val == null) return ["N/A", name];
+                                      const sign = val > 0 ? "+" : "";
+                                      if (activeTrendGroup === "ABS_TURBO")
+                                        return [
+                                          `${sign}${val.toFixed(0)} RPM`,
+                                          name,
+                                        ];
+                                      if (activeTrendGroup === "ABS_EXHAUST")
+                                        return [
+                                          `${sign}${val.toFixed(1)} °C`,
+                                          name,
+                                        ];
                                       return [
-                                        `${sign}${val.toFixed(0)} RPM`,
+                                        `${sign}${val.toFixed(2)}%`,
                                         name,
                                       ];
-                                    if (activeTrendGroup === "ABS_EXHAUST")
-                                      return [
-                                        `${sign}${val.toFixed(1)} °C`,
-                                        name,
-                                      ];
-                                    return [`${sign}${val.toFixed(2)}%`, name];
-                                  }}
-                                  contentStyle={{
-                                    fontSize: "0.8rem",
-                                    borderRadius: "10px",
-                                    border: "1px solid #e2e8f0",
-                                    boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-                                  }}
-                                />
+                                    }}
+                                    contentStyle={{
+                                      fontSize: "0.8rem",
+                                      borderRadius: "10px",
+                                      border: "1px solid #e2e8f0",
+                                      boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+                                    }}
+                                  />
 
-                                <Legend
-                                  verticalAlign="bottom"
-                                  height={32}
-                                  iconType="circle"
-                                  iconSize={8}
-                                  wrapperStyle={{
-                                    fontSize: "10px",
-                                    paddingTop: "6px",
-                                  }}
-                                />
+                                  <Legend
+                                    verticalAlign="bottom"
+                                    height={32}
+                                    iconType="circle"
+                                    iconSize={8}
+                                    wrapperStyle={{
+                                      fontSize: "10px",
+                                      paddingTop: "6px",
+                                    }}
+                                  />
 
-                                {/* Baseline — always shown */}
-                                <ReferenceLine
-                                  y={0}
-                                  stroke="#16a34a"
-                                  strokeWidth={2}
-                                  strokeDasharray="5 4"
-                                  label={{
-                                    value: "Baseline",
-                                    position: "right",
-                                    fill: "#16a34a",
-                                    fontSize: 9,
-                                    fontWeight: 700,
-                                  }}
-                                />
+                                  {/* Baseline — always shown */}
+                                  <ReferenceLine
+                                    y={0}
+                                    stroke="#16a34a"
+                                    strokeWidth={2}
+                                    strokeDasharray="5 4"
+                                    label={{
+                                      value: "Baseline",
+                                      position: "right",
+                                      fill: "#16a34a",
+                                      fontSize: 9,
+                                      fontWeight: 700,
+                                    }}
+                                  />
 
-                                {/* ── % THRESHOLD BANDS (Group A / B) — original logic unchanged ──
+                                  {/* ── % THRESHOLD BANDS (Group A / B) — original logic unchanged ──
                           Group A → amber ±3%,  red ±5%
                           Group B → amber ±5%,  red ±10%
                           Mixed   → no bands                                              */}
-                                {!isAbsoluteMode &&
-                                  tAmber !== null &&
-                                  tRed !== null && (
-                                    <>
-                                      <ReferenceArea
-                                        y1={-tAmber}
-                                        y2={tAmber}
-                                        fill="#dcfce7"
-                                        fillOpacity={0.55}
-                                        ifOverflow="visible"
-                                      />
-                                      <ReferenceArea
-                                        y1={tAmber}
-                                        y2={tRed}
-                                        fill="#fef3c7"
-                                        fillOpacity={0.55}
-                                        ifOverflow="visible"
-                                      />
-                                      <ReferenceArea
-                                        y1={-tRed}
-                                        y2={-tAmber}
-                                        fill="#fef3c7"
-                                        fillOpacity={0.55}
-                                        ifOverflow="visible"
-                                      />
-                                      <ReferenceArea
-                                        y1={tRed}
-                                        y2={yMax}
-                                        fill="#fee2e2"
-                                        fillOpacity={0.55}
-                                        ifOverflow="visible"
-                                      />
-                                      <ReferenceArea
-                                        y1={yMin}
-                                        y2={-tRed}
-                                        fill="#fee2e2"
-                                        fillOpacity={0.55}
-                                        ifOverflow="visible"
-                                      />
-                                      <ReferenceLine
-                                        y={tAmber}
-                                        stroke="#f59e0b"
-                                        strokeDasharray="3 3"
-                                        strokeWidth={1}
-                                      />
-                                      <ReferenceLine
-                                        y={-tAmber}
-                                        stroke="#f59e0b"
-                                        strokeDasharray="3 3"
-                                        strokeWidth={1}
-                                      />
-                                      <ReferenceLine
-                                        y={tRed}
-                                        stroke="#ef4444"
-                                        strokeDasharray="3 3"
-                                        strokeWidth={1}
-                                      />
-                                      <ReferenceLine
-                                        y={-tRed}
-                                        stroke="#ef4444"
-                                        strokeDasharray="3 3"
-                                        strokeWidth={1}
-                                      />
-                                    </>
-                                  )}
+                                  {!isAbsoluteMode &&
+                                    tAmber !== null &&
+                                    tRed !== null && (
+                                      <>
+                                        <ReferenceArea
+                                          y1={-tAmber}
+                                          y2={tAmber}
+                                          fill="#dcfce7"
+                                          fillOpacity={0.55}
+                                          ifOverflow="visible"
+                                        />
+                                        <ReferenceArea
+                                          y1={tAmber}
+                                          y2={tRed}
+                                          fill="#fef3c7"
+                                          fillOpacity={0.55}
+                                          ifOverflow="visible"
+                                        />
+                                        <ReferenceArea
+                                          y1={-tRed}
+                                          y2={-tAmber}
+                                          fill="#fef3c7"
+                                          fillOpacity={0.55}
+                                          ifOverflow="visible"
+                                        />
+                                        <ReferenceArea
+                                          y1={tRed}
+                                          y2={yMax}
+                                          fill="#fee2e2"
+                                          fillOpacity={0.55}
+                                          ifOverflow="visible"
+                                        />
+                                        <ReferenceArea
+                                          y1={yMin}
+                                          y2={-tRed}
+                                          fill="#fee2e2"
+                                          fillOpacity={0.55}
+                                          ifOverflow="visible"
+                                        />
+                                        <ReferenceLine
+                                          y={tAmber}
+                                          stroke="#f59e0b"
+                                          strokeDasharray="3 3"
+                                          strokeWidth={1}
+                                        />
+                                        <ReferenceLine
+                                          y={-tAmber}
+                                          stroke="#f59e0b"
+                                          strokeDasharray="3 3"
+                                          strokeWidth={1}
+                                        />
+                                        <ReferenceLine
+                                          y={tRed}
+                                          stroke="#ef4444"
+                                          strokeDasharray="3 3"
+                                          strokeWidth={1}
+                                        />
+                                        <ReferenceLine
+                                          y={-tRed}
+                                          stroke="#ef4444"
+                                          strokeDasharray="3 3"
+                                          strokeWidth={1}
+                                        />
+                                      </>
+                                    )}
 
-                                {/* ── ABSOLUTE THRESHOLD BANDS (Turbo / Exhaust) — NEW ──
+                                  {/* ── ABSOLUTE THRESHOLD BANDS (Turbo / Exhaust) — NEW ──
                           Turbo:   amber ±500 RPM,  red ±1000 RPM
                           Exhaust: amber ±40 °C,    red ±60 °C
                           Shown only when ALL selected params are same abs group.  */}
-                                {isAbsoluteMode &&
-                                  tAbsAmber !== null &&
-                                  tAbsRed !== null && (
-                                    <>
-                                      <ReferenceArea
-                                        y1={-tAbsAmber}
-                                        y2={tAbsAmber}
-                                        fill="#dcfce7"
-                                        fillOpacity={0.55}
-                                        ifOverflow="visible"
-                                      />
-                                      <ReferenceArea
-                                        y1={tAbsAmber}
-                                        y2={tAbsRed}
-                                        fill="#fef3c7"
-                                        fillOpacity={0.55}
-                                        ifOverflow="visible"
-                                      />
-                                      <ReferenceArea
-                                        y1={-tAbsRed}
-                                        y2={-tAbsAmber}
-                                        fill="#fef3c7"
-                                        fillOpacity={0.55}
-                                        ifOverflow="visible"
-                                      />
-                                      <ReferenceArea
-                                        y1={tAbsRed}
-                                        y2={yMax}
-                                        fill="#fee2e2"
-                                        fillOpacity={0.55}
-                                        ifOverflow="visible"
-                                      />
-                                      <ReferenceArea
-                                        y1={yMin}
-                                        y2={-tAbsRed}
-                                        fill="#fee2e2"
-                                        fillOpacity={0.55}
-                                        ifOverflow="visible"
-                                      />
-                                      <ReferenceLine
-                                        y={tAbsAmber}
-                                        stroke="#f59e0b"
-                                        strokeDasharray="3 3"
-                                        strokeWidth={1}
-                                      />
-                                      <ReferenceLine
-                                        y={-tAbsAmber}
-                                        stroke="#f59e0b"
-                                        strokeDasharray="3 3"
-                                        strokeWidth={1}
-                                      />
-                                      <ReferenceLine
-                                        y={tAbsRed}
-                                        stroke="#ef4444"
-                                        strokeDasharray="3 3"
-                                        strokeWidth={1}
-                                      />
-                                      <ReferenceLine
-                                        y={-tAbsRed}
-                                        stroke="#ef4444"
-                                        strokeDasharray="3 3"
-                                        strokeWidth={1}
-                                      />
-                                    </>
-                                  )}
+                                  {isAbsoluteMode &&
+                                    tAbsAmber !== null &&
+                                    tAbsRed !== null && (
+                                      <>
+                                        <ReferenceArea
+                                          y1={-tAbsAmber}
+                                          y2={tAbsAmber}
+                                          fill="#dcfce7"
+                                          fillOpacity={0.55}
+                                          ifOverflow="visible"
+                                        />
+                                        <ReferenceArea
+                                          y1={tAbsAmber}
+                                          y2={tAbsRed}
+                                          fill="#fef3c7"
+                                          fillOpacity={0.55}
+                                          ifOverflow="visible"
+                                        />
+                                        <ReferenceArea
+                                          y1={-tAbsRed}
+                                          y2={-tAbsAmber}
+                                          fill="#fef3c7"
+                                          fillOpacity={0.55}
+                                          ifOverflow="visible"
+                                        />
+                                        <ReferenceArea
+                                          y1={tAbsRed}
+                                          y2={yMax}
+                                          fill="#fee2e2"
+                                          fillOpacity={0.55}
+                                          ifOverflow="visible"
+                                        />
+                                        <ReferenceArea
+                                          y1={yMin}
+                                          y2={-tAbsRed}
+                                          fill="#fee2e2"
+                                          fillOpacity={0.55}
+                                          ifOverflow="visible"
+                                        />
+                                        <ReferenceLine
+                                          y={tAbsAmber}
+                                          stroke="#f59e0b"
+                                          strokeDasharray="3 3"
+                                          strokeWidth={1}
+                                        />
+                                        <ReferenceLine
+                                          y={-tAbsAmber}
+                                          stroke="#f59e0b"
+                                          strokeDasharray="3 3"
+                                          strokeWidth={1}
+                                        />
+                                        <ReferenceLine
+                                          y={tAbsRed}
+                                          stroke="#ef4444"
+                                          strokeDasharray="3 3"
+                                          strokeWidth={1}
+                                        />
+                                        <ReferenceLine
+                                          y={-tAbsRed}
+                                          stroke="#ef4444"
+                                          strokeDasharray="3 3"
+                                          strokeWidth={1}
+                                        />
+                                      </>
+                                    )}
 
-                                {/* DATA LINES — unchanged */}
-                                {selectedTrendParams.map((key, i) => {
-                                  const color =
-                                    COLORS[
-                                      PARAM_LIST.findIndex(
-                                        (p) => p.key === key,
-                                      ) % COLORS.length
-                                    ] || COLORS[i % COLORS.length];
-                                  return (
-                                    <React.Fragment key={key}>
-                                      {/* Original deviation points — dots only, no connecting line */}
-                                      <Line
-                                        type="monotone"
-                                        dataKey={key}
-                                        stroke={color}
-                                        strokeWidth={0}
-                                        dot={{
-                                          r: 4,
-                                          fill: color,
-                                          stroke: "white",
-                                          strokeWidth: 1.5,
-                                        }}
-                                        activeDot={{ r: 6 }}
-                                        legendType="none"
-                                        connectNulls={false}
-                                        isAnimationActive={false}
-                                      />
-                                      {/* Smooth polynomial curve — line only, no dots */}
-                                      <Line
-                                        type="monotone"
-                                        dataKey={`${key}__curve`}
-                                        stroke={color}
-                                        strokeWidth={2.5}
-                                        dot={false}
-                                        activeDot={{ r: 5 }}
-                                        legendType="none"
-                                        connectNulls={false}
-                                        isAnimationActive={false}
-                                      />
-                                    </React.Fragment>
-                                  );
-                                })}
-                              </LineChart>
-                            </ResponsiveContainer>
-                          </div>
+                                  {/* DATA LINES — unchanged */}
+                                  {selectedTrendParams.map((key, i) => {
+                                    const color =
+                                      COLORS[
+                                        PARAM_LIST.findIndex(
+                                          (p) => p.key === key,
+                                        ) % COLORS.length
+                                      ] || COLORS[i % COLORS.length];
+                                    return (
+                                      <React.Fragment key={key}>
+                                        {/* Original deviation points — dots only, no connecting line */}
+                                        <Line
+                                          type="monotone"
+                                          dataKey={key}
+                                          stroke={color}
+                                          strokeWidth={0}
+                                          dot={{
+                                            r: 4,
+                                            fill: color,
+                                            stroke: "white",
+                                            strokeWidth: 1.5,
+                                          }}
+                                          activeDot={{ r: 6 }}
+                                          legendType="none"
+                                          connectNulls={false}
+                                          isAnimationActive={false}
+                                        />
+                                        {/* Smooth polynomial curve — line only, no dots */}
+                                        <Line
+                                          type="monotone"
+                                          dataKey={`${key}__curve`}
+                                          stroke={color}
+                                          strokeWidth={2.5}
+                                          dot={false}
+                                          activeDot={{ r: 5 }}
+                                          legendType="none"
+                                          connectNulls={false}
+                                          isAnimationActive={false}
+                                        />
+                                      </React.Fragment>
+                                    );
+                                  })}
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
 
                             {/* DELTA INSIGHT BOX */}
                             {(() => {
@@ -11207,11 +11320,12 @@ export default function Performance({
                                 .filter(Boolean);
                               if (insights.length === 0) return null;
                               return (
-                                  <div className="trend-time-insight-box">
-                                    <div className="trend-time-insight-title">
-                                      Latest vs Previous · {previous.date} → {latest.date}
-                                    </div>
-                                    <div className="trend-time-insight-pills">
+                                <div className="trend-time-insight-box">
+                                  <div className="trend-time-insight-title">
+                                    Latest vs Previous · {previous.date} →{" "}
+                                    {latest.date}
+                                  </div>
+                                  <div className="trend-time-insight-pills">
                                     {insights.map(({ key, curr, change }) => {
                                       const found = PARAM_LIST.find(
                                         (p) => p.key === key,
@@ -11262,22 +11376,24 @@ export default function Performance({
                                             : `${sign}${change.toFixed(2)}%`;
 
                                       return (
-                                          <div
-                                            key={key}
-                                            className="trend-time-insight-pill"
-                                            style={{ border: `1.5px solid ${color}35` }}
+                                        <div
+                                          key={key}
+                                          className="trend-time-insight-pill"
+                                          style={{
+                                            border: `1.5px solid ${color}35`,
+                                          }}
+                                        >
+                                          <span className="trend-time-insight-pill-label">
+                                            {label}:
+                                          </span>
+                                          <span
+                                            className="trend-time-insight-pill-value"
+                                            style={{ color }}
                                           >
-                                            <span className="trend-time-insight-pill-label">
-                                              {label}:
-                                            </span>
-                                            <span
-                                              className="trend-time-insight-pill-value"
-                                              style={{ color }}
-                                            >
-                                              {formatted}
-                                            </span>
-                                          </div>
-                                        );
+                                            {formatted}
+                                          </span>
+                                        </div>
+                                      );
                                     })}
                                   </div>
                                 </div>
@@ -11422,7 +11538,9 @@ export default function Performance({
                       <span
                         className="trend-load-chevron"
                         style={{
-                          transform: isEnvelopeCardExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                          transform: isEnvelopeCardExpanded
+                            ? "rotate(180deg)"
+                            : "rotate(0deg)",
                         }}
                       >
                         ▼
@@ -11449,7 +11567,9 @@ export default function Performance({
                                 }}
                                 style={{
                                   border: `2px solid ${isActive ? "#7c3aed" : "#e2e8f0"}`,
-                                  backgroundColor: isActive ? "#7c3aed" : "white",
+                                  backgroundColor: isActive
+                                    ? "#7c3aed"
+                                    : "white",
                                   color: isActive ? "white" : "#64748b",
                                 }}
                               >
@@ -11469,7 +11589,10 @@ export default function Performance({
                                 color: "#334155",
                               },
                             ].map((stat) => (
-                              <div key={stat.label} className="trend-load-stat-box">
+                              <div
+                                key={stat.label}
+                                className="trend-load-stat-box"
+                              >
                                 <div className="trend-load-stat-label">
                                   {stat.label}
                                 </div>
@@ -11496,175 +11619,349 @@ export default function Performance({
                           <>
                             <div className="trend-load-chart-wrap">
                               <ResponsiveContainer width="100%" height="100%">
-                              <ComposedChart
-                                margin={{
-                                  left: 16,
-                                  right: 24,
-                                  top: 10,
-                                  bottom: 30,
-                                }}
-                              >
-                                {/* ── visible grid H+V ── */}
-                                <CartesianGrid
-                                  strokeDasharray="4 4"
-                                  vertical={true}
-                                  horizontal={true}
-                                  stroke="#cbd5e1"
-                                  strokeOpacity={0.8}
-                                />
-
-                                <XAxis
-                                  dataKey="load"
-                                  type="number"
-                                  domain={
-                                    isAuxMode
-                                      ? ["dataMin - 5", "dataMax + 5"]
-                                      : [20, 115]
-                                  }
-                                  ticks={
-                                    isAuxMode
-                                      ? undefined
-                                      : [25, 50, 75, 100, 110]
-                                  }
-                                  tickFormatter={(v) =>
-                                    `${Number(v).toFixed(0)}%`
-                                  }
-                                  fontSize={10}
-                                  stroke="#e2e8f0"
-                                  tick={{ fill: "#64748b" }}
-                                  tickLine={false}
-                                  label={{
-                                    value: "Load (%)",
-                                    position: "insideBottom",
-                                    offset: -16,
-                                    style: {
-                                      fontWeight: 600,
-                                      fill: "#64748b",
-                                      fontSize: 11,
-                                    },
+                                <ComposedChart
+                                  margin={{
+                                    left: 16,
+                                    right: 24,
+                                    top: 10,
+                                    bottom: 30,
                                   }}
-                                />
+                                >
+                                  {/* ── visible grid H+V ── */}
+                                  <CartesianGrid
+                                    strokeDasharray="4 4"
+                                    vertical={true}
+                                    horizontal={true}
+                                    stroke="#cbd5e1"
+                                    strokeOpacity={0.8}
+                                  />
 
-                                {/* ── CHANGE: domain auto to remove empty Y space ── */}
-                                <YAxis
-                                  fontSize={10}
-                                  stroke="#e2e8f0"
-                                  tick={{ fill: "#64748b" }}
-                                  tickLine={false}
-                                  axisLine={false}
-                                  tickFormatter={(v) => v.toFixed(1)}
-                                  width={50}
-                                  domain={["auto", "auto"]}
-                                  label={{
-                                    value: unit,
-                                    angle: -90,
-                                    position: "insideLeft",
-                                    offset: 12,
-                                    style: {
-                                      fontWeight: 600,
-                                      fill: "#64748b",
-                                      fontSize: 11,
-                                    },
-                                  }}
-                                />
-
-                                {/* ── CHANGE: clean tooltip, load key filtered, month shown ── */}
-                                <Tooltip
-                                  formatter={(val, name) => {
-                                    // Filter out the internal "load" key from curveData
-                                    if (name === "load") return null;
-                                    return [`${val?.toFixed(2)} ${unit}`, name];
-                                  }}
-                                  contentStyle={{
-                                    fontSize: "0.8rem",
-                                    borderRadius: "10px",
-                                    border: "1px solid #e2e8f0",
-                                    boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-                                    padding: "10px 14px",
-                                  }}
-                                  labelFormatter={(l) =>
-                                    `📍 Load: ${Number(l).toFixed(1)}%`
-                                  }
-                                  itemStyle={{
-                                    fontSize: "0.75rem",
-                                    padding: "2px 0",
-                                  }}
-                                />
-
-                                {/* ── Shop Trial baseline line — NO xAxisId ── */}
-                                <Line
-                                  data={curveData}
-                                  type="monotone"
-                                  dataKey="baseline"
-                                  name="Shop Trial (Baseline)"
-                                  stroke="#ca8a04"
-                                  strokeWidth={2.5}
-                                  strokeDasharray="6 4"
-                                  dot={false}
-                                  isAnimationActive={false}
-                                />
-
-                                {scatterPoints.map((pt, idx) => (
-                                  <Scatter
-                                    key={`env-${idx}`}
-                                    name={pt.name}
-                                    data={[
-                                      { load: pt.load, actual: pt.actual },
-                                    ]}
-                                    dataKey="actual"
-                                    fill={pt.color}
-                                    shape={(props) => {
-                                      const { cx, cy } = props;
-                                      if (
-                                        !Number.isFinite(cx) ||
-                                        !Number.isFinite(cy)
-                                      )
-                                        return null;
-                                      const c =
-                                        SCATTER_COLORS[
-                                          idx % SCATTER_COLORS.length
-                                        ];
-                                      return (
-                                        <g>
-                                          <line
-                                            x1={cx - 6}
-                                            y1={cy - 6}
-                                            x2={cx + 6}
-                                            y2={cy + 6}
-                                            stroke={c}
-                                            strokeWidth={2.5}
-                                          />
-                                          <line
-                                            x1={cx - 6}
-                                            y1={cy + 6}
-                                            x2={cx + 6}
-                                            y2={cy - 6}
-                                            stroke={c}
-                                            strokeWidth={2.5}
-                                          />
-                                          <circle
-                                            cx={cx}
-                                            cy={cy}
-                                            r={10}
-                                            fill="transparent"
-                                          />
-                                        </g>
-                                      );
+                                  <XAxis
+                                    dataKey="load"
+                                    type="number"
+                                    domain={
+                                      isAuxMode
+                                        ? ["dataMin - 5", "dataMax + 5"]
+                                        : [20, 115]
+                                    }
+                                    ticks={
+                                      isAuxMode
+                                        ? undefined
+                                        : [25, 50, 75, 100, 110]
+                                    }
+                                    tickFormatter={(v) =>
+                                      `${Number(v).toFixed(0)}%`
+                                    }
+                                    fontSize={10}
+                                    stroke="#e2e8f0"
+                                    tick={{ fill: "#64748b" }}
+                                    tickLine={false}
+                                    label={{
+                                      value: "Load (%)",
+                                      position: "insideBottom",
+                                      offset: -16,
+                                      style: {
+                                        fontWeight: 600,
+                                        fill: "#64748b",
+                                        fontSize: 11,
+                                      },
                                     }}
+                                  />
+
+                                  {/* ── CHANGE: domain auto to remove empty Y space ── */}
+                                  <YAxis
+                                    fontSize={10}
+                                    stroke="#e2e8f0"
+                                    tick={{ fill: "#64748b" }}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickFormatter={(v) => v.toFixed(1)}
+                                    width={50}
+                                    domain={["auto", "auto"]}
+                                    label={{
+                                      value: unit,
+                                      angle: -90,
+                                      position: "insideLeft",
+                                      offset: 12,
+                                      style: {
+                                        fontWeight: 600,
+                                        fill: "#64748b",
+                                        fontSize: 11,
+                                      },
+                                    }}
+                                  />
+
+                                  {/* ── CHANGE: clean tooltip, load key filtered, month shown ── */}
+                                  <Tooltip
+                                    formatter={(val, name) => {
+                                      // Filter out the internal "load" key from curveData
+                                      if (name === "load") return null;
+                                      return [
+                                        `${val?.toFixed(2)} ${unit}`,
+                                        name,
+                                      ];
+                                    }}
+                                    contentStyle={{
+                                      fontSize: "0.8rem",
+                                      borderRadius: "10px",
+                                      border: "1px solid #e2e8f0",
+                                      boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+                                      padding: "10px 14px",
+                                    }}
+                                    labelFormatter={(l) =>
+                                      `📍 Load: ${Number(l).toFixed(1)}%`
+                                    }
+                                    itemStyle={{
+                                      fontSize: "0.75rem",
+                                      padding: "2px 0",
+                                    }}
+                                  />
+
+                                  {/* ── Shop Trial baseline line — NO xAxisId ── */}
+                                  <Line
+                                    data={curveData}
+                                    type="monotone"
+                                    dataKey="baseline"
+                                    name="Shop Trial (Baseline)"
+                                    stroke="#ca8a04"
+                                    strokeWidth={2.5}
+                                    strokeDasharray="6 4"
+                                    dot={false}
                                     isAnimationActive={false}
                                   />
-                                ))}
-                              </ComposedChart>
-                            </ResponsiveContainer>
-                          </div>
+
+                                  {scatterPoints.map((pt, idx) => (
+                                    <Scatter
+                                      key={`env-${idx}`}
+                                      name={pt.name}
+                                      data={[
+                                        { load: pt.load, actual: pt.actual },
+                                      ]}
+                                      dataKey="actual"
+                                      fill={pt.color}
+                                      shape={(props) => {
+                                        const { cx, cy } = props;
+                                        if (
+                                          !Number.isFinite(cx) ||
+                                          !Number.isFinite(cy)
+                                        )
+                                          return null;
+                                        const c =
+                                          SCATTER_COLORS[
+                                            idx % SCATTER_COLORS.length
+                                          ];
+                                        return (
+                                          <g
+                                            style={{
+                                              cursor: "pointer",
+                                              outline: "none",
+                                            }}
+                                            tabIndex="-1"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActivePoint({
+                                                x: pt.load,
+                                                y: pt.actual,
+                                                cx: cx,
+                                                cy: cy,
+                                                name: pt.name,
+                                                date: pt.date
+                                                  ? pt.date
+                                                      .split("-")
+                                                      .reverse()
+                                                      .join("/")
+                                                  : "",
+                                                color: c,
+                                                absX: pt.load,
+                                                absY: pt.actual,
+                                                unit: unit,
+                                                metricKey: `envelope_${activeKey}`,
+                                              });
+                                            }}
+                                          >
+                                            <line
+                                              x1={cx - 6}
+                                              y1={cy - 6}
+                                              x2={cx + 6}
+                                              y2={cy + 6}
+                                              stroke={c}
+                                              strokeWidth={2.5}
+                                            />
+                                            <line
+                                              x1={cx - 6}
+                                              y1={cy + 6}
+                                              x2={cx + 6}
+                                              y2={cy - 6}
+                                              stroke={c}
+                                              strokeWidth={2.5}
+                                            />
+                                            <circle
+                                              cx={cx}
+                                              cy={cy}
+                                              r={10}
+                                              fill="transparent"
+                                            />
+                                          </g>
+                                        );
+                                      }}
+                                      isAnimationActive={false}
+                                    />
+                                  ))}
+                                  {activePoint &&
+                                    activePoint.metricKey ===
+                                      `envelope_${activeKey}` && (
+                                      <ReferenceDot
+                                        x={activePoint.x}
+                                        y={activePoint.y}
+                                        shape={() => {
+                                          const cardW = 200;
+                                          const cardH = 130;
+                                          const padding = 15;
+                                          const showBelow =
+                                            activePoint.cy < cardH + padding;
+                                          const posY = showBelow
+                                            ? activePoint.cy + padding
+                                            : activePoint.cy - (cardH + 5);
+                                          const showLeft = activePoint.cx > 450;
+                                          const posX = showLeft
+                                            ? activePoint.cx - (cardW + padding)
+                                            : activePoint.cx + 10;
+
+                                          return (
+                                            <g>
+                                              <rect
+                                                x={posX}
+                                                y={posY}
+                                                width={cardW}
+                                                height={cardH}
+                                                fill="#ffffff"
+                                                fillOpacity="1"
+                                                opacity="1"
+                                                rx="8"
+                                                style={{
+                                                  filter:
+                                                    "drop-shadow(0px 4px 10px rgba(0,0,0,0.25))",
+                                                }}
+                                              />
+                                              <foreignObject
+                                                x={posX}
+                                                y={posY}
+                                                width={cardW}
+                                                height={cardH}
+                                                style={{
+                                                  pointerEvents: "none",
+                                                }}
+                                              >
+                                                <div
+                                                  style={{
+                                                    background: "#ffffff",
+                                                    backgroundColor: "#ffffff",
+                                                    padding: "14px",
+                                                    border: `1.5px solid ${activePoint.color}`,
+                                                    borderRadius: "8px",
+                                                    fontSize: "12px",
+                                                    fontFamily:
+                                                      "Inter, sans-serif",
+                                                    color: "#1e293b",
+                                                    height: "100%",
+                                                    boxSizing: "border-box",
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    justifyContent:
+                                                      "space-between",
+                                                  }}
+                                                >
+                                                  <div
+                                                    style={{
+                                                      fontWeight: "800",
+                                                      borderBottom:
+                                                        "1px solid #f1f5f9",
+                                                      paddingBottom: "6px",
+                                                      marginBottom: "6px",
+                                                    }}
+                                                  >
+                                                    {activePoint.name}
+                                                  </div>
+                                                  <div
+                                                    style={{
+                                                      display: "flex",
+                                                      justifyContent:
+                                                        "space-between",
+                                                    }}
+                                                  >
+                                                    <span
+                                                      style={{
+                                                        color: "#64748b",
+                                                      }}
+                                                    >
+                                                      Load:
+                                                    </span>
+                                                    <span>
+                                                      <strong>
+                                                        {activePoint.x?.toFixed(
+                                                          1,
+                                                        )}
+                                                        %
+                                                      </strong>
+                                                    </span>
+                                                  </div>
+                                                  <div
+                                                    style={{
+                                                      display: "flex",
+                                                      justifyContent:
+                                                        "space-between",
+                                                    }}
+                                                  >
+                                                    <span
+                                                      style={{
+                                                        color: "#64748b",
+                                                      }}
+                                                    >
+                                                      Value:
+                                                    </span>
+                                                    <span>
+                                                      <strong>
+                                                        {activePoint.y?.toFixed(
+                                                          2,
+                                                        )}
+                                                      </strong>{" "}
+                                                      {activePoint.unit}
+                                                    </span>
+                                                  </div>
+                                                  <div
+                                                    style={{
+                                                      marginTop: "auto",
+                                                      fontSize: "10px",
+                                                      color: "#94a3b8",
+                                                      textAlign: "right",
+                                                      fontWeight: "500",
+                                                    }}
+                                                  >
+                                                    {activePoint.date}
+                                                  </div>
+                                                </div>
+                                              </foreignObject>
+                                            </g>
+                                          );
+                                        }}
+                                      />
+                                    )}
+                                </ComposedChart>
+                              </ResponsiveContainer>
+                            </div>
                             {/* MANUAL LEGEND — outside SVG, zero collision risk */}
                             <div className="trend-load-legend-wrap">
                               {/* Baseline legend item */}
                               <div className="trend-load-legend-item">
                                 <svg width="22" height="10">
                                   <line
-                                    x1="0" y1="5" x2="22" y2="5"
-                                    stroke="#ca8a04" strokeWidth="2.5" strokeDasharray="6 4"
+                                    x1="0"
+                                    y1="5"
+                                    x2="22"
+                                    y2="5"
+                                    stroke="#ca8a04"
+                                    strokeWidth="2.5"
+                                    strokeDasharray="6 4"
                                   />
                                 </svg>
                                 <span className="trend-load-legend-text">
@@ -11674,16 +11971,33 @@ export default function Performance({
 
                               {/* One entry per scatter point */}
                               {scatterPoints.map((pt, idx) => (
-                                <div key={`leg-${idx}`} className="trend-load-legend-item">
+                                <div
+                                  key={`leg-${idx}`}
+                                  className="trend-load-legend-item"
+                                >
                                   <svg width="12" height="12">
                                     <line
-                                      x1="1" y1="1" x2="11" y2="11"
-                                      stroke={SCATTER_COLORS[idx % SCATTER_COLORS.length]}
+                                      x1="1"
+                                      y1="1"
+                                      x2="11"
+                                      y2="11"
+                                      stroke={
+                                        SCATTER_COLORS[
+                                          idx % SCATTER_COLORS.length
+                                        ]
+                                      }
                                       strokeWidth="2.5"
                                     />
                                     <line
-                                      x1="1" y1="11" x2="11" y2="1"
-                                      stroke={SCATTER_COLORS[idx % SCATTER_COLORS.length]}
+                                      x1="1"
+                                      y1="11"
+                                      x2="11"
+                                      y2="1"
+                                      stroke={
+                                        SCATTER_COLORS[
+                                          idx % SCATTER_COLORS.length
+                                        ]
+                                      }
                                       strokeWidth="2.5"
                                     />
                                   </svg>

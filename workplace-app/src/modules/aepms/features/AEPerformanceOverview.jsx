@@ -54,6 +54,11 @@ const safeFixed = (val, digits = 2) => {
   return Number(val).toFixed(digits);
 };
 
+const formatVesselDisplayName = (name) => {
+  if (!name) return "";
+  return name.toUpperCase().trim();
+};
+
 const formatDate = (dateString) => {
   if (!dateString) return "-";
   try {
@@ -944,89 +949,89 @@ useEffect(() => {
     }
   };
 
-  const handleDotClick = async (reportId, vesselName) => {
-    if (!reportId) return;
-    setIsModalOpen(true);
-    setDetailsLoading(true);
+ const handleDotClick = async (reportId, vesselName) => {
+  if (!reportId) return;
+  setDetailsLoading(true);
 
-    setModalDetails({ vessel_name: vesselName, rows: [], status: "Normal" });
+  try {
+    const response = await axiosAepms.getAEReportDetails(reportId);
+    const { report, curves } = response;
 
-    try {
-      const response = await axiosAepms.getAEReportDetails(reportId);
-      const { report, curves } = response;
+    const currentLoad = report.load_percentage ?? report.load_percent ?? 0;
 
-      const currentLoad = report.load_percentage ?? report.load_percent ?? 0;
+    let critCount = 0;
+    let warnCount = 0;
 
-      let critCount = 0;
-      let warnCount = 0;
+    const calculatedRows = AE_HISTORY_PARAMS.map((paramConfig) => {
+      const key = paramConfig.key;
+      const actualVal = report[key];
 
-      const calculatedRows = AE_HISTORY_PARAMS.map((paramConfig) => {
-        const key = paramConfig.key;
-        const actualVal = report[key];
-
-        // --- IMPROVED ROBUST CURVE LOOKUP ---
-        let curvePoints = [];
-        if (curves) {
-          // 1. Try exact match (e.g. pmax_bar)
-          if (curves[key]) {
-            curvePoints = curves[key];
-          }
-          // 2. Try 'graph' match (e.g. pmax_graph_bar)
-          else if (
-            curves[`${key.split("_")[0]}_graph_bar` || `${key}_graph` || key]
-          ) {
-            const potentialKey = Object.keys(curves).find((k) =>
-              k.includes(key.split("_")[0]),
-            );
-            curvePoints = curves[potentialKey] || [];
-          }
+      // --- IMPROVED ROBUST CURVE LOOKUP ---
+      let curvePoints = [];
+      if (curves) {
+        // 1. Try exact match (e.g. pmax_bar)
+        if (curves[key]) {
+          curvePoints = curves[key];
         }
+        // 2. Try 'graph' match (e.g. pmax_graph_bar)
+        else if (
+          curves[`${key.split("_")[0]}_graph_bar` || `${key}_graph` || key]
+        ) {
+          const potentialKey = Object.keys(curves).find((k) =>
+            k.includes(key.split("_")[0]),
+          );
+          curvePoints = curves[potentialKey] || [];
+        }
+      }
 
-        const baseline = interpolate(currentLoad, curvePoints);
-        const { dev, delta, status, colorClass } = getDeviationStatus(
-          actualVal,
-          baseline,
-          paramConfig.label,
-        );
+      const baseline = interpolate(currentLoad, curvePoints);
+      const { dev, delta, status, colorClass } = getDeviationStatus(
+        actualVal,
+        baseline,
+        paramConfig.label,
+      );
 
-        if (status === "critical") critCount++;
-        if (status === "warning") warnCount++;
+      if (status === "critical") critCount++;
+      if (status === "warning") warnCount++;
 
-        return {
-          label: paramConfig.label,
-          unit: paramConfig.unit,
-          actual: actualVal,
-          baseline: baseline,
-          delta: delta,
-          dev: dev,
-          status: status,
-          colorClass: colorClass,
-        };
-      });
+      return {
+        label: paramConfig.label,
+        unit: paramConfig.unit,
+        actual: actualVal,
+        baseline: baseline,
+        delta: delta,
+        dev: dev,
+        status: status,
+        colorClass: colorClass,
+      };
+    });
 
-      let reportStatus = "Normal";
-      if (critCount > 0) reportStatus = "Critical";
-      else if (warnCount > 0) reportStatus = "Warning";
+    let reportStatus = "Normal";
+    if (critCount > 0) reportStatus = "Critical";
+    else if (warnCount > 0) reportStatus = "Warning";
 
-      setModalDetails({
-        vessel_name: vesselName || report.vessel_name,
-        generator_name: report.generator_name,
-        load_pct: currentLoad,
-        load_kw: report.load_kw,
-        report_date: report.report_date,
-        status: reportStatus,
-        rows: calculatedRows,
-        raw_report_view_url: report.raw_report_view_url,
-        raw_report_download_url: report.raw_report_download_url,
-        generated_report_view_url: report.generated_report_view_url,
-        generated_report_download_url: report.generated_report_download_url,
-      });
-    } catch (err) {
-      console.error("Failed to calculate report details for modal:", err);
-    } finally {
-      setDetailsLoading(false);
-    }
-  };
+    setModalDetails({
+      vessel_name: vesselName || report.vessel_name,
+      generator_name: report.generator_name,
+      load_pct: currentLoad,
+      load_kw: report.load_kw,
+      report_date: report.report_date,
+      status: reportStatus,
+      rows: calculatedRows,
+      raw_report_view_url: report.raw_report_view_url,
+      raw_report_download_url: report.raw_report_download_url,
+      generated_report_view_url: report.generated_report_view_url,
+      generated_report_download_url: report.generated_report_download_url,
+    });
+
+    setIsModalOpen(true); // ← Moved here: opens ONLY after real data is ready
+
+  } catch (err) {
+    console.error("Failed to calculate report details for modal:", err);
+  } finally {
+    setDetailsLoading(false);
+  }
+};
   const getDaysElapsedClass = (days) => {
     if (days === null) return "";
     if (days > 60) return "ae-days-critical";
@@ -1539,11 +1544,9 @@ useEffect(() => {
   onClick={() => setIsSectionOpen(!isSectionOpen)}
 >
             {/* 1. Icon Badge - The signature dark ME style */}
-            <div
-              className="card-icon-badge"
-            >
-              <Clock size={22} />
-            </div>
+            <div className="card-icon-badge pulsing-icon">
+  <Clock size={22} />
+</div>
 
             {/* 2. Title Section - flex: 1 pushes everything else to the right */}
             <div className="card-title-group">
@@ -1584,7 +1587,7 @@ useEffect(() => {
                             groupedRunningHours.length
                           ? "✓ All"
                           : selectedVesselsFilter.length === 1
-                            ? `✓ ${selectedVesselsFilter[0]?.vessel_name}`
+                            ? `✓ ${selectedVesselsFilter[0]?.vessel_name?.toUpperCase()}`
                             : `✓ ${selectedVesselsFilter.length} Selected`}
                     </span>
                   </div>
@@ -1641,7 +1644,7 @@ useEffect(() => {
                               )}
                               readOnly
                             />
-                            <span>{vessel.vessel_name}</span>
+                            <span>{formatVesselDisplayName(vessel.vessel_name)}</span>
                           </label>
                         </div>
                       ))}
@@ -1658,15 +1661,23 @@ useEffect(() => {
               onClick={(e) => { e.stopPropagation(); setIsSectionOpen(!isSectionOpen); }}
             >
               {isSectionOpen ? (
-                <ChevronUp size={32} color="#475569" strokeWidth={2.5} />
+                <ChevronUp size={24} color="#475569" strokeWidth={2.5} />
               ) : (
-                <ChevronDown size={32} color="#475569" strokeWidth={2.5} />
+                <ChevronDown size={24} color="#475569" strokeWidth={2.5} />
               )}
             </div>
           </div>
           <div className="card-body-enhanced ae-days-card-body">
             {/* 1. CONTAINER: Strict overflow-x rule keeps the scrollbar inside the white card */}
-            <div ref={aeTableWrapperRef} className={`ae-table-wrapper ${isSectionOpen ? "expanded" : "collapsed"}`}>
+            <div 
+  ref={aeTableWrapperRef} 
+  className={`ae-table-wrapper ${isSectionOpen ? "expanded" : "collapsed"}`}
+  style={
+    isSectionOpen && filteredGroupedRunningHours.length > 2
+      ? { maxHeight: `${(2 * 3 * 48) + 42 + 36}px`, overflowY: 'auto' }
+      : undefined
+  }
+>
 
               {(externalVesselId && filteredGroupedRunningHours.length > 0) ? (
                 <table className="performance-table-modern ae-days-table">
@@ -1737,7 +1748,7 @@ useEffect(() => {
 
                   <tbody>
                     {filteredGroupedRunningHours.map((row) => (
-                      <React.Fragment key={row.vessel_name}>
+                      <React.Fragment key={formatVesselDisplayName(row.vessel_name)}>
                         {GENS.map((gen, index) => {
                           const genData = row[gen];
                           const reportDate = genData?.report_date;
@@ -1755,7 +1766,7 @@ useEffect(() => {
 
                           return (
                             <tr
-  key={`${row.vessel_name}-${gen}`}
+  key={`${formatVesselDisplayName(row.vessel_name)}-${gen}`}
   className={`table-row-enhanced ae-days-tr ${index === GENS.length - 1 ? "ae-days-tr--last-gen" : ""}`}
 >
                               {index === 0 && (
@@ -1765,8 +1776,30 @@ useEffect(() => {
   onClick={() => handleVesselHistoryClick(row.vessel_name)}
 >
   <div className="ae-vessel-name-inner">
-    <div className="status-dot ae-blinking-dot" style={{ background: "#3b82f6", width: "8px", height: "8px", flexShrink: 0 }} />
-    <span className="ae-vessel-name-text">{row.vessel_name}</span>
+    {(() => {
+  // Get worst days across all 3 AEs for this vessel
+  const allDays = GENS.map(gen => {
+    const reportDate = row[gen]?.report_date;
+    return calculateDaysElapsed(reportDate);
+  }).filter(d => d !== null);
+
+  let dotColor = "#16a34a"; // green default
+  if (allDays.length === 0) {
+    dotColor = "#94a3b8"; // grey if no data at all
+  } else if (allDays.some(d => d > 60)) {
+    dotColor = "#dc2626"; // red — any AE overdue > 60 days
+  } else if (allDays.some(d => d > 45)) {
+    dotColor = "#ca8a04"; // amber — any AE overdue > 45 days
+  }
+
+  return (
+    <div 
+      className="status-dot ae-blinking-dot" 
+      style={{ background: dotColor, width: "8px", height: "8px", flexShrink: 0 }} 
+    />
+  );
+})()}
+    <span className="ae-vessel-name-text">{formatVesselDisplayName(row.vessel_name)}</span>
   </div>
 </td>
                               )}
@@ -1802,7 +1835,7 @@ useEffect(() => {
       {Number(loadVal).toFixed(1)}%
     </span>
   ) : (
-    <span style={{ color: "#d1d5db" }}>-</span>
+    <span style={{ color: "#4b5563" }}>-</span>
   )}
 </td>
 
@@ -1920,7 +1953,7 @@ useEffect(() => {
       {/* Title group */}
       <div className="card-title-group">
         <h2 className="card-title-performance">
-          {selectedVesselDetails.name} — Detailed History
+          {formatVesselDisplayName(selectedVesselDetails.name)} — Detailed History
         </h2>
         <p className="card-description">
           {isDetailLoading

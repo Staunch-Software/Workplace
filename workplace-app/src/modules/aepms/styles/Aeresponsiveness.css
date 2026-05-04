@@ -141,8 +141,9 @@
 
 /* Fast smooth open — ease-out feels snappy */
 .ae-table-wrapper.expanded {
-    max-height: 9999px;
+    max-height: 340px;  /* ~2 vessels × 3 rows × ~48px + thead ~42px + tfoot ~36px */
     overflow-x: auto;
+    overflow-y: auto;
     transition: max-height 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -261,7 +262,7 @@
 .ae-td-load,
 .ae-td-spacer {
     position: sticky !important;
-    z-index: 10 !important;
+    /* z-index: 10 !important; */
     background-color: #fff !important;
     border-bottom: 1px solid #f3f4f6 !important;
     vertical-align: middle !important;
@@ -1065,4 +1066,21 @@
     .ae-detail-param-dot    { width: 12px !important; height: 12px !important; }
     .ae-detail-header .card-title-performance { font-size: 1.35rem !important; }
     .ae-detail-header .card-description       { font-size: 1rem !important; }
+}
+
+/* ==========================================================================
+   PULSING ICON OVERRIDE — AE days card icon matches ME behavior
+   ========================================================================== */
+
+.ae-days-card .card-icon-badge.pulsing-icon {
+    background-color: #eff6ff !important;
+    color: #3b82f6 !important;
+    transform: none !important;
+    transition: background-color 0.25s ease !important;
+    cursor: pointer;
+}
+
+.ae-days-card:hover .card-icon-badge.pulsing-icon {
+    background-color: #0f172a !important;
+    color: white !important;
 }
