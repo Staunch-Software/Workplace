@@ -592,52 +592,49 @@ export default function AEPerformanceOverview({ embeddedMode = false, externalVe
   const vesselDropdownRef = useRef(null);
   // ── Responsive visible month count ──
   // ── Responsive visible month count ──
-  const getVisibleMonthCount = () => {
+  const aeTableContainerRef = useRef(null);
+
+const calculateVisibleMonths = () => {
+  if (!aeTableContainerRef.current) {
     const w = window.innerWidth;
     if (w <= 480)  return 3;
     if (w <= 768)  return 3;
     if (w <= 1024) return 5;
-    if (w <= 1250) return 10;
-    return 12; // Displays 12 months perfectly on 1440px and higher
+    return 10;
+  }
+  const containerWidth = aeTableContainerRef.current.getBoundingClientRect().width;
+  // Fixed columns: Vessel(160) + Gen(55) + LastReport(100) + Days(65) + Load(70) + NavLeft(45) + NavRight(45) = 540px
+  const FIXED_COLS_WIDTH = 540;
+  const MONTH_COL_WIDTH = 75;
+  const available = containerWidth - FIXED_COLS_WIDTH;
+  const count = Math.floor(available / MONTH_COL_WIDTH);
+  return Math.max(2, Math.min(count, 12));
+};
+
+const [visibleMonthCount, setVisibleMonthCount] = useState(10);
+
+useEffect(() => {
+  const updateCount = () => {
+    const newCount = calculateVisibleMonths();
+    setVisibleMonthCount(prev => {
+      if (prev !== newCount) setViewOffset(0);
+      return newCount;
+    });
   };
 
-  // Initialize state
-  const [visibleMonthCount, setVisibleMonthCount] = useState(12);
+  updateCount();
 
-  useEffect(() => {
-    // 1. Set correct count on initial mount
-    setVisibleMonthCount(getVisibleMonthCount());
+  const resizeObserver = new ResizeObserver(updateCount);
+  if (aeTableContainerRef.current) {
+    resizeObserver.observe(aeTableContainerRef.current);
+  }
 
-    // 2. Adjust count smoothly on window resize
-    const handleResize = () => {
-      const newCount = getVisibleMonthCount();
-      setVisibleMonthCount(prev => {
-        if (prev !== newCount) {
-          setViewOffset(0); // Reset navigation when columns change
-          return newCount;
-        }
-        return prev;
-      });
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
- 
-  // ── On resize: update count AND reset offset when count changes ─────────────
-  useEffect(() => {
-    const handleResize = () => {
-      const newCount = getVisibleMonthCount();
-      setVisibleMonthCount(prev => {
-        if (prev !== newCount) {
-          setViewOffset(0); // reset scroll position when column count changes
-        }
-        return newCount;
-      });
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  window.addEventListener("resize", updateCount);
+  return () => {
+    resizeObserver.disconnect();
+    window.removeEventListener("resize", updateCount);
+  };
+}, []);
   const maxOffset = useMemo(() => {
     const today = new Date();
     const startYear = 2025;
@@ -1671,7 +1668,7 @@ useEffect(() => {
           <div className="card-body-enhanced ae-days-card-body">
             {/* 1. CONTAINER: Strict overflow-x rule keeps the scrollbar inside the white card */}
             <div 
-  ref={aeTableWrapperRef} 
+  ref={(el) => { aeTableWrapperRef.current = el; aeTableContainerRef.current = el; }}
   className={`ae-table-wrapper ${isSectionOpen ? "expanded" : "collapsed"}`}
   style={
     isSectionOpen && filteredGroupedRunningHours.length > 2

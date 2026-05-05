@@ -1530,9 +1530,7 @@
     min-height: 100vh;
     height: auto;
     background: linear-gradient(135deg, #fbf6f6 0%, #f8fafc 50%, #f1f5f9 100%);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-                  Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue",
-                  sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
     color: #1e293b;
 }
 

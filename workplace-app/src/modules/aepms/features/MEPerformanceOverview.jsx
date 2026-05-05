@@ -671,20 +671,45 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
   const [viewOffset, setViewOffset] = useState(0);
 
   // ── Responsive visible month count — declared FIRST before maxOffset uses it ──
-  const getVisibleMonthCount = () => {
+  const tableContainerRef = useRef(null);
+
+const calculateVisibleMonths = () => {
+  if (!tableContainerRef.current) {
     const w = window.innerWidth;
     if (w <= 480)  return 3;
     if (w <= 768)  return 5;
     if (w <= 1024) return 7;
-    if (w <= 1250) return 10;
-    return 12;
+    return 10;
+  }
+  const containerWidth = tableContainerRef.current.getBoundingClientRect().width;
+  // Fixed columns: Vessel(160) + LastReport(100) + Days(65) + Load(70) + NavLeft(45) + NavRight(45) = 485px
+  const FIXED_COLS_WIDTH = 485;
+  const MONTH_COL_WIDTH = 75;
+  const available = containerWidth - FIXED_COLS_WIDTH;
+  const count = Math.floor(available / MONTH_COL_WIDTH);
+  return Math.max(2, Math.min(count, 12));
+};
+
+const [visibleMonthCount, setVisibleMonthCount] = useState(10);
+
+useEffect(() => {
+  const updateCount = () => {
+    setVisibleMonthCount(calculateVisibleMonths());
   };
-  const [visibleMonthCount, setVisibleMonthCount] = useState(getVisibleMonthCount);
-  useEffect(() => {
-    const handleResize = () => setVisibleMonthCount(getVisibleMonthCount());
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+
+  updateCount(); // Run on mount
+
+  const resizeObserver = new ResizeObserver(updateCount);
+  if (tableContainerRef.current) {
+    resizeObserver.observe(tableContainerRef.current);
+  }
+
+  window.addEventListener("resize", updateCount);
+  return () => {
+    resizeObserver.disconnect();
+    window.removeEventListener("resize", updateCount);
+  };
+}, []);
   const maxOffset = useMemo(() => {
     const today = new Date();
     const startYear = 2025;
@@ -829,23 +854,17 @@ const [daysSortConfig, setDaysSortConfig] = useState({
     }
   }, [consoleShipId, daysElapsedData, unifiedEngineType]);
   // Auto-scroll for Report Status Card
-  useEffect(() => {
-    if (isReportStatusOpen && selectedDaysVesselsFilter.length > 0 && daysElapsedCardRef.current) {
-      setTimeout(() => {
-        if (isPropellerCardOpen && controlBarRef.current) {
-          controlBarRef.current.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
-        } else {
-          daysElapsedCardRef.current.scrollIntoView({
-            behavior: "smooth",
-            block: "nearest",
-          });
-        }
-      }, 300);
-    }
-  }, [selectedDaysVesselsFilter]);
+  // Auto-scroll for Report Status Card
+useEffect(() => {
+  if (isReportStatusOpen && selectedDaysVesselsFilter.length > 0 && daysElapsedCardRef.current) {
+    setTimeout(() => {
+      daysElapsedCardRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 350);
+  }
+}, [selectedDaysVesselsFilter]);
   
   // --- PDF GENERATION ---
   const handlePdfAction = async (actionType) => {
@@ -2123,7 +2142,7 @@ const [daysSortConfig, setDaysSortConfig] = useState({
                       /* 1. WRAPPER: Height set to approx 380px to show ~6 vessels cleanly */
                       <div
   className="performance-table-wrapper days-table-wrapper"
-  ref={tableRowRef}
+  ref={(el) => { tableRowRef.current = el; tableContainerRef.current = el; }}
   style={{
     maxHeight: filteredDaysElapsedData.length > 6
       ? `${(6 * actualRowHeight) + 42 + 36}px`
