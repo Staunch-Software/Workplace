@@ -55,8 +55,8 @@ class ModuleStatus(BaseModel):
 
 class SyncError(BaseModel):
     id: int = 0
-    error_type: str
-    error_msg: str
+    error_type: str = "" 
+    error_msg: Optional[str] = None
     created_at: Optional[str] = None
 
 class VesselStatusOut(BaseModel):
