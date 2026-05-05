@@ -12,8 +12,10 @@ function AepmsModule() {
   useEffect(() => { document.title = 'Engine Performance'; }, []);
   return (
     <Suspense fallback={
-      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        Loading AEPMS...
+      <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--white)', gap: '16px' }}>
+        <div style={{ width: '44px', height: '44px', border: '4px solid var(--gray-200)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <span style={{ fontSize: '0.875rem', color: 'var(--gray-500)', fontFamily: 'Inter, sans-serif' }}>Loading...</span>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     }>
       <Routes>

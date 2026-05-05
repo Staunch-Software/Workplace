@@ -73,6 +73,13 @@ async def backfill():
             prefix = make_prefix(vessel_name)
             print(f"  {vessel_name} ({prefix}) — {len(dlist)} defects")
 
+            # Include deleted defects so we never reuse a number covered by the unique constraint
+            taken_rows = await db.execute(
+                text("SELECT defect_number FROM defects WHERE vessel_imo = :imo AND defect_number IS NOT NULL"),
+                {"imo": imo},
+            )
+            taken_numbers = {row.defect_number for row in taken_rows}
+
             seq = 0
             for defect in dlist:
                 seq += 1
@@ -82,6 +89,11 @@ async def backfill():
                     continue
 
                 defect_number = f"{prefix}#{str(seq).zfill(4)}"
+                while defect_number in taken_numbers:
+                    seq += 1
+                    defect_number = f"{prefix}#{str(seq).zfill(4)}"
+                taken_numbers.add(defect_number)
+
                 await db.execute(
                     text("""
                         UPDATE defects 

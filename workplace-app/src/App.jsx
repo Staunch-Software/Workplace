@@ -17,6 +17,27 @@ const JiraModule = lazy(() => import('./modules/jira/JiraModule'));
 const AepmsModule = lazy(() => import('./modules/aepms/AepmsModule'));
 const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
 
+const moduleLoaderStyle = {
+  position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
+  alignItems: 'center', justifyContent: 'center',
+  background: 'var(--white)', gap: '16px', zIndex: 999,
+};
+const spinnerStyle = {
+  width: '44px', height: '44px',
+  border: '4px solid var(--gray-200)', borderTopColor: 'var(--primary)',
+  borderRadius: '50%', animation: 'spin 0.8s linear infinite',
+};
+const spinKeyframes = `@keyframes spin { to { transform: rotate(360deg); } }`;
+const ModuleLoader = ({ label }) => (
+  <div style={moduleLoaderStyle}>
+    <div style={spinnerStyle} />
+    <span style={{ fontSize: '0.875rem', color: 'var(--gray-500)', fontFamily: 'Inter, sans-serif' }}>
+      {label}
+    </span>
+    <style>{spinKeyframes}</style>
+  </div>
+);
+
 function App() {
   const [searchQuery, setSearchQuery] = useState('');
   return (
@@ -73,7 +94,7 @@ function App() {
           {/* ── DRS MODULE ─────────────────────────────── */}
           <Route path="/drs/*" element={
             <ProtectedRoute>
-              <Suspense fallback={<div className="p-10 text-center">Loading DRS...</div>}>
+              <Suspense fallback={<ModuleLoader label="Loading DRS..." />}>
                 <DrsModule />
               </Suspense>
             </ProtectedRoute>
@@ -87,7 +108,7 @@ function App() {
 
           <Route path="/jira/*" element={
             <ProtectedRoute allowedRoles={['SHORE', 'ADMIN', 'VESSEL']}>
-              <Suspense fallback={<div className="p-10 text-center">Loading JIRA...</div>}>
+              <Suspense fallback={<ModuleLoader label="Loading JIRA..." />}>
                 <JiraModule />
               </Suspense>
             </ProtectedRoute>
@@ -96,7 +117,7 @@ function App() {
 
           <Route path="/aepms/*" element={
             <ProtectedRoute allowedRoles={['SHORE', 'ADMIN', 'VESSEL']}>
-              <Suspense fallback={<div className="p-10 text-center">Loading AEPMS...</div>}>
+              <Suspense fallback={<ModuleLoader label="Loading AEPMS..." />}>
                 <AepmsModule />
               </Suspense>
             </ProtectedRoute>
