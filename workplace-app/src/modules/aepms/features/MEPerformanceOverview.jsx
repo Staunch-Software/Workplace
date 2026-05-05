@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
-import "../styles/MEPerformanceOverview.css";
 import "../styles/Meresponsiveness.css";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
