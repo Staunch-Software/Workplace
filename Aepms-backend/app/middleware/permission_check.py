@@ -1,6 +1,7 @@
 # app/middleware/permission_check.py
 from fastapi import Request, HTTPException
 from app.utils.auth_utils import verify_application_jwt
+from jose import JWTError
 import logging
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,9 @@ async def check_endpoint_permission(request: Request, call_next):
         
     except HTTPException:
         raise
+    except JWTError as e:
+        logger.warning(f"❌ JWT validation failed: {e}")
+        raise HTTPException(status_code=401, detail="Token has expired or is invalid")
     except Exception as e:
         logger.error(f"❌ Permission check error: {e}")
         raise HTTPException(status_code=403, detail=f"Permission check failed: {str(e)}")

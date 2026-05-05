@@ -22,9 +22,9 @@ async def get_current_user(
         payload = decode_token(token)
         user_id: str = payload.get("sub")
         if not user_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Could not validate credentials")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
     except JWTError:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Could not validate credentials")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
 
     stmt = (
         select(User)

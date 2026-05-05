@@ -16,7 +16,9 @@ axiosLub.interceptors.request.use((config) => {
 axiosLub.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    const status = err.response?.status;
+    const detail = err.response?.data?.detail || '';
+    if (status === 401 || (status === 403 && (detail === 'Not authenticated' || detail === 'Could not validate credentials'))) {
       handleExpiredSession();
     }
     return Promise.reject(err);

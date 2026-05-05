@@ -190,6 +190,9 @@ app.add_middleware(
 from app.routes.sync import router as sync_router
 app.include_router(sync_router, prefix="/api/sync", tags=["Sync"])
 
+from app.routes.vessels import router as vessels_router
+app.include_router(vessels_router, prefix="/api/vessels", tags=["Vessels"])
+
 # Database Initialization
 @app.on_event("startup")
 async def startup_event():

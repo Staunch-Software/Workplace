@@ -43,6 +43,16 @@ class ApiService {
         throw new Error('Session expired');
       }
 
+      if (response.status === 403) {
+        let body = {};
+        try { body = await response.clone().json(); } catch (_) {}
+        const detail = body?.detail || '';
+        if (detail === 'Not authenticated' || detail === 'Could not validate credentials') {
+          handleExpiredSession();
+          throw new Error('Session expired');
+        }
+      }
+
       const contentType = response.headers.get('content-type');
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}`;

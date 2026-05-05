@@ -4,7 +4,6 @@ import { handleExpiredSession } from '../../../utils/authGuard';
 const axiosJira = axios.create({
   // baseURL: 'http://localhost:8004',
   baseURL: '/jira/api',
-  // baseURL: '/jira',
 });
 
 axiosJira.interceptors.request.use((config) => {
@@ -16,7 +15,9 @@ axiosJira.interceptors.request.use((config) => {
 axiosJira.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    const status = err.response?.status;
+    const detail = err.response?.data?.detail || '';
+    if (status === 401 || (status === 403 && detail === 'Could not validate credentials')) {
       handleExpiredSession();
     }
     return Promise.reject(err);

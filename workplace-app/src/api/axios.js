@@ -18,7 +18,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401 && !err.config?.url?.includes('/login/access-token')) {
+    const status = err.response?.status;
+    const detail = err.response?.data?.detail || '';
+    const isLoginUrl = err.config?.url?.includes('/login/access-token');
+    if (!isLoginUrl && (status === 401 || (status === 403 && (detail === 'Not authenticated' || detail === 'Could not validate credentials')))) {
       handleExpiredSession();
     }
     return Promise.reject(err);

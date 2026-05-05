@@ -1,518 +1,367 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Building2, Search, Shield, LogOut, ChevronDown, Ship, X, Check, KeyRound, Activity, ChevronRight, Database, Clock, Wifi, WifiOff, FileText, Trello, Droplet, Zap, AlertCircle, BookOpen } from "lucide-react";
+import { Building2, Search, Shield, LogOut, ChevronDown, Ship, X, Check, KeyRound, Activity, ChevronRight, Database, Clock, Wifi, WifiOff, FileText, Trello, Droplet, Zap, AlertCircle, Terminal, RefreshCw, ArrowUpRight, ArrowDownLeft, CheckCircle, Ship as ShipIcon, BookOpen } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getVesselStatus } from '../pages/admin/lib/adminApi';
 import './Navbar.css';
+import apiDrs from '../modules/drs/api/axiosDrs';
+import axiosJira from '../modules/jira/api/axiosJira';
 import api from '../api/axios';
+import apiLuboil from '../modules/lubeoil/api/axiosLub';
+
 
 // ── Module metadata keyed by backend permission key ───────────────────────────
-const MODULE_META = {
-    drs: { label: 'DRS', icon: <FileText size={13} />, color: '#3b82f6' },
-    jira: { label: 'SmartPAL JIRA', icon: <Trello size={13} />, color: '#f97316' },
-    voyage: { label: 'Voyage Performance', icon: <Ship size={13} />, color: '#8b5cf6' },
-    lubeoil: { label: 'Lubeoil Analysis', icon: <Droplet size={13} />, color: '#06b6d4' },
-    engine_performance: { label: 'Engine Performance', icon: <Zap size={13} />, color: '#22c55e' },
+const THEME = {
+    primary: '#6366f1',
+    success: '#10b981',
+    danger: '#f43f5e',
+    warning: '#f59e0b',
+    surface: '#ffffff',
+    background: '#f8fafc',
+    border: '#e2e8f0',
+    textMain: '#0f172a',
+    textMuted: '#64748b'
 };
 
-const VesselStatusModal = ({ onClose, assignedVessels = [], userPermissions = {} }) => {
-    const [vessels, setVessels] = useState([]);
+const MODULE_META = {
+    drs: { label: 'DRS (Defects)', icon: <FileText size={14} />, color: '#3b82f6' },
+    jira: { label: 'JIRA Sync', icon: <Trello size={14} />, color: '#f97316' },
+    voyage: { label: 'Voyage Perf', icon: <Ship size={14} />, color: '#8b5cf6' },
+    lubeoil: { label: 'Lube Analysis', icon: <Droplet size={14} />, color: '#06b6d4' },
+    engine_performance: { label: 'Engine Perf', icon: <Zap size={14} />, color: '#22c55e' },
+};
+function formatAgo(iso) {
+    if (!iso) return 'Never';
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function ageClass(iso) {
+    if (!iso) return 'never';
+    const h = (Date.now() - new Date(iso).getTime()) / 3_600_000;
+    if (h < 1) return 'fresh';
+    if (h < 12) return 'stale';
+    return 'old';
+}
+
+const SYNC_COLORS = {
+    fresh: { bg: '#EAF3DE', border: '#C0DD97', text: '#3B6D11' },
+    stale: { bg: '#FAEEDA', border: '#FAC775', text: '#854F0B' },
+    old: { bg: '#FCEBEB', border: '#F7C1C1', text: '#A32D2D' },
+    never: { bg: '#f8fafc', border: '#e2e8f0', text: '#94a3b8' },
+};
+
+const LiveModuleDetail = ({ imo, moduleKey, isInstalled }) => {
+    const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [expandedImo, setExpandedImo] = useState(null);
-    const [filter, setFilter] = useState('all');
-    const rowRefs = useRef({});
-    const allowedKeys = Object.keys(userPermissions).filter(k => userPermissions[k] === true);
+
+    const fetchSyncData = async () => {
+    if (!imo || !isInstalled) {
+        setLoading(false);
+        return;
+    }
+
+    try {
+        if (moduleKey === 'drs') {
+            const res = await apiDrs.get(`/vessels/${imo}/sync-log`);
+            setData(res.data);
+
+        } else if (moduleKey === 'lubeoil') {
+            const res = await apiLuboil.get(`api/vessels/${imo}/sync-log`);
+            setData(res.data);
+
+        } else {
+            setData(null);
+        }
+    } catch (err) {
+        console.error("Sync log fetch failed", err);
+    } finally {
+        setLoading(false);
+    }
+};
 
     useEffect(() => {
-        const fetchStatuses = async () => {
-            try {
-                const res = await getVesselStatus();
-                console.log('[DEBUG] res.data type:', typeof res.data, '| value:', JSON.stringify(res.data).slice(0, 300));
-                const filtered = res.data.map(v => ({
-                    ...v,
-                    modules: (v.modules || []).filter(m => allowedKeys.includes(m.key)),
-                }));
-                setVessels(filtered);
-            } catch (err) {
-                // ← Log the REAL error so you can see what's failing
-                console.error('[VesselStatusModal] Failed to fetch vessel status:', err);
-                console.error('[VesselStatusModal] Status code:', err?.response?.status);
-                console.error('[VesselStatusModal] Detail:', err?.response?.data?.detail);
+        setLoading(true);
+        fetchSyncData();
+        const interval = setInterval(fetchSyncData, 30000); // 30s Polling
+        return () => clearInterval(interval);
+    }, [imo, moduleKey, isInstalled]);
 
-                // ← Show empty state instead of fake data
-                setVessels([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchStatuses();
-    }, []);
+    if (!isInstalled) return (
+        <div style={mStyles.notInstalledBox}>
+            <Activity size={40} color="#cbd5e1" />
+            <h3 style={{ color: THEME.textMuted, margin: '15px 0 5px' }}>Module Not Configured</h3>
+            <p style={{ color: THEME.textMuted, fontSize: '13px' }}>This application is not installed on this vessel.</p>
+        </div>
+    );
 
-    const formatSync = (iso) => {
-        if (!iso) return 'Never';
-        const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-        if (diff < 60) return `${diff}s ago`;
-        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-        return `${Math.floor(diff / 86400)}d ago`;
-    };
+    if (loading) return <div style={{ padding: 40, textAlign: 'center' }}><RefreshCw className="spin" color={THEME.primary} /></div>;
 
-    const liveCount = vessels.filter(v => v.online).length;
-    const errorCount = vessels.filter(v => (v.sync_errors || []).length > 0).length;
-
-    const filteredVessels = vessels.filter(v => {
-        if (filter === 'live') return v.online;
-        if (filter === 'errors') return (v.sync_errors || []).length > 0;
-        return true;
-    });
-
-    const handleToggle = (imo) => {
-        const next = expandedImo === imo ? null : imo;
-        setExpandedImo(next);
-        if (next) setTimeout(() => rowRefs.current[next]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
-    };
-
-    const handleStatCard = (type) => {
-        setFilter(prev => prev === type ? 'all' : type);
-        setExpandedImo(null);
-    };
-
-    const ageStyle = (iso) => {
-        if (!iso) return { bg: '#f8fafc', border: '#e2e8f0', color: '#94a3b8' };
-        const h = (Date.now() - new Date(iso).getTime()) / 3_600_000;
-        if (h < 1) return { bg: '#f0fdf4', border: '#86efac', color: '#15803d' };
-        if (h < 6) return { bg: '#fefce8', border: '#fde68a', color: '#854d0e' };
-        return { bg: '#fff1f2', border: '#fecdd3', color: '#be123c' };
-    };
+    const activeErrors = data?.active_errors || [];
 
     return (
-        <div style={{
-            position: 'fixed', inset: 0, zIndex: 1000,
-            background: 'rgba(15,23,42,0.5)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            backdropFilter: 'blur(2px)',
-        }}>
-            <div style={{
-                background: '#fff', borderRadius: 20,
-                width: 540, maxHeight: '86vh',
-                display: 'flex', flexDirection: 'column',
-                boxShadow: '0 32px 80px rgba(0,0,0,0.28)',
-                overflow: 'hidden',
-                border: '1px solid #e2e8f0',
-            }}>
-
-                {/* ── Header ── */}
-                <div style={{
-                    padding: '18px 22px',
-                    borderBottom: '1px solid #f1f5f9',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    background: '#fff',
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{
-                            width: 38, height: 38, borderRadius: 11,
-                            background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
-                        }}>
-                            <Activity size={18} color="white" />
-                        </div>
-                        <div>
-                            <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em' }}>Fleet Status</div>
-                            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
-                                {vessels.length} vessel{vessels.length !== 1 ? 's' : ''} assigned
-                            </div>
-                        </div>
+        <div style={{ animation: 'fadeIn 0.3s ease' }}>
+            <div className='fsize-15' style={mStyles.sectionLabel}>{moduleKey.toUpperCase()} Sync Statistics</div>
+            <div style={mStyles.statsRow}>
+                <div style={mStyles.statBox}>
+                    <div className='fsize-15' style={mStyles.statLabel}><ArrowUpRight size={14} /> Vessel → Shore (Push)</div>
+                    <div className='fsize-20' style={{ fontSize: '16px', fontWeight: 800, color: data?.vessel_reported_push ? THEME.success : THEME.danger }}>
+                        {data?.vessel_reported_push ? new Date(data.vessel_reported_push).toLocaleString() : 'Never Synced'}
                     </div>
-                    <button onClick={onClose} style={{
-                        background: '#f8fafc', border: '1px solid #e2e8f0',
-                        cursor: 'pointer', color: '#64748b', padding: '6px 8px',
-                        borderRadius: 8, display: 'flex', alignItems: 'center',
-                        transition: 'background 0.15s',
-                    }}>
-                        <X size={16} />
-                    </button>
                 </div>
-
-                {/* ── Stat cards ── */}
-                {!loading && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '14px 18px 0' }}>
-                        {/* Live */}
-                        <div onClick={() => handleStatCard('live')} style={{
-                            borderRadius: 12, padding: '13px 15px', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: 11,
-                            background: filter === 'live' ? '#dcfce7' : '#f0fdf4',
-                            border: `1.5px solid ${filter === 'live' ? '#22c55e' : '#bbf7d0'}`,
-                            transition: 'all 0.15s',
-                        }}>
-                            <div style={{
-                                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-                                background: filter === 'live' ? '#bbf7d0' : '#dcfce7',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
-                                <Wifi size={18} color="#16a34a" />
-                            </div>
-                            <div>
-                                <div style={{ fontSize: 24, fontWeight: 800, color: '#15803d', lineHeight: 1, letterSpacing: '-0.02em' }}>{liveCount}</div>
-                                <div style={{ fontSize: 11, color: '#4ade80', fontWeight: 600, marginTop: 3 }}>
-                                    {filter === 'live' ? '← tap to clear' : 'Live now'}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Errors */}
-                        <div onClick={() => handleStatCard('errors')} style={{
-                            borderRadius: 12, padding: '13px 15px', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: 11,
-                            background: filter === 'errors' ? '#fee2e2' : (errorCount > 0 ? '#fff1f2' : '#f8fafc'),
-                            border: `1.5px solid ${filter === 'errors' ? '#ef4444' : (errorCount > 0 ? '#fecdd3' : '#e2e8f0')}`,
-                            transition: 'all 0.15s',
-                            opacity: errorCount === 0 ? 0.55 : 1,
-                        }}>
-                            <div style={{
-                                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-                                background: filter === 'errors' ? '#fecaca' : (errorCount > 0 ? '#fee2e2' : '#f1f5f9'),
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
-                                <AlertCircle size={18} color={errorCount > 0 ? '#dc2626' : '#94a3b8'} />
-                            </div>
-                            <div>
-                                <div style={{ fontSize: 24, fontWeight: 800, color: errorCount > 0 ? '#b91c1c' : '#94a3b8', lineHeight: 1, letterSpacing: '-0.02em' }}>{errorCount}</div>
-                                <div style={{ fontSize: 11, color: errorCount > 0 ? '#f87171' : '#cbd5e1', fontWeight: 600, marginTop: 3 }}>
-                                    {filter === 'errors' ? '← tap to clear' : 'With errors'}
-                                </div>
-                            </div>
-                        </div>
+                <div style={mStyles.statBox}>
+                    <div className='fsize-15' style={mStyles.statLabel}><ArrowDownLeft size={14} /> Shore → Vessel (Pull)</div>
+                    <div className='fsize-20' style={{ fontSize: '16px', fontWeight: 800, color: data?.vessel_reported_pull ? THEME.success : THEME.danger }}>
+                        {data?.vessel_reported_pull ? new Date(data.vessel_reported_pull).toLocaleString() : 'Never Synced'}
                     </div>
-                )}
-
-                {/* ── Filter tabs ── */}
-                {!loading && (
-                    <div style={{ display: 'flex', gap: 5, padding: '10px 18px 0' }}>
-                        {[
-                            { key: 'all', label: `All`, count: vessels.length },
-                            { key: 'live', label: `Online`, count: liveCount },
-                            { key: 'errors', label: `Errors`, count: errorCount },
-                        ].map(tab => (
-                            <button key={tab.key}
-                                onClick={() => { setFilter(tab.key); setExpandedImo(null); }}
-                                style={{
-                                    fontSize: 12, padding: '5px 12px', borderRadius: 20,
-                                    cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5,
-                                    background: filter === tab.key ? '#0f172a' : '#f8fafc',
-                                    border: `1px solid ${filter === tab.key ? '#0f172a' : '#e2e8f0'}`,
-                                    color: filter === tab.key ? '#fff' : '#64748b',
-                                    transition: 'all 0.15s',
-                                }}
-                            >
-                                {tab.label}
-                                <span style={{
-                                    fontSize: 10, fontWeight: 700,
-                                    background: filter === tab.key ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
-                                    color: filter === tab.key ? '#fff' : '#64748b',
-                                    padding: '1px 6px', borderRadius: 10,
-                                }}>
-                                    {tab.count}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-                )}
-
-                {/* ── Vessel list ── */}
-                <div style={{ overflowY: 'auto', padding: '10px 18px 14px', flex: 1 }}>
-                    {loading ? (
-                        <div style={{ textAlign: 'center', padding: '48px 0' }}>
-                            <div style={{ width: 32, height: 32, border: '3px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', margin: '0 auto 12px', animation: 'spin 0.8s linear infinite' }} />
-                            <div style={{ fontSize: 13, color: '#94a3b8' }}>Loading vessel status…</div>
-                        </div>
-                    ) : filteredVessels.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '48px 0', color: '#94a3b8', fontSize: 13 }}>
-                            No vessels match this filter.
-                        </div>
-                    ) : (
-                        filteredVessels.map((v) => {
-                            const isExpanded = expandedImo === v.imo;
-                            const errors = v.sync_errors || [];
-                            const hasErrors = errors.length > 0;
-                            const ps = ageStyle(v.last_push_at);
-                            const pl = ageStyle(v.last_pull_at);
-
-                            return (
-                                <div key={v.imo} ref={el => rowRefs.current[v.imo] = el}
-                                    style={{
-                                        borderRadius: 13, marginBottom: 8, overflow: 'hidden',
-                                        border: `1px solid ${hasErrors ? '#fecdd3' : isExpanded ? '#c7d2fe' : '#e2e8f0'}`,
-                                        boxShadow: isExpanded ? '0 0 0 3px rgba(99,102,241,0.1)' : 'none',
-                                        transition: 'all 0.2s',
-                                    }}
-                                >
-                                    {/* ── Row summary (always visible) ── */}
-                                    <div onClick={() => handleToggle(v.imo)} style={{
-                                        padding: '12px 14px',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                        cursor: 'pointer',
-                                        background: hasErrors ? '#fff5f5' : isExpanded ? '#f5f3ff' : '#fff',
-                                        transition: 'background 0.15s',
-                                    }}>
-                                        {/* Left: status dot + name */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                            <div style={{ position: 'relative', flexShrink: 0 }}>
-                                                <div style={{
-                                                    width: 34, height: 34, borderRadius: 9,
-                                                    background: v.online ? '#f0fdf4' : '#f8fafc',
-                                                    border: `1px solid ${v.online ? '#86efac' : '#e2e8f0'}`,
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                }}>
-                                                    <Ship size={15} color={v.online ? '#16a34a' : '#94a3b8'} />
-                                                </div>
-                                                {/* Online indicator dot */}
-                                                <div style={{
-                                                    position: 'absolute', bottom: -2, right: -2,
-                                                    width: 9, height: 9, borderRadius: '50%',
-                                                    background: v.online ? '#22c55e' : '#d1d5db',
-                                                    border: '2px solid #fff',
-                                                }} />
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em' }}>
-                                                    {v.name}
-                                                </div>
-                                                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
-                                                    IMO {v.imo}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Right: badges + chevron */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-
-                                            {/* Error badge */}
-                                            {hasErrors && (
-                                                <div style={{
-                                                    display: 'flex', alignItems: 'center', gap: 4,
-                                                    fontSize: 11, padding: '3px 8px', borderRadius: 20,
-                                                    background: '#fee2e2', color: '#b91c1c',
-                                                    fontWeight: 700, border: '1px solid #fecaca',
-                                                }}>
-                                                    <AlertCircle size={10} />
-                                                    {errors.length}
-                                                </div>
-                                            )}
-
-                                            {/* ── Offline app install badge ── */}
-                                            {(() => {
-                                                const anyInstalled = (v.modules || []).some(m => m.available === true);
-                                                return (
-                                                    <div style={{
-                                                        display: 'flex', alignItems: 'center', gap: 5,
-                                                        fontSize: 11, padding: '4px 9px', borderRadius: 20,
-                                                        fontWeight: 600,
-                                                        background: anyInstalled ? '#f0fdf4' : '#f8fafc',
-                                                        border: `1px solid ${anyInstalled ? '#86efac' : '#e2e8f0'}`,
-                                                        color: anyInstalled ? '#15803d' : '#94a3b8',
-                                                    }}>
-                                                        <div style={{
-                                                            width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                                                            background: anyInstalled ? '#22c55e' : '#d1d5db',
-                                                        }} />
-                                                        {anyInstalled ? 'App installed' : 'Not installed'}
-                                                    </div>
-                                                );
-                                            })()}
-
-                                            <ChevronRight size={14} color="#cbd5e1"
-                                                style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
-                                        </div>
-                                    </div>
-
-                                    {/* ── Expanded panel ── */}
-                                    {isExpanded && (
-                                        <div style={{
-                                            borderTop: '1px solid #f1f5f9',
-                                            background: '#fafbfc',
-                                            animation: 'fadeSlideIn 0.18s ease',
-                                        }}>
-                                            {/* Sync timestamps (Shore Perspective) */}
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '12px 14px' }}>
-                                                {[
-                                                    {
-                                                        label: 'Shore Pull (Vessel → Shore)',
-                                                        value: v.last_pull_at,
-                                                        s: ageStyle(v.last_pull_at)
-                                                    },
-                                                    {
-                                                        label: 'Shore Push (Shore → Vessel)',
-                                                        value: v.last_push_at,
-                                                        s: ageStyle(v.last_push_at)
-                                                    },
-                                                ].map(({ label, value, s }) => (
-                                                    <div key={label} style={{
-                                                        padding: '10px 12px', borderRadius: 9,
-                                                        background: s.bg, border: `1px solid ${s.border}`,
-                                                    }}>
-                                                        <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, marginBottom: 4, lineHeight: 1.3, textTransform: 'uppercase' }}>
-                                                            {label}
-                                                        </div>
-                                                        <div style={{ fontSize: 14, fontWeight: 800, color: s.color, letterSpacing: '-0.01em' }}>
-                                                            {formatSync(value)}
-                                                        </div>
-                                                        {value && (
-                                                            <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>
-                                                                {new Date(value).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-
-                                            {/* ── Error log — only shown when expanded ── */}
-                                            {hasErrors && (
-                                                <div style={{ padding: '0 14px 12px' }}>
-                                                    <div style={{
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                                        marginBottom: 8,
-                                                    }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                            <AlertCircle size={12} color="#ef4444" />
-                                                            <span style={{ fontSize: 11, fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                                                Sync errors
-                                                            </span>
-                                                        </div>
-                                                        <span style={{
-                                                            fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
-                                                            background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca',
-                                                        }}>
-                                                            {errors.length} event{errors.length !== 1 ? 's' : ''}
-                                                        </span>
-                                                    </div>
-
-                                                    <div style={{
-                                                        maxHeight: 220, overflowY: 'auto',
-                                                        display: 'flex', flexDirection: 'column', gap: 6,
-                                                        paddingRight: 2,
-                                                    }}>
-                                                        {errors.map((err, i) => (
-                                                            <div key={err.id ?? i} style={{
-                                                                display: 'flex', gap: 9, alignItems: 'flex-start',
-                                                                padding: '9px 10px', borderRadius: 9,
-                                                                background: '#fff',
-                                                                border: `1px solid ${err.error_type === 'shore_error' ? '#fecaca' : '#fed7aa'}`,
-                                                            }}>
-                                                                {/* Type badge */}
-                                                                <div style={{
-                                                                    fontSize: 9, fontWeight: 800, padding: '3px 6px',
-                                                                    borderRadius: 5, flexShrink: 0, letterSpacing: '0.04em',
-                                                                    background: err.error_type === 'shore_error' ? '#fef2f2' : '#fff7ed',
-                                                                    color: err.error_type === 'shore_error' ? '#b91c1c' : '#c2410c',
-                                                                    border: `1px solid ${err.error_type === 'shore_error' ? '#fecaca' : '#fed7aa'}`,
-                                                                    marginTop: 1,
-                                                                }}>
-                                                                    {err.error_type === 'shore_error' ? 'SHORE' : 'SHIP'}
-                                                                </div>
-
-                                                                {/* Message + time */}
-                                                                <div style={{ flex: 1, minWidth: 0 }}>
-                                                                    <div style={{
-                                                                        fontSize: 12, fontWeight: 600, color: '#1e293b',
-                                                                        wordBreak: 'break-word', lineHeight: 1.4,
-                                                                    }}>
-                                                                        {err.error_msg}
-                                                                    </div>
-                                                                    {err.created_at && (
-                                                                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>
-                                                                            {new Date(err.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* ── Modules ── */}
-                                            <div style={{ padding: '0 14px 14px' }}>
-                                                <div style={{
-                                                    fontSize: 11, fontWeight: 700, color: '#94a3b8',
-                                                    textTransform: 'uppercase', letterSpacing: '0.05em',
-                                                    marginBottom: 8,
-                                                }}>
-                                                    Modules
-                                                </div>
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                                                    {(v.modules || []).map((mod) => {
-                                                        const meta = MODULE_META[mod.key] ?? { label: mod.key, icon: <Database size={13} />, color: '#6b7280' };
-                                                        return (
-                                                            <div key={mod.key} style={{
-                                                                display: 'flex', alignItems: 'center', gap: 8,
-                                                                padding: '8px 10px', borderRadius: 8,
-                                                                background: mod.available ? `${meta.color}0d` : '#f8fafc',
-                                                                border: `1px solid ${mod.available ? `${meta.color}25` : '#e2e8f0'}`,
-                                                            }}>
-                                                                <div style={{
-                                                                    width: 26, height: 26, borderRadius: 7, flexShrink: 0,
-                                                                    background: mod.available ? `${meta.color}18` : '#f1f5f9',
-                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                                    color: mod.available ? meta.color : '#cbd5e1',
-                                                                }}>
-                                                                    {React.cloneElement(meta.icon, { size: 13 })}
-                                                                </div>
-                                                                <div>
-                                                                    <div style={{ fontSize: 12, fontWeight: 600, color: mod.available ? '#1e293b' : '#94a3b8' }}>
-                                                                        {meta.label}
-                                                                    </div>
-                                                                    <div style={{ fontSize: 10, color: mod.available ? '#22c55e' : '#cbd5e1', fontWeight: 600 }}>
-                                                                        {mod.available ? 'Active' : 'Inactive'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })
-                    )}
-                </div>
-
-                {/* ── Footer ── */}
-                <div style={{
-                    padding: '12px 18px', borderTop: '1px solid #f1f5f9',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    background: '#fafbfc',
-                }}>
-                    <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                        {liveCount} online · {errorCount} with errors
-                    </div>
-                    <button onClick={onClose} style={{
-                        padding: '7px 18px', borderRadius: 8,
-                        border: '1px solid #e2e8f0', background: '#fff',
-                        cursor: 'pointer', fontSize: 13, color: '#475569', fontWeight: 600,
-                    }}>
-                        Close
-                    </button>
                 </div>
             </div>
 
-            <style>{`
-                @keyframes fadeSlideIn {
-                    from { opacity: 0; transform: translateY(-5px); }
-                    to   { opacity: 1; transform: translateY(0); }
-                }
-                @keyframes spin {
-                    to { transform: rotate(360deg); }
-                }
-            `}</style>
+            <div className='fsize-15' style={{ ...mStyles.sectionLabel, marginTop: 30 }}>Current Active Issues</div>
+            {activeErrors.length === 0 ? (
+                <div style={mStyles.emptyState}>
+                    <CheckCircle size={32} color={THEME.success} />
+                    <span style={{ fontWeight: 600, color: THEME.textMain }}>All data synchronized</span>
+                    <span className='fsize-16' style={{ fontSize: '12px' }}>No active sync errors found for this module.</span>
+                </div>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {activeErrors.map((err, i) => (
+                        <div key={i} style={mStyles.normalErrorCard}>
+                            <div className='fsize-15' style={mStyles.errCardHeader}>
+                                <span style={{ fontWeight: 800, color: '#b91c1c' }}>{err.entity?.toUpperCase()} ERROR</span>
+                                <span style={{ color: THEME.textMuted }}>{new Date(err.ts).toLocaleTimeString()}</span>
+                            </div>
+                            <div className='fsize-17' style={mStyles.errCardBody}>{err.msg}</div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
 
+const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
+    const [vessels, setVessels] = useState([]);
+    const [selectedVessel, setSelectedVessel] = useState(null);
+    const [selectedModule, setSelectedModule] = useState('drs');
+    const [filter, setFilter] = useState('all');
+    const [search, setSearch] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [drsErrors, setDrsErrors] = useState({});
+
+    useEffect(() => {
+
+        // Load vessels from Core
+        getVesselStatus().then(res => {
+            setVessels(res.data || []);
+            if (res.data?.length > 0)
+                setSelectedVessel(res.data[0]);
+            setLoading(false);
+        });
+
+        // Load DRS error summary
+        apiDrs.get("/vessels/sync-status/all")
+            .then(res => {
+                setDrsErrors(res.data || {});
+            })
+            .catch(err => {
+                console.error("Failed to load DRS errors", err);
+            });
+
+    }, []);
+
+    useEffect(() => {
+
+        const loadErrors = () => {
+
+            apiDrs.get("/vessels/sync-status/all")
+                .then(res => {
+                    setDrsErrors(res.data || {});
+                })
+                .catch(err => {
+                    console.error("Failed to load DRS errors", err);
+                });
+
+        };
+
+        loadErrors();
+
+        const interval =
+            setInterval(loadErrors, 30000);
+
+        return () =>
+            clearInterval(interval);
+
+    }, []);
+
+    const filteredVessels = vessels.filter(v => {
+
+        const matchesSearch =
+            v.name.toLowerCase()
+                .includes(search.toLowerCase());
+
+        if (filter === 'live')
+            return v.online && matchesSearch;
+
+        if (filter === 'errors') {
+
+            const errCount =
+                drsErrors[v.imo]?.failed_items_count || 0;
+
+            return errCount > 0 && matchesSearch;
+        }
+
+        return matchesSearch;
+    });
+
+    return (
+        <div style={mStyles.overlay}>
+            <div style={mStyles.modalContainer}>
+
+                {/* --- Sidebar: Vessel List --- */}
+                <div style={mStyles.sidebar}>
+                    <div style={mStyles.sidebarHeader}>
+                        <div style={mStyles.searchBox}>
+                            <Search size={14} color={THEME.textMuted} />
+                            <input placeholder="Search vessels..." className='fsize-18' style={mStyles.searchInput} onChange={e => setSearch(e.target.value)} />
+                        </div>
+                        <div style={mStyles.pillRow}>
+                            <button onClick={() => setFilter('all')} className='fsize-16' style={{ ...mStyles.pill, background: filter === 'all' ? THEME.primary : '#fff', color: filter === 'all' ? '#fff' : THEME.textMuted, borderColor: filter === 'all' ? THEME.primary : THEME.border }}>All</button>
+                            <button onClick={() => setFilter('live')} className='fsize-16' style={{ ...mStyles.pill, background: filter === 'live' ? THEME.success : '#fff', color: filter === 'live' ? '#fff' : THEME.textMuted, borderColor: filter === 'live' ? THEME.success : THEME.border }}>Live</button>
+                            <button onClick={() => setFilter('errors')} className='fsize-16' style={{ ...mStyles.pill, background: filter === 'errors' ? THEME.danger : '#fff', color: filter === 'errors' ? '#fff' : THEME.textMuted, borderColor: filter === 'errors' ? THEME.danger : THEME.border }}>Errors</button>
+                        </div>
+                    </div>
+
+                    <div style={mStyles.listArea}>
+                        {filteredVessels.map(v => {
+                            const isSel = selectedVessel?.imo === v.imo;
+                            return (
+                                <div key={v.imo} onClick={() => setSelectedVessel(v)} style={{
+                                    ...mStyles.vesselItem,
+                                    backgroundColor: isSel ? '#f0f7ff' : 'transparent',
+                                    borderLeft: `4px solid ${isSel ? THEME.primary : 'transparent'}`
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                        <div style={mStyles.statusCircle}>
+                                            <ShipIcon size={18} color={v.online ? THEME.success : THEME.textMuted} />
+                                            {v.online && <div className="pulse-dot" style={{ position: 'absolute', bottom: -2, right: -2, width: 8, height: 8, background: THEME.success, borderRadius: '50%', border: '2px solid #fff' }} />}
+                                        </div>
+                                        <div>
+                                            <div className='fsize-18' style={{ fontSize: '14px', fontWeight: 700, color: THEME.textMain }}>{v.name}</div>
+                                            <div className='fsize-15' style={{ fontSize: '11px', color: THEME.textMuted }}>IMO {v.imo}</div>
+                                        </div>
+                                    </div>
+                                    {(drsErrors[v.imo]?.failed_items_count || 0) > 0 && (
+                                        <AlertCircle
+                                            size={16}
+                                            color={THEME.danger}
+                                        />
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* --- Main Console: Module Detail --- */}
+                <div style={mStyles.contentPane}>
+                    <header style={mStyles.contentHeader}>
+                        <div>
+                            <h2 className='fsize-24' style={{ margin: 0, fontSize: '20px', fontWeight: 800 }}>{selectedVessel?.name}</h2>
+                            <div className='fsize-15' style={{ display: 'flex', gap: 12, fontSize: '11px', marginTop: 4, fontWeight: 600 }}>
+                                <span style={{ color: selectedVessel?.online ? THEME.success : THEME.textMuted }}>
+                                    {selectedVessel?.online ? '● LIVE CONNECTION' : '○ OFFLINE'}
+                                </span>
+                                <span style={{ color: THEME.border }}>|</span>
+                                <span style={{ color: THEME.textMuted }}>IMO: {selectedVessel?.imo}</span>
+                            </div>
+                        </div>
+                        <button onClick={onClose} style={mStyles.closeBtn}><X size={20} /></button>
+                    </header>
+
+                    <div style={{ padding: '30px', overflowY: 'auto', flex: 1 }}>
+                        <div className='fsize-15' style={mStyles.sectionLabel}>Installed Applications</div>
+                        <div style={mStyles.moduleGrid}>
+                            {Object.entries(MODULE_META).map(([key, meta]) => {
+                                const isInstalled = selectedVessel?.modules?.find(m => m.key === key)?.available;
+                                const isActive = selectedModule === key;
+                                return (
+                                    <div key={key} onClick={() => isInstalled && setSelectedModule(key)} style={{
+                                        ...mStyles.moduleCard,
+                                        borderColor: isActive ? THEME.primary : THEME.border,
+                                        background: isActive ? '#f5f3ff' : '#fff',
+                                        cursor: isInstalled ? 'pointer' : 'default',
+                                        opacity: isInstalled ? 1 : 0.4
+                                    }}>
+                                        <div style={{ color: isInstalled ? meta.color : THEME.textMuted }}>{meta.icon}</div>
+                                        <div className='fsize-15' style={{ fontSize: '11px', fontWeight: 800, marginTop: 10, textAlign: 'center', color: isInstalled ? THEME.textMain : THEME.textMuted }}>{meta.label}</div>
+                                        <div className='fsize-13' style={{
+                                            marginTop: 6, fontSize: '9px', fontWeight: 900,
+                                            color: isInstalled ? THEME.success : THEME.textMuted,
+                                            background: isInstalled ? '#ecfdf5' : '#f1f5f9',
+                                            padding: '2px 8px', borderRadius: '4px'
+                                        }}>
+                                            {isInstalled ? 'INSTALLED' : 'N/A'}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <LiveModuleDetail
+                            imo={selectedVessel?.imo_number || selectedVessel?.imo}
+                            moduleKey={selectedModule}
+                            isInstalled={selectedVessel?.modules?.find(m => m.key === selectedModule)?.available}
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+const mStyles = {
+    overlay: { position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    modalContainer: { background: '#fff', width: '1000px', height: '85vh', borderRadius: '28px', display: 'flex', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' },
+
+    // Sidebar (Left)
+    sidebar: { width: '320px', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', background: '#fcfcfd' },
+    sidebarHeader: { padding: '25px 20px', borderBottom: '1px solid #e2e8f0', background: '#fff' },
+    searchBox: { display: 'flex', alignItems: 'center', gap: 8, background: '#f1f5f9', padding: '10px 14px', borderRadius: '12px', marginBottom: '15px' },
+    searchInput: { border: 'none', background: 'transparent', outline: 'none', fontSize: '14px', width: '100%', fontWeight: 500 },
+    pillRow: { display: 'flex', gap: 6 },
+    pill: { flex: 1, border: '1px solid', padding: '6px 0', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', transition: '0.2s' },
+    listArea: { flex: 1, overflowY: 'auto', padding: '12px' },
+    vesselItem: { padding: '15px', borderRadius: '14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', transition: '0.2s' },
+    statusCircle: { position: 'relative', width: 40, height: 40, borderRadius: '12px', background: '#fff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+
+    // Content (Right)
+    contentPane: { flex: 1, display: 'flex', flexDirection: 'column', background: '#fff' },
+    contentHeader: { padding: '25px 35px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+    closeBtn: { border: 'none', background: '#f1f5f9', padding: '10px', borderRadius: '12px', cursor: 'pointer' },
+    sectionLabel: { fontSize: '11px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '18px', letterSpacing: '1.5px' },
+
+    moduleGrid: { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginBottom: '35px' },
+    moduleCard: { padding: '20px 10px', borderRadius: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', transition: '0.2s' },
+
+    statsRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' },
+    statBox: { padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', background: '#f8fafc' },
+    statLabel: { fontSize: '11px', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 },
+
+    normalErrorCard: { background: '#fff', border: '1px solid #fecdd3', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' },
+    errCardHeader: { padding: '10px 18px', background: '#fff1f2', borderBottom: '1px solid #fecdd3', display: 'flex', justifyContent: 'space-between', fontSize: '11px' },
+    errCardBody: { padding: '15px 18px', fontSize: '13px', color: '#334155', lineHeight: '1.6', fontFamily: 'monospace', wordBreak: 'break-all' },
+
+    emptyState: { padding: '50px', textAlign: 'center', color: '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, border: '2px dashed #e2e8f0', borderRadius: '20px' },
+    notInstalledBox: { padding: '80px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', border: '1px solid #f1f5f9', borderRadius: '24px', background: '#fafbfc' },
+};
+
+
 // ── Main Navbar ────────────────────────────────────────────────────────────────
-const Navbar = () => {
+const Navbar = ({ setSearchQuery }) => {
     const { user, logout, setUser } = useAuth();
     const navigate = useNavigate();
     const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -634,7 +483,7 @@ const Navbar = () => {
                     <div className="nav-right">
                         <div className="search-wrapper">
                             <Search className="search-icon" size={18} />
-                            <input type="text" placeholder="Search..." className="search-input" />
+                            <input type="text" placeholder="Search..." className="search-input" onChange={e => setSearchQuery(e.target.value)} />
                         </div>
 
                         <div className="divider"></div>
@@ -774,9 +623,9 @@ const Navbar = () => {
             {/* Change Password Modal */}
             {changePasswordOpen && (
                 <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ background: 'var(--white)', borderRadius: 16, width: 420, padding: 32, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+                    <div className='width-500' style={{ background: 'var(--white)', borderRadius: 16, width: 420, padding: 32, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--gray-900)' }}>Change Password</h2>
+                            <h2 className='fsize-21' style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--gray-900)' }}>Change Password</h2>
                             <button onClick={() => { setChangePasswordOpen(false); setCpError(''); setCpForm({ old_password: '', new_password: '', confirm: '' }); }}
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-400)' }}><X size={20} /></button>
                         </div>
@@ -789,7 +638,7 @@ const Navbar = () => {
                             <>
                                 {['old_password', 'new_password', 'confirm'].map((field, i) => (
                                     <div key={field} style={{ marginBottom: 14 }}>
-                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--gray-600)', display: 'block', marginBottom: 4 }}>
+                                        <label className='fsize-16' style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--gray-600)', display: 'block', marginBottom: 4 }}>
                                             {['Current Password', 'New Password', 'Confirm New Password'][i]}
                                         </label>
                                         <input type="password" value={cpForm[field]}
@@ -797,8 +646,9 @@ const Navbar = () => {
                                             style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--gray-300)', fontSize: '0.875rem', boxSizing: 'border-box' }} />
                                     </div>
                                 ))}
-                                {cpError && <p style={{ color: '#ef4444', fontSize: '0.8rem', marginBottom: 12 }}>{cpError}</p>}
+                                {cpError && <p className='fsize-16' style={{ color: '#ef4444', fontSize: '0.8rem', marginBottom: 12 }}>{cpError}</p>}
                                 <button onClick={handleChangePassword} disabled={cpLoading}
+                                    className='fsize-16'
                                     style={{ width: '100%', padding: '10px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem' }}>
                                     {cpLoading ? 'Saving...' : 'Update Password'}
                                 </button>

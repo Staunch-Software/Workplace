@@ -200,7 +200,7 @@
 
 /* --- MAIN VIEWPORT --- */
 .main-viewport {
-  flex: 1; padding: 30px;
+  flex: 1; padding: 15px;
    margin: 0 auto; width: 100%;
 }
 .page-title { font-size: 24px; font-weight: 700; color: var(--primary-navy); margin-bottom: 24px; }
@@ -246,7 +246,7 @@
   text-transform: uppercase;
   border-bottom: 2px solid var(--border-color);
   position: relative;
-  vertical-align: top;
+  /* vertical-align: top; */
   /* border: 1px solid #cbd5e1; */
 }
 
@@ -1058,6 +1058,27 @@ input[type="date"] {
   transform: scale(1.2);
 }
 
+@media (min-width:1023px) and (max-width:1440px) {
+    .fsize-18{
+    font-size: 12px !important;
+  }
+  .fsize-17{
+    font-size: 11px !important;
+  }
+
+  .fsize-14{
+    font-size: 8px !important;
+  }
+
+  .fsize-15{
+    font-size: 9px !important;
+  }
+
+  .fsize-19{
+    font-size: 13px !important;
+  }
+}
+
 @media (min-width:1900px) {
 
   .fsize-18{
@@ -1088,3 +1109,9 @@ input[type="date"] {
         --action-bar-height: 57px;
     }
 }
+
+@media (min-width: 1300px) and (max-width: 1360px) {
+    .data-table.vessel th, .data-table.vessel td {
+        --action-bar-height: 48px;
+    }
+  }

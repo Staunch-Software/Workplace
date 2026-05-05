@@ -504,6 +504,16 @@ export const defectApi = {
     return response.data;
   },
 
+  getVesselSyncLog: async (imo) => {
+    const res = await api.get(`/vessels/${imo}/sync-log`);
+    return res.data;
+  },
+
+  getAllVesselSyncStatus: async () => {
+    const res = await api.get(`/vessels/sync-status/all`);
+    return res.data; // expects { [imo]: { last_sync_success, failed_items_count } }
+  },
+
   // ============================================
   // DEFECT IMAGES MANAGEMENT
   // ============================================

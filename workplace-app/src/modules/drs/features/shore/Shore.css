@@ -348,8 +348,8 @@
 
 /* --- TABLE ENHANCEMENTS --- */
 .data-table th, .data-table td {
-  padding: 12px 0px;
-  font-size: 13px;
+  padding: 12px 3px;
+  font-size: 12.5px;
   white-space: nowrap;
   --action-bar-height: 48px;
   /* Prevent wrapping for dense data */
@@ -775,6 +775,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-bottom: 0px;
 }
 
 .vessel-info h1 {
@@ -1002,7 +1003,7 @@
 
   .legend-container {
     display: flex !important;
-    gap: 32px !important;
+    gap: 24px !important;
     /* Large gaps */
     padding: 10px 20px !important;
     background: #f8fafc !important;
@@ -1043,6 +1044,7 @@
     flex-wrap: wrap;
     /* Allow wrapping */
     gap: 12px;
+    align-items: flex-start;
   }
 
   .action-buttons-group {
@@ -1085,6 +1087,9 @@
     justify-content: flex-start;
     gap: 10px;
   }
+  .action-buttons-group {
+    flex: 0 0 auto;
+  }
 
   .legend-container {
     display: grid;
@@ -1112,7 +1117,7 @@
   }
 
   .btn-create-defect-main {
-    flex: 1;
+    flex: none;
     /* Make button wider for thumb-tap */
     justify-content: center;
   }
@@ -1120,12 +1125,11 @@
   .action-buttons-group {
     display: flex;
     gap: 8px;
-    width: 100%;
   }
 
   /* Make the main button take most of the space */
   .btn-create-defect-main {
-    flex: 2;
+    flex: none;
     justify-content: center;
   }
 
@@ -1166,7 +1170,7 @@
 
 .action-buttons-group {
   display: flex;
-  width: 100%;
+  /* width: 100%; */
   gap: 10px;
   align-items: center;
 }
@@ -1253,13 +1257,13 @@
 
 .btn-create-defect-main,
 .pr-sync-wrapper {
-  flex: 1;
+  flex: none;
   /* Both buttons take 50% width */
 }
 
 .btn-create-defect-main,
 .btn-pr-sync {
-  width: 100%;
+  width: max-content;
   height: 36px;
   /* Uniform height */
   justify-content: center;
@@ -1326,11 +1330,15 @@
     display: flex;
     flex: 1;
     justify-content: space-between;
-    gap: 6px;
+    gap: 4px;
+    padding: 5px;
+  }
+  .legend-item {
+    gap: 2px;
   }
 
   .legend-icons {
-    gap: 8px;
+    gap: 7px;
   }
 
   .legend-icons label {
@@ -1389,8 +1397,9 @@
     background: #f8fafc;
     border-bottom: 2px solid #cbd5e1;
   }
-   .data-table th, .data-table td {
-    font-size: 8px;
+
+  .data-table th, .data-table td {
+    font-size: 11px;
 
   }
 }
@@ -1422,7 +1431,8 @@
     flex-direction: row !important;
     align-items: center !important;
     flex: 1;
-    justify-content: center;
+    gap: 0px;
+    justify-content: space-between;
     white-space: nowrap !important;
     /* CRITICAL: Prevents 2nd line */
     /* overflow: hidden; */
@@ -1434,11 +1444,11 @@
   }
 
   .legend-item strong {
-    font-size: 11px;
+    font-size: 10px;
   }
 
   .legend-icons {
-    gap: 5px;
+    gap: 3px;
   }
 
   .btn-create-defect-main {
@@ -1490,7 +1500,7 @@
 
 @media (min-width: 1300px) and (max-width: 1360px) {
   .data-table th, .data-table td {
-    --action-bar-height: 95px;
+    --action-bar-height: 54px;
   }
 }
 
@@ -1500,7 +1510,7 @@
   }
 
   .data-table th, .data-table td {
-    --action-bar-height: 68px;
+    --action-bar-height: 58px;
   }
 
   .legend-item strong {
@@ -1538,6 +1548,14 @@
   }
 }
 
+@media (min-width: 2500px){
+  :root{
+    --navbar-height: 88px;
+  }
+  .data-table th, .data-table td {
+    --action-bar-height: 60px;
+  } 
+}
 
 @media (max-width: 1300px) {
   :root {
@@ -1547,9 +1565,11 @@
 
 @media (min-width: 1600px) and (max-width:1900px) {
   :root {
-    --action-bar-height: 60px !important;
-  }.data-table thead th {
-    --action-bar-height: 60px !important;
+    --action-bar-height: 55px !important;
+  }
+
+  .data-table thead th {
+    --action-bar-height: 55px !important;
 
   }
 
@@ -1625,6 +1645,41 @@
     font-size: 11px;
   }
 }
+
+@media (max-width: 1440px) {
+  .thread-title {
+    font-size: 12.5px;
+  }
+
+  .chat-mode-toggle, .toggle-btn {
+    font-size: 9.5px;
+  }
+
+  .empty-thread-text {
+    font-size: 10px !important;
+  }
+
+  .closure-body, .closure-label, .system-pill, .thread-author, .closure-remark, .closre-btn-accept {
+    font-size: 10px !important;
+  }
+
+  .thread-author-time, .closed-thread {
+    font-size: 8px !important;
+  }
+
+  .thread-body, .closure-hearder {
+    font-size: 8px !important;
+  }
+
+  .input-thread-text, .closed-defect-td {
+    font-size: 12px !important;
+  }
+
+  .image-size-hearer {
+    font-size: 20px !important;
+  }
+}
+
 
 @media (min-width: 1900px) {
   .thread-header {
@@ -1707,29 +1762,34 @@
 
 /* 1. Reduce the height of the horizontal scrollbar */
 .table-scroll-wrapper::-webkit-scrollbar {
-  height: 6px; /* This makes it much thinner (default is usually 12-15px) */
+  height: 6px;
+  /* This makes it much thinner (default is usually 12-15px) */
 }
 
 /* 2. Track (The background area of the scrollbar) */
 .table-scroll-wrapper::-webkit-scrollbar-track {
-  background: #f1f5f9; /* Light grey/slate background */
+  background: #f1f5f9;
+  /* Light grey/slate background */
   border-radius: 10px;
 }
 
 /* 3. Thumb (The draggable handle) */
 .table-scroll-wrapper::-webkit-scrollbar-thumb {
-  background: #cbd5e1; /* Subtle slate color */
+  background: #cbd5e1;
+  /* Subtle slate color */
   border-radius: 10px;
   transition: background 0.2s ease;
 }
 
 /* 4. Handle on hover (Make it slightly darker when user interacts) */
 .table-scroll-wrapper::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8; 
+  background: #94a3b8;
 }
 
 /* --- FIREFOX SUPPORT --- */
 .table-scroll-wrapper {
-  scrollbar-width: thin; /* Firefox specific */
-  scrollbar-color: #cbd5e1 #f1f5f9; /* handle color | track color */
+  scrollbar-width: thin;
+  /* Firefox specific */
+  scrollbar-color: #cbd5e1 #f1f5f9;
+  /* handle color | track color */
 }

@@ -3,6 +3,8 @@ node_modules
 dist
 build
 
+jira-backend/automation/jira-cookies.json
+
 # Python
 venv
 __pycache__

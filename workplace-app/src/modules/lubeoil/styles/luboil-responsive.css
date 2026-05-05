@@ -5282,14 +5282,14 @@ div.section-header-enhanced {
 .lub-pdf-panel {
   flex: 1.8 !important;
   border-right: 1px solid #e2e8f0;
-  min-width: 400px !important;
+  min-width: 100px !important;
   display: flex;
   flex-direction: column;
 }
 
 .lub-chat-panel {
   flex: 1.2 !important;
-  min-width: 300px !important;
+  min-width: 100px !important;
   display: flex;
   flex-direction: column;
 }
@@ -5445,6 +5445,7 @@ div.section-header-enhanced {
   flex: 0 0 50px !important;
   /* Fixed narrow width when closed */
   cursor: pointer;
+  min-width: 100px !important;
 }
 
 .lub-diag-header {
@@ -6318,8 +6319,24 @@ div.section-header-enhanced {
 }
 
 .lub-pdf-panel.collapsed {
-  flex: 0 0 45px !important;
-  max-width: 45px !important;
+  flex: 0 0 50px !important;
+  min-width: 100px !important;
+}
+.collapsed .lub-pdf-header {
+    flex-direction: column !important;
+    justify-content: center !important;
+    gap: 20px !important;
+    padding: 20px 0 !important;
+    height: 100% !important;
+    border-bottom: none !important;
+}
+.collapsed .lub-chat-header {
+    flex-direction: column !important;
+    justify-content: center !important;
+    gap: 20px !important;
+    padding: 20px 0 !important;
+    height: 100% !important;
+    border-bottom: none !important;
 }
 
 .lub-pdf-header {
@@ -6328,7 +6345,7 @@ div.section-header-enhanced {
   align-items: center !important;
   justify-content: space-between !important;
   padding: 0 16px !important;
-  background-color: #ffffff !important;
+  background-color: #f8fafc  !important;
   border-bottom: 1px solid #e2e8f0 !important;
   cursor: pointer;
   flex-shrink: 0 !important;
@@ -6474,7 +6491,7 @@ div.section-header-enhanced {
 
 .lub-pdf-panel.collapsed {
   flex: 0 0 45px !important;
-  max-width: 45px !important;
+  max-width: 100px !important;
 }
 
 .lub-pdf-header {
@@ -6483,7 +6500,7 @@ div.section-header-enhanced {
   align-items: center !important;
   justify-content: space-between !important;
   padding: 0 16px !important;
-  background-color: #ffffff !important;
+  background-color: #f8fafc !important;
   border-bottom: 1px solid #e2e8f0 !important;
   cursor: pointer;
   flex-shrink: 0 !important;
@@ -6631,7 +6648,7 @@ div.section-header-enhanced {
 /* THE COLLAPSED STATE (Sidebar) */
 .lub-chat-panel.collapsed {
   flex: 0 0 45px !important;
-  max-width: 45px !important;
+  min-width: 100px !important;
   cursor: pointer;
   border-left: 1px solid #e2e8f0;
 }
@@ -6792,7 +6809,7 @@ div.section-header-enhanced {
 @media (max-width: 768px) {
   .lub-chat-panel {
     flex: none !important;
-    width: 100% !important;
+    width: max-content !important;
     height: 600px !important;
     /* Ensure it has height when stacked in mobile modal */
   }
@@ -7275,7 +7292,7 @@ div.section-header-enhanced {
 @media (max-width: 768px) {
   .lub-chat-panel {
     height: 600px !important;
-    width: 100% !important;
+    width: max-content !important;
   }
 
   .lub-msg-bubble {
@@ -9826,3 +9843,5 @@ div.section-header-enhanced {
   width: 100% !important;
 }
 /* End @media (min-width: 1600px) and (max-width: 2000px) */
+
+

@@ -280,3 +280,119 @@
 
 .jh-dropdown-logout { color: #dc2626; }
 .jh-dropdown-logout:hover { background: #fef2f2; color: #b91c1c; }
+
+/* ============================================================
+   1. TABLET OPTIMIZATION (768px - 1023px)
+   Focus: Saving horizontal space
+   ============================================================ */
+@media (max-width: 1023px) {
+  .jh-nav {
+    height: 48px; /* Slightly slimmer */
+    padding: 0 12px;
+  }
+
+  /* Hide sub-brand text to prevent overlap with user name */
+  /* .jh-brand-sub {
+    display: none;
+  } */
+
+  .jh-brand {
+    /* border: none; */
+    margin-left: 0;
+    padding-left: 4px;
+  }
+
+  /* Hide user role on tablet to keep the name visible */
+  /* .jh-user-role {
+    display: none;
+  } */
+
+  .jh-user-btn {
+    padding: 4px;
+  }
+}
+
+/* ============================================================
+   2. SMALL DESKTOPS / LAPTOPS (1024px - 1440px)
+   Focus: High information density (Smaller fonts)
+   ============================================================ */
+@media (min-width: 1024px) and (max-width: 1440px) {
+  .jh-nav { height: 50px; }
+  .jh-brand-logo { font-size: 18px; }
+  .jh-brand-sub { font-size: 13px; }
+  .jh-user-name { font-size: 13px; }
+}
+
+/* ============================================================
+   3. LARGE DESKTOPS (1441px - 1899px)
+   Focus: Increased breathing room
+   ============================================================ */
+/* @media (min-width: 1441px) {
+  .jh-nav {
+    height: 60px;
+    padding: 0 24px;
+  }
+
+  .jh-brand-logo { font-size: 20px; }
+  .jh-brand-sub { font-size: 14px; }
+
+  .jh-avatar { width: 34px; height: 34px; }
+  .jh-user-name { font-size: 14px; }
+} */
+
+/* ============================================================
+   4. ULTRA-WIDE & 4K SCREENS (1900px+)
+   Focus: Proportional scaling for high-res displays
+   ============================================================ */
+@media (min-width: 1900px) {
+  .jh-nav {
+    height: 85px; /* Taller bar for 4K */
+    padding: 0 40px;
+  }
+
+  /* 9-Dot Switcher Scaling */
+  .jh-nine-dot { padding: 12px 16px; gap: 4px; }
+  .jh-dot { width: 7px; height: 7px; }
+  .jh-dot-grid { gap: 4px; grid-template-columns: repeat(3, 7px); }
+  
+  /* Brand Scaling */
+  .jh-brand { gap: 15px; margin-left: 10px; padding-left: 15px; }
+  .jh-brand-logo { font-size: 26px; }
+  .jh-brand-sub { font-size: 18px; }
+
+  /* User Pill Scaling */
+  .jh-user-btn { gap: 12px; padding: 10px 15px; border-radius: 12px; }
+  .jh-avatar { width: 48px; height: 48px; font-size: 18px; }
+  .jh-user-name { font-size: 18px; }
+  .jh-user-role { font-size: 16px; }
+
+  /* Dropdown Scaling */
+  .jh-dropdown {
+    width: 340px; /* Wider for better readability */
+    top: calc(100% + 12px);
+    border-radius: 16px;
+  }
+
+  .jh-dropdown-profile { padding: 24px; gap: 18px; }
+  .jh-avatar-lg { width: 60px; height: 60px; font-size: 22px; }
+  .jh-dropdown-profile-info strong { font-size: 18px; }
+  .jh-dropdown-profile-info span { font-size: 14px; }
+  .jh-role-pill { font-size: 13px; padding: 4px 12px; }
+
+  .jh-dropdown-item {
+    padding: 18px 24px;
+    font-size: 16px;
+    gap: 15px;
+  }
+}
+
+/* ============================================================
+   5. EXTRA SCALE FOR 4K+ (Above 2500px)
+   ============================================================ */
+@media (min-width: 2500px) {
+  .jh-nav { height: 85px; }
+  .jh-brand-logo { font-size: 32px; }
+  .jh-brand-sub { font-size: 22px; }
+  .jh-avatar { width: 56px; height: 56px; }
+  .jh-user-name { font-size: 22px; }
+}
