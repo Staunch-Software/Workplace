@@ -19,7 +19,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 # ✅ This Vessel model uses ControlBase → bound to engine_control → correct DB
 from app.models.vessel import Vessel
-
+from app.models.mariapps_pr_cache import MariappsPrCache
 from app.models.user import User
 from app.models.defect import Defect, Thread, Attachment, PrEntry, DefectImage
 from app.models.tasks import Task, Notification, LiveFeed
@@ -49,127 +49,89 @@ async def record_vessel_sync_time(
     is_vessel_pushing: bool,
     error_msg: str = None,
     telemetry: dict = None,
-    db: AsyncSession = None,  # main DB — needed for SyncState
+    db: AsyncSession = None,
 ):
     if not imo: return
 
+    # 1. Fetch Vessel from Control DB
     res = await control_db.execute(select(Vessel).where(Vessel.imo == imo))
     vessel = res.scalar_one_or_none()
     if not vessel: return
 
     now = datetime.now(timezone.utc)
-    update_data = {"updated_at": now}
-
-    if is_vessel_pushing:
-        # Use vessel's own reported push timestamp if available
-        vessel_time_str = telemetry.get("vessel_reported_push") if telemetry else None
-        try:
-            push_at = parser.isoparse(vessel_time_str) if vessel_time_str else now
-        except:
-            push_at = now
-        update_data["last_pull_at"] = push_at
-
-        # Write vessel's SyncState timestamps into shore's main DB
-        if db:
-            try:
-                for scope, push_key, pull_key in [
-                    ("DEFECT", "vessel_reported_push", "vessel_reported_pull"),
-                    ("CONFIG", "vessel_config_push",   "vessel_config_pull"),
-                ]:
-                    raw_push = telemetry.get(push_key) if telemetry else None
-                    raw_pull = telemetry.get(pull_key) if telemetry else None
-
-                    try:
-                        scope_push_at = parser.isoparse(raw_push) if raw_push else None
-                    except:
-                        scope_push_at = None
-                    try:
-                        scope_pull_at = parser.isoparse(raw_pull) if raw_pull else None
-                    except:
-                        scope_pull_at = None
-
-                    insert_values = {
-                        "vessel_imo": imo,
-                        "sync_scope": scope,
-                        "last_push_at": scope_push_at,
-                        "last_pull_at": scope_pull_at,
-                    }
-
-                    update_set = {}
-                    if scope_push_at:
-                        update_set["last_push_at"] = scope_push_at
-                    if scope_pull_at:
-                        update_set["last_pull_at"] = scope_pull_at
-
-                    # Always run — creates row even with null timestamps
-                    await db.execute(
-                        pg_insert(SyncState)
-                        .values(**insert_values)
-                        .on_conflict_do_update(
-                            index_elements=["vessel_imo", "sync_scope"],
-                            set_=update_set if update_set else {"vessel_imo": imo}
-                        )
-                    )
-                await db.commit()
-            except Exception as e:
-                print(f"❌ SyncState upsert failed for imo={imo}: {e}")
-                traceback.print_exc()
-
-    else:
-        # Vessel pulled from shore — stamp shore's push time in SyncState
-        update_data["last_push_at"] = now
-        if db:
-            await db.execute(
-                pg_insert(SyncState)
-                .values(vessel_imo=imo, sync_scope="DEFECT", last_push_at=now)
-                .on_conflict_do_update(
-                    index_elements=["vessel_imo", "sync_scope"],
-                    set_={"last_push_at": now}
-                )
-            )
-            await db.commit()
-
-    # --- Error history ---
-    try:
-        current_errors = json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
-        if not isinstance(current_errors, list): current_errors = []
-    except:
-        current_errors = []
-
-    new_err_content = None
-    err_type = None
-
+    
+    # 2. Extract Data from Telemetry
+    # This list represents the "Current Reality" of failures on the ship
+    active_errors = telemetry.get("active_errors", []) if telemetry else []
+    failed_count = telemetry.get("failed_items_count", 0) if telemetry else 0
+    
+    # If the Shore API itself crashed, add that to the active list
     if error_msg:
-        new_err_content = error_msg
-        err_type = "shore_error"
-    elif telemetry and telemetry.get("failed_items_count", 0) > 0:
-        new_err_content = telemetry.get("last_local_error")
-        err_type = "vessel_error"
+        active_errors.insert(0, {
+            "entity": "Shore-API",
+            "msg": error_msg,
+            "ts": now.isoformat()
+        })
 
-    if new_err_content:
-        is_duplicate = len(current_errors) > 0 and current_errors[0]['msg'] == new_err_content
-        if not is_duplicate:
-            current_errors.insert(0, {
-                "id": int(now.timestamp()),
-                "type": err_type,
-                "msg": new_err_content,
-                "ts": now.isoformat()
-            })
-        update_data["last_sync_success"] = False
+    is_healthy = (len(active_errors) == 0)
+
+    # 3. Update SyncState in Module DB (The detailed tracking)
+    if db:
+        sync_state_vals = {
+            "vessel_imo": imo,
+            "sync_scope": "DEFECT",
+            "active_errors": active_errors, # <--- OVERWRITES old list (Solving Logic)
+            "updated_at": now
+        }
+        
+        # Mapping update logic
+        update_set = {
+            "active_errors": active_errors,
+            "updated_at": now
+        }
+        
+        if is_vessel_pushing:
+            sync_state_vals["last_push_at"] = now
+            update_set["last_push_at"] = now
+        else:
+            sync_state_vals["last_pull_at"] = now
+            update_set["last_pull_at"] = now
+
+        await db.execute(
+            pg_insert(SyncState)
+            .values(**sync_state_vals)
+            .on_conflict_do_update(
+                index_elements=["vessel_imo", "sync_scope"],
+                set_=update_set
+            )
+        )
+        await db.commit()
+
+    # 4. Update Vessel Table in Control DB (High-level connectivity)
+    vessel_update = {
+        "updated_at": now,
+        "last_sync_success": is_healthy,
+    }
+    
+    # Update high-level timestamps without removing columns
+    if is_vessel_pushing:
+        vessel_update["last_push_at"] = now
     else:
-        if telemetry and telemetry.get("failed_items_count") == 0:
-            update_data["last_sync_success"] = True
+        vessel_update["last_pull_at"] = now
 
-    one_week_ago = now - timedelta(days=7)
-    pruned_errors = [
-        e for e in current_errors
-        if datetime.fromisoformat(e['ts']) > one_week_ago
-    ]
-    update_data["last_sync_error"] = json.dumps(pruned_errors[:50])
+    if not is_healthy:
+        try:
+            history = json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
+            latest_msg = active_errors[0]['msg']
+            if not history or history[0]['msg'] != latest_msg:
+                history.insert(0, {"type": "vessel_error", "msg": latest_msg, "ts": now.isoformat()})
+            vessel_update["last_sync_error"] = json.dumps(history[:50])
+        except:
+            pass
 
-    await control_db.execute(update(Vessel).where(Vessel.imo == imo).values(update_data))
-    await control_db.commit()
-           
+    await control_db.execute(update(Vessel).where(Vessel.imo == imo).values(vessel_update))
+    await control_db.commit()           
+
 # ---------------------------------------------------------------------------
 # Heartbeat
 # ---------------------------------------------------------------------------

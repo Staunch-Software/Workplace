@@ -200,6 +200,60 @@ const ShopTrialModal = ({ isOpen, onClose, data, type }) => {
     );
 };
 
+const CustomDropdown = ({ options, value, onChange, placeholder, disabled }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef(null);
+
+    const selectedOption = options.find((opt) => String(opt.value) === String(value));
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (containerRef.current && !containerRef.current.contains(event.target)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    return (
+        <div ref={containerRef} className="custom-dropdown-container">
+            <div
+                className={`custom-dropdown-trigger ${disabled ? 'disabled' : ''} ${isOpen ? 'open' : ''}`}
+                onClick={() => !disabled && setIsOpen(!isOpen)}
+            >
+                <span 
+                    className="custom-dropdown-text" 
+                    title={selectedOption ? selectedOption.label : placeholder}
+                >
+                    {selectedOption ? selectedOption.label : placeholder}
+                </span>
+                <span className="custom-dropdown-arrow" style={{ transform: isOpen ? 'rotate(-180deg)' : 'rotate(0deg)' }}>
+                    ▼
+                </span>
+            </div>
+
+            {isOpen && !disabled && (
+                <div className="custom-dropdown-menu">
+                    {options.map((option) => (
+                        <div
+                            key={option.value}
+                            className={`custom-dropdown-item ${String(value) === String(option.value) ? 'selected' : ''}`}
+                            onClick={() => {
+                                onChange(option.value);
+                                setIsOpen(false);
+                            }}
+                            title={option.label}
+                        >
+                            {option.label}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 export default function Dashboard() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -295,17 +349,43 @@ export default function Dashboard() {
         }
     }, [selectedAeUploadShip]);
 
+    // 1. Update this function
+    const handleCloseConfig = () => {
+        setShowMeConfigDetails(false);
+        setShowAeConfigDetails(false);
+        
+        // --- ADD THESE 3 LINES TO RESET DROPDOWNS ---
+        setSelectedUploadImo("");
+        setSelectedAeUploadShip("");
+        setSelectedAeUploadGen("");
+
+        // Smoothly scroll back to the top of the page
+        setTimeout(() => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 100);
+    };
+
+    // 2. Update this function
     const handleKpiCardClick = (type) => {
+        // --- ADD THESE 3 LINES TO RESET DROPDOWNS ON SWITCHING CARDS ---
+        setSelectedUploadImo("");
+        setSelectedAeUploadShip("");
+        setSelectedAeUploadGen("");
+
         if (type === 'ME_CONFIG') {
-            setShowMeConfigDetails(!showMeConfigDetails);
-            setShowAeConfigDetails(false);
-            if (!showMeConfigDetails) {
+            if (showMeConfigDetails) {
+                handleCloseConfig();
+            } else {
+                setShowMeConfigDetails(true);
+                setShowAeConfigDetails(false);
                 setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
             }
         } else if (type === 'AE_CONFIG') {
-            setShowAeConfigDetails(!showAeConfigDetails);
-            setShowMeConfigDetails(false);
-            if (!showAeConfigDetails) {
+            if (showAeConfigDetails) {
+                handleCloseConfig();
+            } else {
+                setShowAeConfigDetails(true);
+                setShowMeConfigDetails(false);
                 setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
             }
         }
@@ -442,7 +522,13 @@ export default function Dashboard() {
             <div className="table-card-body">
                 <div className="vessel-table-wrapper">
                     <table className="vessel-table-enhanced">
-                        <thead><tr><th>Vessel Name</th><th>IMO Number</th><th style={{textAlign: 'center'}}>Status</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th style={{width: '40%', textAlign: 'left'}}>Vessel Name</th>
+                                <th style={{width: '30%', textAlign: 'left'}}>IMO Number</th>
+                                <th style={{width: '30%', textAlign: 'center'}}>Status</th>
+                            </tr>
+                        </thead>
                         <tbody>
                             {list.length === 0 ? (<tr><td colSpan="3" className="all-configured-cell"><div className="success-message">All vessels configured!</div></td></tr>) : (
                                 list.map((ship) => (<tr key={ship.id}><td className="vessel-name-cell">{formatVesselName(ship.name)}</td><td className="imo-cell">{ship.imo}</td><td><span className="status-badge status-error">Not Configured</span></td></tr>))
@@ -455,7 +541,7 @@ export default function Dashboard() {
     );
 
     const renderMeConfigurationDetails = () => (
-        <div className="enhanced-card card-animated">
+        <div key="me-card" className="enhanced-card card-animated">
             <div className="card-header-me">
                 <div className="card-title-wrapper">
                     <h3 className="card-title-enhanced flex-items-xl">
@@ -469,33 +555,22 @@ export default function Dashboard() {
 
                 <div className="header-controls-me">
                     <div className="select-wrapper-me">
-                        <select
-                            className="select-input-me"
-                            value={selectedUploadImo}
-                            onChange={(e) => setSelectedUploadImo(e.target.value)}
-                            onMouseDown={(e) => {
-                                e.currentTarget.parentElement.toggleAttribute("data-open");
-                            }}
-                            onBlur={(e) => {
-                                e.currentTarget.parentElement.removeAttribute("data-open");
-                            }}
-                        >
-                            <option value="" disabled>
-                                Select Vessel to Upload PDF...
-                            </option>
-                            {meConfiguredList.map(ship => (
-                                <option key={ship.imo} value={ship.imo}>
-                                    {formatVesselName(ship.name)} (Update PDF)
-                                </option>
-                            ))}
-                        </select>
+                        <CustomDropdown
+                        value={selectedUploadImo}
+                        onChange={(val) => setSelectedUploadImo(val)}
+                        placeholder="Select Vessel to Upload PDF..."
+                        options={meConfiguredList.map(ship => ({
+                            value: ship.imo,
+                            label: `${formatVesselName(ship.name)}`
+                        }))}
+                    />
                     </div>
 
                     <button onClick={handleUploadClick} disabled={isUploading || !selectedUploadImo} className="btn-upload-me">
                         {isUploading ? <RefreshCw className="animate-spin" size={18} /> : <UploadCloud size={18} />}
                         <span>{isUploading ? 'Uploading...' : 'Upload Shop Trial'}</span>
                     </button>
-                    <button onClick={() => setShowMeConfigDetails(false)} className="close-btn-me"><X size={22} /></button>
+                    <button onClick={handleCloseConfig} className="close-btn-me"><X size={22} /></button>
                 </div>
             </div>
             <div className="card-content-enhanced p-6">
@@ -530,7 +605,7 @@ export default function Dashboard() {
     );
 
     const renderAeConfigurationDetails = () => (
-        <div className="enhanced-card">
+        <div key="ae-card" className="enhanced-card">
             <div className="card-header-ae">
                 {/* TITLE BLOCK */}
                 <div>
@@ -550,44 +625,29 @@ export default function Dashboard() {
                     <div className="ae-controls-row-1">
                         {/* VESSEL SELECT */}
                         <div className="ae-select-wrapper-vessel">
-                            <select
-                                className="select-vessel-ae"
-                                value={selectedAeUploadShip}
-                                onChange={(e) => setSelectedAeUploadShip(e.target.value)}
-                                onMouseDown={(e) => e.currentTarget.parentElement.toggleAttribute("data-open")}
-                                onBlur={(e) => e.currentTarget.parentElement.removeAttribute("data-open")}
-                            >
-                                <option value="" disabled>
-                                    Select Vessel...
-                                </option>
-                                
-                                {aeConfiguredList.map(ship => (
-                                    <option key={ship.imo} value={ship.imo}>
-                                        {formatVesselName(ship.name)} (Update PDF)
-                                    </option>
-                                ))}
-                            </select>
+                            <CustomDropdown
+                            value={selectedAeUploadShip}
+                            onChange={(val) => setSelectedAeUploadShip(val)}
+                            placeholder="Select Vessel..."
+                            options={aeConfiguredList.map(ship => ({
+                                value: ship.imo,
+                                label: `${formatVesselName(ship.name)}`
+                            }))}
+                        />
                         </div>
 
                         {/* GENERATOR SELECT – Desktop shows here, Mobile hides via CSS */}
                         <div className="ae-select-wrapper-gen">
-                            <select
-                                className="select-gen-ae"
-                                value={selectedAeUploadGen}
-                                onChange={(e) => setSelectedAeUploadGen(e.target.value)}
-                                disabled={!selectedAeUploadShip}
-                                onMouseDown={(e) => e.currentTarget.parentElement.toggleAttribute("data-open")}
-                                onBlur={(e) => e.currentTarget.parentElement.removeAttribute("data-open")}
-                            >
-                                <option value="" disabled>
-                                    Select Generator...
-                                </option>
-                                {availableGenerators.map((gen) => (
-                                    <option key={gen.generator_id} value={gen.generator_id}>
-                                        {gen.designation} ({gen.engine_model})
-                                    </option>
-                                ))}
-                            </select>
+                            <CustomDropdown
+                            value={selectedAeUploadGen}
+                            onChange={(val) => setSelectedAeUploadGen(val)}
+                            placeholder="Select Generator..."
+                            disabled={!selectedAeUploadShip}
+                            options={availableGenerators.map((gen) => ({
+                                value: gen.generator_id,
+                                label: `${gen.designation} (${gen.engine_model})`
+                            }))}
+                        />
                         </div>
 
                         {/* UPLOAD BUTTON */}
@@ -607,34 +667,27 @@ export default function Dashboard() {
 
                         {/* CLOSE BUTTON */}
                         <button
-                            className="close-btn-ae"
-                            onClick={() => setShowAeConfigDetails(false)}
-                            title="Close AE Configuration"
-                        >
-                            <X size={22} />
-                        </button>
+    className="close-btn-ae"
+    onClick={handleCloseConfig}
+    title="Close AE Configuration"
+>
+    <X size={22} />
+</button>
                     </div>
 
                     {/* ROW 2: GENERATOR SELECT (Mobile only - shown via CSS) */}
                     <div className="ae-controls-row-2">
                         <div className="ae-select-wrapper-gen">
-                            <select
-                                className="select-gen-ae"
-                                value={selectedAeUploadGen}
-                                onChange={(e) => setSelectedAeUploadGen(e.target.value)}
-                                disabled={!selectedAeUploadShip}
-                                onMouseDown={(e) => e.currentTarget.parentElement.toggleAttribute("data-open")}
-                                onBlur={(e) => e.currentTarget.parentElement.removeAttribute("data-open")}
-                            >
-                                <option value="" disabled>
-                                    Select Generator...
-                                </option>
-                                {availableGenerators.map((gen) => (
-                                    <option key={gen.generator_id} value={gen.generator_id}>
-                                        {gen.designation} ({gen.engine_model})
-                                    </option>
-                                ))}
-                            </select>
+                            <CustomDropdown
+                            value={selectedAeUploadGen}
+                            onChange={(val) => setSelectedAeUploadGen(val)}
+                            placeholder="Select Generator..."
+                            disabled={!selectedAeUploadShip}
+                            options={availableGenerators.map((gen) => ({
+                                value: gen.generator_id,
+                                label: `${gen.designation} (${gen.engine_model})`
+                            }))}
+                        />
                         </div>
                     </div>
 

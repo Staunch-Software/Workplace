@@ -779,10 +779,6 @@
    1. TOP HEADER & EDIT BUTTON
    ============================================================ */
 
-/* --- BASE SETTINGS --- */
-.defect-dashboard-container {
-  padding: 20px !important;
-}
 
 .defect-header-row {
   margin-bottom: 25px !important;
@@ -819,7 +815,7 @@
 }
 
 /* --- TABLETS (Under 1024px) --- */
-@media (max-width: 1024px) {
+@media (max-width: 1023px) {
   .defect-page-title { font-size: 1.6rem !important; }
 }
 

@@ -5,12 +5,16 @@
 }
 
 .vd-main {
-  max-width: 1024px;
+  max-width: 85% !important;
   margin: 0 auto;
   padding: 32px 16px;
 }
+
 @media (min-width: 640px) {
-  .vd-main { padding-left: 24px; padding-right: 24px; }
+  .vd-main {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
 }
 
 /* ─── Top Bar ─────────────────────────────────────────────── */
@@ -47,12 +51,18 @@
   border: none;
   cursor: pointer;
   transition: background 0.15s;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   white-space: nowrap;
 }
-.vd-raise-btn:hover { background: #d05608; }
 
-.vd-raise-btn-icon { width: 16px; height: 16px; }
+.vd-raise-btn:hover {
+  background: #d05608;
+}
+
+.vd-raise-btn-icon {
+  width: 16px;
+  height: 16px;
+}
 
 /* ─── Tabs ────────────────────────────────────────────────── */
 .vd-tabs {
@@ -69,7 +79,7 @@
   cursor: pointer;
   transition: background 0.15s;
   border: 1px solid transparent;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .vd-tab--active {
@@ -83,18 +93,23 @@
   color: #4b5563;
   border-color: #e5e7eb;
 }
-.vd-tab--inactive:hover { background: #f9fafb; }
+
+.vd-tab--inactive:hover {
+  background: #f9fafb;
+}
 
 /* ─── Table Card ──────────────────────────────────────────── */
 .vd-card {
   background: white;
   border-radius: 12px;
   border: 1px solid #e5e7eb;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
 
-.vd-table-scroll { overflow-x: auto; }
+.vd-table-scroll {
+  overflow-x: auto;
+}
 
 .vd-table {
   width: 100%;
@@ -104,7 +119,7 @@
 }
 
 .vd-table thead {
-  background: rgba(249,250,251,0.8);
+  background: rgba(249, 250, 251, 0.8);
   border-bottom: 1px solid #f3f4f6;
 }
 
@@ -117,17 +132,25 @@
   letter-spacing: 0.05em;
 }
 
-.vd-table tbody { }
+.vd-table tbody {}
 
 .vd-table tbody tr {
   border-bottom: 1px solid #f9fafb;
   cursor: pointer;
   transition: background 0.1s;
 }
-.vd-table tbody tr:last-child { border-bottom: none; }
-.vd-table tbody tr:hover { background: rgba(239,246,255,0.4); }
 
-.vd-td { padding: 16px 20px; }
+.vd-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.vd-table tbody tr:hover {
+  background: rgba(239, 246, 255, 0.4);
+}
+
+.vd-td {
+  padding: 16px 20px;
+}
 
 /* ─── Reference cell ──────────────────────────────────────── */
 .vd-ref {
@@ -136,7 +159,10 @@
   color: #2563eb;
   white-space: nowrap;
 }
-.vd-table tbody tr:hover .vd-ref { text-decoration: underline; }
+
+.vd-table tbody tr:hover .vd-ref {
+  text-decoration: underline;
+}
 
 .vd-ref-pending {
   display: inline-flex;
@@ -158,8 +184,13 @@
 }
 
 @keyframes vd-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.5; }
+  0%, 100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* ─── Summary cell ────────────────────────────────────────── */
@@ -173,7 +204,9 @@
 }
 
 /* ─── Module cell ─────────────────────────────────────────── */
-.vd-module { color: #6b7280; }
+.vd-module {
+  color: #6b7280;
+}
 
 /* ─── Skeleton rows ───────────────────────────────────────── */
 .vd-skeleton-cell {
@@ -196,7 +229,10 @@
   margin: 0 auto 12px;
 }
 
-.vd-empty-text { font-size: 14px; color: #9ca3af; }
+.vd-empty-text {
+  font-size: 14px;
+  color: #9ca3af;
+}
 
 /* ─── Pagination ──────────────────────────────────────────── */
 .vd-pagination {
@@ -205,11 +241,17 @@
   justify-content: space-between;
   padding: 12px 20px;
   border-top: 1px solid #f3f4f6;
-  background: rgba(249,250,251,0.6);
+  background: rgba(249, 250, 251, 0.6);
 }
 
-.vd-pagination-info { font-size: 12px; color: #9ca3af; }
-.vd-pagination-info strong { color: #4b5563; }
+.vd-pagination-info {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.vd-pagination-info strong {
+  color: #4b5563;
+}
 
 .vd-pagination-btns {
   display: flex;
@@ -229,5 +271,228 @@
   cursor: pointer;
   transition: background 0.1s;
 }
-.vd-page-btn:hover:not(:disabled) { background: #f3f4f6; }
-.vd-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.vd-page-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.vd-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   1. TABLET OPTIMIZATION (Under 1024px)
+   Focus: Adjusting padding and preventing table squishing
+   ============================================================ */
+@media (max-width: 1023px) {
+  .vd-main {
+    padding: 20px 12px !important;
+    max-width: 95% !important;
+  }
+
+  /* Header: Stack Title and Button on very small tablets */
+  @media (max-width: 600px) {
+    .vd-topbar {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 15px;
+    }
+
+    .vd-raise-btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  /* Tabs: Make them scrollable if they overflow */
+  .vd-tabs {
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  /* Table: Protect columns */
+  .vd-table {
+    min-width: 800px !important;
+  }
+
+  .vd-th {
+    font-size: 10px;
+  }
+
+  .vd-td {
+    padding: 12px !important;
+    font-size: 12px !important;
+  }
+
+  .vd-topbar-title {
+    font-size: 20px;
+  }
+
+  .vd-topbar-sub {
+    font-size: 10px;
+  }
+
+  .vd-raise-btn {
+    font-size: 12px;
+    padding: 8px 18px;
+  }
+
+  .vd-tab {
+    font-size: 12px;
+    padding: 6px 18px;
+  }
+}
+
+/* ============================================================
+   2. LAPTOP DENSITY (1024px to 1440px)
+   Focus: Increasing the layout width (Default was too narrow)
+   ============================================================ */
+
+
+@media (min-width: 1024px) and (max-width: 1440px) {
+  .vd-main {
+    max-width: 1300px !important;
+    /* Expanded from 1024px */
+  }
+
+  .vd-th {
+    padding: 10px 15px !important;
+  }
+
+  .vd-td {
+    padding: 12px 15px !important;
+    font-size: 13px !important;
+  }
+
+  .vd-topbar-title {
+    font-size: 22px;
+  }
+
+  .vd-topbar-sub {
+    font-size: 12px;
+  }
+
+  .vd-raise-btn {
+    font-size: 12px;
+    padding: 9px 19px;
+  }
+
+  .vd-tab {
+    font-size: 12px;
+    padding: 8px 20px;
+  }
+}
+
+/* ============================================================
+   3. BIG SCREEN / 4K SCALING (Above 1900px)
+   Focus: Proportional scaling for high-res displays
+   ============================================================ */
+@media (min-width: 1900px) {
+  .vd-main {
+    max-width: 85% !important;
+    padding: 40px 60px !important;
+  }
+
+  .vd-topbar-title {
+    font-size: 32px !important;
+  }
+
+  .vd-topbar-sub {
+    font-size: 18px !important;
+  }
+
+  /* Scale Button */
+  .vd-raise-btn {
+    height: 52px !important;
+    padding: 0 28px !important;
+    font-size: 1.1rem !important;
+    border-radius: 12px !important;
+  }
+
+  .vd-raise-btn-icon {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  /* Scale Tabs */
+  .vd-tabs {
+    gap: 12px !important;
+    margin-bottom: 24px !important;
+  }
+
+  .vd-tab {
+    padding: 12px 32px !important;
+    font-size: 1rem !important;
+    border-radius: 12px !important;
+  }
+
+  /* Scale Table */
+  .vd-th {
+    font-size: 13px !important;
+    padding: 20px !important;
+  }
+
+  .vd-td {
+    font-size: 1.1rem !important;
+    padding: 24px 20px !important;
+  }
+
+  .vd-ref {
+    font-size: 1.1rem !important;
+  }
+
+  .vd-summary {
+    max-width: 500px !important;
+  }
+
+  .vd-module {
+    font-size: 1rem !important;
+  }
+
+  /* Pagination Scaling */
+  .vd-pagination {
+    padding: 20px 30px !important;
+  }
+
+  .vd-pagination-info, .vd-page-btn {
+    font-size: 1rem !important;
+  }
+
+  .vd-page-btn {
+    height: 44px !important;
+    padding: 0 24px !important;
+  }
+}
+
+/* ============================================================
+   4. EXTRA LARGE 4K (Above 2500px)
+   ============================================================ */
+@media (min-width: 2500px) {
+  .vd-main {
+    max-width: 85% !important;
+  }
+
+  .vd-topbar-title {
+    font-size: 42px !important;
+  }
+
+  .vd-td {
+    font-size: 1.25rem !important;
+  }
+
+  .vd-summary {
+    max-width: 700px !important;
+  }
+
+  .vd-th {
+    font-size: 1rem !important;
+  }
+
+  .vd-module,.vd-ref {
+    font-size: 20px !important;
+  }
+  .vd-pagination-info, .vd-page-btn{
+    font-size: 20px !important;
+  }
+}

@@ -593,12 +593,12 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
                 </div>
               ) : (
                 <div
-                className='closure-remark' 
-                style={{
-                  fontSize: '12px',
-                  color: '#ea580c',
-                  fontWeight: '600'
-                }}>
+                  className='closure-remark'
+                  style={{
+                    fontSize: '12px',
+                    color: '#ea580c',
+                    fontWeight: '600'
+                  }}>
                   ⏳ Waiting for Shore Approval...
                 </div>
               )}
@@ -615,17 +615,17 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
           background: chatMode === 'internal' ? '#eff6ff' : 'white'
         }}>
           {chatMode === 'internal' && (
-            <div 
-            className='closed-thread'
-            style={{
-              marginBottom: '8px',
-              fontSize: '11px',
-              color: '#3b82f6',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
+            <div
+              className='closed-thread'
+              style={{
+                marginBottom: '8px',
+                fontSize: '11px',
+                color: '#3b82f6',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
               Internal Discussion (Shore Team Only)
             </div>
           )}
@@ -701,7 +701,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
 
                   return (
                     <div
-                     className='empty-thread-text'
+                      className='empty-thread-text'
                       key={u.id}
                       onClick={() => selectMention(u)}
                       style={{
@@ -725,16 +725,16 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
 
                       {isShore && (
                         <span
-                        className='closed-thread' 
-                        style={{
-                          fontSize: '9px',
-                          background: '#dbeafe',
-                          color: '#1e40af',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          fontWeight: 'bold',
-                          letterSpacing: '0.05em'
-                        }}>
+                          className='closed-thread'
+                          style={{
+                            fontSize: '9px',
+                            background: '#dbeafe',
+                            color: '#1e40af',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontWeight: 'bold',
+                            letterSpacing: '0.05em'
+                          }}>
                           SHORE
                         </span>
                       )}
@@ -747,7 +747,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
 
           <div style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
             <label
-             className='empty-thread-text'
+              className='empty-thread-text'
               style={{
                 cursor: 'pointer',
                 color: '#64748b',
@@ -765,19 +765,19 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
         </div>
       ) : (
         <div
-        className='empty-thread-text'
-         style={{
-          padding: '12px',
-          borderTop: '1px solid #e2e8f0',
-          textAlign: 'center',
-          background: '#f8fafc',
-          color: '#64748b',
-          fontSize: '13px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px'
-        }}>
+          className='empty-thread-text'
+          style={{
+            padding: '12px',
+            borderTop: '1px solid #e2e8f0',
+            textAlign: 'center',
+            background: '#f8fafc',
+            color: '#64748b',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}>
           <Lock size={14} /> Thread Locked (Defect Closed)
         </div>
       )}
@@ -984,7 +984,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
 
             {previewImages.length > 0 && (
               <button
-              className='closre-btn-accept'
+                className='closre-btn-accept'
                 onClick={handleUpload}
                 disabled={isUploading}
                 style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '4px', padding: '6px 10px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
@@ -2658,9 +2658,17 @@ const ShoreDashboard = () => {
                 <Clock size={14} color="#dc2626" /> <label>Overdue</label>
               </span>
             </div>
+            {/* <div className="legend-item">
+              <strong>Owner:</strong>
+              <span className="legend-icons">
+                  <UserCircle size={14} color="#22c55e" /> <label>Owner</label>
+                  <UserCircle size={14} color="#9ca3af" /> <label>Others</label>
+              </span>
+            </div> */}
             <div className="legend-item">
               <strong>Other:</strong>
               <span className="legend-icons">
+                <UserCircle size={14} color="#22c55e" /> <label>Owner</label>
                 <Flag size={14} color="#e8290b" fill="#e8290b" /> <label>Flag</label>
                 <div className="dd-icon-small">DD</div> <label>DryDock</label>
               </span>
@@ -2745,7 +2753,7 @@ const ShoreDashboard = () => {
                   items={visibleColumns}
                   strategy={horizontalListSortingStrategy}
                 > <tr>
-                    <th style={{ width: 100 }}>Defect ID</th>
+                    <th style={{ width: 100,paddingLeft:"8px" }}>Defect ID</th>
                     <th style={{ width: 20 }}>
                       <EquipmentFilter
                         label="Vessel"
@@ -3277,6 +3285,7 @@ const ShoreDashboard = () => {
                                           textDecorationColor: '#cbd5e1',
                                           textUnderlineOffset: '2px',
                                           textTransform: 'uppercase',
+                                          paddingLeft: "3px"
                                         }}
                                       >
                                         <span style={{ borderBottom: '1px dashed #cbd5e1', paddingBottom: '1px', display: 'inline' }}>
@@ -3300,6 +3309,7 @@ const ShoreDashboard = () => {
                                             marginTop: '4px',
                                             zIndex: 50,
                                             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                            paddingLeft: "3px"
                                             // fontSize: '13px'
                                           }}
                                         >
@@ -3391,6 +3401,7 @@ const ShoreDashboard = () => {
                                           lineHeight: '1.4',
                                           maxHeight: '2.8em', // 2 lines * 1.4 line-height
                                           textTransform: 'uppercase',
+                                          paddingLeft: "3px"
                                         }}
                                         title="Click to view full description"
                                       >
@@ -3416,6 +3427,7 @@ const ShoreDashboard = () => {
                                             whiteSpace: 'pre-wrap',
                                             // fontSize: '13px',
                                             textTransform: 'uppercase',
+                                            paddingLeft: "5px"
 
                                           }}
                                         >
@@ -3707,20 +3719,20 @@ const ShoreDashboard = () => {
                               <div style={{ background: '#f8fafc', padding: '20px', borderBottom: '1px solid #e2e8f0' }}>
                                 {isClosed && (
                                   <div
-                                  className='closed-defect-td' 
-                                  style={{
-                                    background: '#fef3c7',
-                                    border: '1px solid #fbbf24',
-                                    borderRadius: '8px',
-                                    padding: '12px',
-                                    marginBottom: '20px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '10px',
-                                    fontSize: '13px',
-                                    color: '#92400e',
-                                    fontWeight: '600'
-                                  }}>
+                                    className='closed-defect-td'
+                                    style={{
+                                      background: '#fef3c7',
+                                      border: '1px solid #fbbf24',
+                                      borderRadius: '8px',
+                                      padding: '12px',
+                                      marginBottom: '20px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '10px',
+                                      fontSize: '13px',
+                                      color: '#92400e',
+                                      fontWeight: '600'
+                                    }}>
                                     <Lock size={16} />
                                     CLOSED - Read Only Mode (All editing disabled)
                                   </div>
@@ -3845,7 +3857,7 @@ const ShoreDashboard = () => {
                           );
                         case 'priority':
                           return (
-                            <td key="priority" style={{ width: 20,overflow: 'hidden' }}>
+                            <td key="priority" style={{ width: 20, overflow: 'hidden' }}>
                               <FloatingSelectWithIcon icon={getPriorityIcon(newDefect.priority)} value={newDefect.priority} options={PRIORITY_OPTIONS} iconRenderer={getPriorityIcon} onChange={(val) => setNewDefect(prev => ({ ...prev, priority: val }))} />
                             </td>
                           );
@@ -3853,7 +3865,7 @@ const ShoreDashboard = () => {
                         // ✅ ADDED: Owner Selection Column
                         case 'owner':
                           return (
-                            <td key="owner" style={{ width: 24 ,overflow: 'hidden'}}>
+                            <td key="owner" style={{ width: 24, overflow: 'hidden' }}>
                               <OwnerFloatingSelectWithIcon
                                 icon={getOwnerIcon(newDefect.is_owner)}
                                 value={newDefect.is_owner}
@@ -3871,13 +3883,13 @@ const ShoreDashboard = () => {
 
                         case 'status':
                           return (
-                            <td key="status" style={{ width: 20,overflow: 'hidden' }}>
+                            <td key="status" style={{ width: 20, overflow: 'hidden' }}>
                               <FloatingSelectWithIcon icon={getStatusIcon(newDefect.status)} value={newDefect.status} options={STATUS_OPTIONS} iconRenderer={getStatusIcon} onChange={(val) => setNewDefect(prev => ({ ...prev, status: val }))} />
                             </td>
                           );
                         case 'deadline_icon':
                           return (
-                            <td key="deadline_icon" style={{ width: 20, textAlign: 'center',overflow: 'hidden' }}>
+                            <td key="deadline_icon" style={{ width: 20, textAlign: 'center', overflow: 'hidden' }}>
                               <Clock size={20} color="#94a3b8" title="Set due date first" />
                             </td>
                           );
@@ -3890,7 +3902,7 @@ const ShoreDashboard = () => {
 
                         case 'flag':
                           return (
-                            <td key="flag" style={{ width: 24, textAlign: 'center',overflow: 'hidden' }}>
+                            <td key="flag" style={{ width: 24, textAlign: 'center', overflow: 'hidden' }}>
                               <div
                                 onClick={() => setNewDefect(prev => ({ ...prev, is_flagged: !prev.is_flagged }))}
                                 style={{ cursor: 'pointer', display: 'inline-flex', padding: '4px', borderRadius: '4px' }}
@@ -3903,7 +3915,7 @@ const ShoreDashboard = () => {
 
                         case 'dd':
                           return (
-                            <td key="dd" style={{ width: 24, textAlign: 'center',overflow: 'hidden' }}>
+                            <td key="dd" style={{ width: 24, textAlign: 'center', overflow: 'hidden' }}>
                               <div
                                 onClick={() => setNewDefect(prev => ({ ...prev, is_dd: !prev.is_dd }))}
                                 style={{ cursor: 'pointer', display: 'inline-flex', padding: '4px', borderRadius: '4px' }}

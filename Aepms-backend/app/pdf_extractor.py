@@ -168,6 +168,12 @@ def clean_value_for_acroform(v: Any, key_name: Optional[str] = None) -> Any:
                     logger.warning(f"Could not convert IMO '{vv}' to integer. Keeping as string.")
                     return vv
         
+
+        text_fields = ['model', 'enginemodel', 'engine_model', 'type', 'enginetype', 'engine_type', 'maker', 'enginemaker', 'engine_maker', 'vesselname']
+        if key_name and key_name.lower() in text_fields:
+            return vv
+
+            
         # General numeric conversion (after specific string handling)
         # Convert to Decimal for numbers to preserve precision.
         try:

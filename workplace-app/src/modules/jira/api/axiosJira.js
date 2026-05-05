@@ -4,7 +4,6 @@ import { handleExpiredSession } from '../../../utils/authGuard';
 const axiosJira = axios.create({
   // baseURL: 'http://localhost:8004',
   baseURL: '/jira/api',
-  // baseURL: '/jira',
 });
 
 axiosJira.interceptors.request.use((config) => {

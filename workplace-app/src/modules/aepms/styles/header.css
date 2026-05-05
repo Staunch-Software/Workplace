@@ -2,7 +2,9 @@
    APP HEADER - PROFESSIONAL RESPONSIVE
    FIXED FOR ALL DEVICES - NO OVERFLOW
    ======================================== */
-
+.app-header {
+  z-index: 99999 !important;  /* increase this above 9999 */
+}
 .app-header {
   position: fixed;
   top: 0;

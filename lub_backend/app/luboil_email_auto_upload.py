@@ -62,7 +62,12 @@ SENDER_KEYWORDS  = [
     "shell lube",
     "noreply",
     "no-reply",
-    "no reply"
+    "no reply" ,
+    "la-support-noreply@shell.com",   # exact sender address — most reliable
+    "shell lubeanalyst",               # sender name variant 1
+    "shell lube analyst",              # sender name variant 2
+    "lubeanalyst",                     # catches any variant
+    "noreply@shell", 
 ]
 SUBJECT_KEYWORDS = [
     "lubeanalyst",
@@ -71,6 +76,7 @@ SUBJECT_KEYWORDS = [
     "luboil",
     "lube oil",
     "oil analysis",
+    "sample reminders",
     "shell",        # catches "Shell LubeAnalyst" in subject
     "action",       # catches "0 Action, 0 Attention" in subject
     "attention",    # catches "0 Attention" in subject
@@ -195,9 +201,10 @@ async def fetch_recent_luboil_emails(graph_token: str) -> list:
         subject_match = any(kw in subject for kw in SUBJECT_KEYWORDS)
 
         if sender_match or subject_match:
+            match_reason = "SENDER" if sender_match else "SUBJECT"
             logger.info(
-                f"✅ MATCHED email | Subject: '{msg.get('subject')}' | "
-                f"From: '{msg.get('from', {}).get('emailAddress', {}).get('name')}' | "
+                f"✅ MATCHED [{match_reason}] | Subject: '{msg.get('subject')}' | "
+                f"From: '{sender_name}' <{sender_addr}> | "
                 f"Received: {msg.get('receivedDateTime')}"
             )
             matched_emails.append(msg)

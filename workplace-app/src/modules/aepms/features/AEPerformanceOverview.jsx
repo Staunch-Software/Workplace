@@ -18,6 +18,7 @@ import {
   ArrowDownCircle,
 } from "lucide-react";
 import "../styles/AEPerformanceOverview.css";
+import "../styles/Aeresponsiveness.css";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -41,7 +42,7 @@ const AE_STANDARD_PARAMS = [
 
 const AE_HISTORY_PARAMS = [
   { key: "pmax_bar", label: "Pmax", unit: "Bar" },
-  { key: "fuel_pump_index_graph", label: "FIPI", unit: "mm" },
+  { key: "fuel_pump_index_graph", label: "Fuel Index", unit: "mm" },
   { key: "scav_air_pressure_bar", label: "Scav Air", unit: "Bar" },
   { key: "exh_temp_tc_inlet_graph_c", label: "TC Inlet", unit: "°C" },
   { key: "exh_temp_tc_outlet_graph_c", label: "TC Outlet", unit: "°C" },
@@ -51,6 +52,11 @@ const AE_HISTORY_PARAMS = [
 const safeFixed = (val, digits = 2) => {
   if (val === null || val === undefined || isNaN(val)) return "N/A";
   return Number(val).toFixed(digits);
+};
+
+const formatVesselDisplayName = (name) => {
+  if (!name) return "";
+  return name.toUpperCase().trim();
 };
 
 const formatDate = (dateString) => {
@@ -564,7 +570,7 @@ export default function AEPerformanceOverview({ embeddedMode = false, externalVe
   const totalGeneratorsReported = runningHoursData.length;
   const GENS = ["AE1", "AE2", "AE3"];
   const [viewOffset, setViewOffset] = useState(0);
-  const [isSectionOpen, setIsSectionOpen] = useState(false);
+  const [isSectionOpen, setIsSectionOpen] = useState(true);
   const [isLoadOpen, setIsLoadOpen] = useState(true);
   const [daysSortConfig, setDaysSortConfig] = useState({
     key: "vessel_name",
@@ -577,12 +583,60 @@ export default function AEPerformanceOverview({ embeddedMode = false, externalVe
   const [selectedVesselDetails, setSelectedVesselDetails] = useState(null); // NEW
   const [isDetailLoading, setIsDetailLoading] = useState(false); // NEW
   const aeDaysCardRef = useRef(null);
+  const aeTableWrapperRef = useRef(null);
   const detailsSectionRef = useRef(null); // NEW
   const [hoveredStatusDot, setHoveredStatusDot] = useState(null);
   const [selectedVesselsFilter, setSelectedVesselsFilter] = useState([]);
   const [isVesselDropdownOpen, setIsVesselDropdownOpen] = useState(false);
   const vesselDropdownRef = useRef(null);
+  // ── Responsive visible month count ──
+  // ── Responsive visible month count ──
+  const getVisibleMonthCount = () => {
+    const w = window.innerWidth;
+    if (w <= 480)  return 3;
+    if (w <= 768)  return 3;
+    if (w <= 1024) return 5;
+    if (w <= 1250) return 10;
+    return 12; // Displays 12 months perfectly on 1440px and higher
+  };
 
+  // Initialize state
+  const [visibleMonthCount, setVisibleMonthCount] = useState(12);
+
+  useEffect(() => {
+    // 1. Set correct count on initial mount
+    setVisibleMonthCount(getVisibleMonthCount());
+
+    // 2. Adjust count smoothly on window resize
+    const handleResize = () => {
+      const newCount = getVisibleMonthCount();
+      setVisibleMonthCount(prev => {
+        if (prev !== newCount) {
+          setViewOffset(0); // Reset navigation when columns change
+          return newCount;
+        }
+        return prev;
+      });
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+ 
+  // ── On resize: update count AND reset offset when count changes ─────────────
+  useEffect(() => {
+    const handleResize = () => {
+      const newCount = getVisibleMonthCount();
+      setVisibleMonthCount(prev => {
+        if (prev !== newCount) {
+          setViewOffset(0); // reset scroll position when column count changes
+        }
+        return newCount;
+      });
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   const maxOffset = useMemo(() => {
     const today = new Date();
     const startYear = 2025;
@@ -593,8 +647,8 @@ export default function AEPerformanceOverview({ embeddedMode = false, externalVe
       (today.getFullYear() - startYear) * 12 + today.getMonth();
 
     // Stop scrolling when Jan 2025 is the 12th column (matching ME logic)
-    return Math.max(0, totalMonthsSinceStart - 11);
-  }, []);
+    return Math.max(0, totalMonthsSinceStart - (visibleMonthCount - 1));
+  }, [visibleMonthCount]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -649,12 +703,29 @@ useEffect(() => {
   }
 }, [externalVesselId, groupedRunningHours]);
 
+// Re-apply vessel filter if cleared externally (e.g. ME↔AE mode switch)
+useEffect(() => {
+  if (
+    externalVesselId &&
+    groupedRunningHours.length > 0 &&
+    selectedVesselsFilter.length === 0
+  ) {
+    const vessel = groupedRunningHours.find(
+      (v) => String(v.imo_number) === String(externalVesselId)
+    );
+    if (vessel) {
+      setSelectedVesselsFilter([vessel]);
+      setIsSectionOpen(true);
+    }
+  }
+}, [selectedVesselsFilter.length, externalVesselId, groupedRunningHours]);
+
   // --- Generate 12 Months ---
   const visibleMonths = useMemo(() => {
     const months = [];
     const today = new Date();
 
-    for (let i = viewOffset; i < viewOffset + 12; i++) {
+    for (let i = viewOffset; i < viewOffset + visibleMonthCount; i++) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
 
       // 🔥 STOP generating months if we hit 2024
@@ -668,7 +739,7 @@ useEffect(() => {
       });
     }
     return months;
-  }, [viewOffset]);
+  }, [viewOffset, visibleMonthCount]);
 
   // --- HANDLER: Expand Detailed History Section ---
   const handleVesselHistoryClick = async (vesselName, filterGen = null) => {
@@ -878,94 +949,94 @@ useEffect(() => {
     }
   };
 
-  const handleDotClick = async (reportId, vesselName) => {
-    if (!reportId) return;
-    setIsModalOpen(true);
-    setDetailsLoading(true);
+ const handleDotClick = async (reportId, vesselName) => {
+  if (!reportId) return;
+  setDetailsLoading(true);
 
-    setModalDetails({ vessel_name: vesselName, rows: [], status: "Normal" });
+  try {
+    const response = await axiosAepms.getAEReportDetails(reportId);
+    const { report, curves } = response;
 
-    try {
-      const response = await axiosAepms.getAEReportDetails(reportId);
-      const { report, curves } = response;
+    const currentLoad = report.load_percentage ?? report.load_percent ?? 0;
 
-      const currentLoad = report.load_percentage ?? report.load_percent ?? 0;
+    let critCount = 0;
+    let warnCount = 0;
 
-      let critCount = 0;
-      let warnCount = 0;
+    const calculatedRows = AE_HISTORY_PARAMS.map((paramConfig) => {
+      const key = paramConfig.key;
+      const actualVal = report[key];
 
-      const calculatedRows = AE_HISTORY_PARAMS.map((paramConfig) => {
-        const key = paramConfig.key;
-        const actualVal = report[key];
-
-        // --- IMPROVED ROBUST CURVE LOOKUP ---
-        let curvePoints = [];
-        if (curves) {
-          // 1. Try exact match (e.g. pmax_bar)
-          if (curves[key]) {
-            curvePoints = curves[key];
-          }
-          // 2. Try 'graph' match (e.g. pmax_graph_bar)
-          else if (
-            curves[`${key.split("_")[0]}_graph_bar` || `${key}_graph` || key]
-          ) {
-            const potentialKey = Object.keys(curves).find((k) =>
-              k.includes(key.split("_")[0]),
-            );
-            curvePoints = curves[potentialKey] || [];
-          }
+      // --- IMPROVED ROBUST CURVE LOOKUP ---
+      let curvePoints = [];
+      if (curves) {
+        // 1. Try exact match (e.g. pmax_bar)
+        if (curves[key]) {
+          curvePoints = curves[key];
         }
+        // 2. Try 'graph' match (e.g. pmax_graph_bar)
+        else if (
+          curves[`${key.split("_")[0]}_graph_bar` || `${key}_graph` || key]
+        ) {
+          const potentialKey = Object.keys(curves).find((k) =>
+            k.includes(key.split("_")[0]),
+          );
+          curvePoints = curves[potentialKey] || [];
+        }
+      }
 
-        const baseline = interpolate(currentLoad, curvePoints);
-        const { dev, delta, status, colorClass } = getDeviationStatus(
-          actualVal,
-          baseline,
-          paramConfig.label,
-        );
+      const baseline = interpolate(currentLoad, curvePoints);
+      const { dev, delta, status, colorClass } = getDeviationStatus(
+        actualVal,
+        baseline,
+        paramConfig.label,
+      );
 
-        if (status === "critical") critCount++;
-        if (status === "warning") warnCount++;
+      if (status === "critical") critCount++;
+      if (status === "warning") warnCount++;
 
-        return {
-          label: paramConfig.label,
-          unit: paramConfig.unit,
-          actual: actualVal,
-          baseline: baseline,
-          delta: delta,
-          dev: dev,
-          status: status,
-          colorClass: colorClass,
-        };
-      });
+      return {
+        label: paramConfig.label,
+        unit: paramConfig.unit,
+        actual: actualVal,
+        baseline: baseline,
+        delta: delta,
+        dev: dev,
+        status: status,
+        colorClass: colorClass,
+      };
+    });
 
-      let reportStatus = "Normal";
-      if (critCount > 0) reportStatus = "Critical";
-      else if (warnCount > 0) reportStatus = "Warning";
+    let reportStatus = "Normal";
+    if (critCount > 0) reportStatus = "Critical";
+    else if (warnCount > 0) reportStatus = "Warning";
 
-      setModalDetails({
-        vessel_name: vesselName || report.vessel_name,
-        generator_name: report.generator_name,
-        load_pct: currentLoad,
-        load_kw: report.load_kw,
-        report_date: report.report_date,
-        status: reportStatus,
-        rows: calculatedRows,
-        raw_report_view_url: report.raw_report_view_url,
-        raw_report_download_url: report.raw_report_download_url,
-        generated_report_view_url: report.generated_report_view_url,
-        generated_report_download_url: report.generated_report_download_url,
-      });
-    } catch (err) {
-      console.error("Failed to calculate report details for modal:", err);
-    } finally {
-      setDetailsLoading(false);
-    }
-  };
+    setModalDetails({
+      vessel_name: vesselName || report.vessel_name,
+      generator_name: report.generator_name,
+      load_pct: currentLoad,
+      load_kw: report.load_kw,
+      report_date: report.report_date,
+      status: reportStatus,
+      rows: calculatedRows,
+      raw_report_view_url: report.raw_report_view_url,
+      raw_report_download_url: report.raw_report_download_url,
+      generated_report_view_url: report.generated_report_view_url,
+      generated_report_download_url: report.generated_report_download_url,
+    });
+
+    setIsModalOpen(true); // ← Moved here: opens ONLY after real data is ready
+
+  } catch (err) {
+    console.error("Failed to calculate report details for modal:", err);
+  } finally {
+    setDetailsLoading(false);
+  }
+};
   const getDaysElapsedClass = (days) => {
-    if (days === null) return "days-default";
-    if (days > 60) return "days-critical";
-    if (days > 45) return "days-warning";
-    return "days-success";
+    if (days === null) return "";
+    if (days > 60) return "ae-days-critical";
+    if (days > 45) return "ae-days-warning";
+    return "ae-days-success";
   };
   const getLoadClass = (load) => {
     if (load === null || typeof load !== "number") return "margin-default";
@@ -1177,8 +1248,8 @@ useEffect(() => {
               onMouseLeave={() => setHoveredStatusDot(null)}
               title={`Date: ${formattedDate} | Status: ${finalStatus}`}
               style={{
-                width: "11px",
-                height: "11px",
+                width: "8px",
+                height: "8px",
                 borderRadius: "50%",
                 backgroundColor: dotColor,
                 cursor: reportId ? "pointer" : "default",
@@ -1195,22 +1266,30 @@ useEffect(() => {
   };
 
   const handleVesselToggle = (vessel) => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    setSelectedVesselsFilter((prev) => {
-      const exists = prev.find((v) => v.imo_number === vessel.imo_number);
-      if (exists) return prev.filter((v) => v.imo_number !== vessel.imo_number);
-      return [...prev, vessel];
-    });
-  };
+  setSelectedVesselsFilter((prev) => {
+    const exists = prev.find((v) => v.imo_number === vessel.imo_number);
+    if (exists) return prev.filter((v) => v.imo_number !== vessel.imo_number);
+    return [...prev, vessel];
+  });
+  setTimeout(() => {
+    if (aeDaysCardRef.current) {
+      aeDaysCardRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, 150);
+};
 
   const handleSelectAllVessels = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    if (selectedVesselsFilter.length === groupedRunningHours.length) {
-      setSelectedVesselsFilter([]);
-    } else {
-      setSelectedVesselsFilter(groupedRunningHours);
+  if (selectedVesselsFilter.length === groupedRunningHours.length) {
+    setSelectedVesselsFilter([]);
+  } else {
+    setSelectedVesselsFilter(groupedRunningHours);
+  }
+  setTimeout(() => {
+    if (aeDaysCardRef.current) {
+      aeDaysCardRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  };
+  }, 150);
+};
 
   // The filtered data to be used in the table map
   const handleDaysSort = () => {
@@ -1414,7 +1493,7 @@ useEffect(() => {
   
   if (embeddedMode) {
   return (
-    <div style={{ width: "100%" }}>
+    <div style={{ width: "100%", minWidth: 0, maxWidth: "100%" }}>
       <PerformanceDetailsModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -1452,79 +1531,32 @@ useEffect(() => {
 
       <div
         className="performance-cards-grid"
-        style={{ gridTemplateColumns: "1fr", gap: "24px" }}
+        style={{ gridTemplateColumns: "1fr", gap: "24px", minWidth: 0 }}
       >
         <div
           ref={aeDaysCardRef}
-          className="performance-data-card enhanced-card"
-          style={{
-            borderRadius: "12px",
-            overflow: "hidden",
-            border: "1px solid #e2e8f0",
-            scrollMarginTop: "100px",
-            boxShadow:
-              "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
-          }}
+          className="performance-data-card enhanced-card ae-days-card"
+          style={{ minWidth: 0 }}
         >
           {/* --- UPDATED HEADER FOR AE PERFORMANCE --- */}
           <div
-            className="card-header-enhanced"
-            style={{
-              cursor: "default", // Changed from pointer to default
-              display: "flex",
-              alignItems: "center",
-              width: "100%",
-              padding: "16px 24px",
-              backgroundColor: "#fff",
-              borderBottom: isSectionOpen ? "1px solid #f1f5f9" : "none",
-              gap: "16px",
-            }}
-            onClick={(e) => {
-                e.stopPropagation();
-                setIsSectionOpen(!isSectionOpen); // Open/Close action moved to this specific element
-              }}
-            // onClick removed from here
-          >
+  className={`card-header-enhanced ${!isSectionOpen ? "header-closed" : ""}`}
+  onClick={() => setIsSectionOpen(!isSectionOpen)}
+>
             {/* 1. Icon Badge - The signature dark ME style */}
-            <div
-              style={{
-                backgroundColor: "#1e293b",
-                color: "white",
-                minWidth: "44px",
-                height: "44px",
-                borderRadius: "10px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <Clock size={22} />
-            </div>
+            <div className="card-icon-badge pulsing-icon">
+  <Clock size={22} />
+</div>
 
             {/* 2. Title Section - flex: 1 pushes everything else to the right */}
-            <div className="card-title-group" style={{ flex: 1, minWidth: 0 }}>
+            <div className="card-title-group">
               <h2
                 className="card-title-performance"
-                style={{
-                  fontSize: "1.15rem",
-                  fontWeight: "700",
-                  color: "#1f2937",
-                  margin: "0",
-                  letterSpacing: "-0.01em",
-                  lineHeight: "1.2",
-                }}
               >
                 Report Status – Days Elapsed
               </h2>
               <p
                 className="card-description"
-                style={{
-                  margin: "4px 0 0 0",
-                  fontSize: "0.85rem",
-                  color: "#64748b",
-                  fontWeight: "400",
-                }}
               >
                 Time since last report & 12-Month Alert History
               </p>
@@ -1535,10 +1567,6 @@ useEffect(() => {
               className="vessel-filter-wrapper"
               ref={vesselDropdownRef}
               onClick={(e) => e.stopPropagation()}
-              style={{
-                marginRight: "8px",
-                flexShrink: 0,
-              }}
             >
               <div style={{ position: "relative" }}>
                 <button
@@ -1559,7 +1587,7 @@ useEffect(() => {
                             groupedRunningHours.length
                           ? "✓ All"
                           : selectedVesselsFilter.length === 1
-                            ? `✓ ${selectedVesselsFilter[0]?.vessel_name}`
+                            ? `✓ ${selectedVesselsFilter[0]?.vessel_name?.toUpperCase()}`
                             : `✓ ${selectedVesselsFilter.length} Selected`}
                     </span>
                   </div>
@@ -1616,7 +1644,7 @@ useEffect(() => {
                               )}
                               readOnly
                             />
-                            <span>{vessel.vessel_name}</span>
+                            <span>{formatVesselDisplayName(vessel.vessel_name)}</span>
                           </label>
                         </div>
                       ))}
@@ -1628,251 +1656,67 @@ useEffect(() => {
 
             {/* 4. Large Right Side Chevron Toggle - Logic moved here exclusively */}
             <div
-              className="ae-header-toggle-wrapper"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "40px",
-                height: "40px",
-                borderRadius: "50%",
-                flexShrink: 0,
-                cursor: "pointer", // Added pointer here
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsSectionOpen(!isSectionOpen); // Open/Close action moved to this specific element
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "#f1f5f9")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "transparent")
-              }
+              className="ae-days-chevron-btn"
+              style={{ marginLeft: "auto" }}
+              onClick={(e) => { e.stopPropagation(); setIsSectionOpen(!isSectionOpen); }}
             >
               {isSectionOpen ? (
-                <ChevronUp size={32} color="#475569" strokeWidth={2.5} />
+                <ChevronUp size={24} color="#475569" strokeWidth={2.5} />
               ) : (
-                <ChevronDown size={32} color="#475569" strokeWidth={2.5} />
+                <ChevronDown size={24} color="#475569" strokeWidth={2.5} />
               )}
             </div>
           </div>
-          <div className="card-body-enhanced">
+          <div className="card-body-enhanced ae-days-card-body">
             {/* 1. CONTAINER: Strict overflow-x rule keeps the scrollbar inside the white card */}
-            <div
-              className={`performance-table-wrapper ${isSectionOpen ? "expanded" : "collapsed"}`}
-              style={{
-                overflowX: "auto",
-                maxWidth: "100%",
-                position: "relative",
-                background: "#fff",
-              }}
-            >
+            <div 
+  ref={aeTableWrapperRef} 
+  className={`ae-table-wrapper ${isSectionOpen ? "expanded" : "collapsed"}`}
+  style={
+    isSectionOpen && filteredGroupedRunningHours.length > 2
+      ? { maxHeight: `${(2 * 3 * 48) + 42 + 36}px`, overflowY: 'auto' }
+      : undefined
+  }
+>
+
               {(externalVesselId && filteredGroupedRunningHours.length > 0) ? (
-                <table
-                  className="performance-table-modern"
-                  style={{
-                    width: "max-content",
-                    minWidth: "100%",
-                    borderCollapse: "separate",
-                    borderSpacing: 0,
-                    tableLayout: "fixed",
-                  }}
-                >
-                  <thead>
+                <table className="performance-table-modern ae-days-table">
+                  <thead className="ae-days-thead">
                     <tr style={{ backgroundColor: "#fff" }}>
                       {/* STICKY CORNER */}
-                      <th
-                        style={{
-                          position: "sticky",
-                          left: 0,
-                          top: 0,
-                          zIndex: 70,
-                          backgroundColor: "#fff",
-                          width: "150px",
-                          minWidth: "140px",
-                          textAlign: "left",
-                          padding: "16px 12px 16px 20px",
-                          color: "#6b7280",
-                          fontSize: "0.7rem",
-                          fontWeight: "700",
-                          textTransform: "uppercase",
-                          borderBottom: "2px solid #f3f4f6",
-                        }}
-                      >
-                        Vessel Name
-                      </th>
+                      <th className="ae-th-vessel">Vessel Name</th>
 
                       {/* STICKY GEN */}
-                      <th
-                        style={{
-                          position: "sticky",
-                          left: "140px",
-                          top: 0,
-                          zIndex: 70,
-                          backgroundColor: "#fff",
-                          width: "50px",
-                          minWidth: "50px",
-                          textAlign: "center",
-                          padding: "16px 4px",
-                          color: "#6b7280",
-                          fontSize: "0.7rem",
-                          fontWeight: "700",
-                          textTransform: "uppercase",
-                          borderBottom: "2px solid #f3f4f6",
-                        }}
-                      >
-                        Gen
-                      </th>
+                      <th className="ae-th-gen">Gen</th>
 
                       {/* STICKY LAST REPORT */}
-                      <th
-                        style={{
-                          position: "sticky",
-                          left: "190px",
-                          top: 0,
-                          zIndex: 70,
-                          backgroundColor: "#fff",
-                          width: "110px",
-                          minWidth: "110px",
-                          textAlign: "center",
-                          padding: "16px 4px",
-                          color: "#6b7280",
-                          fontSize: "0.7rem",
-                          fontWeight: "700",
-                          textTransform: "uppercase",
-                          borderBottom: "2px solid #f3f4f6",
-                        }}
-                      >
-                        Last Report
-                      </th>
+                      <th className="ae-th-lastReport">Last Report</th>
 
                       {/* STICKY DAYS */}
                       <th
+                        className={`ae-th-days ${daysSortConfig.key === "days_elapsed" ? "ae-th-days--sorted" : ""}`}
                         onClick={handleDaysSort}
-                        style={{
-                          position: "sticky",
-                          left: "300px",
-                          top: 0,
-                          zIndex: 70,
-                          backgroundColor: "#fff",
-                          width: "70px",
-                          minWidth: "70px",
-                          textAlign: "center",
-                          padding: "16px 4px",
-                          color:
-                            daysSortConfig.key === "days_elapsed"
-                              ? "#1e3a8a"
-                              : "#6b7280",
-                          fontSize: "0.7rem",
-                          fontWeight: "700",
-                          textTransform: "uppercase",
-                          borderBottom: "2px solid #f3f4f6",
-                          boxShadow: "4px 0 4px -4px rgba(0,0,0,0.05)",
-                          cursor: "pointer",
-                          userSelect: "none",
-                        }}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "4px",
-                          }}
-                        >
+                        <div className="ae-sort-header-inner">
                           Days
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              lineHeight: 1,
-                            }}
-                          >
-                            <ChevronUp
-                              size={10}
-                              style={{
-                                opacity:
-                                  daysSortConfig.key === "days_elapsed" &&
-                                  daysSortConfig.direction === "asc"
-                                    ? 1
-                                    : 0.2,
-                              }}
-                            />
-                            <ChevronDown
-                              size={10}
-                              style={{
-                                opacity:
-                                  daysSortConfig.key === "days_elapsed" &&
-                                  daysSortConfig.direction === "desc"
-                                    ? 1
-                                    : 0.2,
-                                marginTop: "-2px",
-                              }}
-                            />
+                          <div className="ae-sort-arrows">
+                            <ChevronUp size={10} className={daysSortConfig.key === "days_elapsed" && daysSortConfig.direction === "asc" ? "ae-sort-arrow--active" : "ae-sort-arrow--inactive"} />
+                            <ChevronDown size={10} className={daysSortConfig.key === "days_elapsed" && daysSortConfig.direction === "desc" ? "ae-sort-arrow--active" : "ae-sort-arrow--inactive"} />
                           </div>
                         </div>
                       </th>
 
                       {/* NEW STICKY LOAD % COLUMN */}
-                      <th
-                        style={{
-                          position: "sticky",
-                          left: "370px",
-                          top: 0,
-                          zIndex: 70,
-                          backgroundColor: "#fff",
-                          width: "70px",
-                          minWidth: "70px",
-                          textAlign: "center",
-                          padding: "16px 4px",
-                          color: "#6b7280",
-                          fontSize: "0.7rem",
-                          fontWeight: "700",
-                          textTransform: "uppercase",
-                          borderBottom: "2px solid #f3f4f6",
-                        }}
-                      >
-                        Load %
-                      </th>
+                      <th className="ae-th-load">Load %</th>
 
                       {/* COMPACT NAVIGATION: OFFSET MOVED TO 440px TO PREVENT OVERLAP */}
-                      <th
-                        style={{
-                          position: "sticky",
-                          top: 0,
-                          left: "440px",
-                          zIndex: 70,
-                          backgroundColor: "#fff",
-                          width: "40px",
-                          minWidth: "40px",
-                          padding: "0",
-                          borderBottom: "2px solid #f3f4f6",
-                        }}
-                      >
+                      <th className="ae-th-nav-left">
                         <button
-                          onClick={() =>
-                            setViewOffset((curr) => Math.max(0, curr - 1))
-                          }
+                          className={`ae-nav-btn ${viewOffset === 0 ? "ae-nav-btn--disabled" : ""}`}
+                          onClick={() => setViewOffset((curr) => Math.max(0, curr - 1))}
                           disabled={viewOffset === 0}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            background: "transparent",
-                            border: "none",
-                            outline: "none",
-                            cursor: viewOffset === 0 ? "default" : "pointer",
-                            opacity: viewOffset === 0 ? 0.1 : 1,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
                         >
-                          <ChevronLeft
-                            size={20}
-                            strokeWidth={2.5}
-                            color="#374151"
-                          />
+                          <ChevronLeft size={20} strokeWidth={2.5} color="#374151" />
                         </button>
                       </th>
 
@@ -1882,24 +1726,7 @@ useEffect(() => {
                         return (
                           <th
                             key={m.key}
-                            style={{
-                              position: "sticky",
-                              top: 0,
-                              zIndex: 50,
-                              width: "73px",
-                              minWidth: "73px",
-                              textAlign: "center",
-                              fontSize: "0.65rem",
-                              color: isLatestMonth ? "#1e3a8a" : "#6b7280",
-                              fontWeight: "700",
-                              textTransform: "uppercase",
-                              padding: "16px 0",
-                              backgroundColor: isLatestMonth
-                                ? "#eff6ff"
-                                : "#fff",
-                              borderBottom: "2px solid #f3f4f6",
-                              borderLeft: "1px solid #f3f4f6",
-                            }}
+                            className={`ae-th-month ${isLatestMonth ? "ae-th-month--current" : ""}`}
                           >
                             {m.label}
                           </th>
@@ -1907,44 +1734,13 @@ useEffect(() => {
                       })}
 
                       {/* RIGHT NAVIGATION */}
-                      <th
-                        style={{
-                          position: "sticky",
-                          top: 0,
-                          zIndex: 50,
-                          backgroundColor: "#fff",
-                          width: "40px",
-                          minWidth: "40px",
-                          padding: "0",
-                          borderBottom: "2px solid #f3f4f6",
-                        }}
-                      >
+                      <th className="ae-th-nav-right">
                         <button
-                          onClick={() =>
-                            setViewOffset((curr) =>
-                              Math.min(maxOffset, curr + 1),
-                            )
-                          }
+                          className={`ae-nav-btn ${viewOffset >= maxOffset ? "ae-nav-btn--disabled" : ""}`}
+                          onClick={() => setViewOffset((curr) => Math.min(maxOffset, curr + 1))}
                           disabled={viewOffset >= maxOffset}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            background: "transparent",
-                            border: "none",
-                            outline: "none",
-                            cursor:
-                              viewOffset >= maxOffset ? "default" : "pointer",
-                            opacity: viewOffset >= maxOffset ? 0.1 : 1,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
                         >
-                          <ChevronRight
-                            size={20}
-                            strokeWidth={2.5}
-                            color="#374151"
-                          />
+                          <ChevronRight size={20} strokeWidth={2.5} color="#374151" />
                         </button>
                       </th>
                     </tr>
@@ -1952,7 +1748,7 @@ useEffect(() => {
 
                   <tbody>
                     {filteredGroupedRunningHours.map((row) => (
-                      <React.Fragment key={row.vessel_name}>
+                      <React.Fragment key={formatVesselDisplayName(row.vessel_name)}>
                         {GENS.map((gen, index) => {
                           const genData = row[gen];
                           const reportDate = genData?.report_date;
@@ -1970,218 +1766,95 @@ useEffect(() => {
 
                           return (
                             <tr
-                              key={`${row.vessel_name}-${gen}`}
-                              className="table-row-enhanced"
-                            >
+  key={`${formatVesselDisplayName(row.vessel_name)}-${gen}`}
+  className={`table-row-enhanced ae-days-tr ${index === GENS.length - 1 ? "ae-days-tr--last-gen" : ""}`}
+>
                               {index === 0 && (
                                 <td
-                                  rowSpan={GENS.length}
-                                  style={{
-                                    position: "sticky",
-                                    left: 0,
-                                    backgroundColor: "#fff",
-                                    padding: "12px 12px 12px 20px",
-                                    verticalAlign: "middle",
-                                    borderBottom: "1px solid #cbd5e1",
-                                    width: "140px",
-                                  }}
-                                  onClick={() =>
-                                    handleVesselHistoryClick(row.vessel_name)
-                                  }
-                                >
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "8px",
-                                    }}
-                                  >
-                                    <div
-                                      className="status-dot blinking-dot"
-                                      style={{
-                                        background: "#3b82f6",
-                                        width: "8px",
-                                        height: "8px",
-                                        flexShrink: 0,
-                                      }}
-                                    />
-                                    <span
-                                      style={{
-                                        fontWeight: "600",
-                                        color: "#374151",
-                                        fontSize: "0.85rem",
-                                        whiteSpace: "nowrap",
-                                      }}
-                                    >
-                                      {row.vessel_name}
-                                    </span>
-                                  </div>
-                                </td>
+  rowSpan={GENS.length}
+  className="ae-td-vessel"
+  onClick={() => handleVesselHistoryClick(row.vessel_name)}
+>
+  <div className="ae-vessel-name-inner">
+    {(() => {
+  // Get worst days across all 3 AEs for this vessel
+  const allDays = GENS.map(gen => {
+    const reportDate = row[gen]?.report_date;
+    return calculateDaysElapsed(reportDate);
+  }).filter(d => d !== null);
+
+  let dotColor = "#16a34a"; // green default
+  if (allDays.length === 0) {
+    dotColor = "#94a3b8"; // grey if no data at all
+  } else if (allDays.some(d => d > 60)) {
+    dotColor = "#dc2626"; // red — any AE overdue > 60 days
+  } else if (allDays.some(d => d > 45)) {
+    dotColor = "#ca8a04"; // amber — any AE overdue > 45 days
+  }
+
+  return (
+    <div 
+      className="status-dot ae-blinking-dot" 
+      style={{ background: dotColor, width: "8px", height: "8px", flexShrink: 0 }} 
+    />
+  );
+})()}
+    <span className="ae-vessel-name-text">{formatVesselDisplayName(row.vessel_name)}</span>
+  </div>
+</td>
                               )}
 
                               <td
-                                onClick={() =>
-                                  handleVesselHistoryClick(row.vessel_name, gen)
-                                }
-                                style={{
-                                  position: "sticky",
-                                  left: "140px",
-                                  backgroundColor: "#f9fafb",
-                                  textAlign: "center",
-                                  fontWeight: "600",
-                                  color: "#4b5563",
-                                  fontSize: "0.8rem",
-                                  borderBottom:
-                                    index === 2
-                                      ? "1px solid #cbd5e1"
-                                      : "1px solid #f3f4f6",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                {gen}
-                              </td>
+  className="ae-td-gen"
+  onClick={() => handleVesselHistoryClick(row.vessel_name, gen)}
+>
+  {gen}
+</td>
 
-                              <td
-                                style={{
-                                  position: "sticky",
-                                  left: "190px",
-                                  backgroundColor: "#fff",
-                                  textAlign: "center",
-                                  color: "#4b5563",
-                                  fontSize: "0.8rem",
-                                  borderBottom:
-                                    index === 2
-                                      ? "1px solid #cbd5e1"
-                                      : "1px solid #f3f4f6",
-                                }}
-                              >
-                                {formatDate(reportDate)}
-                              </td>
+                              <td className="ae-td-lastReport">{formatDate(reportDate)}</td>
 
-                              <td
-                                style={{
-                                  position: "sticky",
-                                  left: "300px",
-                                  height: "53px",
-                                  backgroundColor: "#fff",
-                                  textAlign: "center",
-                                  boxShadow: "4px 0 4px -4px rgba(0,0,0,0.05)",
-                                  borderBottom:
-                                    index === 2
-                                      ? "1px solid #cbd5e1"
-                                      : "1px solid #f3f4f6",
-                                }}
-                              >
-                                {days !== null ? (
-                                  <span
-                                    className={`days-badge ${getDaysElapsedClass(days)}`}
-                                    style={{
-                                      minWidth: "40px",
-                                      fontSize: "0.75rem",
-                                    }}
-                                  >
-                                    {days}
-                                  </span>
-                                ) : (
-                                  "-"
-                                )}
-                              </td>
+                              <td className="ae-td-days">
+  {days !== null ? (
+    <span className={`ae-days-badge ${getDaysElapsedClass(days)}`}>{days}</span>
+  ) : (
+    "-"
+  )}
+</td>
 
                               {/* LOAD % COLUMN DATA */}
                               {/* 5. Load % (Sticky) - FIXED DATA SOURCE & ALIGNMENT */}
-                              <td
-                                style={{
-                                  position: "sticky",
-                                  left: "380px",
-                                  backgroundColor: "#fff",
-                                  textAlign: "center",
-                                  borderBottom:
-                                    index === 2
-                                      ? "1px solid #cbd5e1"
-                                      : "1px solid #f3f4f6",
-                                }}
-                              >
-                                {loadVal !== null &&
-                                !isNaN(parseFloat(loadVal)) ? (
-                                  <span
-                                    style={{
-                                      backgroundColor:
-                                        loadVal < 60
-                                          ? "#fee2e2"
-                                          : loadVal <= 75
-                                            ? "#fef3c7"
-                                            : "#d1fae5",
-                                      color:
-                                        loadVal < 60
-                                          ? "#dc2626"
-                                          : loadVal <= 75
-                                            ? "#ca8a04"
-                                            : "#16a34a",
-                                      padding: "2px 6px",
-                                      borderRadius: "4px",
-                                      fontWeight: "700",
-                                      fontSize: "0.75rem",
-                                      display: "inline-block",
-                                      minWidth: "45px",
-                                    }}
-                                  >
-                                    {Number(loadVal).toFixed(1)}%
-                                  </span>
-                                ) : (
-                                  <span style={{ color: "#d1d5db" }}>-</span>
-                                )}
-                              </td>
+                              <td className="ae-td-load">
+  {loadVal !== null && !isNaN(parseFloat(loadVal)) ? (
+    <span
+      className="ae-load-badge"
+      style={{
+        backgroundColor: loadVal < 60 ? "#fee2e2" : loadVal <= 75 ? "#fef3c7" : "#d1fae5",
+        color: loadVal < 60 ? "#dc2626" : loadVal <= 75 ? "#ca8a04" : "#16a34a",
+      }}
+    >
+      {Number(loadVal).toFixed(1)}%
+    </span>
+  ) : (
+    <span style={{ color: "#4b5563" }}>-</span>
+  )}
+</td>
 
                               {/* NAVIGATION SPACER COLUMN: OFFSET MOVED TO 440px */}
-                              <td
-                                style={{
-                                  position: "sticky",
-                                  left: "440px",
-                                  backgroundColor: "#fff",
-                                  borderBottom:
-                                    index === 2
-                                      ? "1px solid #cbd5e1"
-                                      : "1px solid #f3f4f6",
-                                }}
-                              ></td>
+                              <td className="ae-td-spacer"></td>
 
                               {visibleMonths.map((m, i) => {
                                 const isLatestMonth =
                                   i === 0 && viewOffset === 0;
                                 return (
                                   <td
-                                    key={m.key}
-                                    style={{
-                                      textAlign: "center",
-                                      verticalAlign: "middle",
-                                      borderLeft: "1px solid #f3f4f6",
-                                      borderBottom:
-                                        index === 2
-                                          ? "1px solid #cbd5e1"
-                                          : "1px solid #f3f4f6",
-                                      backgroundColor: isLatestMonth
-                                        ? "#eff6ff"
-                                        : "#fff",
-                                      padding: "12px 0",
-                                    }}
-                                  >
-                                    {renderStatusDot(
-                                      row.vessel_name,
-                                      gen,
-                                      m.key,
-                                    )}
-                                  </td>
+  key={m.key}
+  className={`ae-td-month ${isLatestMonth ? "ae-td-month--current" : ""}`}
+>
+  {renderStatusDot(row.vessel_name, gen, m.key)}
+</td>
                                 );
                               })}
-                              <td
-                                style={{
-                                  backgroundColor: "#fff",
-                                  borderBottom:
-                                    index === 2
-                                      ? "1px solid #cbd5e1"
-                                      : "1px solid #f3f4f6",
-                                }}
-                              ></td>
+                              <td className="ae-td-tail"></td>
                             </tr>
                           );
                         })}
@@ -2189,78 +1862,29 @@ useEffect(() => {
                     ))}
                   </tbody>
 
-                  <tfoot style={{ position: "sticky", bottom: 0, zIndex: 50 }}>
-                    <tr style={{ backgroundColor: "#fff" }}>
-                      {/* UPDATED colSpan to 5 to cover Vessel, Gen, Last Report, Days, and Load % */}
-                      <td
-                        colSpan="5"
-                        style={{
-                          position: "sticky",
-                          left: 0,
-                          bottom: 0,
-                          zIndex: 60,
-                          backgroundColor: "#fff",
-                          borderTop: "2px solid #e5e7eb",
-                          height: "40px",
-                        }}
-                      ></td>
-
-                      {/* UPDATED left offset to 440px */}
-                      <td
-                        style={{
-                          position: "sticky",
-                          left: "440px",
-                          bottom: 0,
-                          zIndex: 60,
-                          backgroundColor: "#fff",
-                          borderTop: "2px solid #e5e7eb",
-                        }}
-                      ></td>
-
-                      {visibleMonths.map((m, i) => {
-                        const isLatestMonth = i === 0 && viewOffset === 0;
-                        return (
-                          <td
-                            key={i}
-                            style={{
-                              textAlign: "center",
-                              fontSize: "0.65rem",
-                              fontWeight: "700",
-                              textTransform: "uppercase",
-                              padding: "12px 0",
-                              borderTop: "2px solid #e5e7eb",
-                              borderLeft: "1px solid #f3f4f6",
-                              color: isLatestMonth ? "#1e3a8a" : "#6b7280",
-                              backgroundColor: isLatestMonth
-                                ? "#eff6ff"
-                                : "#fff",
-                            }}
-                          >
-                            {m.label}
-                          </td>
-                        );
-                      })}
-                      <td
-                        style={{
-                          borderTop: "2px solid #e5e7eb",
-                          backgroundColor: "#fff",
-                        }}
-                      ></td>
-                    </tr>
-                  </tfoot>
+                  <tfoot className="ae-days-tfoot">
+  <tr>
+    <td colSpan="5" className="ae-tfoot-th-sticky"></td>
+    <td className="ae-tfoot-th-spacer"></td>
+    {visibleMonths.map((m, i) => {
+      const isLatestMonth = i === 0 && viewOffset === 0;
+      return (
+        <td
+          key={i}
+          className={`ae-tfoot-th-month ${isLatestMonth ? "ae-tfoot-th-month--current" : ""}`}
+        >
+          {m.label}
+        </td>
+      );
+    })}
+    <td className="ae-tfoot-th-tail"></td>
+  </tr>
+</tfoot>
                 </table>
               ) : (
-                <div
-                  style={{
-                    padding: "72px 24px",
-                    textAlign: "center",
-                    color: "#94a3af",
-                  }}
-                >
-                  <p style={{ margin: 0, fontSize: "1.1rem" }}>
-                    👆 Select one or more vessels above to view Report Status
-                  </p>
-                </div>
+                <div className="ae-days-empty-state">
+  <p>👆 Select one or more vessels above to view Report Status</p>
+</div>
               )}
             </div>
           </div>
@@ -2313,530 +1937,266 @@ useEffect(() => {
         {/* --- DETAILED ANALYSIS SECTION --- */}
         {/* DETAILED ANALYSIS */}
         {selectedVesselDetails && (
-          <div
-            ref={detailsSectionRef}
-            className="performance-data-card enhanced-card"
-            style={{
-              width: "100%",
-              marginTop: "16px",
-              borderTop: "4px solid #111827",
-              animation: "fadeIn 0.5s ease",
-            }}
-          >
-            {/* Header */}
-            <div
-              className="card-header-enhanced"
-              style={{
-                backgroundColor: "#f9fafb",
-                padding: "16px 24px",
-                display: "flex",
-                alignItems: "center",
-                borderBottom: "1px solid #e5e7eb",
-              }}
-            >
-              <div
-                className="card-icon-badge"
-                style={{
-                  backgroundColor: "#111827",
-                  color: "white",
-                  padding: "8px",
-                  borderRadius: "8px",
-                  marginRight: "12px",
-                }}
-              >
-                <Activity size={24} />
-              </div>
-              <div className="card-title-group">
-                <h2
-                  className="card-title-performance"
-                  style={{
-                    fontSize: "1.25rem",
-                    fontWeight: "700",
-                    color: "#1f2937",
-                    margin: 0,
-                  }}
-                >
-                  {selectedVesselDetails.name} — Detailed History
-                </h2>
-                <p
-                  className="card-description"
-                  style={{
-                    color: "#6b7280",
-                    fontSize: "0.875rem",
-                    marginTop: "4px",
-                  }}
-                >
-                  {isDetailLoading
-                    ? "Fetching detailed data..."
-                    : `Showing historical data for: ${selectedVesselDetails.filter}`}
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedVesselDetails(null)}
-                style={{
-                  marginLeft: "auto",
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                }}
-              >
-                <X size={24} color="#6b7280" />
-              </button>
-            </div>
-
-            {/* Table Body */}
-            <div
-              className="card-body-enhanced"
-              style={{ padding: "0", overflowX: "hidden" }}
-            >
-              {isDetailLoading ? (
-                <div
-                  style={{
-                    padding: "60px",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    flexDirection: "column",
-                    gap: "12px",
-                  }}
-                >
-                  <Loader2 className="animate-spin" size={40} color="#111827" />
-                  <p
-                    style={{
-                      color: "#6b7280",
-                      fontSize: "0.9rem",
-                      fontWeight: "500",
-                    }}
-                  >
-                    Loading report details...
-                  </p>
-                </div>
-              ) : (
-                <table
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    textAlign: "center",
-                    tableLayout: "fixed",
-                  }}
-                >
-                  <thead
-                    style={{
-                      backgroundColor: "#f3f4f6",
-                      position: "sticky",
-                      top: 0,
-                      zIndex: 40,
-                    }}
-                  >
-                    <tr
-                      style={{
-                        fontSize: "0.7rem",
-                        color: "#4b5563",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.02em",
-                      }}
-                    >
-                      <th
-                        style={{
-                          width: "5%",
-                          padding: "14px 4px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          textAlign: "left",
-                          paddingLeft: "24px",
-                        }}
-                      >
-                        Gen
-                      </th>
-                      <th
-                        style={{
-                          width: "8.5%",
-                          padding: "14px 4px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                        }}
-                      >
-                        Report Date
-                      </th>
-                      <th
-                        style={{
-                          width: "6%",
-                          padding: "14px 4px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                        }}
-                      >
-                        Load %
-                      </th>
-                      <th
-                        style={{
-                          width: "9.5%",
-                          padding: "14px 4px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                        }}
-                      >
-                        Status
-                      </th>
-                      <th
-                        style={{
-                          width: "6%",
-                          padding: "14px 4px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                        }}
-                      >
-                        Raw Rep
-                      </th>
-                      <th
-                        style={{
-                          width: "6%",
-                          padding: "14px 4px",
-                          borderBottom: "1px solid #e5e7eb",
-                          fontWeight: "700",
-                          borderRight: "1px solid #e5e7eb",
-                        }}
-                      >
-                        Ana Rep
-                      </th>
-
-                      {/* Dynamic Parameters (Fills the remaining 59%) */}
-                      {AE_HISTORY_PARAMS.map((param) => (
-                        <th
-                          key={param.key}
-                          style={{
-                            width: `${59 / AE_HISTORY_PARAMS.length}%`,
-                            padding: "14px 4px",
-                            borderBottom: "1px solid #e5e7eb",
-                            fontWeight: "700",
-                          }}
-                        >
-                          {param.label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedVesselDetails.reports.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={6 + AE_HISTORY_PARAMS.length}
-                          style={{
-                            padding: "30px",
-                            textAlign: "center",
-                            color: "#9ca3af",
-                          }}
-                        >
-                          No reports found.
-                        </td>
-                      </tr>
-                    ) : (
-                      selectedVesselDetails.reports.map((r, i) => {
-                        const load = r.load_percentage || r.load_percent || 0;
-
-                        // --- Status Logic ---
-                        let calculatedStatus = "Normal";
-                        let critCount = 0;
-                        let warnCount = 0;
-
-                        AE_HISTORY_PARAMS.forEach((paramConfig) => {
-                          const key = paramConfig.key;
-                          const actualVal = r[key];
-                          if (actualVal !== null && actualVal !== undefined) {
-                            let curve = [];
-                            if (r.curves) {
-                              if (r.curves[key]) curve = r.curves[key];
-                              else {
-                                const labelMatch = Object.entries(
-                                  r.curves,
-                                ).find(([k]) =>
-                                  k
-                                    .toLowerCase()
-                                    .includes(
-                                      paramConfig.label
-                                        .toLowerCase()
-                                        .split(" ")[0],
-                                    ),
-                                );
-                                if (labelMatch) curve = labelMatch[1];
-                              }
-                            }
-                            const baseline = interpolate(load, curve);
-                            const { status } = getDeviationStatus(
-                              actualVal,
-                              baseline,
-                              paramConfig.label,
-                            );
-                            if (status === "critical") critCount++;
-                            if (status === "warning") warnCount++;
-                          }
-                        });
-
-                        if (critCount > 0) calculatedStatus = "Critical";
-                        else if (warnCount > 0) calculatedStatus = "Warning";
-
-                        // --- Rename Logic ---
-                        const rawName = String(
-                          r.generator_designation || r.generator_name || "",
-                        ).toUpperCase();
-                        let shortGenName = "AE";
-                        if (rawName.includes("1")) shortGenName = "AE1";
-                        else if (rawName.includes("2")) shortGenName = "AE2";
-                        else if (rawName.includes("3")) shortGenName = "AE3";
-
-                        // --- Styles ---
-                        const rowBg = i % 2 === 0 ? "#fff" : "#fafafa";
-
-                        let statusColor = "green";
-                        if (calculatedStatus === "Critical")
-                          statusColor = "red";
-                        else if (calculatedStatus === "Warning")
-                          statusColor = "yellow";
-
-                        const badgeStyle = {
-                          red: {
-                            bg: "#fee2e2",
-                            text: "#991b1b",
-                            border: "#fecaca",
-                          },
-                          yellow: {
-                            bg: "#fef9c3",
-                            text: "#854d0e",
-                            border: "#fde047",
-                          },
-                          green: {
-                            bg: "#dcfce7",
-                            text: "#166534",
-                            border: "#bbf7d0",
-                          },
-                        }[statusColor];
-
-                        // --- Dot Render Helper ---
-                        // --- Updated Dot Render Helper ---
-                        const renderCell = (paramConfig) => {
-                          const key = paramConfig.key;
-                          const actualVal = r[key];
-                          if (actualVal === null || actualVal === undefined)
-                            return <span style={{ color: "#d1d5db" }}>-</span>;
-
-                          const findCurve = () => {
-                            if (!r.curves) return [];
-                            if (r.curves[key]) return r.curves[key];
-                            const labelMatch = Object.entries(r.curves).find(
-                              ([k]) =>
-                                k
-                                  .toLowerCase()
-                                  .includes(
-                                    paramConfig.label
-                                      .toLowerCase()
-                                      .split(" ")[0],
-                                  ),
-                            );
-                            if (labelMatch) return labelMatch[1];
-                            return [];
-                          };
-
-                          const curve = findCurve();
-                          const baseline = interpolate(load, curve);
-
-                          // Destructure 'dev' (percentage) from the helper
-                          const { status: dotStatus, dev } = getDeviationStatus(
-                            actualVal,
-                            baseline,
-                            paramConfig.label,
-                          );
-
-                          let dotColor = "#10b981";
-                          if (dotStatus === "warning") dotColor = "#f59e0b";
-                          if (dotStatus === "critical") dotColor = "#ef4444";
-
-                          // Format the sign for the percentage
-                          const pctSign = dev > 0 ? "+" : "";
-
-                          return (
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent: "center",
-                                alignItems: "center",
-                                height: "100%",
-                              }}
-                            >
-                              <div
-                                // UPDATED TOOLTIP LOGIC HERE
-                                title={`Act: ${safeFixed(actualVal)} | Dev: ${pctSign}${safeFixed(dev, 1)}%`}
-                                style={{
-                                  width: "10px",
-                                  height: "10px",
-                                  borderRadius: "50%",
-                                  backgroundColor: dotColor,
-                                  cursor: "help",
-                                }}
-                              />
-                            </div>
-                          );
-                        };
-
-                        const cellStyle = {
-                          padding: "12px 2px",
-                          borderBottom: "1px solid #f3f4f6",
-                          fontSize: "0.8rem",
-                          color: "#374151",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        };
-
-                        return (
-                          <tr key={i} style={{ backgroundColor: rowBg }}>
-                            {/* Gen Name - Left Aligned */}
-                            <td
-                              style={{
-                                ...cellStyle,
-                                fontWeight: "bold",
-                                textAlign: "left",
-                                paddingLeft: "24px",
-                              }}
-                            >
-                              {shortGenName}
-                            </td>
-
-                            {/* Date - Centered to match other columns */}
-                            <td style={{ ...cellStyle }}>
-                              {formatDate(r.report_date)}
-                            </td>
-
-                            {/* Load - Centered Monospace */}
-                            <td
-                              style={{
-                                ...cellStyle,
-                                fontFamily: "monospace",
-                                fontWeight: "600",
-                              }}
-                            >
-                              {safeFixed(load, 1)}%
-                            </td>
-
-                            {/* Status - Badge */}
-                            <td style={cellStyle}>
-                              <div
-                                style={{
-                                  backgroundColor: badgeStyle.bg,
-                                  color: badgeStyle.text,
-                                  border: `1px solid ${badgeStyle.border}`,
-                                  padding: "3px 8px",
-                                  borderRadius: "4px",
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                  fontSize: "0.65rem",
-                                  fontWeight: "700",
-                                  textTransform: "uppercase",
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    width: "5px",
-                                    height: "5px",
-                                    borderRadius: "50%",
-                                    background: badgeStyle.text,
-                                  }}
-                                ></span>
-                                {calculatedStatus}
-                              </div>
-                            </td>
-
-                            {/* Monthly Reports */}
-                            <td style={cellStyle}>
-                              {r.raw_report_view_url ? (
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    gap: "8px",
-                                    justifyContent: "center",
-                                  }}
-                                >
-                                  <button
-                                    onClick={() =>
-                                      window.open(
-                                        r.raw_report_view_url,
-                                        "_blank",
-                                      )
-                                    }
-                                    title="View Raw"
-                                    style={{
-                                      border: "none",
-                                      background: "transparent",
-                                      cursor: "pointer",
-                                      color: "#4b5563",
-                                      padding: 0,
-                                    }}
-                                  >
-                                    <FileText size={15} />
-                                  </button>
-                                  {/* <button onClick={() => handleDownloadClick(r.raw_report_download_url)} title="Download Raw" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#2563eb', padding: 0 }}><ArrowDownCircle size={15} /></button> */}
-                                </div>
-                              ) : (
-                                <span style={{ color: "#d1d5db" }}>-</span>
-                              )}
-                            </td>
-
-                            {/* Analytical Reports */}
-                            <td
-                              style={{
-                                ...cellStyle,
-                                borderRight: "1px solid #e5e7eb",
-                              }}
-                            >
-                              {r.generated_report_view_url ? (
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    gap: "8px",
-                                    justifyContent: "center",
-                                  }}
-                                >
-                                  <button
-                                    onClick={() =>
-                                      window.open(
-                                        r.generated_report_view_url,
-                                        "_blank",
-                                      )
-                                    }
-                                    title="View Analytical"
-                                    style={{
-                                      border: "none",
-                                      background: "transparent",
-                                      cursor: "pointer",
-                                      color: "#4b5563",
-                                      padding: 0,
-                                    }}
-                                  >
-                                    <FileText size={15} />
-                                  </button>
-                                  {/* <button onClick={() => handleDownloadClick(r.generated_report_download_url)} title="Download Analytical" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#2563eb', padding: 0 }}><ArrowDownCircle size={15} /></button> */}
-                                </div>
-                              ) : (
-                                <span style={{ color: "#d1d5db" }}>-</span>
-                              )}
-                            </td>
-
-                            {/* Dynamic Parameters */}
-                            {AE_HISTORY_PARAMS.map((param) => (
-                              <td key={param.key} style={cellStyle}>
-                                {renderCell(param)}
-                              </td>
-                            ))}
-                          </tr>
+  <div
+    ref={detailsSectionRef}
+    className="ae-detail-card performance-data-card enhanced-card"
+  >
+ 
+    {/* ── HEADER ─────────────────────────────────────────────────────────── */}
+    <div className="ae-detail-header card-header-enhanced">
+ 
+      {/* Icon — .ae-detail-header .card-icon-badge scopes the dark bg override */}
+      <div className="card-icon-badge">
+        <Activity size={24} />
+      </div>
+ 
+      {/* Title group */}
+      <div className="card-title-group">
+        <h2 className="card-title-performance">
+          {formatVesselDisplayName(selectedVesselDetails.name)} — Detailed History
+        </h2>
+        <p className="card-description">
+          {isDetailLoading
+            ? "Fetching detailed data..."
+            : `Showing historical data for: ${selectedVesselDetails.filter}`}
+        </p>
+      </div>
+ 
+      {/* Close button */}
+      <button
+        className="ae-detail-close-btn"
+        onClick={() => setSelectedVesselDetails(null)}
+      >
+        <X size={24} />
+      </button>
+    </div>
+ 
+    {/* ── BODY ───────────────────────────────────────────────────────────── */}
+    <div className="card-body-enhanced">
+ 
+      {isDetailLoading ? (
+        <div className="ae-detail-loading">
+          <Loader2 className="animate-spin" size={40} color="#111827" />
+          <p>Loading report details...</p>
+        </div>
+      ) : (
+        <table className="ae-detail-table">
+ 
+          {/* ── THEAD ──────────────────────────────────────────────────── */}
+          <thead className="ae-detail-thead">
+            <tr>
+              {/* Sticky header cells */}
+              <th className="ae-dth-gen">Gen</th>
+              <th className="ae-dth-date">Report Date</th>
+              <th className="ae-dth-load">Load %</th>
+              <th className="ae-dth-status">Status</th>
+              <th className="ae-dth-raw">Raw Rep</th>
+              <th className="ae-dth-ana">Ana Rep</th>
+ 
+              {/* Scrollable param headers */}
+              {AE_HISTORY_PARAMS.map((param) => (
+                <th key={param.key} className="ae-dth-param">
+                  {param.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+ 
+          {/* ── TBODY ──────────────────────────────────────────────────── */}
+          <tbody>
+            {selectedVesselDetails.reports.length === 0 ? (
+              <tr className="ae-detail-no-reports">
+                <td colSpan={6 + AE_HISTORY_PARAMS.length}>No reports found.</td>
+              </tr>
+            ) : (
+              selectedVesselDetails.reports.map((r, i) => {
+                const load = r.load_percentage || r.load_percent || 0;
+ 
+                // ── Status calculation (100% original logic) ────────────────
+                let calculatedStatus = "Normal";
+                let critCount = 0;
+                let warnCount = 0;
+ 
+                AE_HISTORY_PARAMS.forEach((paramConfig) => {
+                  const key = paramConfig.key;
+                  const actualVal = r[key];
+                  if (actualVal !== null && actualVal !== undefined) {
+                    let curve = [];
+                    if (r.curves) {
+                      if (r.curves[key]) {
+                        curve = r.curves[key];
+                      } else {
+                        const labelMatch = Object.entries(r.curves).find(([k]) =>
+                          k.toLowerCase().includes(
+                            paramConfig.label.toLowerCase().split(" ")[0]
+                          )
                         );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        )}
+                        if (labelMatch) curve = labelMatch[1];
+                      }
+                    }
+                    const baseline = interpolate(load, curve);
+                    const { status } = getDeviationStatus(
+                      actualVal,
+                      baseline,
+                      paramConfig.label
+                    );
+                    if (status === "critical") critCount++;
+                    if (status === "warning")  warnCount++;
+                  }
+                });
+ 
+                if (critCount > 0)      calculatedStatus = "Critical";
+                else if (warnCount > 0) calculatedStatus = "Warning";
+ 
+                // ── Short generator name (100% original logic) ──────────────
+                const rawName = String(
+                  r.generator_designation || r.generator_name || ""
+                ).toUpperCase();
+                let shortGenName = "AE";
+                if (rawName.includes("1"))      shortGenName = "AE1";
+                else if (rawName.includes("2")) shortGenName = "AE2";
+                else if (rawName.includes("3")) shortGenName = "AE3";
+ 
+                // ── Status badge CSS variant class ──────────────────────────
+                const statusVariant =
+                  calculatedStatus === "Critical" ? "ae-status--critical" :
+                  calculatedStatus === "Warning"  ? "ae-status--warning"  :
+                                                    "ae-status--normal";
+ 
+                // ── Row zebra class ─────────────────────────────────────────
+                const rowClass =
+                  i % 2 === 0 ? "ae-detail-row-even" : "ae-detail-row-odd";
+ 
+                // ── renderCell (100% original logic, only style→class changed) ──
+                const renderCell = (paramConfig) => {
+                  const key = paramConfig.key;
+                  const actualVal = r[key];
+ 
+                  if (actualVal === null || actualVal === undefined) {
+                    return <span className="ae-detail-empty">-</span>;
+                  }
+ 
+                  const findCurve = () => {
+                    if (!r.curves) return [];
+                    if (r.curves[key]) return r.curves[key];
+                    const labelMatch = Object.entries(r.curves).find(([k]) =>
+                      k.toLowerCase().includes(
+                        paramConfig.label.toLowerCase().split(" ")[0]
+                      )
+                    );
+                    if (labelMatch) return labelMatch[1];
+                    return [];
+                  };
+ 
+                  const curve    = findCurve();
+                  const baseline = interpolate(load, curve);
+                  const { status: dotStatus, dev } = getDeviationStatus(
+                    actualVal,
+                    baseline,
+                    paramConfig.label
+                  );
+ 
+                  // dotColor is a runtime JS value — stays inline
+                  const dotColor =
+                    dotStatus === "critical" ? "#ef4444" :
+                    dotStatus === "warning"  ? "#f59e0b" :
+                                               "#10b981";
+ 
+                  const pctSign = dev > 0 ? "+" : "";
+ 
+                  return (
+                    <div className="ae-detail-param-dot-wrap">
+                      <div
+                        className="ae-detail-param-dot"
+                        title={`Act: ${safeFixed(actualVal)} | Dev: ${pctSign}${safeFixed(dev, 1)}%`}
+                        style={{ backgroundColor: dotColor }}
+                      />
+                    </div>
+                  );
+                };
+ 
+                // ── Row render ──────────────────────────────────────────────
+                return (
+                  <tr key={i} className={rowClass}>
+ 
+                    {/* GEN — sticky */}
+                    <td className="ae-dtd-gen">
+                      {shortGenName}
+                    </td>
+ 
+                    {/* REPORT DATE — sticky */}
+                    <td className="ae-dtd-date">
+                      {formatDate(r.report_date)}
+                    </td>
+ 
+                    {/* LOAD % — sticky */}
+                    <td className="ae-dtd-load">
+                      {safeFixed(load, 1)}%
+                    </td>
+ 
+                    {/* STATUS — sticky */}
+                    <td className="ae-dtd-status">
+                      <span className={`ae-detail-status-badge ${statusVariant}`}>
+                        <span className="ae-detail-status-badge__dot" />
+                        {calculatedStatus}
+                      </span>
+                    </td>
+ 
+                    {/* RAW REP — sticky */}
+                    <td className="ae-dtd-raw">
+                      {r.raw_report_view_url ? (
+                        <div className="ae-detail-icon-wrap">
+                          <button
+                            className="ae-detail-icon-btn"
+                            onClick={() => window.open(r.raw_report_view_url, "_blank")}
+                            title="View Raw"
+                          >
+                            <FileText size={15} />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="ae-detail-empty">-</span>
+                      )}
+                    </td>
+ 
+                    {/* ANA REP — sticky (last pinned col, has shadow divider) */}
+                    <td className="ae-dtd-ana">
+                      {r.generated_report_view_url ? (
+                        <div className="ae-detail-icon-wrap">
+                          <button
+                            className="ae-detail-icon-btn"
+                            onClick={() =>
+                              window.open(r.generated_report_view_url, "_blank")
+                            }
+                            title="View Analytical"
+                          >
+                            <FileText size={15} />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="ae-detail-empty">-</span>
+                      )}
+                    </td>
+ 
+                    {/* SCROLLABLE PARAM CELLS */}
+                    {AE_HISTORY_PARAMS.map((param) => (
+                      <td key={param.key} className="ae-dtd-param">
+                        {renderCell(param)}
+                      </td>
+                    ))}
+ 
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+ 
+        </table>
+      )}
+    </div>
+ 
+  </div>
+)}
       </div>
     </div>
   );

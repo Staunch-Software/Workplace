@@ -1204,8 +1204,7 @@ const VesselDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const vesselImo = user?.assigned_vessels?.[0]?.imo || user?.assigned_vessel_imos?.[0] || '';
-  console.log(vesselImo)
+  const vesselImo = user?.assigned_vessels?.[0] || '';
   const [showCreateRow, setShowCreateRow] = useState(false);
   const rowRefs = useRef({});
   const [currentPage, setCurrentPage] = useState(1);
@@ -2009,6 +2008,11 @@ const VesselDashboard = () => {
       alert('Area of Concern and Description are required');
       return;
     }
+    if (!vesselImo) {
+      alert('❌ No vessel assigned to your account. Please contact admin.');
+      console.error('vesselImo is empty. User object:', user);
+      return;
+    }
 
     const defectId = generateId(); // ✅ DEFINE ONCE
 
@@ -2367,7 +2371,7 @@ const VesselDashboard = () => {
             {/* PRIORITY */}
             <div className="legend-item">
               <strong>Priority:</strong>
-              <span style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <span className="legend-icons">
                 <AlertTriangle size={14} color="#16a34a" /> <label>Low</label>
                 <AlertTriangle size={14} color="#2563eb" /> <label>Medium</label>
                 <AlertTriangle size={14} color="#f97316" /> <label>High</label>
@@ -2440,7 +2444,7 @@ const VesselDashboard = () => {
                   items={visibleColumns}
                   strategy={horizontalListSortingStrategy}
                 > <tr>
-                    <th style={{ width: 100 }}>Defect ID</th>
+                    <th style={{ width: 100,paddingLeft:"5px" }}>Defect ID</th>
 
                     {visibleColumns.map((colId) => {
                       switch (colId) {

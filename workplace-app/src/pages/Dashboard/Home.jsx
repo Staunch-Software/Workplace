@@ -39,7 +39,7 @@ const FullScreenLoader = () => (
 
 
 
-const Home = () => {
+const Home = ({ searchQuery = '' }) => {
   const navigate = useNavigate();
   const { user, setUser } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -99,7 +99,13 @@ const Home = () => {
     { id: 'engine', permKey: 'engine_performance', name: 'Engine Performance', desc: 'Metrics & Health', icon: <Activity size={32} />, class: 'hm-card-engine', delay: '0.4s' },
   ];
 
-  const apps = allApps.filter(app => user?.permissions?.[app.permKey] === true);
+  const apps = allApps
+    .filter(app => user?.permissions?.[app.permKey] === true)
+    .filter(app =>
+      !searchQuery.trim() ||
+      app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      app.desc.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   return (
     <>

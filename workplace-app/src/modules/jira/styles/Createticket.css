@@ -5,7 +5,7 @@
 }
 
 .ct-main {
-  max-width: 680px;
+  max-width: 70%;
   margin: 0 auto;
   padding: 24px 16px;
 }
@@ -83,6 +83,7 @@
   background: #fef2f2;
   border-color: #fecaca;
 }
+
 .ct-priority-btn--Critical .ct-priority-btn-title {
   color: #dc2626;
 }
@@ -92,6 +93,7 @@
   background: #fff7ed;
   border-color: #fed7aa;
 }
+
 .ct-priority-btn--Major .ct-priority-btn-title {
   color: #f97316;
 }
@@ -101,6 +103,7 @@
   background: #fefce8;
   border-color: #fef08a;
 }
+
 .ct-priority-btn--Minor .ct-priority-btn-title {
   color: #ca8a04;
 }
@@ -298,4 +301,246 @@
 
 .ct-attachment-remove:hover {
   color: #b91c1c;
+}
+
+
+/* ============================================================
+   1. TABLET OPTIMIZATION (Under 1024px)
+   Focus: Touch-friendly targets and padding adjustments
+   ============================================================ */
+@media (max-width: 1023px) {
+  .ct-main {
+    max-width: 100% !important;
+    padding: 20px 16px !important;
+  }
+
+  .ct-title {
+    font-size: 20px !important;
+  }
+
+  /* Priority buttons: Larger tap area */
+  .ct-priority-btn {
+    padding: 18px !important;
+  }
+
+  /* Form padding */
+  .ct-card {
+    padding: 16px !important;
+    border-radius: 10px !important;
+  }
+
+  .ct-selected-priority-name {
+    font-size: 14px;
+  }
+
+  .ct-selected-priority-desc {
+    font-size: 10px;
+  }
+
+
+  /* Form actions: Stack buttons on very small screens */
+  @media (max-width: 480px) {
+    .ct-actions {
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .ct-submit-btn, .ct-cancel-btn {
+      width: 100%;
+      height: 48px;
+      justify-content: center;
+    }
+  }
+}
+
+/* ============================================================
+   2. LAPTOP DENSITY (1024px to 1440px)
+   Focus: Maintaining the compact form feel
+   ============================================================ */
+@media (min-width: 1024px) and (max-width: 1440px) {
+  .ct-main {
+    max-width: 70% !important;
+  }
+}
+
+/* ============================================================
+   3. BIG SCREEN / 4K SCALING (Above 1900px)
+   Focus: Expanding the form width and scaling all inputs
+   ============================================================ */
+@media (min-width: 1900px) {
+  .ct-main {
+    max-width: 70% !important;
+    /* Wider form for big screens */
+    padding: 60px 0 !important;
+  }
+
+  .ct-breadcrumb {
+    font-size: 1rem !important;
+    margin-bottom: 24px !important;
+  }
+
+  .ct-breadcrumb-btn {
+    font-size: 1rem !important;
+  }
+
+  .ct-title {
+    font-size: 36px !important;
+    margin: 10px 0 !important;
+  }
+
+  .ct-subtitle {
+    font-size: 1.1rem !important;
+  }
+
+  .ct-brand {
+    font-size: 1rem !important;
+  }
+
+  /* Scale Priority Selection */
+  .ct-priority-label {
+    font-size: 1.25rem !important;
+    margin-bottom: 20px !important;
+  }
+
+  .ct-priority-list {
+    gap: 16px !important;
+  }
+
+  .ct-priority-btn {
+    padding: 24px !important;
+    border-radius: 16px !important;
+  }
+
+  .ct-priority-btn-title {
+    font-size: 1.4rem !important;
+  }
+
+  .ct-priority-btn-desc {
+    font-size: 1rem !important;
+  }
+
+  /* Scale Form Card */
+  .ct-card {
+    padding: 40px !important;
+    border-radius: 20px !important;
+  }
+
+  .ct-selected-priority {
+    padding: 20px !important;
+    margin-bottom: 32px !important;
+  }
+
+  .ct-selected-priority-name {
+    font-size: 1.25rem !important;
+  }
+
+  .ct-selected-priority-desc {
+    font-size: 1rem !important;
+  }
+
+  /* Scale Fields */
+  .ct-field {
+    margin-bottom: 24px !important;
+  }
+
+  .ct-label {
+    font-size: 1.1rem !important;
+    margin-bottom: 10px !important;
+  }
+
+  .ct-input, .ct-textarea, .ct-select {
+    font-size: 1.15rem !important;
+    padding: 16px 20px !important;
+    border-radius: 12px !important;
+  }
+
+  /* Scale Upload Zone */
+  .ct-upload-zone {
+    padding: 35px 20px !important;
+    border-radius: 12px !important;
+  }
+
+  .ct-upload-text {
+    font-size: 1.1rem !important;
+  }
+
+  /* Scale Attachment list */
+  .ct-attachment-item {
+    padding: 12px 18px !important;
+    font-size: 1rem !important;
+  }
+
+  /* Scale Buttons */
+  .ct-actions {
+    gap: 20px !important;
+    margin-top: 20px !important;
+  }
+
+  .ct-submit-btn {
+    height: 50px !important;
+    padding: 0 40px !important;
+    font-size: 1.2rem !important;
+    border-radius: 12px !important;
+  }
+
+  .ct-cancel-btn {
+    font-size: 1.1rem !important;
+  }
+
+  .ct-change-btn {
+    font-size: 15px;
+    font-weight: 700;
+  }
+}
+
+/* ============================================================
+   4. EXTRA LARGE 4K (Above 2500px)
+   ============================================================ */
+@media (min-width: 2500px) {
+  .ct-main {
+    max-width: 70% !important;
+  }
+
+  .ct-title {
+    font-size: 48px !important;
+  }
+
+  .ct-priority-btn-title {
+    font-size: 1.8rem !important;
+  }
+
+  .ct-priority-btn-desc {
+    font-size: 1.2rem !important;
+  }
+
+  .ct-input, .ct-textarea, .ct-select {
+    font-size: 1.3rem !important;
+    padding: 20px 24px !important;
+  }
+
+  .ct-label {
+    font-size: 1.25rem !important;
+  }
+
+  .ct-submit-btn {
+    height: 70px !important;
+    font-size: 1.4rem !important;
+  }
+
+  .ct-brand {
+    font-size: 1.2rem !important;
+  }
+
+  .ct-selected-priority-name {
+    font-size: 1.4rem !important;
+  }
+
+  .ct-selected-priority-desc {
+    font-size: 1.2rem !important;
+  }
+
+  .ct-change-btn {
+    font-size: 18px;
+    font-weight: 700;
+  }
 }
