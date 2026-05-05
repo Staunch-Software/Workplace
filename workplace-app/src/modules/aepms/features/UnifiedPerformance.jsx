@@ -2172,6 +2172,7 @@ export default function Performance({
   defaultEngineType = "mainEngine",
   onEngineTypeChange,
   onShipChange,
+  onUploadSuccess,
 }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("view");
@@ -3797,6 +3798,7 @@ export default function Performance({
 
           alert(response.message || "✅ Upload successful!");
           isUploadInProgressRef.current = true;
+          if (onUploadSuccess) onUploadSuccess(); 
           setRefreshReportsTrigger((prev) => prev + 1);
           setShowReport(true);
 
@@ -3937,6 +3939,7 @@ export default function Performance({
 
           alert(result.message || "✅ Upload successful!");
           isUploadInProgressRef.current = true;
+          if (onUploadSuccess) onUploadSuccess();
           setRefreshReportsTrigger((prev) => prev + 1);
           setShowReport(true);
 
@@ -9901,7 +9904,9 @@ export default function Performance({
                   report={allMonthlyReports[0]}
                   baseline={baseline}
                   analysisMode={analysisMode}
-                  availableReports={availableReports}
+                  availableReports={availableReports.filter(r =>
+                    new Date(r.report_date) <= new Date(allMonthlyReports[0]?.report_date)
+                  )}
                 />
               )}
 

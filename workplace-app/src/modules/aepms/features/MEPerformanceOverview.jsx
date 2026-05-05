@@ -24,7 +24,7 @@ import {
 import { useNavigate, useLocation } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import "../styles/MEPerformanceOverview.css";
-import "../styles/MeResponsiveness.css";
+import "../styles/Meresponsiveness.css";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 // import ozellarLogo from "../assets/250714_OzellarMarine-Logo-Final.png";
@@ -755,6 +755,7 @@ const [daysSortConfig, setDaysSortConfig] = useState({
   key: "vessel_name",
   direction: "asc",
 });
+ const [aeRefreshTrigger, setAeRefreshTrigger] = useState(0);
 
 
   // ===== NEW: Download State =====
@@ -1136,37 +1137,37 @@ const [daysSortConfig, setDaysSortConfig] = useState({
   }, []);
 
   // --- DATA FETCHING ---
+  // --- DATA FETCHING ---
+  const fetchDashboardData = async (isSilentRefresh = false) => {
+    try {
+      if (!isSilentRefresh) setLoading(true);
+      setError(null);
+      const [daysResponse, marginResponse] = await Promise.all([
+        axiosAepms.getDaysElapsedOverview(),
+        axiosAepms.getPropellerMarginTrend(),
+      ]);
+
+      const vessels = (daysResponse.data || []).sort((a, b) =>
+        (a.vessel_name || "").localeCompare(b.vessel_name || ""),
+      );
+
+      const propellerData = (marginResponse.data || []).sort((a, b) =>
+        (a.vessel_name || "").localeCompare(b.vessel_name || ""),
+      );
+
+      setDaysElapsedData(vessels);
+      setPropellerTrendData(propellerData);
+
+      await fetchAlertHistory(vessels);
+    } catch (err) {
+      setError(err.message || "Failed to load performance data");
+    } finally {
+      if (!isSilentRefresh) setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const [daysResponse, marginResponse] = await Promise.all([
-          axiosAepms.getDaysElapsedOverview(),
-          axiosAepms.getPropellerMarginTrend(),
-        ]);
-
-        // --- ADDED: Sort Report Status (Days Elapsed) Data Alphabetically ---
-        const vessels = (daysResponse.data || []).sort((a, b) =>
-          (a.vessel_name || "").localeCompare(b.vessel_name || ""),
-        );
-
-        // --- ADDED: Sort Propeller Margin Data Alphabetically ---
-        const propellerData = (marginResponse.data || []).sort((a, b) =>
-          (a.vessel_name || "").localeCompare(b.vessel_name || ""),
-        );
-
-        setDaysElapsedData(vessels);
-        setPropellerTrendData(propellerData);
-
-        await fetchAlertHistory(vessels);
-      } catch (err) {
-        setError(err.message || "Failed to load performance data");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    fetchDashboardData(false);
   }, []);
 
   useEffect(() => {
@@ -1956,15 +1957,21 @@ const [daysSortConfig, setDaysSortConfig] = useState({
               embeddedMode={true}
               onEngineTypeChange={(type) => {
                 setUnifiedEngineType(type);
-                // CHANGE 1: This closes the history table when switching ME <-> AE
                 setSelectedVesselDetails(null);
                 setSelectedDaysVesselsFilter([]);
               }}
               onShipChange={(id) => {
                 setConsoleShipId(id);
-                // CHANGE 2: This closes the table if you change to a different vessel
                 setSelectedVesselDetails(null);
                 setSelectedDaysVesselsFilter([]);
+              }}
+              onUploadSuccess={() => {
+                // If ME is active, refresh ME data silently. If AE, bump AE trigger.
+                if (unifiedEngineType === "mainEngine") {
+                  fetchDashboardData(true); 
+                } else {
+                  setAeRefreshTrigger(prev => prev + 1);
+                }
               }}
             />
           </div>
@@ -2394,6 +2401,7 @@ const [daysSortConfig, setDaysSortConfig] = useState({
               <AEPerformanceOverview
                 embeddedMode={true}
                 externalVesselId={consoleShipId}
+                refreshTrigger={aeRefreshTrigger}
               />
             ))}
 
