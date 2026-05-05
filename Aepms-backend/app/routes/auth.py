@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Any
 from app.core.database_control import get_control_db as get_db
 from app.model.control.user import User
 from datetime import datetime
@@ -15,7 +15,7 @@ from app.utils.auth_utils import (
 )
 
 router = APIRouter()
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 logger = logging.getLogger(__name__) 
 
 # ======================= MODELS =======================
@@ -50,8 +50,10 @@ class ProtectedDataResponse(BaseModel):
 
 # ======================= DEPENDENCIES =======================
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> dict:
     """Dependency to verify JWT token and extract current user."""
+    if not credentials:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     token = credentials.credentials
     payload = verify_application_jwt(token)
     return payload

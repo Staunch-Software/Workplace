@@ -27,13 +27,13 @@ async def get_current_user(
         user_id: str = payload.get("sub")
         if not user_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
+                status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials"
             )
     except JWTError as e:
         print(f"DEBUG: JWT Decode Error: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials"
         )
 
