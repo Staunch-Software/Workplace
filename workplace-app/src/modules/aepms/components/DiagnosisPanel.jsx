@@ -134,8 +134,9 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
   if (rawMargin != null) {
     propDev = Math.abs(rawMargin) > 50 ? rawMargin - 100 : rawMargin;
   }
-  const propIsHeavy         = propDev != null && propDev >= 0;
-  const propIsHeavyCritical = propDev != null && propDev > 5;
+  // FIXED:
+  const propIsHeavy = propDev != null && propDev >= 5;
+  const propIsHeavyCritical = propDev != null && propDev > 10;
 
   // ── Cylinder imbalance helper ─────────────────────────────────────────
   const checkCylinderImbalance = (cylKey, isoAvg, isPercent = false, noAmber = false) => {
@@ -203,8 +204,8 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
       causes: [
         "TC compressor or turbine blade fouling reducing airflow",
         "Clogged or damaged nozzle ring restricting exhaust gas flow",
-        "Air filter blockage reducing air intake to TC",
-        "TC bearing wear increasing rotor friction",
+        "Exhaust gas bypass valve partially open — diverting exhaust away from turbine reducing TC speed",
+        "Fouled TC air side filter mesh — combined with turbine fouling creates compound efficiency loss",
       ],
       remedy:
         "Perform TC water washing on both air and exhaust sides. " +
@@ -544,7 +545,6 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         remedy:
           "Carry out scavenge port inspection on affected cylinders. " +
           "Perform exhaust valve drop test. " +
-          "Check piston crown with template. " +
           "Measure liner wear on affected units.",
         evidence: ["Pcomp (cylinder level)"],
       });

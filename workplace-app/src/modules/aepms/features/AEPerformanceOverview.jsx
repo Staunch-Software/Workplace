@@ -73,7 +73,8 @@ const formatDate = (dateString) => {
 };
 
 // --- Custom Hook ---
-const useAEPerformanceData = () => {
+// --- Custom Hook ---
+const useAEPerformanceData = (refreshTrigger) => { // <-- ADDED
   const [loading, setLoading] = useState(true);
   const [runningHoursData, setRunningHoursData] = useState([]);
   const [loadHistoryData, setLoadHistoryData] = useState([]);
@@ -83,7 +84,7 @@ const useAEPerformanceData = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
+        if (refreshTrigger === 0) setLoading(true); // Don't show global loader on silent refresh
         setError(null);
         const perfResponse = await axiosAepms.getAEPerformanceOverview();
         setRunningHoursData(perfResponse.running_hours_data || []);
@@ -97,7 +98,7 @@ const useAEPerformanceData = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [refreshTrigger]); // <-- ADDED
 
   return {
     runningHoursData,
@@ -559,14 +560,14 @@ const normalizeDesignation = (designation) => {
 };
 
 // --- MAIN PAGE COMPONENT ---
-export default function AEPerformanceOverview({ embeddedMode = false, externalVesselId = "" }) {
+export default function AEPerformanceOverview({ embeddedMode = false, externalVesselId = "", refreshTrigger = 0 }) {
   const {
     runningHoursData,
     loadHistoryData,
     statusHistoryData,
     loading,
     error,
-  } = useAEPerformanceData();
+  } = useAEPerformanceData(refreshTrigger);
   const totalGeneratorsReported = runningHoursData.length;
   const GENS = ["AE1", "AE2", "AE3"];
   const [viewOffset, setViewOffset] = useState(0);
