@@ -31,6 +31,9 @@ async def verify_sync_key(api_key: str = Security(sync_api_key_header)):
     if api_key != settings.SYNC_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid Sync API Key")
     
+MODULE_KEY = "luboil" # Ensure this is at the top of shore sync.py
+SYNC_SCOPE = "LUBOIL"
+
 async def record_vessel_sync_time(
     control_db: AsyncSession,
     imo: str,
@@ -39,63 +42,63 @@ async def record_vessel_sync_time(
     telemetry: dict = None,
     db: AsyncSession = None,
 ):
-    if not imo:
-        return
-
+    if not imo: return
     res = await control_db.execute(select(Vessel).where(Vessel.imo == imo))
     vessel = res.scalar_one_or_none()
-    if not vessel:
-        return
+    if not vessel: return
 
     now = datetime.now(timezone.utc)
+    # Extract reported values from vessel
+    reported_count = telemetry.get("failed_items_count", 0) if telemetry else None
     active_errors = telemetry.get("active_errors", []) if telemetry else []
-
+    
     if error_msg:
         active_errors.insert(0, {"entity": "Shore-API", "msg": error_msg, "ts": now.isoformat()})
+        if reported_count is not None:
+            reported_count = max(reported_count, len(active_errors))
 
-    is_healthy = (len(active_errors) == 0)
-
+    # Update Module-Specific DB (sync_state table)
     if db:
-        sync_state_vals = {
-            "vessel_imo": imo,
-            "sync_scope": "LUBOIL",
-            "active_errors": active_errors,
-            "updated_at": now,
-        }
-        update_set = {"active_errors": active_errors, "updated_at": now}
-
-        if is_vessel_pushing:
-            sync_state_vals["last_push_at"] = now
-            update_set["last_push_at"] = now
-        else:
-            sync_state_vals["last_pull_at"] = now
-            update_set["last_pull_at"] = now
+        update_set = {"updated_at": now}
+        if telemetry is not None or error_msg:
+            update_set["active_errors"] = active_errors
+        
+        update_set["last_push_at" if is_vessel_pushing else "last_pull_at"] = now
 
         await db.execute(
             pg_insert(SyncState)
-            .values(**sync_state_vals)
-            .on_conflict_do_update(
-                index_elements=["vessel_imo", "sync_scope"],
-                set_=update_set,
-            )
+            .values(vessel_imo=imo, sync_scope=SYNC_SCOPE, **update_set)
+            .on_conflict_do_update(index_elements=["vessel_imo", "sync_scope"], set_=update_set)
         )
         await db.commit()
 
-    vessel_update = {"updated_at": now, "last_sync_success": is_healthy}
-    if is_vessel_pushing:
-        vessel_update["last_push_at"] = now
-    else:
-        vessel_update["last_pull_at"] = now
+    # --- SELF-HEALING & MULTI-MODULE LOGIC (Control DB) ---
+    vessel_update = {"updated_at": now}
+    vessel_update["last_push_at" if is_vessel_pushing else "last_pull_at"] = now
 
-    if not is_healthy:
+    # Only update counts if telemetry was actually provided (prevents Pull wiping counts)
+    if reported_count is not None:
+        current_counts = dict(vessel.module_error_counts or {})
+        current_counts[MODULE_KEY] = reported_count
+        new_total = sum(current_counts.values())
+        
+        vessel_update["module_error_counts"] = current_counts
+        vessel_update["total_error_count"] = new_total
+        vessel_update["last_sync_success"] = (new_total == 0)
+
+    # --- HISTORY LOGGING ---
+    if len(active_errors) > 0:
         try:
             history = json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
             latest_msg = active_errors[0]["msg"]
-            if not history or history[0]["msg"] != latest_msg:
-                history.insert(0, {"type": "vessel_error", "msg": latest_msg, "ts": now.isoformat()})
-            vessel_update["last_sync_error"] = json.dumps(history[:50])
-        except Exception:
-            pass
+            if not history or history[0].get("msg") != latest_msg:
+                history.insert(0, {
+                    "module": MODULE_KEY.upper(), 
+                    "msg": latest_msg, 
+                    "ts": now.isoformat()
+                })
+                vessel_update["last_sync_error"] = json.dumps(history[:50])
+        except: pass
 
     await control_db.execute(update(Vessel).where(Vessel.imo == imo).values(vessel_update))
     await control_db.commit()

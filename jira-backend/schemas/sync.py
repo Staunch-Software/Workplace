@@ -9,3 +9,4 @@ class SyncPayload(BaseModel):
     version: int
     origin: str             # VESSEL / SHORE
     vessel_imo: Optional[str] = None
+    vessel_telemetry: dict = {}

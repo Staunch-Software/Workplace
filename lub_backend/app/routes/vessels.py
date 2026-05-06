@@ -31,10 +31,15 @@ async def get_all_vessel_sync_status(
         for v in vessels:
             state = sync_states.get(v.imo)
             active_errors = state.active_errors if (state and state.active_errors) else []
+            
+            # GET THE REAL COUNT from the module counts map
+            counts_map = v.module_error_counts or {}
+            lub_count = counts_map.get("luboil", 0) # matches MODULE_KEY
+
             result[v.imo] = {
                 "name": v.name,
-                "last_sync_success": len(active_errors) == 0,
-                "failed_items_count": len(active_errors),
+                "last_sync_success": (lub_count == 0 and len(active_errors) == 0),
+                "failed_items_count": lub_count, # <--- FIXED
                 "latest_error": active_errors[0] if active_errors else None,
             }
         return result
@@ -64,7 +69,8 @@ async def get_vessel_sync_log(
     sync_state = ss_res.scalar_one_or_none()
 
     active_errors = sync_state.active_errors if (sync_state and sync_state.active_errors) else []
-
+    counts_map = vessel.module_error_counts or {}
+    lub_count = counts_map.get("luboil", 0)
     return {
         "imo": imo,
         "name": vessel.name,
@@ -72,6 +78,6 @@ async def get_vessel_sync_log(
         "vessel_reported_push": sync_state.last_push_at if sync_state else None,
         "vessel_reported_pull": sync_state.last_pull_at if sync_state else None,
         "active_errors": active_errors,
-        "failed_items_count": len(active_errors),
+        "failed_items_count": lub_count, # <--- FIXED
         "error_history": json.loads(vessel.last_sync_error) if vessel.last_sync_error else [],
     }

@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, Text
+from sqlalchemy import Column, String, Boolean, DateTime, Text,Integer
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -26,6 +26,8 @@ class Vessel(Base):
     last_pull_at = Column(DateTime(timezone=True), nullable=True)   # vessel → shore
     last_sync_success = Column(Boolean, default=True, nullable=False)
     last_sync_error = Column(Text, nullable=True)
+    module_error_counts = Column(JSONB, nullable=False, server_default='{}')
+    total_error_count = Column(Integer, nullable=False, default=0, server_default='0')
     vessel_telemetry = Column(JSONB, nullable=False, server_default='{}')
 
     # RELATIONS

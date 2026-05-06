@@ -3522,9 +3522,6 @@ div.section-header-enhanced {
   background-color: #f8fafc;
 }
 
-.vessel-menu-item {
-  padding: 8px 10px !important;
-}
 
 .vessel-checkbox-label {
   display: flex !important;
@@ -3533,6 +3530,7 @@ div.section-header-enhanced {
   cursor: pointer;
   font-size: 0.85rem !important;
   font-weight: 600;
+  padding: 8px 10px;
 }
 
 .vessel-dropdown-scroll {
@@ -3578,6 +3576,7 @@ div.section-header-enhanced {
   .lub-vessel-select-menu {
     width: 400px !important;
     border-radius: 15px !important;
+    max-height: 320px !important;
   }
 
   .vessel-menu-header {
@@ -3587,11 +3586,9 @@ div.section-header-enhanced {
   .vessel-checkbox-label {
     font-size: 1.3rem !important;
     gap: 15px !important;
-  }
-
-  .vessel-menu-item {
     padding: 15px 20px !important;
   }
+
 }
 
 
