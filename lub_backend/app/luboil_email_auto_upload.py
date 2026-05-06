@@ -7,6 +7,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from dotenv import load_dotenv
+from zoneinfo import ZoneInfo
 
 # Load .env from lub_backend root (one level up from app/)
 load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
@@ -529,36 +530,35 @@ async def run_luboil_email_upload_job():
 async def start_async_email_scheduler():
     logger.info("=" * 60)
     logger.info("  ASYNC LUBOIL AUTO-UPLOAD SCHEDULER STARTED")
-    logger.info("  Scheduled run times: 08:00 AM and 05:00 PM (17:00) daily")
-    logger.info(f"  Watching mailbox   : {MAILBOX_EMAIL}")
-    logger.info(f"  FastAPI backend    : {FASTAPI_UPLOAD_BASE}")
+    logger.info("  Scheduled run times: 08:00 AM and 05:00 PM (17:00) IST")
     logger.info("=" * 60)
 
-    # Optional: Also run immediately on startup
+    # 1. We still need the short wait so the VM ports can open on startup!
+    logger.info("▶️  Waiting 10 seconds for VM ports to open before immediate check...")
+    await asyncio.sleep(10)
+    
     logger.info("▶️  Running immediate check on startup...")
     await run_luboil_email_upload_job()
 
     last_run_time = None
 
-    # Keep the scheduler alive asynchronously
-    logger.info(f"\n⏰ Scheduler active. Waiting for next scheduled time.\n")
     while True:
         try:
-            # Check the current time
-            now_str = datetime.now().strftime("%H:%M")
+            # 2. FORCE PYTHON TO CHECK THE SPECIFIC TIMEZONE (e.g., India Standard Time)
+            local_time = datetime.now(ZoneInfo("Asia/Kolkata"))
+            now_str = local_time.strftime("%H:%M")
             
-            if now_str in ["08:00", "17:11"] and last_run_time != now_str:
+            # Now it will perfectly trigger at 08:00 and 17:00 local time
+            if now_str in ["08:00", "17:20"] and last_run_time != now_str:
                 await run_luboil_email_upload_job()
-                last_run_time = now_str  # Mark as run so it doesn't run repeatedly this minute
+                last_run_time = now_str  
             
-            # Reset the flag when the minute passes
-            if now_str not in ["08:00", "17:11"]:
+            if now_str not in ["08:00", "17:20"]:
                 last_run_time = None
 
         except Exception as e:
             logger.error(f"Scheduler loop error prevented crash: {e}")
 
-        # Sleep asynchronously for 60 seconds (does NOT block FastAPI)
         await asyncio.sleep(60)
 
 
