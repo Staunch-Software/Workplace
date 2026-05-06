@@ -4074,7 +4074,7 @@ const LuboilAnalysis = () => {
             {/* NEW HEADER FOR TABLE */}
             <CardHeader
               onClick={() => setIsTableOpen(!isTableOpen)}
-              className="lub-matrix-card-header"
+              className={`lub-matrix-card-header ${isTableOpen ? "active" : ""}`}
             >
               {/* LEFT GROUP: Icon + Title + Filter (Now grouped together) */}
               <div className="lub-matrix-header-left">

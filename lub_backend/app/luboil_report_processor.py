@@ -272,8 +272,16 @@ async def save_luboil_report(
         for m in machineries if m.get('sample_info', {}).get('number')
     ]
 
+    # NEW: Content fingerprint set for full comparison
+    incoming_sample_numbers = {
+        str(m.get('sample_info', {}).get('number'))
+        for m in machineries
+        if m.get('sample_info', {}).get('number')
+    }
+
     is_duplicate = False
     report = None
+    existing_map = {}  # always initialize so sample loop never breaks
 
     if pdf_sample_numbers:
         existing_samples_result = await session.execute(
@@ -313,20 +321,30 @@ async def save_luboil_report(
         )
 
         if all_match:
-            is_duplicate = True
-            existing_report_result = await session.execute(
-                select(LuboilReport).where(
-                    LuboilReport.report_id == existing_samples[0].report_id
+            # NEW: Full content comparison — all sample numbers must match exactly
+            existing_sample_numbers = {s.sample_number for s in existing_samples}
+
+            if existing_sample_numbers == incoming_sample_numbers:
+                # EXACT DUPLICATE — same vessel + same date + same sample numbers
+                # Works regardless of file name (same or different)
+                is_duplicate = True
+                existing_report_result = await session.execute(
+                    select(LuboilReport).where(
+                        LuboilReport.report_id == existing_samples[0].report_id
+                    )
                 )
-            )
-            report = existing_report_result.scalars().first()
-            report.file_name = filename
-            report.full_json_data = extracted_data
-            report.oil_source = oil_source_extracted
-            logger.info(f"DUPLICATE: reusing report_id={report.report_id}")
+                report = existing_report_result.scalars().first()
+                report.file_name = filename
+                report.full_json_data = extracted_data
+                report.oil_source = oil_source_extracted
+                existing_map = {s.sample_number: s for s in existing_samples}
+                logger.info(f"DUPLICATE: same content detected, reusing report_id={report.report_id}")
+            else:
+                # Same date but sample numbers changed → treat as new report
+                logger.info(f"Content changed → treating as new report")
 
     if not is_duplicate:
-        # Extra safety: if same vessel + same date report already exists, treat as duplicate
+        # Extra safety: if same vessel + same date report already exists
         existing_report_check = await session.execute(
             select(LuboilReport).where(
                 LuboilReport.imo_number == vessel_imo,
@@ -336,22 +354,29 @@ async def save_luboil_report(
         existing_report = existing_report_check.scalars().first()
 
         if existing_report:
-            # Found same vessel + date → treat as duplicate, reuse that report
-            is_duplicate = True
-            report = existing_report
-            report.file_name = filename
-            report.full_json_data = extracted_data
-            report.oil_source = oil_source_extracted
-
-            # Rebuild existing_map from this report's samples for the update loop below
+            # NEW: Compare content before treating as duplicate
             existing_samples_re = await session.execute(
                 select(LuboilSample).where(
                     LuboilSample.report_id == existing_report.report_id
                 )
             )
-            existing_map = {s.sample_number: s for s in existing_samples_re.scalars().all()}
-            logger.info(f"SAFETY CATCH: reusing existing report_id={existing_report.report_id}")
-        else:
+            existing_samples_list = existing_samples_re.scalars().all()
+            existing_sample_numbers = {s.sample_number for s in existing_samples_list}
+
+            if existing_sample_numbers == incoming_sample_numbers:
+                # EXACT DUPLICATE — same vessel + same date + same content
+                is_duplicate = True
+                report = existing_report
+                report.file_name = filename
+                report.full_json_data = extracted_data
+                report.oil_source = oil_source_extracted
+                existing_map = {s.sample_number: s for s in existing_samples_list}
+                logger.info(f"SAFETY CATCH DUPLICATE: reusing report_id={existing_report.report_id}")
+            else:
+                # Same vessel + same date BUT content changed → new row
+                logger.info(f"SAFETY CATCH: content changed → creating new row")
+
+        if not is_duplicate:
             report = LuboilReport(
                 imo_number=vessel_imo,
                 file_name=filename,

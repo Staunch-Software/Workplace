@@ -13,7 +13,9 @@ div.section-header-enhanced {
   /* Forces them to stay on one line */
   width: 100% !important;
 }
-
+.lub-matrix-card-header.active{
+  border-radius: 8px 8px 0 0 !important;
+}
 /* --- ULTRA-WIDE / BIG SCREEN (2560px+) --- */
 @media (min-width: 2000px) {
   div.section-header-enhanced {
@@ -533,6 +535,10 @@ div.section-header-enhanced {
   overflow: auto !important;
   /* This creates the scrollbars */
   scrollbar-width: thin !important;
+  border-bottom-left-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+  clip-path: inset(-1000px 0px 0px 0px round 0px 0px 8px 8px) !important;
+
 }
 
 /* --- 2. MACHINERY STICKY CELL (LEFT) --- */
@@ -3411,6 +3417,7 @@ div.section-header-enhanced {
   border: 1px solid #e2e8f0 !important;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
   margin-bottom: 0px !important;
+  border-radius: 8px !important;
 }
 
 .lub-matrix-card-header {
@@ -3421,6 +3428,7 @@ div.section-header-enhanced {
   padding: 8px 20px !important;
   background-color: white !important;
   cursor: pointer;
+  border-radius: 8px !important;
 }
 
 .lub-matrix-header-left {
@@ -3856,6 +3864,14 @@ div.section-header-enhanced {
   font-weight: 800 !important;
   color: #475569 !important;
   text-transform: uppercase !important;
+  border-bottom-left-radius: 8px !important;
+}
+/* 👇 ADD THIS NEW BLOCK */
+.lub-matrix-footer-cell:last-child {
+  border-bottom-right-radius: 0px !important;
+}
+.matrix-scroll-container::-webkit-scrollbar-corner {
+  background-color: transparent !important;
 }
 
 .lub-matrix-footer-cell {
