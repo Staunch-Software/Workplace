@@ -59,29 +59,33 @@ const LiveModuleDetail = ({ imo, moduleKey, isInstalled }) => {
     const [loading, setLoading] = useState(true);
 
     const fetchSyncData = async () => {
-    if (!imo || !isInstalled) {
-        setLoading(false);
-        return;
-    }
-
-    try {
-        if (moduleKey === 'drs') {
-            const res = await apiDrs.get(`/vessels/${imo}/sync-log`);
-            setData(res.data);
-
-        } else if (moduleKey === 'lubeoil') {
-            const res = await apiLuboil.get(`api/vessels/${imo}/sync-log`);
-            setData(res.data);
-
-        } else {
-            setData(null);
+        if (!imo || !isInstalled) {
+            setLoading(false);
+            return;
         }
-    } catch (err) {
-        console.error("Sync log fetch failed", err);
-    } finally {
-        setLoading(false);
-    }
-};
+
+        try {
+            if (moduleKey === 'drs') {
+                const res = await apiDrs.get(`/vessels/${imo}/sync-log`);
+                setData(res.data);
+
+            } else if (moduleKey === 'lubeoil') {
+                const res = await apiLuboil.get(`api/vessels/${imo}/sync-log`);
+                setData(res.data);
+
+            } else if (moduleKey === 'jira') {
+                const res = await axiosJira.get(`api/vessels/${imo}/sync-log`);
+                setData(res.data);
+
+            } else {
+                setData(null);
+            }
+        } catch (err) {
+            console.error("Sync log fetch failed", err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         setLoading(true);
@@ -151,69 +155,46 @@ const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
     const [filter, setFilter] = useState('all');
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
-    const [drsErrors, setDrsErrors] = useState({});
+    const [moduleErrors, setModuleErrors] = useState({});
 
     useEffect(() => {
-
-        // Load vessels from Core
         getVesselStatus().then(res => {
-            setVessels(res.data || []);
-            if (res.data?.length > 0)
-                setSelectedVessel(res.data[0]);
+            const normalized = (res.data || []).map(v => ({
+                ...v,
+                imo: v.imo || v.imo_number,
+            }));
+            setVessels(normalized);
+            if (normalized.length > 0) setSelectedVessel(normalized[0]);
             setLoading(false);
         });
-
-        // Load DRS error summary
-        apiDrs.get("/vessels/sync-status/all")
-            .then(res => {
-                setDrsErrors(res.data || {});
-            })
-            .catch(err => {
-                console.error("Failed to load DRS errors", err);
-            });
-
-    }, []);
-
-    useEffect(() => {
-
-        const loadErrors = () => {
-
-            apiDrs.get("/vessels/sync-status/all")
-                .then(res => {
-                    setDrsErrors(res.data || {});
-                })
-                .catch(err => {
-                    console.error("Failed to load DRS errors", err);
+        const loadAllModuleErrors = async () => {
+            const [drsRes, lubRes, jiraRes] = await Promise.allSettled([
+                apiDrs.get("/vessels/sync-status/all"),
+                apiLuboil.get("api/vessels/sync-status/all"),
+                axiosJira.get("api/vessels/sync-status/all"),
+            ]);
+            const merged = {};
+            [drsRes, lubRes, jiraRes].forEach(res => {
+                if (res.status !== "fulfilled") return;
+                Object.entries(res.value.data || {}).forEach(([imo, data]) => {
+                    merged[imo] = (merged[imo] || 0) + (data.failed_items_count || 0);
                 });
-
+            });
+            setModuleErrors(merged);
         };
-
-        loadErrors();
-
-        const interval =
-            setInterval(loadErrors, 30000);
-
-        return () =>
-            clearInterval(interval);
-
+        loadAllModuleErrors();
+        const interval = setInterval(loadAllModuleErrors, 30000);
+        return () => clearInterval(interval);
     }, []);
 
     const filteredVessels = vessels.filter(v => {
+        const matchesSearch = v.name.toLowerCase().includes(search.toLowerCase());
 
-        const matchesSearch =
-            v.name.toLowerCase()
-                .includes(search.toLowerCase());
+        // Use the live moduleErrors state for the filter
+        const totalErrors = moduleErrors[String(v.imo)] || 0;
 
-        if (filter === 'live')
-            return v.online && matchesSearch;
-
-        if (filter === 'errors') {
-
-            const errCount =
-                drsErrors[v.imo]?.failed_items_count || 0;
-
-            return errCount > 0 && matchesSearch;
-        }
+        if (filter === 'live') return v.online && matchesSearch;
+        if (filter === 'errors') return totalErrors > 0 && matchesSearch;
 
         return matchesSearch;
     });
@@ -255,11 +236,24 @@ const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
                                             <div className='fsize-15' style={{ fontSize: '11px', color: THEME.textMuted }}>IMO {v.imo}</div>
                                         </div>
                                     </div>
-                                    {(drsErrors[v.imo]?.failed_items_count || 0) > 0 && (
-                                        <AlertCircle
-                                            size={16}
-                                            color={THEME.danger}
-                                        />
+                                    {/* Minimalist Alert UI: Icon + Number in Red */}
+                                    {(moduleErrors[v.imo] || 0) > 0 && (
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            color: THEME.danger, // Bright Red
+                                            padding: '2px 6px',
+                                        }}>
+                                            <AlertCircle size={15} strokeWidth={3} />
+                                            <span style={{
+                                                fontSize: '13px',
+                                                fontWeight: 800,
+                                                fontFamily: 'sans-serif'
+                                            }}>
+                                                {moduleErrors[String(v.imo)] > 99 ? '99+' : moduleErrors[String(v.imo)]}
+                                            </span>
+                                        </div>
                                     )}
                                 </div>
                             );

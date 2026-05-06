@@ -67,8 +67,11 @@ class VesselStatusOut(BaseModel):
     last_push_at: Optional[str] = None
     last_sync_success: Optional[bool] = None
     failed_items_count: int = 0
-    sync_errors: List[SyncError] = []
+    error_history: List[SyncError] = []   # renamed from sync_errors
     modules: List[ModuleStatus] = []
+    total_errors: int = 0
+    module_errors: dict = {}
+    error_history: List[SyncError] = []
 
     class Config:
         from_attributes = True

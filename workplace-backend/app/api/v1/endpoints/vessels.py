@@ -86,10 +86,10 @@ async def get_vessel_status(
                 to_utc(vessel.last_push_at).isoformat() if vessel.last_push_at else None
             ),
             "last_sync_success": vessel.last_sync_success,
-            "failed_items_count": (vessel.vessel_telemetry or {}).get(
-                "failed_items_count", 0
-            ),
-            "sync_errors": parse_errors(vessel.last_sync_error),
+            "failed_items_count": 0,
+            "error_history": parse_errors(vessel.last_sync_error),
+            "total_errors": vessel.total_error_count, # <--- Return this
+            "module_errors": vessel.module_error_counts, # <--- Return this
             "modules": [
                 {"key": k, "available": (vessel.module_status or {}).get(k, False)}
                 for k in allowed_keys
