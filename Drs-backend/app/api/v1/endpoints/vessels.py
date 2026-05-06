@@ -101,16 +101,13 @@ from app.core.database import get_db
 
 @router.get("/sync-status/all")
 async def get_all_vessel_sync_status(
-    db: AsyncSession = Depends(get_db),              # Module DB
-    control_db: AsyncSession = Depends(get_control_db), # Control DB
+    db: AsyncSession = Depends(get_db),
+    control_db: AsyncSession = Depends(get_control_db),
 ):
-    """Returns a summary of sync health for all vessels using stored counts."""
     try:
-        # 1. Fetch all vessels from Control DB (This now has the error counts)
         v_res = await control_db.execute(select(Vessel))
         vessels = v_res.scalars().all()
 
-        # 2. Fetch all sync states for this module (for the active_errors list)
         ss_res = await db.execute(
             select(SyncState).where(SyncState.sync_scope == SYNC_SCOPE)
         )
@@ -119,10 +116,9 @@ async def get_all_vessel_sync_status(
         result = {}
         for v in vessels:
             state = sync_states.get(v.imo)
-            active_errors = state.active_errors if state else []
+            active_errors = state.active_errors if (state and state.active_errors) else []
             
-            # Use the count we saved in the Main Vessel table
-            # We look for "drs" because that is our MODULE_KEY
+            # Use the "drs" key specifically
             counts_map = v.module_error_counts or {}
             drs_count = counts_map.get("drs", 0)
 
@@ -133,8 +129,7 @@ async def get_all_vessel_sync_status(
                 "latest_error": active_errors[0] if active_errors else None,
             }
             
-        return result # <--- Correct indentation: outside the for loop
-        
+        return result # Indented correctly outside the loop
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -161,32 +156,26 @@ async def get_vessel_sync_log(
     )
     sync_state = ss_res.scalar_one_or_none()
 
-    # 3. Handle Active Errors (The logic for disappearing errors)
-    # If sync_state exists, use its active_errors list. Otherwise, empty list.
+    # 3. Handle Active Errors
     active_errors = sync_state.active_errors if sync_state else []
-    failed_count_res = await db.execute(
-        select(func.count()).where(
-            SyncQueue.status == "FAILED",
-            SyncQueue.sync_scope == SYNC_SCOPE,
-            SyncQueue.payload["vessel_imo"].astext == imo,
-        )
-    )
+    
+    # --- FIX: GET COUNT FROM CENTRAL MAP, NOT SYNC_QUEUE ---
+    counts_map = vessel.module_error_counts or {}
+    drs_count = counts_map.get("drs", 0)
 
     return {
         "imo": imo,
         "name": vessel.name,
         "last_sync_success": vessel.last_sync_success,
         
-        # Live Timestamps from the Module Table
+        # Live Timestamps
         "vessel_reported_push": sync_state.last_push_at if sync_state else None, 
         "vessel_reported_pull": sync_state.last_pull_at if sync_state else None,
         
-        # THE LIVE ERROR LIST: Fixed errors won't be in this list
         "active_errors": active_errors, 
         
-        # Aggregate count for badges
-        "failed_items_count": failed_count_res.scalar() or 0,
+        # USE THE SHARED COUNT
+        "failed_items_count": drs_count, 
         
-        # Historical log (audit trail - doesn't affect "Active" UI)
         "error_history": json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
     }

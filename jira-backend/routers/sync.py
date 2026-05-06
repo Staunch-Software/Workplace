@@ -26,7 +26,7 @@ async def verify_sync_key(api_key: str = Security(sync_api_key_header)):
     if api_key != settings.SYNC_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid Sync API Key")
 
-# --- ADD THESE CONSTANTS AT THE TOP ---
+    # --- ADD THESE CONSTANTS AT THE TOP ---
 MODULE_KEY = "jira"
 SYNC_SCOPE = "TICKET"
 # --------------------------------------
@@ -45,20 +45,26 @@ async def record_vessel_sync_time(
     if not vessel: return
 
     now = datetime.now(timezone.utc)
-    # Extract reported values from vessel telemetry
-    reported_count = telemetry.get("failed_items_count", 0) if telemetry else None
+    
+    # --- FIX 1: Extract telemetry safely ---
+    # We use None as default for reported_count to detect if telemetry was sent
+    reported_count = telemetry.get("failed_items_count") if telemetry else None
     active_errors = telemetry.get("active_errors", []) if telemetry else []
     
     if error_msg:
         active_errors.insert(0, {"entity": "Shore-API", "msg": error_msg, "ts": now.isoformat()})
-        if reported_count is not None:
-            reported_count = max(reported_count, len(active_errors))
+        # If API error, count is at least the length of errors
+        reported_count = max(reported_count or 0, len(active_errors))
 
-    # 1. Update Module-Specific DB (sync_state table in Jira DB)
+    # 1. Update Jira Module DB (SyncState)
     if db:
         update_set = {"updated_at": now}
+        
+        # --- FIX 2: Only wipe/update errors if fresh telemetry was provided ---
+        # This prevents "Pull" requests (where telemetry is None) from clearing the UI
         if telemetry is not None or error_msg:
             update_set["active_errors"] = active_errors
+        
         update_set["last_push_at" if is_vessel_pushing else "last_pull_at"] = now
 
         await db.execute(
@@ -68,21 +74,22 @@ async def record_vessel_sync_time(
         )
         await db.commit()
 
-    # 2. Update Central Control DB (The Shared Vessel Table)
+    # 2. Update Central Control DB (Shared Vessel Table)
+    # Remove .replace(tzinfo=None) to stay consistent with UTC-aware columns
     vessel_update = {"updated_at": now}
     vessel_update["last_push_at" if is_vessel_pushing else "last_pull_at"] = now
 
-    # SELF-HEALING MATH: Only update if telemetry was provided
+    # --- FIX 3: Self-Healing Logic (Only if telemetry exists) ---
     if reported_count is not None:
         current_counts = dict(vessel.module_error_counts or {})
-        current_counts[MODULE_KEY] = reported_count # Updates the "jira" slot
+        current_counts[MODULE_KEY] = reported_count 
         new_total = sum(current_counts.values())
         
         vessel_update["module_error_counts"] = current_counts
         vessel_update["total_error_count"] = new_total
         vessel_update["last_sync_success"] = (new_total == 0)
 
-    # 3. TAGGED HISTORY
+    # 3. Tagged History Logging
     if len(active_errors) > 0:
         try:
             history = json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
@@ -94,11 +101,10 @@ async def record_vessel_sync_time(
                     "ts": now.isoformat()
                 })
                 vessel_update["last_sync_error"] = json.dumps(history[:50])
-        except: pass
+        except Exception: pass
 
     await control_db.execute(update(Vessel).where(Vessel.imo == imo).values(vessel_update))
-    await control_db.commit()
-    
+    await control_db.commit()    
     
 @router.post("/heartbeat", dependencies=[Depends(verify_sync_key)])
 async def receive_heartbeat(

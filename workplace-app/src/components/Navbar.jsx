@@ -237,24 +237,28 @@ const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
                                         </div>
                                     </div>
                                     {/* Minimalist Alert UI: Icon + Number in Red */}
-                                    {(moduleErrors[v.imo] || 0) > 0 && (
-                                        <div style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '4px',
-                                            color: THEME.danger, // Bright Red
-                                            padding: '2px 6px',
-                                        }}>
-                                            <AlertCircle size={15} strokeWidth={3} />
-                                            <span style={{
-                                                fontSize: '13px',
-                                                fontWeight: 800,
-                                                fontFamily: 'sans-serif'
+                                    {(() => {
+                                        const errorCount = moduleErrors[String(v.imo)] || 0;
+                                        if (errorCount === 0) return null;
+                                        return (
+                                            <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                color: THEME.danger,
+                                                padding: '2px 6px',
                                             }}>
-                                                {moduleErrors[String(v.imo)] > 99 ? '99+' : moduleErrors[String(v.imo)]}
-                                            </span>
-                                        </div>
-                                    )}
+                                                <AlertCircle size={15} strokeWidth={3} />
+                                                <span style={{
+                                                    fontSize: '13px',
+                                                    fontWeight: 800,
+                                                    fontFamily: 'sans-serif'
+                                                }}>
+                                                    {errorCount > 99 ? '99+' : errorCount}
+                                                </span>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             );
                         })}
