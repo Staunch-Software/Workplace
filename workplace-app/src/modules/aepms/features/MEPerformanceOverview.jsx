@@ -1960,7 +1960,7 @@ useEffect(() => {
                 ) : (
                   <div className="propeller-empty-state">
                     <p>
-                      👆 Select one or more vessels above to view their
+                       Select one or more vessels above to view their
                       propeller margin performance
                     </p>
                   </div>
@@ -2407,7 +2407,7 @@ useEffect(() => {
                     ) : (
                       <div className="days-empty-state">
                         <p>
-                          👆 Select one or more vessels above to view Report
+                           Select one or more vessels above to view Report
                           Status
                         </p>
                       </div>

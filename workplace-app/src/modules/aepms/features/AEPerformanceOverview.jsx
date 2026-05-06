@@ -1881,7 +1881,7 @@ useEffect(() => {
                 </table>
               ) : (
                 <div className="ae-days-empty-state">
-  <p>👆 Select one or more vessels above to view Report Status</p>
+  <p> Select one or more vessels above to view Report Status</p>
 </div>
               )}
             </div>

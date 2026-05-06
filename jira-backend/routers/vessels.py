@@ -1,5 +1,6 @@
 import json
-from fastapi import APIRouter, Depends
+import traceback
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from db.database import get_control_db
@@ -39,17 +40,17 @@ from db.database import get_db
 
 @router.get("/sync-status/all")
 async def get_all_vessel_sync_status(
-    db: AsyncSession = Depends(get_db),              # Module DB
-    control_db: AsyncSession = Depends(get_control_db), # Control DB
+    db: AsyncSession = Depends(get_db),
+    control_db: AsyncSession = Depends(get_control_db),
 ):
-    """Returns a summary of sync health for all vessels."""
     try:
-        # Fetch all vessels from Control DB
         v_res = await control_db.execute(select(Vessel))
         vessels = v_res.scalars().all()
 
-        # Fetch all sync states for DRS from Module DB
-        ss_res = await db.execute(select(SyncState).where(SyncState.sync_scope == "DEFECT"))
+        # --- FIX: Change "DEFECT" to "TICKET" ---
+        ss_res = await db.execute(
+            select(SyncState).where(SyncState.sync_scope == "TICKET")
+        )
         sync_states = {s.vessel_imo: s for s in ss_res.scalars().all()}
 
         result = {}
@@ -64,15 +65,16 @@ async def get_all_vessel_sync_status(
             result[v.imo] = {
                 "name": v.name,
                 "last_sync_success": (jira_count == 0 and len(active_errors) == 0),
-                "failed_items_count": jira_count, # <--- FIXED
+                "failed_items_count": jira_count,
                 "latest_error": active_errors[0] if active_errors else None
             }
-        return result # <--- Ensure this is OUTSIDE the for loop
+        return result
     
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-
+    
+    
 @router.get("/{imo}/sync-log")
 async def get_vessel_sync_log(
     imo: str,

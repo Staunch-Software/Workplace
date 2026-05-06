@@ -43,7 +43,6 @@ async def verify_sync_key(api_key: str = Security(sync_api_key_header)):
 # Helper: record sync timestamp + telemetry on the control Vessel row
 # ---------------------------------------------------------------------------
 
-
 async def record_vessel_sync_time(
     control_db: AsyncSession,
     imo: str,
@@ -59,16 +58,21 @@ async def record_vessel_sync_time(
     if not vessel: return
 
     now = datetime.now(timezone.utc)
-    reported_count = telemetry.get("failed_items_count", 0) if telemetry else 0
+    
+    # --- CHANGE 1: Use None as default instead of 0 ---
+    # This identifies if telemetry was actually sent or not
+    reported_count = telemetry.get("failed_items_count") if telemetry else None 
     active_errors = telemetry.get("active_errors", []) if telemetry else []
     
     if error_msg:
         active_errors.insert(0, {"entity": "Shore-API", "msg": error_msg, "ts": now.isoformat()})
-        reported_count = max(reported_count, len(active_errors))
+        # If there is a Shore-API error, we ensure count is at least 1
+        reported_count = max(reported_count or 0, len(active_errors))
 
     # Update Module DB (SyncState)
     if db:
         update_set = {"updated_at": now}
+        # Only overwrite active_errors if fresh telemetry or an error was provided
         if telemetry is not None or error_msg:
             update_set["active_errors"] = active_errors
         
@@ -82,24 +86,25 @@ async def record_vessel_sync_time(
         await db.commit()
 
     # --- SELF-HEALING LOGIC FOR CONTROL DB ---
-    current_counts = dict(vessel.module_error_counts or {})
-    current_counts[MODULE_KEY] = reported_count
-    new_total = sum(current_counts.values())
-
-    vessel_update = {
-        "updated_at": now,
-        "module_error_counts": current_counts,
-        "total_error_count": new_total,
-        "last_sync_success": (new_total == 0)
-    }
+    vessel_update = {"updated_at": now}
     vessel_update["last_push_at" if is_vessel_pushing else "last_pull_at"] = now
+
+    # --- CHANGE 2: Only update error maps if we have new data ---
+    # This prevents the "Pull" request from wiping your sidebar badges
+    if reported_count is not None:
+        current_counts = dict(vessel.module_error_counts or {})
+        current_counts[MODULE_KEY] = reported_count
+        new_total = sum(current_counts.values())
+
+        vessel_update["module_error_counts"] = current_counts
+        vessel_update["total_error_count"] = new_total
+        vessel_update["last_sync_success"] = (new_total == 0)
 
     # --- TAGGED HISTORY LOGIC ---
     if len(active_errors) > 0:
         try:
             history = json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
             latest_msg = active_errors[0]["msg"]
-            # Only add if the message is new for this history
             if not history or history[0].get("msg") != latest_msg:
                 history.insert(0, {
                     "module": MODULE_KEY.upper(), 
@@ -113,6 +118,7 @@ async def record_vessel_sync_time(
     await control_db.execute(update(Vessel).where(Vessel.imo == imo).values(vessel_update))
     await control_db.commit()
     
+        
 # ---------------------------------------------------------------------------
 # Heartbeat
 # ---------------------------------------------------------------------------

@@ -48,21 +48,20 @@ async def record_vessel_sync_time(
     if not vessel: return
 
     now = datetime.now(timezone.utc)
-    # Extract reported values from vessel
-    reported_count = telemetry.get("failed_items_count", 0) if telemetry else None
+    
+    # --- CHANGE 1: Use None as default to identify "Pull" vs "Heartbeat/Push" ---
+    reported_count = telemetry.get("failed_items_count") if telemetry else None
     active_errors = telemetry.get("active_errors", []) if telemetry else []
     
     if error_msg:
         active_errors.insert(0, {"entity": "Shore-API", "msg": error_msg, "ts": now.isoformat()})
-        if reported_count is not None:
-            reported_count = max(reported_count, len(active_errors))
+        reported_count = max(reported_count or 0, len(active_errors))
 
-    # Update Module-Specific DB (sync_state table)
+    # Update Module DB (sync_state)
     if db:
         update_set = {"updated_at": now}
         if telemetry is not None or error_msg:
             update_set["active_errors"] = active_errors
-        
         update_set["last_push_at" if is_vessel_pushing else "last_pull_at"] = now
 
         await db.execute(
@@ -72,11 +71,11 @@ async def record_vessel_sync_time(
         )
         await db.commit()
 
-    # --- SELF-HEALING & MULTI-MODULE LOGIC (Control DB) ---
+    # --- SELF-HEALING LOGIC (Control DB) ---
     vessel_update = {"updated_at": now}
     vessel_update["last_push_at" if is_vessel_pushing else "last_pull_at"] = now
 
-    # Only update counts if telemetry was actually provided (prevents Pull wiping counts)
+    # --- CHANGE 2: Only update counts if telemetry was provided (prevents flicker) ---
     if reported_count is not None:
         current_counts = dict(vessel.module_error_counts or {})
         current_counts[MODULE_KEY] = reported_count
@@ -86,7 +85,7 @@ async def record_vessel_sync_time(
         vessel_update["total_error_count"] = new_total
         vessel_update["last_sync_success"] = (new_total == 0)
 
-    # --- HISTORY LOGGING ---
+    # --- CHANGE 3: Merged & Tagged History Logging ---
     if len(active_errors) > 0:
         try:
             history = json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
@@ -98,11 +97,12 @@ async def record_vessel_sync_time(
                     "ts": now.isoformat()
                 })
                 vessel_update["last_sync_error"] = json.dumps(history[:50])
-        except: pass
+        except Exception: pass
 
     await control_db.execute(update(Vessel).where(Vessel.imo == imo).values(vessel_update))
     await control_db.commit()
-
+    
+    
 @router.post("/heartbeat", dependencies=[Depends(verify_sync_key)])
 async def receive_heartbeat(
     payload: Dict[str, Any],
