@@ -3938,14 +3938,14 @@ async def admin_data_sync(
         
         if engine_type == 'mainEngine':
             # create_tables=False prevents "Table already exists" errors
-            success = load_excel_to_database(
+            success = await load_excel_to_database(
                 excel_path=temp_file_path,
                 ae_excel_path=None,
                 create_tables=False, 
                 dry_run=False
             )
         elif engine_type == 'auxiliaryEngine':
-            success = load_excel_to_database(
+            success = await load_excel_to_database(
                 excel_path=None,
                 ae_excel_path=temp_file_path,
                 create_tables=False, 
