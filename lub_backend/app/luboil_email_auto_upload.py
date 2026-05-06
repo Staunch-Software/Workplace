@@ -547,12 +547,12 @@ async def start_async_email_scheduler():
             # Check the current time
             now_str = datetime.now().strftime("%H:%M")
             
-            if now_str in ["08:00", "16:55"] and last_run_time != now_str:
+            if now_str in ["08:00", "17:11"] and last_run_time != now_str:
                 await run_luboil_email_upload_job()
                 last_run_time = now_str  # Mark as run so it doesn't run repeatedly this minute
             
             # Reset the flag when the minute passes
-            if now_str not in ["08:00", "16:55"]:
+            if now_str not in ["08:00", "17:11"]:
                 last_run_time = None
 
         except Exception as e:
