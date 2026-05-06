@@ -22,8 +22,10 @@ MAILBOX_EMAIL       = os.getenv("MAILBOX_EMAIL", "techdevops@ozellar.com")
 
 
 # --- FastAPI Backend URLs --- 
-FASTAPI_UPLOAD_BASE = "http://localhost:8002"  # Lub_backend for uploading
-FASTAPI_AUTH_BASE   = "http://localhost:8003"  # Workplace_backend for login
+# FASTAPI_UPLOAD_BASE = "http://localhost:8002"  # Lub_backend for uploading
+# FASTAPI_AUTH_BASE   = "http://localhost:8003"  # Workplace_backend for login
+FASTAPI_AUTH_BASE   = "/api/v1"
+FASTAPI_UPLOAD_BASE = "/lub"  
 
 # Update the ports for their respective tasks:
 FASTAPI_LOGIN_URL   = f"{FASTAPI_AUTH_BASE}/api/v1/login/access-token"
