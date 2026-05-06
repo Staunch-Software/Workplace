@@ -139,65 +139,42 @@ export default function AppHeader() {
 
     // 1. File Validation
     if (!syncConfig.file) {
-      alert("Please select an Excel or PDF file.");
+      alert("Please select an Excel file.");
       return;
     }
 
-    // 2. IMO Number Validation (Only required for Shop Trials tab)
-    if (activeTab === 'shop-trials') {
-        if (!syncConfig.imoNumber || syncConfig.imoNumber.trim() === '') {
-            alert("⚠️ Please enter the Vessel IMO Number.");
-            return;
-        }
-    }
-
-    // 3. Label Logic for Confirmation Dialog
+    // 2. Label Logic for Confirmation Dialog
     let typeLabel = "Unknown";
     if (syncConfig.engineType === 'mainEngine') typeLabel = 'Main Engine Data';
     else if (syncConfig.engineType === 'auxiliaryEngine') typeLabel = 'Auxiliary Engine Data';
-    else if (syncConfig.engineType === 'luboilConfig') typeLabel = 'Lube Oil Configuration';
-    else if (syncConfig.engineType === 'shopTrialData') typeLabel = 'Main Engine Shop Trial';
-    else if (syncConfig.engineType === 'aeShopTrialData') typeLabel = 'Aux Engine Shop Trial';
 
-    // 4. Confirmation
-    if (!confirm(`⚠️ Are you sure you want to sync/overwrite the ${typeLabel} database with this file?`)) {
+    // 3. Confirmation
+    if (!window.confirm(`⚠️ Are you sure you want to sync/overwrite the ${typeLabel} database with this file?`)) {
         return;
     }
 
     setSyncing(true);
     try {
-      let res;
+      // 4. API Routing - Replaced 'apiService' with 'axiosAepms' 
+      // Removed the 'activeTab' logic since this modal is only for standard data sync
+      const res = await axiosAepms.adminDataSync(
+          syncConfig.file, 
+          syncConfig.engineType
+      );
 
-      // 5. API Routing
-      if (activeTab === 'shop-trials') {
-          // Call the Baseline Endpoint -> Pass File, Type, AND IMO Number
-          res = await apiService.adminUploadBaseline(
-              syncConfig.file, 
-              syncConfig.engineType, 
-              syncConfig.imoNumber
-          );
-      } else {
-          // Call the Standard Data Sync Endpoint (Logs/Config)
-          res = await apiService.adminDataSync(
-              syncConfig.file, 
-              syncConfig.engineType
-          );
-          setShowSyncModal(false); // Close modal only for standard Data Sync
-      }
-
-      alert(res.message);
+      alert(res.message || "Sync successful!");
       
-      // 6. Reset State
-      // Clear file and IMO number, but keep the selected engine type
+      // 5. Reset State & Close Modal
       setSyncConfig(prev => ({ 
           ...prev, 
-          file: null, 
-          imoNumber: '' 
+          file: null
       }));
+      setShowSyncModal(false);
       
     } catch (err) {
       console.error(err);
-      alert(`❌ Sync Failed: ${err.response?.data?.detail || err.message}`);
+      // Fallback error reading since it's a standard Error object thrown by your API class
+      alert(`❌ Sync Failed: ${err.message || 'An unknown error occurred'}`);
     } finally {
       setSyncing(false);
     }
@@ -401,7 +378,7 @@ export default function AppHeader() {
           >
             <option value="mainEngine">Main Engine Data</option>
             <option value="auxiliaryEngine">Auxiliary Engine Data</option>
-            <option value="luboilConfig">Lube Oil Configuration</option>
+            {/* <option value="luboilConfig">Lube Oil Configuration</option> */}
           </select>
         </div>
 

@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-
+import React, { useState, useEffect, useRef } from "react";
 // ── Baseline interpolation ─────────────────────────────────────────────────
 const interpolateBaseline = (baselineData, targetLoad, metric, xAxis = "load") => {
   if (!baselineData || !baselineData[metric]) return null;
@@ -27,27 +26,173 @@ const interpolateBaseline = (baselineData, targetLoad, metric, xAxis = "load") =
 
 // ── What each pattern "owns" so we don't double-report ────────────────────
 const PATTERN_CONSUMES = {
-  TC_FOULING:          ["Turbospeed", "ScavAir", "ScavAirPressure", "Exh_T/C_inlet", "Exh_T/C_outlet", "Exh_Cylinder_outlet"],
-  SCAV_LOW:            ["ScavAir", "ScavAirPressure"],
-  TURBO_LOW:           ["Turbospeed"],
-  EXH_TC_IN_HIGH:      ["Exh_T/C_inlet"],
-  EXH_CYL_OUT_HIGH:    ["Exh_Cylinder_outlet"],
-  COMPRESSION_LOSS:    ["Pcomp", "Pmax"],
-  RETARDED_INJECTION:  ["Pmax", "Pcomp"],
-  EARLY_INJECTION:     ["Pmax"],
-  PRESSURE_RISE:       ["Pmax", "Pcomp"],
-  PRESSURE_RISE_LOW:   ["Pmax", "Pcomp"],
-  FUEL_SYSTEM_WEAR:    ["FIPI"],
-  CYL_PMAX_IMBALANCE:  ["Pmax"],
-  CYL_PCOMP_IMBALANCE: ["Pcomp"],
-  CYL_EXH_IMBALANCE:   ["Exh_Cylinder_outlet"],
-  HULL_FOULING:        ["propeller_margin_percent"],
-  SFOC_HIGH:           ["SFOC"],
-  TREND_UNIFIED_AIR:   ["Turbospeed", "ScavAir", "ScavAirPressure", "Exh_T/C_inlet", "Exh_T/C_outlet", "Exh_Cylinder_outlet"],
-  TREND_UNIFIED_COMB:  ["Pcomp", "Pmax"],
-  TREND_FIPI:          ["FIPI"],
+  TC_FOULING:             ["Turbospeed", "ScavAir", "ScavAirPressure", "Exh_T/C_inlet", "Exh_T/C_outlet", "Exh_Cylinder_outlet"],
+  SCAV_LOW:               ["ScavAir", "ScavAirPressure"],
+  TURBO_LOW:              ["Turbospeed"],
+  EXH_TC_IN_HIGH:         ["Exh_T/C_inlet"],
+  EXH_CYL_OUT_HIGH:       ["Exh_Cylinder_outlet"],
+  COMPRESSION_LOSS:       ["Pcomp", "Pmax"],
+  RETARDED_INJECTION:     ["Pmax", "Pcomp"],
+  EARLY_INJECTION:        ["Pmax"],
+  PRESSURE_RISE:          ["Pmax", "Pcomp"],
+  PRESSURE_RISE_LOW:      ["Pmax", "Pcomp"],
+  FUEL_SYSTEM_WEAR:       ["FIPI"],
+  CYL_IMBALANCE_GROUPED:  ["Pmax", "Pcomp", "Exh_Cylinder_outlet"],
+  HULL_FOULING:           ["propeller_margin_percent"],
+  SFOC_HIGH:              ["SFOC"],
+  TREND_UNIFIED_AIR:      ["Turbospeed", "ScavAir", "ScavAirPressure", "Exh_T/C_inlet", "Exh_T/C_outlet", "Exh_Cylinder_outlet"],
+  TREND_UNIFIED_COMB:     ["Pcomp", "Pmax"],
+  TREND_FIPI:             ["FIPI"],
+};
+const buildCylinderFaultMap = (report) => {
+  if (!report.cylinder_readings) return {};
+
+  const faultMap = {};
+  const pmaxAvg = Number(report.Pmax);
+  const pcompAvg = Number(report.Pcomp);
+  const exhAvg = Number(report.Exh_Cylinder_outlet);
+
+  Object.keys(report.cylinder_readings).forEach((cylNo) => {
+    const cyl = report.cylinder_readings[cylNo];
+    if (!faultMap[cylNo]) faultMap[cylNo] = {};
+
+    if (cyl.pmax && pmaxAvg) {
+      const dev = Math.abs(Number(cyl.pmax) - pmaxAvg);
+      if (dev > 3) faultMap[cylNo].pmax = "critical";
+      else if (dev > 2) faultMap[cylNo].pmax = "warning";
+    }
+
+    if (cyl.pcomp && pcompAvg) {
+      const dev = Math.abs(Number(cyl.pcomp) - pcompAvg);
+      if (dev > 3) faultMap[cylNo].pcomp = "critical";
+      else if (dev > 2) faultMap[cylNo].pcomp = "warning";
+    }
+
+    if (cyl.exhaust_temp && exhAvg) {
+      const devPct = Math.abs(
+        ((Number(cyl.exhaust_temp) - exhAvg) / exhAvg) * 100
+      );
+      if (devPct > 5) faultMap[cylNo].exh = "critical";
+      else if (devPct > 3) faultMap[cylNo].exh = "warning";
+    }
+  });
+
+  return faultMap;
 };
 
+const buildCylinderImbalanceFinding = (report) => {
+  const faultMap = buildCylinderFaultMap(report);
+
+  const faultedCyls = Object.entries(faultMap).filter(
+    ([_, faults]) => Object.keys(faults).length > 0
+  );
+
+  if (faultedCyls.length === 0) return null;
+
+  const multiParamFaults = faultedCyls.filter(
+    ([_, faults]) => Object.keys(faults).length >= 2
+  );
+
+  const isCritical = faultedCyls.some(([_, faults]) =>
+    Object.values(faults).includes("critical")
+  );
+
+  const cylDetails = faultedCyls
+    .map(([cylNo, faults]) => {
+      const params = Object.keys(faults).map((p) =>
+        p === "pmax" ? "Pmax" : p === "pcomp" ? "Pcomp" : "Exh Temp"
+      );
+      return `Cyl ${cylNo} (${params.join(", ")})`;
+    })
+    .join(" | ");
+
+  const getRootCause = (faults) => {
+    const has = (k) => !!faults[k];
+    if (has("pcomp") && has("pmax")) return "mechanical";
+    if (has("pmax") && has("exh")) return "injection";
+    if (has("exh") && !has("pmax") && !has("pcomp")) return "fuel_valve";
+    return "unknown";
+  };
+
+  const rootCauseTypes = faultedCyls.map(([_, faults]) =>
+    getRootCause(faults)
+  );
+
+  const dominantCause = rootCauseTypes.includes("mechanical")
+    ? "mechanical"
+    : rootCauseTypes.includes("injection")
+      ? "injection"
+      : "fuel_valve";
+
+  const causeMap = {
+    mechanical: {
+      causes: [
+        "Piston ring blow-by on affected cylinders",
+        "Worn cylinder liner on affected units",
+        "Exhaust valve leakage on affected cylinders",
+      ],
+      remedy:
+        "Scavenge port inspection on affected cylinders. " +
+        "Exhaust valve drop test. " +
+        "Measure liner wear on affected units.",
+    },
+    injection: {
+      causes: [
+        "Worn or blocked fuel injector on affected cylinders",
+        "Injection timing drift on affected units",
+        "Worn fuel pump element on affected cylinders",
+      ],
+      remedy:
+        "Pressure test fuel injectors on affected cylinders. " +
+        "Verify fuel pump lead on those specific units. " +
+        "Overhaul injectors if pressure test fails.",
+    },
+    fuel_valve: {
+      causes: [
+        "Worn or stuck fuel injector causing incomplete burn",
+        "Exhaust valve leakage on affected cylinders",
+        "Injection timing drift on those specific units",
+      ],
+      remedy:
+        "Pressure test fuel valves on affected cylinders. " +
+        "Check exhaust valve condition by drop test. " +
+        "Inspect scavenge ports on affected units.",
+    },
+  };
+
+  return {
+    parameter: "Individual Cylinder Imbalance",
+    pattern: "CYL_IMBALANCE_GROUPED",
+    severity: isCritical ? "critical" : "warning",
+    comparedAgainst: "Average of all cylinders",
+    finding:
+      `${faultedCyls.length} cylinder(s) show imbalance: ${cylDetails}. ` +
+      `${multiParamFaults.length > 0
+        ? `${multiParamFaults.length} cylinder(s) have faults across multiple parameters — higher confidence of a real fault.`
+        : "Single parameter deviation — monitor closely."}`,
+    causes: causeMap[dominantCause].causes,
+    remedy: causeMap[dominantCause].remedy,
+    evidence: [
+      ...new Set(
+        faultedCyls.flatMap(([_, faults]) => Object.keys(faults))
+      ),
+    ].map((p) =>
+      p === "pmax"
+        ? "Pmax (cyl level)"
+        : p === "pcomp"
+          ? "Pcomp (cyl level)"
+          : "Exh Temp (cyl level)"
+    ),
+    confidence: {
+      score: multiParamFaults.length,
+      total: faultedCyls.length,
+      label:
+        multiParamFaults.length > 0
+          ? `${multiParamFaults.length} cylinders confirm with multiple parameters`
+          : `${faultedCyls.length} cylinder(s) show single parameter deviation`,
+    },
+  };
+};
 // ── MAIN DIAGNOSIS FUNCTION ───────────────────────────────────────────────
 const getDetectedConcerns = (report, baseline, analysisMode) => {
   if (!report || !baseline || Object.keys(baseline).length === 0) return [];
@@ -138,29 +283,7 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
   const propIsHeavy = propDev != null && propDev >= 5;
   const propIsHeavyCritical = propDev != null && propDev > 10;
 
-  // ── Cylinder imbalance helper ─────────────────────────────────────────
-  const checkCylinderImbalance = (cylKey, isoAvg, isPercent = false, noAmber = false) => {
-    if (!report.cylinder_readings || !isoAvg) return null;
-    const amberCyls = [];
-    const redCyls   = [];
-    Object.keys(report.cylinder_readings).forEach((cylNo) => {
-      const val = Number(report.cylinder_readings[cylNo][cylKey] || 0);
-      if (!val) return;
-      const dev = isPercent
-        ? Math.abs(((val - isoAvg) / isoAvg) * 100)
-        : Math.abs(val - isoAvg);
-      if (noAmber) {
-        if (dev > 3) redCyls.push(`Cyl ${cylNo}`);
-      } else {
-        if (dev > 5) redCyls.push(`Cyl ${cylNo}`);
-        else if (dev > 3) amberCyls.push(`Cyl ${cylNo}`);
-      }
-    });
-    return {
-      amber: amberCyls.length > 0 ? amberCyls.join(", ") : null,
-      red:   redCyls.length   > 0 ? redCyls.join(", ")   : null,
-    };
-  };
+ 
 
   const concerns = [];
 
@@ -486,102 +609,9 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
   // QUESTION 4 — CYLINDER IMBALANCE
   // ====================================================================
   if (report.cylinder_readings) {
-
-    const pmaxImbal = checkCylinderImbalance("pmax", pmaxAct, false, true);
-    if (pmaxImbal?.red || pmaxImbal?.amber) {
-      const severity = pmaxImbal.red ? "critical" : "warning";
-      let findingText = "";
-      if (pmaxImbal.red && pmaxImbal.amber)
-        findingText = `CRITICAL: ${pmaxImbal.red} deviate >±3 bar. WARNING: ${pmaxImbal.amber} deviate >±2 bar.`;
-      else if (pmaxImbal.red)
-        findingText = `${pmaxImbal.red} deviate more than ±3 bar from the average Pmax.`;
-      else
-        findingText = `${pmaxImbal.amber} deviate from average Pmax. Monitor closely.`;
-
-      concerns.push({
-        parameter: "Cylinder Injection Imbalance — Pmax",
-        pattern: "CYL_PMAX_IMBALANCE",
-        severity,
-        comparedAgainst: "Average of all cylinders",
-        finding:
-          `${findingText} Average Pmax is ${pmaxAct != null ? pmaxAct.toFixed(1) : "N/A"} bar. ` +
-          `Injection is imbalanced across cylinders, indicating individual cylinder-level faults.`,
-        causes: [
-          "Worn or blocked fuel injector on affected cylinders",
-          "Injection timing drift on affected units",
-          "Worn fuel pump elements on affected cylinders",
-        ],
-        remedy:
-          "Pressure test and overhaul fuel injectors on the affected cylinders. " +
-          "Verify fuel pump lead and VIT adjustment on those specific units.",
-        evidence: ["Pmax (cylinder level)"],
-      });
-    }
-
-    const pcompImbal = checkCylinderImbalance("pcomp", pcompAct, false, true);
-    if (pcompImbal?.red || pcompImbal?.amber) {
-      const severity = pcompImbal.red ? "critical" : "warning";
-      let findingText = "";
-      if (pcompImbal.red && pcompImbal.amber)
-        findingText = `CRITICAL: ${pcompImbal.red} deviate >±3 bar. WARNING: ${pcompImbal.amber} deviate >±2 bar.`;
-      else if (pcompImbal.red)
-        findingText = `${pcompImbal.red} deviate more than ±3 bar from average Pcomp.`;
-      else
-        findingText = `${pcompImbal.amber} deviate from average Pcomp. Monitor closely.`;
-
-      concerns.push({
-        parameter: "Cylinder Compression Imbalance — Pcomp",
-        pattern: "CYL_PCOMP_IMBALANCE",
-        severity,
-        comparedAgainst: "Average of all cylinders",
-        finding:
-          `${findingText} Average Pcomp is ${pcompAct != null ? pcompAct.toFixed(1) : "N/A"} bar. ` +
-          `These specific cylinders have significantly worse compression than the rest of the engine.`,
-        causes: [
-          "Leaking piston rings on affected cylinders",
-          "Leaking or stuck exhaust valve on affected cylinders",
-          "Worn cylinder liner on affected units",
-        ],
-        remedy:
-          "Carry out scavenge port inspection on affected cylinders. " +
-          "Perform exhaust valve drop test. " +
-          "Measure liner wear on affected units.",
-        evidence: ["Pcomp (cylinder level)"],
-      });
-    }
-
-    const exhImbal = checkCylinderImbalance("exhaust_temp", cylOutAct, true, false);
-    if (exhImbal?.red || exhImbal?.amber) {
-      const severity = exhImbal.red ? "critical" : "warning";
-      let findingText = "";
-      if (exhImbal.red && exhImbal.amber)
-        findingText = `CRITICAL: ${exhImbal.red} deviate >±5% from average. WARNING: ${exhImbal.amber} deviate >±3%.`;
-      else if (exhImbal.red)
-        findingText = `${exhImbal.red} deviate more than ±5% from average exhaust temperature.`;
-      else
-        findingText = `${exhImbal.amber} deviate more than ±3% from average exhaust temperature. Monitor closely.`;
-
-      concerns.push({
-        parameter: "Individual Cylinder Exhaust Imbalance",
-        pattern: "CYL_EXH_IMBALANCE",
-        severity,
-        comparedAgainst: "Average of all cylinders",
-        finding:
-          `${findingText} These cylinders are running significantly hotter or cooler than the rest. ` +
-          `This indicates an individual cylinder combustion problem rather than an engine-wide issue.`,
-        causes: [
-          "Worn or stuck fuel injector on affected cylinders causing late or incomplete burn",
-          "Exhaust valve leakage on affected cylinders",
-          "Injection timing drift on those specific units",
-        ],
-        remedy:
-          "Pressure test and overhaul fuel injectors on affected cylinders. " +
-          "Check exhaust valve condition by drop test. " +
-          "Inspect scavenge ports on affected units.",
-        evidence: ["Exh Cyl Outlet (cylinder level)"],
-      });
-    }
-  }
+  const cylFinding = buildCylinderImbalanceFinding(report);
+  if (cylFinding) concerns.push(cylFinding);
+}
 
   // ====================================================================
   // QUESTION 5 — HULL / PROPELLER (ME only)
@@ -679,7 +709,7 @@ const getTrendDiagnosisFindings = (availableReports, baseline, analysisMode) => 
     .filter((r) => r.report_date && new Date(r.report_date) >= oneYearAgo)
     .sort((a, b) => new Date(a.report_date) - new Date(b.report_date));
 
-  if (sorted.length < 2) return [];
+  if (sorted.length < 3) return [];
 
   const baseTime = new Date(sorted[0].report_date).getTime();
   const getMonthsSinceStart = (dateStr) => {
@@ -948,10 +978,24 @@ const groupIntoVerdicts = (findings) => {
 };
 
 // ── OverallEngineHealthCard ───────────────────────────────────────────────
-const OverallEngineHealthCard = ({ findings, report }) => {
+const OverallEngineHealthCard = ({ findings, report, summary }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedIdx, setSelectedIdx] = useState(null);
-
+  const [showSummary, setShowSummary] = useState(false);
+  const detailPanelRef = useRef(null);
+  useEffect(() => {
+  if (selectedIdx !== null && detailPanelRef.current) {
+    setTimeout(() => {
+      const el = detailPanelRef.current;
+      const rect = el.getBoundingClientRect();
+      const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+      if (!isVisible) {
+        const scrollY = window.scrollY + rect.top - (window.innerHeight * 0.4);
+        window.scrollTo({ top: scrollY, behavior: "smooth" });
+      }
+    }, 100);
+  }
+}, [selectedIdx]);
   const verdicts     = groupIntoVerdicts(findings);
   const selectedItem = selectedIdx !== null ? verdicts[selectedIdx] : null;
 
@@ -972,26 +1016,95 @@ const OverallEngineHealthCard = ({ findings, report }) => {
   return (
     <div style={{ marginBottom: "24px", borderRadius: "14px", overflow: "hidden", border: "1.5px solid #1e293b", backgroundColor: "#0f172a", boxShadow: "0 4px 24px rgba(0,0,0,0.3)" }}>
       <div
-        onClick={() => setIsExpanded(!isExpanded)}
-        style={{ backgroundColor: "#1e293b", borderBottom: isExpanded ? "1.5px solid #334155" : "none", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }}
-      >
-        <h3 style={{ margin: 0, color: "#f1f5f9", fontWeight: "800", fontSize: "1rem", display: "flex", alignItems: "center", gap: "10px" }}>
-          🔧 Overall Engine Health
-          <span style={{ backgroundColor: "#334155", color: "#94a3b8", fontSize: "0.7rem", fontWeight: "700", padding: "2px 10px", borderRadius: "20px", border: "1px solid #475569" }}>
-            {verdicts.length} Issue{verdicts.length !== 1 ? "s" : ""} Found
+  onClick={() => setIsExpanded(!isExpanded)}
+  style={{
+    backgroundColor: "#1e293b",
+    borderBottom: isExpanded ? "1.5px solid #334155" : "none",
+    padding: "14px 24px",
+    display: "flex",
+    flexDirection: "column",
+    cursor: "pointer",
+    userSelect: "none",
+  }}
+>
+  {/* TOP ROW */}
+  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <h3 style={{ margin: 0, color: "#f1f5f9", fontWeight: "800", fontSize: "1rem", display: "flex", alignItems: "center", gap: "10px" }}>
+      🔧 Overall Engine Health
+      <span style={{ backgroundColor: "#334155", color: "#94a3b8", fontSize: "0.7rem", fontWeight: "700", padding: "2px 10px", borderRadius: "20px", border: "1px solid #475569" }}>
+        {verdicts.length} Issue{verdicts.length !== 1 ? "s" : ""} Found
+      </span>
+      {verdicts.some((v) => v.severity === "critical") && (
+        <span style={{ backgroundColor: "#7f1d1d22", color: "#f87171", fontSize: "0.65rem", fontWeight: "800", padding: "2px 10px", borderRadius: "20px", border: "1px solid #ef444455" }}>
+          ACTION REQUIRED
+        </span>
+      )}
+      {summary && summary.rootFindings.length > 0 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowSummary(!showSummary); }}
+          style={{
+            width: "20px", height: "20px", borderRadius: "50%",
+            backgroundColor: "#f59e0b", border: "none", color: "#000",
+            fontWeight: "900", fontSize: "0.75rem", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
+          }}
+          title="View Root Cause Summary"
+        >
+          !
+        </button>
+      )}
+    </h3>
+    <span style={{ fontSize: "1.1rem", color: "#94a3b8", transition: "transform 0.3s ease", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", display: "inline-block" }}>▼</span>
+  </div>
+
+  {/* SUMMARY POPUP */}
+  {showSummary && summary && (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        marginTop: "10px",
+        padding: "12px 16px",
+        borderRadius: "8px",
+        backgroundColor: "#0f172a",
+        border: "1px solid #334155",
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "8px",
+        alignItems: "center",
+      }}
+    >
+      <span style={{ fontSize: "0.65rem", fontWeight: "800", color: "#64748b", textTransform: "uppercase", marginRight: "4px" }}>
+        Root Causes:
+      </span>
+      {summary.rootFindings.map((v, i) => (
+        <span key={i} style={{
+          backgroundColor: v.severity === "critical" ? "#7f1d1d22" : "#78350f22",
+          border: `1px solid ${v.severity === "critical" ? "#dc262655" : "#d9770655"}`,
+          borderRadius: "20px", padding: "3px 10px",
+          fontSize: "0.72rem", fontWeight: "700",
+          color: v.severity === "critical" ? "#fca5a5" : "#fcd34d",
+          display: "flex", alignItems: "center", gap: "5px",
+        }}>
+          <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: v.severity === "critical" ? "#dc2626" : "#d97706" }} />
+          {summary.rootCauseMap[v.pattern] || v.parameter}
+        </span>
+      ))}
+      {summary.downstreamFindings.length > 0 && (
+        <>
+          <span style={{ color: "#475569", fontSize: "0.9rem" }}>→</span>
+          <span style={{ fontSize: "0.65rem", color: "#64748b", fontWeight: "600" }}>
+            {summary.downstreamFindings.length} downstream effect{summary.downstreamFindings.length > 1 ? "s" : ""}
           </span>
-          {verdicts.some((v) => v.severity === "critical") && (
-            <span style={{ backgroundColor: "#7f1d1d22", color: "#f87171", fontSize: "0.65rem", fontWeight: "800", padding: "2px 10px", borderRadius: "20px", border: "1px solid #ef444455" }}>
-              ACTION REQUIRED
-            </span>
-          )}
-        </h3>
-        <span style={{ fontSize: "1.1rem", color: "#94a3b8", transition: "transform 0.3s ease", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", display: "inline-block" }}>▼</span>
-      </div>
+        </>
+      )}
+    </div>
+  )}
+</div>
 
       {isExpanded && (
         <div style={{ padding: "20px 24px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "10px", marginBottom: selectedItem ? "16px" : "0" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "10px", marginBottom: selectedItem ? "16px" : "0", alignItems: "start" }}>
             {verdicts.map((item, idx) => {
               const c          = getTileColors(item);
               const isSelected = selectedIdx === idx;
@@ -999,38 +1112,38 @@ const OverallEngineHealthCard = ({ findings, report }) => {
                 <div
                   key={idx}
                   onClick={() => setSelectedIdx(isSelected ? null : idx)}
-                  style={{ backgroundColor: c.bg, border: `1.5px solid ${isSelected ? "#ffffff44" : c.border}`, borderRadius: "10px", padding: "12px", cursor: "pointer", userSelect: "none", position: "relative", height: "130px", boxSizing: "border-box", display: "flex", flexDirection: "column", justifyContent: "space-between", outline: isSelected ? `2px solid ${c.border}` : "none", outlineOffset: "2px", transition: "all 0.15s ease", boxShadow: isSelected ? `0 0 0 2px ${c.border}` : "none" }}
+                  style={{ backgroundColor: c.bg, border: `1.5px solid ${isSelected ? "#ffffff44" : c.border}`, borderRadius: "10px", padding: "12px", cursor: "pointer", userSelect: "none", position: "relative", height: "130px", boxSizing: "border-box", display: "flex", flexDirection: "column", justifyContent: "space-between", outline: isSelected ? `2px solid ${c.border}` : "none", outlineOffset: "2px", transition: "all 0.15s ease", boxShadow: isSelected ? `0 0 0 2px ${c.border}` : "none", overflow: "hidden" }}
                   onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.filter = "brightness(1.2)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.filter = "brightness(1)"; }}
                 >
                   <div style={{ position: "absolute", top: "8px", right: "8px", backgroundColor: c.badgeBg, color: c.badgeText, fontSize: "0.5rem", fontWeight: "700", padding: "2px 6px", borderRadius: "4px", textTransform: "uppercase" }}>
                     {c.badgeLabel}
                   </div>
-                  <div style={{ color: c.titleColor, fontWeight: "800", fontSize: "0.85rem", lineHeight: "1.3", paddingRight: "60px", marginTop: "4px" }}>
-                    {item.parameter}
-                  </div>
-                  {item.evidence && item.evidence.length > 1 && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginTop: "4px" }}>
-                      {item.evidence.slice(0, 3).map((ev, i) => (
-                        <span key={i} style={{ fontSize: "0.5rem", fontWeight: "700", backgroundColor: `${c.border}55`, color: c.subColor, padding: "1px 5px", borderRadius: "3px" }}>
-                          {ev.replace(" (Average)", "").replace("Exh. ", "")}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  <div style={{ color: c.titleColor, fontWeight: "800", fontSize: "0.85rem", lineHeight: "1.3", paddingRight: "60px", marginTop: "4px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" }}>
+  {item.parameter}
+</div>
+                  {item.evidence && item.evidence.length > 1 && !isSelected && (
+  <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginTop: "4px" }}>
+    {item.evidence.slice(0, 3).map((ev, i) => (
+      <span key={i} style={{ fontSize: "0.5rem", fontWeight: "700", backgroundColor: `${c.border}55`, color: c.subColor, padding: "1px 5px", borderRadius: "3px" }}>
+        {ev.replace(" (Average)", "").replace("Exh. ", "")}
+      </span>
+    ))}
+  </div>
+)}
                   <div style={{ display: "flex", alignItems: "center", gap: "4px", color: c.subColor, fontSize: "0.65rem", fontWeight: "700", marginTop: "8px" }}>
-                    <span style={{ transition: "transform 0.2s", transform: isSelected ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block" }}>▶</span>
-                    {isSelected ? "Hide details" : "View details"}
-                  </div>
+  <span style={{ transition: "transform 0.2s", transform: isSelected ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block" }}>▶</span>
+  {isSelected ? "Hide details" : "View details"}
+</div>
                 </div>
               );
             })}
           </div>
 
           {selectedItem && (() => {
-            const c = getTileColors(selectedItem);
-            return (
-              <div style={{ border: `1.5px solid ${c.border}`, borderRadius: "10px", overflow: "hidden", backgroundColor: c.bg }}>
+  const c = getTileColors(selectedItem);
+  return (
+    <div ref={detailPanelRef} style={{ border: `1.5px solid ${c.border}`, borderRadius: "10px", overflow: "hidden", backgroundColor: c.bg }}>
                 <div style={{ padding: "12px 20px", backgroundColor: "#0d0d1a", borderBottom: `1px solid ${c.border}44`, display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center" }}>
                   <span style={{ color: c.titleColor, fontWeight: "800", fontSize: "0.9rem" }}>{selectedItem.parameter}</span>
                   <span style={{ color: c.subColor, fontSize: "0.7rem", fontWeight: "700", textTransform: "uppercase", opacity: 0.85, textAlign: "center" }}>
@@ -1074,7 +1187,7 @@ const OverallEngineHealthCard = ({ findings, report }) => {
 };
 
 // ── SFOCInsightCard ───────────────────────────────────────────────────────
-const SFOCInsightCard = ({ findings, report, baseline, analysisMode }) => {
+const SFOCInsightCard = ({ findings, report, baseline, analysisMode, verdicts = [] }) => {
   const [isExpanded, setIsExpanded]   = useState(true);
   const [bunkerPrice, setBunkerPrice] = useState(600);
   const [editingPrice, setEditingPrice] = useState(false);
@@ -1111,14 +1224,18 @@ const SFOCInsightCard = ({ findings, report, baseline, analysisMode }) => {
   const badgeColor  = isRed ? "#dc2626" : "#d97706";
 
   // Use pattern codes to identify linked root causes (not string matching)
-  const rootCausesFound = [];
-  if (sfocFinding.finding?.includes("TC fouling"))    rootCausesFound.push("TC Fouling");
-  if (sfocFinding.finding?.includes("compression"))   rootCausesFound.push("Compression Loss");
-  if (sfocFinding.finding?.includes("injection"))     rootCausesFound.push("Injection Issue");
-  if (sfocFinding.finding?.includes("hull") || sfocFinding.finding?.includes("heavy")) rootCausesFound.push("Hull Fouling");
-  if (sfocFinding.finding?.includes("fuel system") || sfocFinding.finding?.includes("pump")) rootCausesFound.push("Fuel System Wear");
-  if (sfocFinding.finding?.includes("scavenge") || sfocFinding.finding?.includes("air deficiency")) rootCausesFound.push("Air Deficiency");
-  if (sfocFinding.finding?.includes("exhaust temperatures")) rootCausesFound.push("Late Combustion");
+  const activePatterns = verdicts.map(v => v.pattern);
+const rootCausesFound = [];
+if (activePatterns.includes("TC_FOULING"))          rootCausesFound.push("TC Fouling");
+if (activePatterns.includes("COMPRESSION_LOSS"))    rootCausesFound.push("Compression Loss");
+if (activePatterns.includes("RETARDED_INJECTION"))  rootCausesFound.push("Retarded Injection");
+if (activePatterns.includes("EARLY_INJECTION"))     rootCausesFound.push("Early Injection");
+if (activePatterns.includes("HULL_FOULING"))        rootCausesFound.push("Hull Fouling");
+if (activePatterns.includes("FUEL_SYSTEM_WEAR"))    rootCausesFound.push("Fuel System Wear");
+if (activePatterns.includes("SCAV_LOW"))            rootCausesFound.push("Air Deficiency");
+if (activePatterns.includes("TURBO_LOW"))           rootCausesFound.push("TC Speed Low");
+if (activePatterns.includes("EXH_TC_IN_HIGH"))      rootCausesFound.push("Late Combustion");
+if (activePatterns.includes("EXH_CYL_OUT_HIGH"))    rootCausesFound.push("Cylinder Exhaust High");
 
   const savingsMetrics = [
     { label: "Extra Fuel / Day",   value: extraFuelPerDay   != null ? `${extraFuelPerDay.toFixed(2)} t`   : "N/A", sub: "vs shop trial baseline",          icon: "", color: accentColor },
@@ -1264,7 +1381,42 @@ const SFOCInsightCard = ({ findings, report, baseline, analysisMode }) => {
     </div>
   );
 };
+const buildRootCauseSummary = (verdicts) => {
+  if (!verdicts || verdicts.length === 0) return null;
 
+  const rootCauseMap = {
+    TC_FOULING:            "TC Fouling",
+    SCAV_LOW:              "Air Cooler / Filter Issue",
+    TURBO_LOW:             "TC Speed Low",
+    COMPRESSION_LOSS:      "Mechanical Compression Loss",
+    RETARDED_INJECTION:    "Retarded Injection / Poor Fuel",
+    EARLY_INJECTION:       "Early Injection Timing",
+    FUEL_SYSTEM_WEAR:      "Fuel System Wear",
+    HULL_FOULING:          "Hull / Propeller Fouling",
+    CYL_IMBALANCE_GROUPED: "Individual Cylinder Fault",
+    TREND_UNIFIED_AIR:     "Progressive Air System Degradation",
+    TREND_UNIFIED_COMB:    "Progressive Combustion Deterioration",
+    TREND_FIPI:            "Progressive Fuel System Wear",
+  };
+
+  const downstreamPatterns = [
+    "SFOC_HIGH",
+    "EXH_TC_IN_HIGH",
+    "EXH_CYL_OUT_HIGH",
+    "PRESSURE_RISE",
+    "PRESSURE_RISE_LOW",
+  ];
+
+  const rootFindings = verdicts.filter(
+    (v) => !downstreamPatterns.includes(v.pattern)
+  );
+
+  const downstreamFindings = verdicts.filter(
+    (v) => downstreamPatterns.includes(v.pattern)
+  );
+
+  return { rootFindings, downstreamFindings, rootCauseMap };
+};
 // ── DiagnosisPanel ────────────────────────────────────────────────────────
 const DiagnosisPanel = ({ report, baseline, analysisMode, availableReports }) => {
   const rawConcerns = getDetectedConcerns(report, baseline, analysisMode);
@@ -1301,22 +1453,31 @@ const DiagnosisPanel = ({ report, baseline, analysisMode, availableReports }) =>
       </div>
     );
   }
+  
 
-  return (
-    <>
-      {sfocFindings.length > 0 && (
-        <SFOCInsightCard
-          findings={sfocFindings}
-          report={report}
-          baseline={baseline}
-          analysisMode={analysisMode}
-        />
-      )}
-      {verdicts.length > 0 && (
-        <OverallEngineHealthCard findings={verdicts} report={report} />
-      )}
-    </>
-  );
+  const summary = buildRootCauseSummary(verdicts);
+
+return (
+  <>
+    {/* ROOT CAUSE SUMMARY — ! button in OverallEngineHealthCard header */}
+    {sfocFindings.length > 0 && (
+      <SFOCInsightCard
+        findings={sfocFindings}
+        report={report}
+        baseline={baseline}
+        analysisMode={analysisMode}
+        verdicts={verdicts}
+      />
+    )}
+    {verdicts.length > 0 && (
+      <OverallEngineHealthCard
+        findings={verdicts}
+        report={report}
+        summary={summary}
+      />
+    )}
+  </>
+);
 };
 
 export {

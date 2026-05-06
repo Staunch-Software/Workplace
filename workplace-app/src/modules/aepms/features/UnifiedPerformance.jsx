@@ -6302,6 +6302,7 @@ export default function Performance({
                         (a, b) =>
                           new Date(b.report_date) - new Date(a.report_date),
                       )
+                      .slice(0, 6)
                       .map((report, index) => (
                         <th key={index} className="hist-th-date">
                           <span className="hist-th-date__month">
@@ -6524,6 +6525,7 @@ export default function Performance({
                         (a, b) =>
                           new Date(b.report_date) - new Date(a.report_date),
                       )
+                      .slice(0, 6)
                       .map((r, idx) => (
                         <th key={idx} className="hist-th-date">
                           <span className="hist-th-date__month">
@@ -6544,7 +6546,11 @@ export default function Performance({
                         {p.label}
                         <span className="hist-td-param__unit">({p.unit})</span>
                       </td>
-                      {meDeviationHistory.map((r, index) => {
+                      {meDeviationHistory
+  .slice() // copy array to safely sort
+  .sort((a, b) => new Date(b.report_date) - new Date(a.report_date))
+  .slice(0, 6) 
+  .map((r, index) => {
                         // ---------------------------
                         // A. Handle Load Row
                         // ---------------------------
@@ -9359,6 +9365,12 @@ export default function Performance({
     setAeDeviationHistory([]);
     setSelectedTrendParams(["Pmax", "SFOC"]);
     setDisplayedReportIds([]); // Clear current view until fresh data arrives
+    setIsSummaryExpanded(true);
+    setIsCylinderCardExpanded(true);
+    setIsTrendCardExpanded(true);
+    setIsEnvelopeCardExpanded(true);
+    setIsLoadDiagramExpanded(true);
+    setIsHistoryExpanded(true);
     // -----------------------------------------------------------
 
     if (selectedReportIds.length === 0) {
@@ -9897,18 +9909,40 @@ export default function Performance({
         <>
           <div ref={analysisResultsRef} style={{ scrollMarginTop: "100px" }}>
             {renderMissingAlert()}
-            {allMonthlyReports.length === 1 &&
-              baseline &&
-              Object.keys(baseline).length > 0 && (
-                <DiagnosisPanel
-                  report={allMonthlyReports[0]}
-                  baseline={baseline}
-                  analysisMode={analysisMode}
-                  availableReports={availableReports.filter(r =>
-                    new Date(r.report_date) <= new Date(allMonthlyReports[0]?.report_date)
-                  )}
-                />
-              )}
+            {allMonthlyReports.length === 1 && (
+  Object.keys(baseline).length > 0 ? (
+    <DiagnosisPanel
+      report={allMonthlyReports[0]}
+      baseline={baseline}
+      analysisMode={analysisMode}
+      availableReports={availableReports.filter(r =>
+        new Date(r.report_date) <= new Date(allMonthlyReports[0]?.report_date)
+      )}
+    />
+  ) : (
+    <div style={{
+      padding: "20px",
+      background: "white",
+      borderRadius: "16px",
+      border: "1px solid #e2e8f0",
+      marginBottom: "32px",
+      display: "flex",
+      alignItems: "center",
+      gap: "12px",
+      color: "#64748b"
+    }}>
+      <div style={{
+        width: "20px",
+        height: "20px",
+        border: "3px solid #e2e8f0",
+        borderTop: "3px solid #0f172a",
+        borderRadius: "50%",
+        animation: "spin 1s linear infinite"
+      }}/>
+      Loading diagnosis...
+    </div>
+  )
+)}
 
             {/* <TrendDiagnosisPanel
               availableReports={availableReports}
