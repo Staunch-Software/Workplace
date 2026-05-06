@@ -533,34 +533,41 @@ async def start_async_email_scheduler():
     logger.info("=" * 60)
     logger.info("  ASYNC LUBOIL AUTO-UPLOAD SCHEDULER STARTED")
     logger.info("  Scheduled run times: 08:00 AM and 05:00 PM (17:00) IST")
+    logger.info(f"  Watching mailbox   : {MAILBOX_EMAIL}")
+    logger.info(f"  FastAPI backend    : {FASTAPI_UPLOAD_BASE}")
     logger.info("=" * 60)
 
-    # 1. We still need the short wait so the VM ports can open on startup!
+    # Wait 10 seconds to ensure the VM fully starts the FastAPI ports
     logger.info("▶️  Waiting 10 seconds for VM ports to open before immediate check...")
     await asyncio.sleep(10)
-    
+
+    # Run immediately on startup
     logger.info("▶️  Running immediate check on startup...")
     await run_luboil_email_upload_job()
 
     last_run_time = None
 
+    # Keep the scheduler alive asynchronously
+    logger.info(f"\n⏰ Scheduler active. Waiting for next scheduled time.\n")
     while True:
         try:
-            # 2. FORCE PYTHON TO CHECK THE SPECIFIC TIMEZONE (e.g., India Standard Time)
+            # 🔥 FORCE PYTHON TO USE INDIA STANDARD TIME (IST)
             local_time = datetime.now(ZoneInfo("Asia/Kolkata"))
             now_str = local_time.strftime("%H:%M")
             
-            # Now it will perfectly trigger at 08:00 and 17:00 local time
-            if now_str in ["08:00", "17:20"] and last_run_time != now_str:
+            # Trigger exactly at 08:00 or 17:00 local time
+            if now_str in ["08:00", "17:00"] and last_run_time != now_str:
                 await run_luboil_email_upload_job()
-                last_run_time = now_str  
+                last_run_time = now_str  # Mark as run so it doesn't run repeatedly this minute
             
-            if now_str not in ["08:00", "17:20"]:
+            # Reset the flag when the minute passes
+            if now_str not in ["08:00", "17:00"]:
                 last_run_time = None
 
         except Exception as e:
             logger.error(f"Scheduler loop error prevented crash: {e}")
 
+        # Sleep asynchronously for 60 seconds (does NOT block FastAPI)
         await asyncio.sleep(60)
 
 
