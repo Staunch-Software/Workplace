@@ -600,7 +600,7 @@ const calculateVisibleMonths = () => {
     if (w <= 480)  return 3;
     if (w <= 768)  return 3;
     if (w <= 1024) return 5;
-    return 10;
+    return 12;
   }
   const containerWidth = aeTableContainerRef.current.getBoundingClientRect().width;
   // Fixed columns: Vessel(160) + Gen(55) + LastReport(100) + Days(65) + Load(70) + NavLeft(45) + NavRight(45) = 540px
