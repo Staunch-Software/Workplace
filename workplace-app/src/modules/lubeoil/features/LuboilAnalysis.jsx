@@ -46,6 +46,7 @@ import {
 import "../styles/dashboard.css"; // Reusing dashboard styles
 import "../styles/luboil.css"; // Specific styles for luboil page
 import "../styles/luboil-responsive.css";
+import "../styles/luboil-fix.css"
 
 const OverdueVesselRow = ({
   v,
@@ -1407,8 +1408,9 @@ const LuboilAnalysis = () => {
     // 1. Reset Chat Modes & Drafts (Preserving your existing logic)
     setChatMode("external");
     setInternalDraft("");
+    const isMobileView = window.innerWidth <= 900;
     setIsDiagCollapsed(false);
-    setIsReportCollapsed(false);
+    setIsReportCollapsed(isMobileView);
     setIsCommCollapsed(false);
     setIsActionsCollapsed(false);
     setIsResamplingActive(false);
@@ -3383,16 +3385,30 @@ const LuboilAnalysis = () => {
     }
   };
 
-  const tryCollapsePanel = (isCollapsed, setCollapsed, otherCollapsedStates) => {
-    const openCount = [isCollapsed, ...otherCollapsedStates].filter(c => !c).length;
-    if (!isCollapsed && openCount <= 1) {
-      // This is the last open panel — block and show toast
-      setPanelToast(true);
-      setTimeout(() => setPanelToast(false), 2500);
-      return;
+  const tryCollapsePanel = (isCollapsed, setCollapsed, otherCollapsedStates, otherSetters) => {
+  const isMobile = window.innerWidth <= 900;
+  const openCount = [isCollapsed, ...otherCollapsedStates].filter(c => !c).length;
+
+  // Block closing the last open panel
+  if (!isCollapsed && openCount <= 1) {
+    setPanelToast(true);
+    setTimeout(() => setPanelToast(false), 2500);
+    return;
+  }
+
+  // On mobile: opening a panel when 2 are already open → auto-collapse the first open other panel
+  if (isMobile && isCollapsed) {
+    const currentlyOpen = otherCollapsedStates
+      .map((c, i) => ({ collapsed: c, index: i }))
+      .filter(x => !x.collapsed);
+
+    if (currentlyOpen.length >= 2 && otherSetters) {
+      otherSetters[currentlyOpen[0].index](true);
     }
-    setCollapsed(prev => !prev);
-  };
+  }
+
+  setCollapsed(prev => !prev);
+};
   // --- LOGIC FOR RESOLUTION GATING ---
   const isVesselUser = !amIShore;
   const currentSampleDate = new Date(
@@ -4125,7 +4141,7 @@ const LuboilAnalysis = () => {
                     <div className=" lub-vessel-select-menu">
                       {/* Sticky Select All at top */}
                       <div className="vessel-menu-header">
-                        <label className="vessel-checkbox-label">
+                        <label className="vessel-checkbox-label checkbox-select-all">
                           <input
                             type="checkbox"
                             checked={
@@ -5987,7 +6003,7 @@ const LuboilAnalysis = () => {
                 <div
                   className="lub-diag-header"
                   // onClick={() => setIsDiagCollapsed(!isDiagCollapsed)}
-                  onClick={() => tryCollapsePanel(isDiagCollapsed, setIsDiagCollapsed, [isReportCollapsed, isCommCollapsed])}
+                  onClick={() => tryCollapsePanel(isDiagCollapsed, setIsDiagCollapsed, [isReportCollapsed, isCommCollapsed], [setIsReportCollapsed, setIsCommCollapsed])}
                 >
                   <div className="lub-header-left">
                     <Activity
@@ -6699,7 +6715,7 @@ const LuboilAnalysis = () => {
                 <div
                   className="lub-pdf-header"
                   // onClick={() => setIsReportCollapsed(!isReportCollapsed)}
-                  onClick={() => tryCollapsePanel(isReportCollapsed, setIsReportCollapsed, [isDiagCollapsed, isCommCollapsed])}
+                  onClick={() => tryCollapsePanel(isReportCollapsed, setIsReportCollapsed, [isDiagCollapsed, isCommCollapsed], [setIsDiagCollapsed, setIsCommCollapsed])}
                 >
                   <div className="lub-header-left">
                     <FileText
@@ -6813,7 +6829,7 @@ const LuboilAnalysis = () => {
                 <div
                   className="lub-chat-header"
                   // onClick={() => setIsCommCollapsed(!isCommCollapsed)}
-                  onClick={() => tryCollapsePanel(isCommCollapsed, setIsCommCollapsed, [isDiagCollapsed, isReportCollapsed])}
+                  onClick={() => tryCollapsePanel(isCommCollapsed, setIsCommCollapsed, [isDiagCollapsed, isReportCollapsed], [setIsDiagCollapsed, setIsReportCollapsed])}
                 >
                   <div className="lub-header-left">
                     <MessageSquareText

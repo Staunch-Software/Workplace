@@ -2499,12 +2499,7 @@ export default function Performance({
   }, [shipId, fleet]);
 
   // Generator List Fetcher (Triggered on Ship Change in Aux Mode)
-
-  // Generator List Fetcher (Triggered on Ship Change OR Mode Change)
   useEffect(() => {
-    // We need generators if EITHER:
-    // 1. The View Tab (analysisMode) is set to Auxiliary Engine
-    // 2. The Upload Tab (uploadMode) is set to Auxiliary Engine
     const needGenerators =
       analysisMode === "auxiliaryEngine" || uploadMode === "auxiliaryEngine";
 
@@ -2517,37 +2512,33 @@ export default function Performance({
         return;
       }
 
-      // Don't set global 'loading' here to avoid flickering the whole page
-      // just for the upload tab dropdown
       axiosAepms
         .getGeneratorsList(imoNumber)
         .then((res) => {
-          const gens = Array.isArray(res)
-            ? res // backend returned array
-            : res.generators || []; // fallback if wrapped in object
-
+          const gens = Array.isArray(res) ? res : res.generators || [];
           setGenerators(gens);
 
-          // Logic specifically for the VIEW TAB (analysisMode)
-          // If we are viewing Analysis, auto-select the first generator
-          if (analysisMode === "auxiliaryEngine" && gens.length > 0) {
-            // Only set if not already set
-            if (!selectedGeneratorId) {
+          if (analysisMode === "auxiliaryEngine") {
+            // 🔥 FIX: Validate if the currently selected generator actually belongs to this new ship
+            const isValidGen = gens.some(g => g.generator_id === selectedGeneratorId);
+            
+            if (gens.length > 0 && (!selectedGeneratorId || !isValidGen)) {
               setSelectedGeneratorId(gens[0].generator_id);
+            } else if (gens.length === 0) {
+              setSelectedGeneratorId(null);
             }
           }
         })
         .catch((error) => {
           console.error("Failed to load auxiliary generators:", error);
           setGenerators([]);
+          setSelectedGeneratorId(null); // 🔥 Reset on error
         });
-    }
-    // Only clear generators if NEITHER tab needs them (i.e., both are Main Engine)
-    else if (analysisMode === "mainEngine" && uploadMode === "mainEngine") {
+    } else if (analysisMode === "mainEngine" && uploadMode === "mainEngine") {
       setGenerators([]);
-      // Do NOT clear selectedGeneratorId here, simply let the UI hide the dropdown
     }
-  }, [shipId, analysisMode, uploadMode, fleet, selectedGeneratorId]);
+    // 🔥 FIX: Removed selectedGeneratorId from dependencies to prevent infinite loops
+  }, [shipId, analysisMode, uploadMode, fleet]);
 
   // 🔥 UPDATED EFFECT: Hide history until a new ME report is uploaded
   useEffect(() => {
@@ -3012,7 +3003,10 @@ export default function Performance({
       analysisMode === "auxiliaryEngine" && shipId && selectedGeneratorId;
 
     // Guard clause: If we can't fetch, stop.
-    if (!canFetchMe && !canFetchAe) return;
+    if (!canFetchMe && !canFetchAe) {
+      setAvailableReports([]);
+      return; 
+    }
 
     setLoading(true);
     const ship = fleet.find((s) => s.id === shipId);
@@ -3436,6 +3430,12 @@ export default function Performance({
     setSelectedRawDownloadIds([]); // Clear download checkboxes
     setDownloadGenId(null); // Clear selected generator
     setDownloadableReports([]); // Clear the dropdown list momentarily
+
+    setSelectedGeneratorId(null);
+    setAvailableReports([]);
+    setSelectedReportIds([]);
+    setLastReportDates({ mainEngine: null, auxiliaryEngine: {} });
+
     // -------------------------
     const selectedShip = fleet.find((s) => String(s.id) === String(newShipId));
     const imoToPass = selectedShip
@@ -3459,6 +3459,8 @@ export default function Performance({
     setSelectedMetric("all");
     setLoadDiagramData(null);
     setShowReport(false);
+    setAvailableReports([]);
+    setSelectedReportIds([]);
     if (onEngineTypeChange) {
       onEngineTypeChange(newMode);
     }
