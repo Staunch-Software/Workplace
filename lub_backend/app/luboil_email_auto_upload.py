@@ -551,11 +551,11 @@ async def start_async_email_scheduler():
             now_str = local_time.strftime("%H:%M")
             
             # Now it will perfectly trigger at 08:00 and 17:00 local time
-            if now_str in ["08:00", "17:20"] and last_run_time != now_str:
+            if now_str in ["09:31", "17:20"] and last_run_time != now_str:
                 await run_luboil_email_upload_job()
                 last_run_time = now_str  
             
-            if now_str not in ["08:00", "17:20"]:
+            if now_str not in ["09:31", "17:20"]:
                 last_run_time = None
 
         except Exception as e:
