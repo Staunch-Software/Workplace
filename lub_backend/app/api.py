@@ -507,18 +507,21 @@ async def upload_luboil_report(
             # Combine using newlines (\n)
             full_structured_message = f"{line_1}\n{line_2}\n{line_3}"
 
-            new_event = LuboilEvent(
-                vessel_name=vessel_name,
-                imo=str(imo_val),
-                machinery_name="Multiple", 
-                event_type="NEW_REPORT",
-                priority=event_priority,
-                message=full_structured_message,
-                created_at=datetime.now(timezone.utc)
-            )
-            db.add(new_event)
-            await db.commit()
-            logger.info(f"Live Feed updated for {vessel_name} (Duplicate: {is_duplicate})")
+            if not is_duplicate:
+                new_event = LuboilEvent(
+                    vessel_name=vessel_name,
+                    imo=str(imo_val),
+                    machinery_name="Multiple", 
+                    event_type="NEW_REPORT",
+                    priority=event_priority,
+                    message=full_structured_message,
+                    created_at=datetime.now(timezone.utc)
+                )
+                db.add(new_event)
+                await db.commit()
+                logger.info(f"Live Feed updated for {vessel_name}")
+            else:
+                logger.info(f"Duplicate report — skipping Live Feed entry for {vessel_name}")
         except Exception as feed_err:
             logger.error(f"Failed to add upload event to Live Feed: {feed_err}")
         # =========================================================
