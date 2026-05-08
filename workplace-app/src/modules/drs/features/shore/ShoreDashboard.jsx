@@ -3969,7 +3969,8 @@ const ShoreDashboard = () => {
             justifyContent: 'space-between',
             alignItems: 'center',
             background: '#f8fafc',
-            borderTop: '1px solid #e2e8f0'
+            borderTop: '1px solid #e2e8f0',
+            borderRadius: '0px 0px 12px 12px'
           }}
         >
           {/* LEFT: Showing count */}

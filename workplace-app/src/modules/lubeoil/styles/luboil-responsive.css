@@ -3506,12 +3506,15 @@ div.section-header-enhanced {
 }
 
 /* 2. WebKit Scrollbar Styling (Chrome, Safari, Edge) */
+.lub-vessel-select-menu::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
 .lub-vessel-select-menu::-webkit-scrollbar {
   width: 6px; /* Thin, elegant width */
 }
 
 .lub-vessel-select-menu::-webkit-scrollbar-track {
-  background: transparent; /* Keeps the track invisible/clean */
   border-radius: 8px;
   margin: 4px 0; /* Keeps scrollbar slightly away from top/bottom edges */
 }
@@ -3524,6 +3527,7 @@ div.section-header-enhanced {
 .lub-vessel-select-menu::-webkit-scrollbar-thumb:hover {
   background-color: #94a3b8; /* Slightly darker grey when hovered */
 }
+
 .vessel-menu-header {
   /* padding: 10px !important; */
   border-bottom: 1px solid #f1f5f9;
@@ -3878,7 +3882,11 @@ div.section-header-enhanced {
   background-color: transparent !important;
 }
 
-.lub-matrix-footer-cell {
+::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #848687; border-radius: 4px; }
+
+.matrix-scroll-container.lub-matrix-footer-cell {
   position: sticky !important;
   bottom: -1px !important;              
   background-color: #ffffff !important;

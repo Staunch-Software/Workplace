@@ -20,7 +20,7 @@ class Vessel(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
+    module_status = Column(JSONB, nullable=False, server_default='{}')
     # ✅ Sync tracking columns
     last_push_at = Column(DateTime(timezone=True), nullable=True)   # shore → vessel
     last_pull_at = Column(DateTime(timezone=True), nullable=True)   # vessel → shore

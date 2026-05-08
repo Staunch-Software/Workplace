@@ -282,7 +282,8 @@
   }
 
   .hm-card-icon-zone {
-    padding-bottom: 20px; /* More gap for larger screens */
+    padding-bottom: 20px;
+    /* More gap for larger screens */
   }
 }
 
@@ -318,8 +319,8 @@
   }
 
   .hm-icon-container {
-    width: 100px;
-    height: 100px;
+    width: 80px;
+    height: 80px;
     border-radius: 1.25rem;
   }
 
@@ -329,7 +330,7 @@
   }
 
   .hm-app-card h3 {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
   }
 
   .hm-app-description {
@@ -337,7 +338,8 @@
   }
 
   .hm-card-icon-zone {
-    padding-bottom: 30px; /* Proportional spacing for 4K */
+    padding-bottom: 30px;
+    /* Proportional spacing for 4K */
   }
 }
 
@@ -373,8 +375,8 @@
   }
 
   .hm-icon-container {
-    width: 130px;
-    height: 130px;
+    width: 120px;
+    height: 120px;
     border-radius: 2rem;
   }
 
@@ -384,11 +386,15 @@
   }
 
   .hm-app-card h3 {
-    font-size: 2.25rem;
+    font-size: 1.75rem;
   }
 
   .hm-app-description {
     font-size: 1.2rem;
+  }
+
+  .hm-card-icon-zone {
+    padding-bottom: 40px;
   }
 }
 

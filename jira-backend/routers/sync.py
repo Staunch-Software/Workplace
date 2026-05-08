@@ -5,7 +5,7 @@ from sqlalchemy import update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from models.control import Vessel  # adjust import path to your project
 from db.database import get_control_db  # adjust to your project
-from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Security, logger, status
 from fastapi.security import APIKeyHeader
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -73,10 +73,19 @@ async def record_vessel_sync_time(
             .on_conflict_do_update(index_elements=["vessel_imo", "sync_scope"], set_=update_set)
         )
         await db.commit()
+    # --- NEW: AUTOMATIC MODULE ACTIVATION ---
+    # Get existing module status map
+    module_status = dict(vessel.module_status or {})
+    
+    # If this module isn't marked as True yet, mark it!
+    # This "discovers" the module automatically when the ship first syncs.
+    if not module_status.get(MODULE_KEY):
+        module_status[MODULE_KEY] = True
+    # ----------------------------------------
 
     # 2. Update Central Control DB (Shared Vessel Table)
     # Remove .replace(tzinfo=None) to stay consistent with UTC-aware columns
-    vessel_update = {"updated_at": now}
+    vessel_update = {"updated_at": now,"module_status": module_status,}
     vessel_update["last_push_at" if is_vessel_pushing else "last_pull_at"] = now
 
     # --- FIX 3: Self-Healing Logic (Only if telemetry exists) ---
