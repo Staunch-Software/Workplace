@@ -1164,6 +1164,7 @@
   /* Reduced padding to remove top space */
   background: #ffffff;
   border-bottom: 1px solid #e2e8f0;
+  border-radius: 12px;
   gap: 10px;
   /* Space between buttons and legend */
 }

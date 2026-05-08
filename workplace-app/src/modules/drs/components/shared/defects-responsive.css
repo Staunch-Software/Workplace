@@ -337,6 +337,7 @@
   height: 20px !important;
   border-radius: 4px !important;
   flex-shrink: 0 !important;
+  background: rgb(254, 215, 170);
 }
 
 /* --- 2. ULTRA-WIDE / BIG SCREEN (2560px+) --- */

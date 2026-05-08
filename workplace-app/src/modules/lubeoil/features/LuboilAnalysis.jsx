@@ -7297,6 +7297,7 @@ const LuboilAnalysis = () => {
                               >
                                 <textarea
                                   ref={chatInputRef}
+                                  style={{scrollbarWidth:'thin'}}
                                   value={
                                     chatMode === "internal"
                                       ? internalDraft
@@ -7308,27 +7309,27 @@ const LuboilAnalysis = () => {
                                     handleInputChange(e.target.value)
                                   }
                                   onKeyDown={(e) => {
-                                    if (e.key === "Enter" && !e.shiftKey) {
-                                      if (
-                                        showMentionDropdown &&
-                                        mentionList.length > 0
-                                      ) {
-                                        const filtered = (
-                                          mentionList || []
-                                        ).filter((u) =>
-                                          u.full_name
-                                            .toLowerCase()
-                                            .includes(mentionFilter),
-                                        );
-                                        if (filtered.length > 0) {
-                                          e.preventDefault();
-                                          applyMention(filtered[0].full_name);
-                                        }
-                                      } else {
-                                        e.preventDefault();
-                                        handleSendMessage();
-                                      }
-                                    }
+                                    // if (e.key === "Enter" && !e.shiftKey) {
+                                    //   if (
+                                    //     showMentionDropdown &&
+                                    //     mentionList.length > 0
+                                    //   ) {
+                                    //     const filtered = (
+                                    //       mentionList || []
+                                    //     ).filter((u) =>
+                                    //       u.full_name
+                                    //         .toLowerCase()
+                                    //         .includes(mentionFilter),
+                                    //     );
+                                    //     if (filtered.length > 0) {
+                                    //       e.preventDefault();
+                                    //       applyMention(filtered[0].full_name);
+                                    //     }
+                                    //   } else {
+                                    //     e.preventDefault();
+                                    //     handleSendMessage();
+                                    //   }
+                                    // }
                                     if (e.key === "Escape")
                                       setShowMentionDropdown(false);
                                   }}
@@ -7371,7 +7372,7 @@ const LuboilAnalysis = () => {
                                         : "VESSEL"}
                                   </strong>
                                 </span>
-                                <span>Enter to send</span>
+                                {/* <span>Enter to send</span> */}
                               </div>
                             </>
                           )}

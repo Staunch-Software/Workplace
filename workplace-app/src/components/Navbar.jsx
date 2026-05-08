@@ -33,6 +33,7 @@ const MODULE_META = {
 function formatAgo(iso) {
     if (!iso) return 'Never';
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 0) return 'Just now';
     if (diff < 60) return `${diff}s ago`;
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
@@ -54,10 +55,374 @@ const SYNC_COLORS = {
     never: { bg: '#f8fafc', border: '#e2e8f0', text: '#94a3b8' },
 };
 
+function parseErrorMessage(raw) {
+    if (!raw) return { title: 'Unknown error', detail: null, code: null, dev: null };
+
+    const dev = { raw };
+
+    // ── 1. Unique Violation ───────────────────────────────────────────────────
+    if (raw.includes('UniqueViolationError') || raw.includes('duplicate key value')) {
+        const keyMatch    = raw.match(/Key \((.+?)\)=\((.+?)\)/);
+        const constrMatch = raw.match(/constraint "(.+?)"/);
+        const sqlMatch    = raw.match(/\[SQL: (.+?)\]/s);
+        const paramMatch  = raw.match(/\[parameters: (.+?)\]/s);
+        dev.exception  = 'asyncpg.exceptions.UniqueViolationError';
+        dev.constraint = constrMatch?.[1] ?? null;
+        dev.sql        = sqlMatch?.[1]?.trim() ?? null;
+        dev.params     = paramMatch?.[1]?.trim() ?? null;
+        dev.ref        = raw.match(/https:\/\/sqlalche\.me\/\S+/)?.[0] ?? null;
+        if (keyMatch) {
+            dev.key = `${keyMatch[1]} = ${keyMatch[2]}`;
+            return {
+                title:  'Duplicate record — already exists',
+                detail: `A record with ${keyMatch[1].replace(/_/g, ' ')} "${keyMatch[2]}" already exists.`,
+                code: keyMatch[2], dev,
+            };
+        }
+        return { title: 'Duplicate record', detail: 'This record already exists in the database.', code: null, dev };
+    }
+
+    // ── 2. Foreign Key Violation ──────────────────────────────────────────────
+    if (raw.includes('ForeignKeyViolationError') || raw.includes('foreign key constraint')) {
+        const tableMatch = raw.match(/table "(.+?)"/);
+        dev.exception = 'asyncpg.exceptions.ForeignKeyViolationError';
+        dev.table     = tableMatch?.[1] ?? null;
+        return {
+            title:  'Linked record missing',
+            detail: tableMatch
+                ? `A referenced record in "${tableMatch[1]}" no longer exists.`
+                : 'This record references something that no longer exists.',
+            code: null, dev,
+        };
+    }
+
+    // ── 3. Not Null Violation ─────────────────────────────────────────────────
+    if (raw.includes('NotNullViolationError') || raw.includes('null value in column')) {
+        const col   = raw.match(/column "(.+?)"/)?.[1];
+        const table = raw.match(/relation "(.+?)"/)?.[1];
+        dev.exception = 'asyncpg.exceptions.NotNullViolationError';
+        return {
+            title:  'Missing required field',
+            detail: col
+                ? `The field "${col.replace(/_/g, ' ')}"${table ? ` in "${table}"` : ''} cannot be empty.`
+                : 'A required field is missing.',
+            code: null, dev,
+        };
+    }
+
+    // ── 4. Check Constraint Violation ────────────────────────────────────────
+    if (raw.includes('CheckViolationError') || raw.includes('check constraint')) {
+        const constr = raw.match(/constraint "(.+?)"/)?.[1];
+        dev.exception  = 'asyncpg.exceptions.CheckViolationError';
+        dev.constraint = constr ?? null;
+        return {
+            title:  'Value not allowed',
+            detail: constr
+                ? `The value violates the rule "${constr.replace(/_/g, ' ')}".`
+                : 'A field value does not meet the required conditions.',
+            code: null, dev,
+        };
+    }
+
+    // ── 5. Exclusion Constraint Violation ────────────────────────────────────
+    if (raw.includes('ExclusionViolationError') || raw.includes('exclusion constraint')) {
+        dev.exception = 'asyncpg.exceptions.ExclusionViolationError';
+        return {
+            title:  'Conflicting record exists',
+            detail: 'This record overlaps with an existing record and cannot be saved.',
+            code: null, dev,
+        };
+    }
+
+    // ── 6. Data Type / Value Error ───────────────────────────────────────────
+    if (raw.includes('DataError') || raw.includes('invalid input syntax') || raw.includes('out of range')) {
+        const typeMatch = raw.match(/type "(.+?)"/);
+        const valMatch  = raw.match(/value "(.+?)"/);
+        dev.exception = 'sqlalchemy.exc.DataError';
+        return {
+            title:  'Invalid data format',
+            detail: valMatch
+                ? `The value "${valMatch[1]}" is not valid${typeMatch ? ` for type "${typeMatch[1]}"` : ''}.`
+                : 'A field contains data in the wrong format.',
+            code: valMatch?.[1] ?? null, dev,
+        };
+    }
+
+    // ── 7. String Too Long ───────────────────────────────────────────────────
+    if (raw.includes('value too long') || raw.includes('string_data_right_truncation')) {
+        const col = raw.match(/column "(.+?)"/)?.[1];
+        dev.exception = 'asyncpg.exceptions.StringDataRightTruncationError';
+        return {
+            title:  'Text too long',
+            detail: col
+                ? `The value for "${col.replace(/_/g, ' ')}" exceeds the maximum allowed length.`
+                : 'One of the fields exceeds the maximum allowed length.',
+            code: null, dev,
+        };
+    }
+
+    // ── 8. Deadlock ──────────────────────────────────────────────────────────
+    if (raw.includes('DeadlockDetectedError') || raw.includes('deadlock detected')) {
+        dev.exception = 'asyncpg.exceptions.DeadlockDetectedError';
+        return {
+            title:  'Deadlock detected',
+            detail: 'Two operations conflicted with each other. The sync will retry automatically.',
+            code: null, dev,
+        };
+    }
+
+    // ── 9. Serialization Failure ─────────────────────────────────────────────
+    if (raw.includes('SerializationFailure') || raw.includes('could not serialize')) {
+        dev.exception = 'asyncpg.exceptions.SerializationFailureError';
+        return {
+            title:  'Sync conflict',
+            detail: 'The record was modified by another process at the same time. Will retry.',
+            code: null, dev,
+        };
+    }
+
+    // ── 10. Insufficient Privilege ───────────────────────────────────────────
+    if (raw.includes('InsufficientPrivilegeError') || raw.includes('permission denied')) {
+        const obj = raw.match(/relation "(.+?)"/)?.[1] ?? raw.match(/table "(.+?)"/)?.[1];
+        dev.exception = 'asyncpg.exceptions.InsufficientPrivilegeError';
+        return {
+            title:  'Permission denied',
+            detail: obj
+                ? `The database user does not have access to "${obj}".`
+                : 'The database user does not have permission to perform this action.',
+            code: null, dev,
+        };
+    }
+
+    // ── 11. Undefined Table / Column ─────────────────────────────────────────
+    if (raw.includes('UndefinedTableError') || raw.includes('relation') && raw.includes('does not exist')) {
+        const table = raw.match(/relation "(.+?)"/)?.[1];
+        dev.exception = 'asyncpg.exceptions.UndefinedTableError';
+        return {
+            title:  'Table not found',
+            detail: table
+                ? `The table "${table}" does not exist. A migration may be required.`
+                : 'A required database table is missing.',
+            code: null, dev,
+        };
+    }
+
+    if (raw.includes('UndefinedColumnError') || raw.includes('column') && raw.includes('does not exist')) {
+        const col = raw.match(/column "(.+?)"/)?.[1];
+        dev.exception = 'asyncpg.exceptions.UndefinedColumnError';
+        return {
+            title:  'Column not found',
+            detail: col
+                ? `The column "${col}" does not exist. A migration may be required.`
+                : 'A required database column is missing.',
+            code: null, dev,
+        };
+    }
+
+    // ── 12. Disk / Storage Full ──────────────────────────────────────────────
+    if (raw.includes('DiskFull') || raw.includes('no space left on device') || raw.includes('out of disk')) {
+        dev.exception = 'asyncpg.exceptions.DiskFull';
+        return {
+            title:  'Server storage full',
+            detail: 'The database server has run out of disk space. Contact your administrator.',
+            code: null, dev,
+        };
+    }
+
+    // ── 13. Blob / File Upload ───────────────────────────────────────────────
+    if (raw.toLowerCase().includes('blob') || raw.toLowerCase().includes('upload')) {
+        return {
+            title:  'File upload failed',
+            detail: 'The file could not be sent to the server. Check the connection and retry.',
+            code: null, dev,
+        };
+    }
+
+    // ── 14. SSL Error ────────────────────────────────────────────────────────
+    if (raw.toLowerCase().includes('ssl') || raw.includes('certificate')) {
+        dev.exception = 'SSL/TLS Error';
+        return {
+            title:  'Secure connection failed',
+            detail: 'An SSL certificate or encryption error occurred. Check server configuration.',
+            code: null, dev,
+        };
+    }
+
+    // ── 15. Connection / Timeout ─────────────────────────────────────────────
+    if (raw.toLowerCase().includes('timeout')) {
+        dev.exception = 'ConnectionTimeoutError';
+        return {
+            title:  'Connection timed out',
+            detail: 'The server did not respond in time. The vessel may have poor connectivity.',
+            code: null, dev,
+        };
+    }
+
+    if (raw.toLowerCase().includes('connection refused') || raw.includes('ECONNREFUSED')) {
+        dev.exception = 'ECONNREFUSED';
+        return {
+            title:  'Connection refused',
+            detail: 'The server actively refused the connection. The service may be down.',
+            code: null, dev,
+        };
+    }
+
+    if (raw.includes('ECONNRESET') || raw.includes('connection reset')) {
+        dev.exception = 'ECONNRESET';
+        return {
+            title:  'Connection was reset',
+            detail: 'The connection was interrupted mid-transfer. The sync will retry.',
+            code: null, dev,
+        };
+    }
+
+    if (raw.includes('ENOTFOUND') || raw.includes('getaddrinfo')) {
+        dev.exception = 'ENOTFOUND';
+        return {
+            title:  'Server not reachable',
+            detail: 'The server address could not be resolved. Check network or DNS settings.',
+            code: null, dev,
+        };
+    }
+
+    if (raw.toLowerCase().includes('connection')) {
+        dev.exception = 'ConnectionError';
+        return {
+            title:  'Connection problem',
+            detail: 'Could not reach the server. The vessel may be offline.',
+            code: null, dev,
+        };
+    }
+
+    // ── 16. Authentication ───────────────────────────────────────────────────
+    if (raw.includes('password authentication failed') || raw.includes('AuthenticationError')) {
+        dev.exception = 'asyncpg.exceptions.AuthenticationError';
+        return {
+            title:  'Authentication failed',
+            detail: 'The database credentials are incorrect or have expired.',
+            code: null, dev,
+        };
+    }
+
+    // ── 17. JSON / Parse Error ───────────────────────────────────────────────
+    if (raw.includes('JSONDecodeError') || raw.includes('invalid json') || raw.includes('JSON parse')) {
+        dev.exception = 'JSONDecodeError';
+        return {
+            title:  'Invalid data received',
+            detail: 'The server returned data in an unexpected format.',
+            code: null, dev,
+        };
+    }
+
+    // ── 18. HTTP Errors ──────────────────────────────────────────────────────
+    if (raw.includes('404') || raw.includes('Not Found')) {
+        return { title: 'Resource not found', detail: 'The requested record or endpoint does not exist.', code: '404', dev };
+    }
+    if (raw.includes('401') || raw.includes('Unauthorized')) {
+        return { title: 'Not authorised', detail: 'The session has expired or the token is invalid. Try logging in again.', code: '401', dev };
+    }
+    if (raw.includes('403') || raw.includes('Forbidden')) {
+        return { title: 'Access denied', detail: 'You do not have permission to perform this action.', code: '403', dev };
+    }
+    if (raw.includes('409') || raw.includes('Conflict')) {
+        return { title: 'Conflict', detail: 'This change conflicts with another update. Please refresh and try again.', code: '409', dev };
+    }
+    if (raw.includes('413') || raw.includes('Request Entity Too Large') || raw.includes('Payload Too Large')) {
+        return { title: 'File too large', detail: 'The file exceeds the maximum allowed upload size.', code: '413', dev };
+    }
+    if (raw.includes('429') || raw.includes('Too Many Requests')) {
+        return { title: 'Too many requests', detail: 'The sync is being rate limited. It will retry shortly.', code: '429', dev };
+    }
+    if (raw.includes('500') || raw.includes('Internal Server Error')) {
+        return { title: 'Server error', detail: 'An unexpected error occurred on the server. Contact your administrator.', code: '500', dev };
+    }
+    if (raw.includes('502') || raw.includes('Bad Gateway')) {
+        return { title: 'Gateway error', detail: 'The server received an invalid response from an upstream service.', code: '502', dev };
+    }
+    if (raw.includes('503') || raw.includes('Service Unavailable')) {
+        return { title: 'Service unavailable', detail: 'The server is temporarily down for maintenance or overloaded.', code: '503', dev };
+    }
+
+    // ── 19. Generic SQLAlchemy / asyncpg ─────────────────────────────────────
+    if (raw.includes('sqlalchemy') || raw.includes('asyncpg')) {
+        const firstLine = raw.split('\n')[0].replace(/\(.*?\)/g, '').trim();
+        dev.exception = raw.match(/asyncpg\.exceptions\.(\w+)/)?.[0]
+            ?? raw.match(/sqlalchemy\.exc\.(\w+)/)?.[0]
+            ?? 'Database error';
+        return {
+            title:  'Database error',
+            detail: firstLine.length < 120 ? firstLine : 'An internal database error occurred.',
+            code: null, dev,
+        };
+    }
+
+    // ── 20. Short readable message — show as-is ───────────────────────────────
+    if (raw.length < 80) return { title: raw, detail: null, code: null, dev };
+
+    // ── 21. Long unknown — truncate ───────────────────────────────────────────
+    return { title: 'Sync error', detail: raw.slice(0, 120) + '…', code: null, dev };
+}
+
+const DevRow = ({ label, value, copyable }) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        const text = typeof value === 'string' ? value : '';
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            });
+        } else {
+            const el = document.createElement('textarea');
+            el.value = text;
+            el.style.position = 'absolute';
+            el.style.left = '-9999px';
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
+    return (
+        <div className="err-dev-row" style={{
+            borderBottom: '0.5px solid #fecdd3',
+            padding: '9px 18px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+        }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span className='fsize-14' style={{ fontSize: '10px', fontWeight: 800, color: '#9f1239', textTransform: 'uppercase', letterSpacing: '0.8px', fontFamily: 'sans-serif' }}>
+                    {label}
+                </span>
+                {copyable && (
+                    <button onClick={handleCopy}className='fsize-15' style={{
+                        fontSize: '11px',
+                        color: copied ? '#10b981' : '#64748b',
+                        background: copied ? '#ecfdf5' : '#f8fafc',
+                        border: `1px solid ${copied ? '#a7f3d0' : '#e2e8f0'}`,
+                        borderRadius: 4, padding: '2px 8px', cursor: 'pointer',
+                        fontFamily: 'sans-serif', transition: '0.2s'
+                    }}>
+                        {copied ? 'Copied!' : 'Copy'}
+                    </button>
+                )}
+            </div>
+            <div className='fsize-15' style={{ fontSize: '12px', color: '#334155', lineHeight: 1.6, wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+                {value}
+            </div>
+        </div>
+    );
+};
+
 const LiveModuleDetail = ({ imo, moduleKey, isInstalled }) => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
-
+    const [devTabs, setDevTabs] = useState({});
     const fetchSyncData = async () => {
         if (!imo || !isInstalled) {
             setLoading(false);
@@ -98,7 +463,7 @@ const LiveModuleDetail = ({ imo, moduleKey, isInstalled }) => {
         <div style={mStyles.notInstalledBox}>
             <Activity size={40} color="#cbd5e1" />
             <h3 style={{ color: THEME.textMuted, margin: '15px 0 5px' }}>Module Not Configured</h3>
-            <p style={{ color: THEME.textMuted, fontSize: '13px' }}>This application is not installed on this vessel.</p>
+            <p className='fsize-17' style={{ color: THEME.textMuted, fontSize: '13px' }}>This application is not installed on this vessel.</p>
         </div>
     );
 
@@ -128,22 +493,80 @@ const LiveModuleDetail = ({ imo, moduleKey, isInstalled }) => {
             {activeErrors.length === 0 ? (
                 <div style={mStyles.emptyState}>
                     <CheckCircle size={32} color={THEME.success} />
-                    <span style={{ fontWeight: 600, color: THEME.textMain }}>All data synchronized</span>
-                    <span className='fsize-16' style={{ fontSize: '12px' }}>No active sync errors found for this module.</span>
+                    <span style={{ fontWeight: 600, color: THEME.textMain }}>Everything is up to date</span>
+                    <span className='fsize-15' style={{ fontSize: '12px', color: THEME.textMuted }}>No issues found for this module.</span>
                 </div>
-            ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {activeErrors.map((err, i) => (
-                        <div key={i} style={mStyles.normalErrorCard}>
-                            <div className='fsize-15' style={mStyles.errCardHeader}>
-                                <span style={{ fontWeight: 800, color: '#b91c1c' }}>{err.entity?.toUpperCase()} ERROR</span>
-                                <span style={{ color: THEME.textMuted }}>{new Date(err.ts).toLocaleTimeString()}</span>
+            ) : activeErrors.map((err, i) => {
+                const parsed = parseErrorMessage(err.msg);
+                const view = devTabs[i] ?? 'user';
+                const setView = (v) => setDevTabs(prev => ({ ...prev, [i]: v }));
+
+                return (
+                    <div key={i} style={mStyles.normalErrorCard}>
+                        {/* Header */}
+                        <div className="err-card-header" style={mStyles.errCardHeader}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span className="fsize-15" style={{ fontWeight: 700, color: '#b91c1c' }}>
+                                    Sync issue{err.entity ? ` · ${err.entity.toLowerCase()}` : ''}
+                                </span>
+                                {parsed.code && (
+                                    <span className="fsize-13" style={{ fontFamily: 'monospace', background: '#fecdd3', color: '#9f1239', padding: '1px 6px', borderRadius: 4 }}>
+                                        {parsed.code}
+                                    </span>
+                                )}
                             </div>
-                            <div className='fsize-17' style={mStyles.errCardBody}>{err.msg}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div style={{ display: 'flex', gap: 2, background: 'rgb(255 212 212)', borderRadius: 6, padding: 3 }}>
+                                    {['user', 'dev'].map(tab => (
+                                        <button className='fsize-15' key={tab} onClick={() => setView(tab)} style={{
+                                            fontSize: '11px', fontWeight: 500,
+                                            padding: '3px 10px', borderRadius: 4, border: 'none', cursor: 'pointer',
+                                            background: view === tab ? '#fff1f2' : 'transparent',
+                                            color: '#b91c1c', transition: 'background .15s',
+                                        }}>
+                                            {tab === 'user' ? 'User' : 'Dev'}
+                                        </button>
+                                    ))}
+                                </div>
+                                <span className="fsize-13" style={{ color: THEME.textMuted }}>{formatAgo(err.ts)}</span>
+                            </div>
                         </div>
-                    ))}
-                </div>
-            )}
+
+                        {/* User view */}
+                        {view === 'user' && (
+                            <div className="err-user-body" style={{ padding: '14px 18px' }}>
+                                <div className='fsize-17' style={{ fontWeight: 600, fontSize: '13px', color: '#1e293b', marginBottom: parsed.detail ? 6 : 0 }}>
+                                    {parsed.title}
+                                </div>
+                                {parsed.detail && (
+                                    <div className='fsize-15' style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.5 }}>
+                                        {parsed.detail}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Dev view */}
+                        {view === 'dev' && (
+                            <div style={{ fontFamily: 'monospace' }}>
+                                <DevRow label="Raw error" value={parsed.dev?.raw ?? err.msg} copyable />
+                                {parsed.dev?.exception && <DevRow label="Exception" value={parsed.dev.exception} />}
+                                {parsed.dev?.constraint && <DevRow label="Constraint" value={parsed.dev.constraint} />}
+                                {parsed.dev?.key && <DevRow label="Conflicting key" value={parsed.dev.key} />}
+                                {parsed.dev?.sql && <DevRow label="SQL" value={parsed.dev.sql} copyable />}
+                                {parsed.dev?.params && <DevRow label="Parameters" value={parsed.dev.params} />}
+                                {parsed.dev?.ref && (
+                                    <DevRow label="SQLAlchemy ref" value={
+                                        <a href={parsed.dev.ref} target="_blank" rel="noreferrer" style={{ color: '#3b82f6' }}>
+                                            {parsed.dev.ref}
+                                        </a>
+                                    } />
+                                )}
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
         </div>
     );
 };
@@ -481,7 +904,7 @@ const Navbar = ({ setSearchQuery }) => {
                     <div className="nav-right">
                         <div className="search-wrapper">
                             <Search className="search-icon" size={18} />
-                            <input type="text" placeholder="Search..." className="search-input" onChange={e => setSearchQuery(e.target.value)} />
+                            <input type="text" placeholder="Search..." className="search-input nav-search-input" onChange={e => setSearchQuery(e.target.value)} />
                         </div>
 
                         <div className="divider"></div>

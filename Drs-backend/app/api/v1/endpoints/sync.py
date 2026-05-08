@@ -84,9 +84,17 @@ async def record_vessel_sync_time(
             .on_conflict_do_update(index_elements=["vessel_imo", "sync_scope"], set_=update_set)
         )
         await db.commit()
-
+    # --- NEW: AUTOMATIC MODULE ACTIVATION ---
+    # Get existing module status map
+    module_status = dict(vessel.module_status or {})
+    
+    # If this module isn't marked as True yet, mark it!
+    # This "discovers" the module automatically when the ship first syncs.
+    if not module_status.get(MODULE_KEY):
+        module_status[MODULE_KEY] = True
+    # ----------------------------------------
     # --- SELF-HEALING LOGIC FOR CONTROL DB ---
-    vessel_update = {"updated_at": now}
+    vessel_update = {"updated_at": now,"module_status": module_status,}
     vessel_update["last_push_at" if is_vessel_pushing else "last_pull_at"] = now
 
     # --- CHANGE 2: Only update error maps if we have new data ---

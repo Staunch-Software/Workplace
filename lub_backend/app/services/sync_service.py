@@ -52,9 +52,12 @@ class SyncService:
                 elif col_type.upper() in ("DATETIME", "TIMESTAMP", "DATETIME_"):
                     try:
                         v = datetime.fromisoformat(v)
-                        # If parsed datetime has no timezone, attach UTC
-                        if v.tzinfo is None:
-                            v = v.replace(tzinfo=timezone.utc)
+                        # Always store as naive UTC — TIMESTAMP WITHOUT TIME ZONE columns
+                        # reject timezone-aware datetimes (asyncpg raises DataError).
+                        # If aware: convert to UTC then strip tzinfo.
+                        # If naive: already treated as UTC, leave as-is.
+                        if v.tzinfo is not None:
+                            v = v.astimezone(timezone.utc).replace(tzinfo=None)
                     except ValueError:
                         pass
             coerced[k] = v
