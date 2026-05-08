@@ -61,7 +61,7 @@ const OverdueVesselRow = ({
   canAddJustification, // 🔥 Newly added prop for workflow
 }) => {
   const [isExpanded, setIsExpanded] = React.useState(false);
-
+  const rowRef = React.useRef(null);
   // 🔥 NEW STATE for the chat input
   const [isChatOpen, setIsChatOpen] = React.useState(false);
   const [vesselRemark, setVesselRemark] = React.useState("");
@@ -96,6 +96,7 @@ const OverdueVesselRow = ({
 
   return (
     <div
+      ref={rowRef}
       className="lub-list-row-container"
       style={{
         borderRadius: "12px",
@@ -117,7 +118,21 @@ const OverdueVesselRow = ({
         }}
       >
         <div
-          onClick={() => setIsExpanded(!isExpanded)}
+          onClick={() => {
+  const next = !isExpanded;
+  setIsExpanded(next);
+  if (next && rowRef.current) {
+    setTimeout(() => {
+  const container = document.querySelector(".vessel-modal-scroll-area");
+  if (container && rowRef.current) {
+    const containerTop = container.getBoundingClientRect().top;
+    const rowTop = rowRef.current.getBoundingClientRect().top;
+    const offset = rowTop - containerTop - 12;
+    container.scrollBy({ top: offset, behavior: "smooth" });
+  }
+}, 50);
+  }
+}}
           className="lub-list-row-header-left"
           style={{
             display: "flex",
@@ -301,7 +316,21 @@ const OverdueVesselRow = ({
 
         {/* Right Side: Item Count and Chevron - Logic Preserved */}
         <div
-          onClick={() => setIsExpanded(!isExpanded)}
+          onClick={() => {
+  const next = !isExpanded;
+  setIsExpanded(next);
+  if (next && rowRef.current) {
+    setTimeout(() => {
+  const container = document.querySelector(".vessel-modal-scroll-area");
+  if (container && rowRef.current) {
+    const containerTop = container.getBoundingClientRect().top;
+    const rowTop = rowRef.current.getBoundingClientRect().top;
+    const offset = rowTop - containerTop - 12;
+    container.scrollBy({ top: offset, behavior: "smooth" });
+  }
+}, 50);
+  }
+}}
           style={{
             display: "flex",
             alignItems: "center",

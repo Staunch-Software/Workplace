@@ -2384,7 +2384,7 @@ div.section-header-enhanced {
   .lub-data-cell svg {
     transform: scale(1.65) !important;
     /* Icons grow by 65% */
-    margin-bottom: 10px !important;
+    /* margin-bottom: 10px !important; */
   }
 
   /* Scale the 'Due Date' badge text */
@@ -2670,7 +2670,7 @@ div.section-header-enhanced {
 
   .lub-data-cell svg {
     transform: scale(1.65) !important;
-    margin-bottom: 10px !important;
+    /* margin-bottom: 10px !important; */
   }
 
   .lub-data-cell span[style*="Due:"] {
@@ -3425,7 +3425,7 @@ div.section-header-enhanced {
   flex-direction: row !important;
   align-items: center !important;
   justify-content: space-between !important;
-  padding: 8px 20px !important;
+  padding: 12px 20px !important;
   background-color: white !important;
   cursor: pointer;
   border-radius: 8px !important;
