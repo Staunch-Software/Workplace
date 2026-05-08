@@ -2262,14 +2262,14 @@ div.section-header-enhanced {
 @media (max-width: 1000px) {
 
   /* Change from Side-by-Side to Stacked */
-  .lub-gallery-overlay {
+  /* .lub-gallery-overlay {
     flex-direction: column-reverse !important;
-  }
+  } */
 
   /* Sidebar becomes a bottom panel */
   .lub-gallery-sidebar {
-    width: 100% !important;
-    height: 45vh !important;
+    /* width: 100% !important; */
+    /* height: 45vh !important; */
     /* Half screen height */
     border-top: 2px solid #e2e8f0 !important;
   }
@@ -2277,7 +2277,7 @@ div.section-header-enhanced {
   /* Preview pane becomes the top panel */
   .lub-gallery-preview-pane {
     width: 100% !important;
-    height: 55vh !important;
+    /* height: 55vh !important; */
     padding: 20px !important;
   }
 
@@ -2288,7 +2288,7 @@ div.section-header-enhanced {
 
   /* Make items sit in a horizontal row or 2-col grid for mobile */
   .lub-gallery-list {
-    display: grid !important;
+    /* display: grid !important; */
     grid-template-columns: 1fr 1fr !important;
     /* 2 columns on mobile list */
     gap: 12px !important;
@@ -3494,7 +3494,7 @@ div.section-header-enhanced {
   border: 1px solid #e2e8f0 !important;
   display: flex;
   flex-direction: column;
-  max-height: 180px !important;
+  max-height: 165px !important;
   
   /* CHANGED: auto means it only shows if needed, not always forced */
   overflow-y: auto !important; 
@@ -3525,7 +3525,7 @@ div.section-header-enhanced {
   background-color: #94a3b8; /* Slightly darker grey when hovered */
 }
 .vessel-menu-header {
-  padding: 10px !important;
+  /* padding: 10px !important; */
   border-bottom: 1px solid #f1f5f9;
   background-color: #f8fafc;
 }
@@ -3541,11 +3541,15 @@ div.section-header-enhanced {
   padding: 8px 10px;
 }
 
+.checkbox-select-all{
+  padding: 10px 10px !important;
+}
+
 .vessel-dropdown-scroll {
   max-height: 300px;
   overflow-Y: auto;
   scrollbar-width: thin;
-  padding: 5px;
+  /* padding: 5px; */
 }
 
 
@@ -3584,12 +3588,12 @@ div.section-header-enhanced {
   .lub-vessel-select-menu {
     width: 400px !important;
     border-radius: 15px !important;
-    max-height: 320px !important;
+    max-height: 330px !important;
   }
 
-  .vessel-menu-header {
+  /* .vessel-menu-header {
     padding: 20px !important;
-  }
+  } */
 
   .vessel-checkbox-label {
     font-size: 1.3rem !important;
@@ -4095,7 +4099,13 @@ div.section-header-enhanced {
   text-align: center !important;
   color: #94a3af !important;
   background-color: #fcfcfc;
-  /* Subtle background difference */
+  min-height: 160px !important;        /* ensures card never collapses */
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-bottom-left-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
 }
 
 .lub-matrix-empty-text {
@@ -5325,20 +5335,20 @@ div.section-header-enhanced {
     font-size: 0.65rem !important;
   }
 
-  /* Ensure panels don't shrink past their minimum readability */
+  /* min-width: 0 lets flex shrink panels without overflow */
   .lub-diag-panel {
     flex: 0.9 !important;
-    min-width: 220px !important;
+    min-width: 0 !important;
   }
 
   .lub-pdf-panel {
     flex: 2 !important;
-    min-width: 350px !important;
+    min-width: 0 !important;
   }
 
   .lub-chat-panel {
     flex: 1.1 !important;
-    min-width: 280px !important;
+    min-width: 0 !important;
   }
 }
 
@@ -5401,37 +5411,146 @@ div.section-header-enhanced {
 }
 
 
-/* --- 4. SMALL MOBILE ONLY (Under 767px) --- */
-/* Only switch to column layout on actual phones where row is impossible */
-@media (max-width: 767px) {
+/* --- 4. SMALL MOBILE ONLY (Under 900px) --- */
+/* --- 4. SMALL MOBILE ONLY (Under 900px) --- */
+@media (max-width: 900px) {
   .lub-modal-shell {
     height: 95vh !important;
-    /* margin-top: 10px !important; */
-    overflow-y: auto !important;
+    overflow-y: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .lub-modal-header {
+    flex-shrink: 0 !important;
+    position: relative !important;
+    z-index: 200 !important;
+    background: white !important;
   }
 
   .lub-modal-panels-wrapper {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    flex-direction: row !important;
+    overflow: hidden !important;
+    display: flex !important;
+  }
+
+  .lub-diag-panel,
+  .lub-pdf-panel,
+  .lub-chat-panel {
+    height: 100% !important;
+    display: flex !important;
     flex-direction: column !important;
-    overflow-y: visible !important;
+    overflow: hidden !important;
   }
 
-  .lub-diag-panel, .lub-pdf-panel, .lub-chat-panel {
-    flex: none !important;
-    width: 100% !important;
-    border-right: none !important;
-    border-bottom: 1px solid #e2e8f0 !important;
+  .lub-diag-panel,
+  .lub-pdf-panel,
+  .lub-chat-panel {
+    min-width: 0 !important;
   }
 
-  .lub-diag-panel {
-    min-height: 350px !important;
+  .lub-diag-panel.collapsed,
+  .lub-pdf-panel.collapsed,
+  .lub-chat-panel.collapsed {
+    flex: 0 0 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
   }
 
-  .lub-pdf-panel {
-    height: 500px !important;
+  .lub-diag-panel:not(.collapsed),
+  .lub-pdf-panel:not(.collapsed),
+  .lub-chat-panel:not(.collapsed) {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    width: 0 !important;
   }
 
   .lub-chat-panel {
-    height: 550px !important;
+    overflow: hidden !important;
+    min-width: 0 !important;
+    width: 0 !important;
+    flex-shrink: 1 !important;
+  }
+
+  /* FIX: Chat wrapper must be a bounded flex column */
+  .lub-chat-wrapper {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* FIX: Message scroll area fills only remaining space */
+  .lub-msg-scroll-area {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* FIX: Footer always pinned at bottom */
+  .lub-chat-footer {
+    flex-shrink: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+  }
+
+  /* FIX: Input box never overflows */
+  .lub-chat-input-box {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* FIX: Toggle bar always visible at top */
+  .lub-chat-toggle-bar {
+    flex-shrink: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+  }
+
+  .lub-modal-header {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 200 !important;
+    background: white !important;
+  }
+  /* FIX: The inline-styled footer div in JSX */
+  .lub-chat-panel div[style*="flexShrink: 0"] {
+    flex-shrink: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  /* FIX: Meta text row ("ACCESSIBLE / Enter to send") must not be clipped */
+  .lub-chat-meta {
+    flex-shrink: 0 !important;
+    overflow: visible !important;
+    padding-bottom: 2px !important;
+  }
+
+  /* FIX: Modal shell must not clip bottom content */
+  .lub-modal-shell {
+    padding-bottom: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* FIX: Panels wrapper must stop exactly at modal bottom */
+  .lub-modal-panels-wrapper {
+    padding-bottom: 0 !important;
+    overflow: hidden !important;
   }
 }
 
@@ -5487,6 +5606,7 @@ div.section-header-enhanced {
 .lub-header-left, .lub-header-right {
   display: flex !important;
   align-items: center !important;
+  gap: 4px !important;
 }
 
 .collapsed .lub-header-left,

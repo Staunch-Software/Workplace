@@ -1,0 +1,465 @@
+/* ============================================================
+   LUBOIL MODAL PANEL FIX — COMPLETE, ALL BREAKPOINTS
+   Import AFTER luboil-responsive.css
+   Fixes:
+     1. Chat footer/input hidden below 900px
+     2. Open panel not filling full width when others are collapsed
+   ============================================================ */
+
+
+/* ============================================================
+   SHARED BASE — all screens <= 1100px
+   ============================================================ */
+@media (max-width: 1100px) {
+
+  /* Shell */
+  .lub-modal-shell {
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* Header: always pinned */
+  .lub-modal-header {
+    flex-shrink: 0 !important;
+    position: relative !important;
+    z-index: 200 !important;
+    background: white !important;
+  }
+
+  /* Panels row */
+  .lub-modal-panels-wrapper {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    overflow: hidden !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* ── FIX 2: All open panels use flex:1 so they share remaining space
+     equally by default. Collapsed ones are fixed-width strips.
+     This means if 2 are collapsed the 1 open one gets ALL the space. ── */
+  .lub-diag-panel,
+  .lub-pdf-panel,
+  .lub-chat-panel {
+    flex: 1 1 0 !important;        /* grow to fill, shrink if needed */
+    height: 100% !important;
+    min-height: 0 !important;
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  /* Collapsed panel: fixed narrow strip, NEVER grows */
+  .lub-diag-panel.collapsed,
+  .lub-pdf-panel.collapsed,
+  .lub-chat-panel.collapsed {
+    flex: 0 0 44px !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 100% !important;
+  }
+
+  .collapsed .lub-diag-header,
+  .collapsed .lub-pdf-header,
+  .collapsed .lub-chat-header {
+    flex-direction: column !important;
+    justify-content: center !important;
+    gap: 16px !important;
+    padding: 16px 0 !important;
+    height: 100% !important;
+    border-bottom: none !important;
+  }
+
+  /* Panel headers */
+  .lub-diag-header,
+  .lub-pdf-header,
+  .lub-chat-header {
+    flex-shrink: 0 !important;
+    min-height: 36px !important;
+  }
+
+  /* Diag body */
+  .lub-diag-body {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+  }
+
+  /* Diag footer */
+  .lub-diag-footer {
+    flex-shrink: 0 !important;
+  }
+
+  /* PDF body */
+  .lub-pdf-body {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .lub-pdf-iframe {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    border: none !important;
+  }
+
+  /* ── FIX 1: Chat wrapper — strict column, bounded ── */
+  .lub-chat-wrapper {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Toggle bar */
+  .lub-chat-toggle-bar {
+    flex-shrink: 0 !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+  }
+
+  /* Messages: takes all space between toggle and footer */
+  .lub-msg-scroll-area {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Footer: NEVER squished or pushed off screen */
+  .lub-chat-footer {
+    flex-shrink: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  /* JSX inline-styled footer div (style="flexShrink: 0") */
+  .lub-chat-panel .lub-chat-wrapper > div:last-child,
+  .lub-chat-panel div[style*="flexShrink: 0"],
+  .lub-chat-panel div[style*="flex-shrink: 0"] {
+    flex-shrink: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  /* Input box */
+  .lub-chat-input-box {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ACCESSIBLE meta row */
+  .lub-chat-meta {
+    flex-shrink: 0 !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    overflow: visible !important;
+    white-space: nowrap !important;
+    padding-bottom: 2px !important;
+  }
+}
+
+
+/* ============================================================
+   RANGE: 901px – 1100px
+   ============================================================ */
+@media (min-width: 901px) and (max-width: 1100px) {
+
+  .lub-modal-shell          { height: 92vh !important; max-height: 92vh !important; }
+  .lub-modal-header         { padding: 8px 14px !important; }
+  .modal-vessel-title       { font-size: 0.92rem !important; }
+  .modal-machinery-subtitle { font-size: 0.72rem !important; }
+  .modal-date-pill          { padding: 3px 8px !important; font-size: 0.68rem !important; }
+
+  /* When all three open: use proportional flex weights */
+ .lub-diag-panel:not(.collapsed),
+.lub-pdf-panel:not(.collapsed),
+.lub-chat-panel:not(.collapsed) { flex: 1 1 0 !important; }
+
+  .lub-diag-header,
+  .lub-pdf-header,
+  .lub-chat-header          { height: 38px !important; padding: 0 10px !important; }
+  .lub-header-title         { font-size: 0.72rem !important; }
+
+  .lub-diag-body            { padding: 10px !important; gap: 10px !important; }
+  .lub-diag-footer          { padding: 8px 10px !important; }
+  .lub-main-status-btn,
+  .lub-reopen-btn           { height: 38px !important; font-size: 0.68rem !important; }
+
+  .lub-chat-toggle-bar      { padding: 6px 8px !important; gap: 4px !important; }
+  .lub-toggle-pill          { padding: 4px 10px !important; font-size: 0.62rem !important; }
+  .lub-msg-scroll-area      { padding: 10px !important; gap: 6px !important; }
+
+  .lub-msg-bubble           { max-width: 88% !important; min-width: 90px !important; padding: 6px 9px !important; }
+  .bubble-text              { font-size: 0.74rem !important; line-height: 1.35 !important; }
+  .sender-name              { font-size: 0.62rem !important; }
+  .bubble-footer            { font-size: 0.58rem !important; }
+
+  .lub-chat-footer,
+  .lub-chat-panel .lub-chat-wrapper > div:last-child,
+  .lub-chat-panel div[style*="flexShrink: 0"],
+  .lub-chat-panel div[style*="flex-shrink: 0"] {
+    padding: 8px 10px !important;
+    padding-bottom: 6px !important;
+    background-color: #f8fafc !important;
+    border-top: 1px solid #e2e8f0 !important;
+    position: relative !important;
+    z-index: 10 !important;
+  }
+
+  .lub-chat-input-box       { height: 40px !important; min-height: 40px !important; border-radius: 8px !important; padding: 4px 8px !important; }
+  .lub-chat-field           { font-size: 0.78rem !important; min-height: 22px !important; max-height: 80px !important; }
+  .lub-chat-meta            { font-size: 0.58rem !important; color: #94a3b8 !important; font-weight: 600 !important; margin-top: 4px !important; padding-bottom: 2px !important; }
+
+  .lub-locked-ui            { padding: 10px !important; font-size: 0.65rem !important; }
+  .lock-title               { font-size: 0.7rem !important; }
+  .lock-desc                { font-size: 0.6rem !important; }
+
+  .lub-approval-card        { padding: 10px !important; margin-bottom: 8px !important; }
+  .card-header              { font-size: 0.7rem !important; }
+  .card-quote               { font-size: 0.72rem !important; padding: 6px 8px !important; }
+  .btn-accept,
+  .btn-decline              { height: 32px !important; font-size: 0.65rem !important; }
+}
+
+
+/* ============================================================
+   RANGE: 481px – 900px
+   ============================================================ */
+@media (min-width: 481px) and (max-width: 900px) {
+
+  .lub-modal-shell          { height: 95vh !important; max-height: 95vh !important; }
+  .lub-modal-header         { padding: 7px 12px !important; }
+  .modal-vessel-title       { font-size: 0.88rem !important; }
+  .modal-machinery-subtitle { font-size: 0.68rem !important; }
+  .modal-date-pill          { padding: 2px 7px !important; font-size: 0.65rem !important; }
+
+  /* Collapsed strips slightly thinner */
+  .lub-diag-panel.collapsed,
+  .lub-pdf-panel.collapsed,
+  .lub-chat-panel.collapsed {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+  }
+
+  /* Proportional weights when all three open */
+  .lub-diag-panel:not(.collapsed),
+.lub-pdf-panel:not(.collapsed),
+.lub-chat-panel:not(.collapsed) { flex: 1 1 0 !important; }
+
+  .lub-diag-header,
+  .lub-pdf-header,
+  .lub-chat-header          { height: 36px !important; min-height: 36px !important; padding: 0 8px !important; }
+  .lub-header-title         { font-size: 0.68rem !important; }
+
+  .lub-diag-body            { padding: 8px !important; gap: 8px !important; }
+  .lub-diag-footer          { padding: 7px 8px !important; }
+  .lub-main-status-btn,
+  .lub-reopen-btn           { height: 36px !important; font-size: 0.65rem !important; }
+
+  .lub-chat-toggle-bar      { padding: 5px 6px !important; gap: 3px !important; }
+  .lub-toggle-pill          { padding: 3px 8px !important; font-size: 0.6rem !important; }
+  .lub-msg-scroll-area      { padding: 8px !important; gap: 5px !important; }
+
+  .lub-msg-bubble           { max-width: 92% !important; min-width: 80px !important; padding: 5px 8px !important; }
+  .bubble-text              { font-size: 0.72rem !important; line-height: 1.3 !important; }
+  .sender-name              { font-size: 0.6rem !important; }
+  .bubble-footer            { font-size: 0.56rem !important; }
+
+  .lub-chat-footer,
+  .lub-chat-panel .lub-chat-wrapper > div:last-child,
+  .lub-chat-panel div[style*="flexShrink: 0"],
+  .lub-chat-panel div[style*="flex-shrink: 0"] {
+    padding: 7px 9px !important;
+    padding-bottom: 6px !important;
+    background-color: #f8fafc !important;
+    border-top: 1px solid #e2e8f0 !important;
+  }
+
+  .lub-chat-input-box       { height: 38px !important; min-height: 38px !important; border-radius: 7px !important; padding: 3px 7px !important; }
+  .lub-chat-field           { font-size: 0.75rem !important; min-height: 20px !important; max-height: 70px !important; }
+  .lub-chat-meta            { font-size: 0.55rem !important; color: #94a3b8 !important; font-weight: 600 !important; margin-top: 3px !important; padding-bottom: 3px !important; }
+
+  .lub-locked-ui            { padding: 9px !important; font-size: 0.62rem !important; }
+  .lock-title               { font-size: 0.68rem !important; }
+  .lock-desc                { font-size: 0.58rem !important; }
+
+  .lub-approval-card        { padding: 8px !important; margin-bottom: 6px !important; }
+  .card-header              { font-size: 0.68rem !important; }
+  .card-quote               { font-size: 0.7rem !important; padding: 5px 7px !important; }
+  .btn-accept,
+  .btn-decline              { height: 30px !important; font-size: 0.62rem !important; }
+}
+
+
+/* ============================================================
+   RANGE: 0 – 480px  (small phones)
+   ============================================================ */
+@media (max-width: 480px) {
+
+  .lub-modal-shell          { height: 97vh !important; max-height: 97vh !important; border-radius: 8px !important; }
+  .lub-modal-header         { padding: 6px 10px !important; }
+  .modal-date-pill          { display: none !important; }
+  .modal-vessel-title       { font-size: 0.82rem !important; }
+  .modal-machinery-subtitle { font-size: 0.62rem !important; }
+
+  .lub-diag-panel.collapsed,
+  .lub-pdf-panel.collapsed,
+  .lub-chat-panel.collapsed {
+    flex: 0 0 32px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
+  }
+
+  .collapsed .lub-diag-header,
+  .collapsed .lub-pdf-header,
+  .collapsed .lub-chat-header { gap: 12px !important; padding: 12px 0 !important; }
+
+  .lub-diag-panel:not(.collapsed) { flex: 0.75 1 0 !important; }
+  .lub-pdf-panel:not(.collapsed)  { flex: 1.6 1 0 !important; }
+  .lub-chat-panel:not(.collapsed) { flex: 1.0 1 0 !important; }
+
+  .lub-diag-header,
+  .lub-pdf-header,
+  .lub-chat-header          { height: 32px !important; min-height: 32px !important; padding: 0 6px !important; }
+  .lub-header-title         { display: none !important; }
+
+  .lub-diag-body            { padding: 6px !important; gap: 6px !important; }
+  .lub-diag-footer          { padding: 5px 6px !important; }
+  .lub-main-status-btn,
+  .lub-reopen-btn           { height: 32px !important; font-size: 0.6rem !important; gap: 4px !important; }
+
+  .lub-chat-toggle-bar      { padding: 4px 5px !important; gap: 2px !important; }
+  .lub-toggle-pill          { padding: 2px 6px !important; font-size: 0.56rem !important; }
+  .lub-msg-scroll-area      { padding: 6px !important; gap: 4px !important; }
+
+  .lub-msg-bubble           { max-width: 95% !important; min-width: 70px !important; padding: 4px 7px !important; }
+  .bubble-text              { font-size: 0.68rem !important; line-height: 1.3 !important; }
+  .sender-name              { font-size: 0.56rem !important; }
+  .bubble-footer            { font-size: 0.52rem !important; }
+
+  .lub-chat-footer,
+  .lub-chat-panel .lub-chat-wrapper > div:last-child,
+  .lub-chat-panel div[style*="flexShrink: 0"],
+  .lub-chat-panel div[style*="flex-shrink: 0"] {
+    padding: 6px 7px !important;
+    padding-bottom: 8px !important;
+    background-color: #f8fafc !important;
+    border-top: 1px solid #e2e8f0 !important;
+  }
+
+  .lub-chat-input-box       { height: 34px !important; min-height: 34px !important; border-radius: 6px !important; padding: 2px 6px !important; }
+  .lub-chat-field           { font-size: 0.7rem !important; min-height: 18px !important; max-height: 60px !important; }
+  .lub-chat-meta            { font-size: 0.5rem !important; color: #94a3b8 !important; font-weight: 600 !important; margin-top: 2px !important; padding-bottom: 4px !important; }
+
+  .lub-locked-ui            { padding: 7px !important; font-size: 0.6rem !important; border-radius: 6px !important; }
+  .lock-title               { font-size: 0.64rem !important; }
+  .lock-desc                { font-size: 0.55rem !important; }
+
+  .lub-approval-card        { padding: 6px !important; margin-bottom: 5px !important; border-radius: 6px !important; }
+  .card-header              { font-size: 0.62rem !important; gap: 4px !important; }
+  .card-quote               { font-size: 0.65rem !important; padding: 4px 6px !important; }
+  .btn-accept,
+  .btn-decline              { height: 28px !important; font-size: 0.6rem !important; border-radius: 5px !important; }
+
+  .lub-mention-dropdown     { left: 0 !important; right: 0 !important; width: 100% !important; }
+}
+
+
+/* ============================================================
+   CRITICAL: neutralise luboil-responsive.css @media(max-width:768px)
+   That file sets width:max-content and height:600px on .lub-chat-panel
+   which completely breaks the flex column layout at every small size.
+   ============================================================ */
+@media (max-width: 768px) {
+
+  .lub-chat-panel {
+    width: auto !important;
+    max-width: none !important;
+    height: 100% !important;
+    flex: 1 1 0 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+  }
+
+  /* Collapsed state still works at this size */
+  .lub-chat-panel.collapsed {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+  }
+
+  .lub-chat-wrapper {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .lub-msg-scroll-area {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  .lub-chat-footer,
+  .lub-chat-panel .lub-chat-wrapper > div:last-child,
+  .lub-chat-panel div[style*="flexShrink: 0"],
+  .lub-chat-panel div[style*="flex-shrink: 0"] {
+    flex-shrink: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+    padding-bottom: 6px !important;
+  }
+
+  .lub-chat-meta {
+    flex-shrink: 0 !important;
+    overflow: visible !important;
+    white-space: nowrap !important;
+    padding-bottom: 4px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+  }
+
+  /* Reset bubble width from responsive overrides */
+  .lub-msg-bubble {
+    max-width: 92% !important;
+  }
+}
