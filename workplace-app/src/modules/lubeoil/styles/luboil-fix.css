@@ -229,7 +229,7 @@
     position: relative !important;
     z-index: 10 !important;
   }
-
+  
   .lub-chat-input-box       { height: 40px !important; min-height: 40px !important; border-radius: 8px !important; padding: 4px 8px !important; }
   .lub-chat-field           { font-size: 0.78rem !important; min-height: 22px !important; max-height: 80px !important; }
   .lub-chat-meta            { font-size: 0.58rem !important; color: #94a3b8 !important; font-weight: 600 !important; margin-top: 4px !important; padding-bottom: 2px !important; }

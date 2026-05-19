@@ -52,7 +52,7 @@ class SSOSettings(BaseSettings):
     CONTROL_DATABASE_URL: str = ""      # ✅ Workplace control DB (users/vessels tables)
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080
-
+    SYNC_API_KEY: str = "PROD_SECURE_SYNC_9922"
     class Config:
         env_file = ".env"
         case_sensitive = True

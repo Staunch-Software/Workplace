@@ -3896,7 +3896,31 @@ div.section-header-enhanced {
   padding: 8px !important;
   z-index: 105 !important;             
 }
+/* ============================================================
+   FIX: STICKY FOOTER CELLS — CENTER SELECT BUTTON VERTICALLY
+   ============================================================ */
 
+.matrix-footer-sticky td {
+  vertical-align: middle !important;
+}
+
+.lub-matrix-footer-cell {
+  vertical-align: middle !important;
+  text-align: center !important;
+  /* padding: 0 !important; */
+}
+
+.footer-popover-wrapper {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 100% !important;
+  width: 100% !important;
+}
+
+.lub-footer-select-btn {
+  margin: 0 auto !important;
+}
 .footer-popover-wrapper {
   position: relative !important;
   display: inline-block !important;
