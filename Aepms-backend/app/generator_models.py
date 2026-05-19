@@ -149,6 +149,7 @@ class GeneratorMonthlyReportHeader(Base):
     measured_by = Column(String(100), nullable=True)
     chief_engineer_name = Column(String(100), nullable=True)
     created_at = Column(TIMESTAMP, default=func.current_timestamp(), nullable=False)
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=False)
 
     generator = relationship("VesselGenerator", back_populates="monthly_reports")
     details_json = relationship("GeneratorMonthlyReportDetailsJsonb", back_populates="header", uselist=False, cascade="all, delete-orphan")
