@@ -5,7 +5,7 @@ import { defectApi } from '@drs/services/defectApi';
 import { blobUploadService } from '@drs/services/blobUploadService';
 import { generateId } from '@drs/services/idGenerator';
 import './EnhancedClosureModal.css';
-
+import { DEFECT_SOURCE_MAP } from '@drs/components/shared/constants';
 const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
     const queryClient = useQueryClient();
 
@@ -117,7 +117,7 @@ const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
             onClick={onClose}
         >
             <div
-                 className='clousure-model'
+                className='clousure-model'
                 style={{
                     background: 'white',
                     borderRadius: '12px',
@@ -155,6 +155,60 @@ const ShoreClosureModal = ({ defect, onClose, onSuccess }) => {
 
                 {/* Body */}
                 <div style={{ padding: '24px' }}>
+                    {/* Defect Details */}
+                    <div style={{
+                        background: 'light-dark(rgba(245, 244, 237, 1), rgba(38, 38, 36, 1))',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        padding: '14px 16px',
+                        marginBottom: '20px'
+                    }}>
+                        <p style={{
+                            fontSize: '11px', fontWeight: '700', color: '#94a3b8',
+                            textTransform: 'uppercase', letterSpacing: '0.05em',
+                            margin: '0 0 12px 0'
+                        }}>
+                            Defect details
+                        </p>
+
+                        {/* Single row: Defect ID | Area of Concern | Source */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                            <div>
+                                <p style={{ fontSize: '11px', color: '#94a3b8', margin: '0 0 3px 0' }}>Defect ID</p>
+                                <p style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', margin: 0 }}>
+                                    {defect.defect_number || '—'}
+                                </p>
+                            </div>
+                            <div>
+                                <p style={{ fontSize: '11px', color: '#94a3b8', margin: '0 0 3px 0' }}>Area of concern</p>
+                                <p style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', margin: 0 }}>
+                                    {defect.equipment_name || '—'}
+                                </p>
+                            </div>
+                            <div>
+                                <p style={{ fontSize: '11px', color: '#94a3b8', margin: '0 0 3px 0' }}>Source</p>
+                                <p style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', margin: 0 }}>
+                                    {DEFECT_SOURCE_MAP[defect.defect_source] || defect.defect_source || '—'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Description below */}
+                        {defect.description && (
+                            <div>
+                                <p style={{ fontSize: '11px', color: '#94a3b8', margin: '0 0 4px 0' }}>Description</p>
+                                <p style={{
+                                    fontSize: '13px', color: '#334155', lineHeight: 1.5,
+                                    background: 'white', border: '1px solid #e2e8f0',
+                                    borderRadius: '6px', padding: '8px 10px',
+                                    margin: 0, textTransform: 'uppercase',
+                                    wordBreak: 'break-word', whiteSpace: 'pre-wrap'
+                                }}>
+                                    {defect.description}
+                                </p>
+                            </div>
+                        )}
+                    </div>
 
                     {/* Closure Remarks */}
                     <div style={{ marginBottom: '20px' }}>

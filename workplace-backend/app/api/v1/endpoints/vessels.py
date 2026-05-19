@@ -69,16 +69,22 @@ async def get_vessel_status(
         
         return result
     # Change this in your GET /vessel-status
+    
+    def is_online(push_at, pull_at):
+        try:
+            return any(
+                dt is not None and (now - to_utc(dt)) < ONLINE_THRESHOLD
+                for dt in [push_at, pull_at]
+            )
+        except Exception as e:
+            print(f"⚠️ Online check failed: {e}")
+            return False
 
     return [
         {
             "imo": vessel.imo,
             "name": vessel.name,
-            "online": (
-                (now - to_utc(vessel.last_push_at)) < ONLINE_THRESHOLD
-                if vessel.last_push_at
-                else False
-            ),
+            "online": is_online(vessel.last_push_at, vessel.last_pull_at),
             "last_pull_at": (
                 to_utc(vessel.last_pull_at).isoformat() if vessel.last_pull_at else None
             ),

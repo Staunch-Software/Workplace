@@ -121,16 +121,19 @@ async def send_welcome_email(
             modules_html = "<p style='font-size:13px;color:#94a3b8;'>No modules assigned.</p>"
 
         # Role responsibilities
-        login_url = "http://localhost:8080" if role.upper() == "VESSEL" else settings.PLATFORM_URL
+        login_url = settings.PLATFORM_URL
+        is_vessel = role.upper() == "VESSEL"
+
+        visit_step = "The platform URL will be shared with you shortly" if is_vessel else f"Visit <a href='{login_url}' style='color:#2563eb;'>{login_url}</a>"
 
         steps = [
-            f"Visit <a href='{login_url}' style='color:#2563eb;'>{login_url}</a>",
+            visit_step,
             "Login with your credentials provided above",
             "<strong>Change your password immediately</strong> upon first login",
             "Explore your assigned modules",
             "You can manage and update your assigned vessels anytime from your profile",
         ]
-        if role.upper() == "VESSEL":
+        if is_vessel:
             steps.append("The old DRS has been moved to the Workplace platform. Kindly use this link going forward and discontinue use of the old system.")
         getting_started_steps = ""
         for i, step in enumerate(steps, 1):
@@ -166,7 +169,18 @@ async def send_welcome_email(
         #     </table>"""
 
         vessels_str = ", ".join(assigned_vessels) if assigned_vessels else "None assigned"
-        login_url = "http://localhost:8080" if role.upper() == "VESSEL" else settings.PLATFORM_URL
+        # AFTER
+        cta_button = "" if is_vessel else f"""
+        <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+            <td align="center">
+            <a href="{login_url}"
+                style="display:inline-block;background:#2563eb;color:#ffffff;font-size:14px;font-weight:700;padding:14px 40px;border-radius:8px;text-decoration:none;letter-spacing:0.3px;">
+                Log In to Workplace
+            </a>
+            </td>
+        </tr>
+        </table>"""
 
         html = (template
             .replace("{{full_name}}", full_name)
@@ -175,6 +189,7 @@ async def send_welcome_email(
             .replace("{{role}}", role)
             .replace("{{assigned_vessels}}", vessels_str)
             .replace("{{platform_url}}", login_url)
+            .replace("{{cta_button}}", cta_button)
             .replace("{{getting_started_steps}}", getting_started_steps)
             .replace("{{modules_html}}", modules_html)
         )
