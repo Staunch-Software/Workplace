@@ -23,6 +23,7 @@ from app.services.sync_service import SyncService
 # Engine Performance models
 from app.models import (
     MonthlyReportHeader,
+    MonthlyReportDetailsJsonb,
     MonthlyISOPerformanceData,
     MEAlertSummary,
     MECriticalAlert,
@@ -32,12 +33,22 @@ from app.models import (
     VesselInfo,
     ShopTrialSession,
     ShopTrialPerformanceData,
+    BaselinePerformanceData,
+    Organization,
+    RolePermission,
 )
 from app.generator_models import (
     GeneratorMonthlyReportHeader,
+    GeneratorMonthlyReportDetailsJsonb,
     GeneratorPerformanceGraphData as GeneratorMonthlyPerformanceData,
+    GeneratorBaselineData,
+    GeneratorReferenceCurve,
+    VesselGenerator,
     AEAlertSummary,
     AEDeviationHistory,
+    AECriticalAlert,
+    AENormalStatus,
+    AEWarningAlert,
 )
 
 router = APIRouter(prefix="/engine-sync", tags=["Engine Sync"])
@@ -272,7 +283,131 @@ async def sync_ae_deviation_history(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/monthly-report-details", status_code=200, dependencies=[Depends(verify_sync_key)])
+async def sync_monthly_report_details(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
+    try:
+        await SyncService.apply_snapshot(db, MonthlyReportDetailsJsonb, int(payload.entity_id), payload.version, payload.data)
+        await db.commit()
+        return {"status": "processed", "id": payload.entity_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/ae-critical-alert", status_code=200, dependencies=[Depends(verify_sync_key)])
+async def sync_ae_critical_alert(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
+    try:
+        await SyncService.apply_snapshot(db, AECriticalAlert, int(payload.entity_id), payload.version, payload.data)
+        await db.commit()
+        return {"status": "processed", "id": payload.entity_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/ae-normal-status", status_code=200, dependencies=[Depends(verify_sync_key)])
+async def sync_ae_normal_status(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
+    try:
+        await SyncService.apply_snapshot(db, AENormalStatus, int(payload.entity_id), payload.version, payload.data)
+        await db.commit()
+        return {"status": "processed", "id": payload.entity_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/ae-warning-alert", status_code=200, dependencies=[Depends(verify_sync_key)])
+async def sync_ae_warning_alert(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
+    try:
+        await SyncService.apply_snapshot(db, AEWarningAlert, int(payload.entity_id), payload.version, payload.data)
+        await db.commit()
+        return {"status": "processed", "id": payload.entity_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/baseline-performance", status_code=200, dependencies=[Depends(verify_sync_key)])
+async def sync_baseline_performance(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
+    try:
+        await SyncService.apply_snapshot(db, BaselinePerformanceData, int(payload.entity_id), payload.version, payload.data)
+        await db.commit()
+        return {"status": "processed", "id": payload.entity_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/generator-baseline", status_code=200, dependencies=[Depends(verify_sync_key)])
+async def sync_generator_baseline(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
+    try:
+        await SyncService.apply_snapshot(db, GeneratorBaselineData, int(payload.entity_id), payload.version, payload.data)
+        await db.commit()
+        return {"status": "processed", "id": payload.entity_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/generator-report-details", status_code=200, dependencies=[Depends(verify_sync_key)])
+async def sync_generator_report_details(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
+    try:
+        await SyncService.apply_snapshot(db, GeneratorMonthlyReportDetailsJsonb, int(payload.entity_id), payload.version, payload.data)
+        await db.commit()
+        return {"status": "processed", "id": payload.entity_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/generator-reference-curves", status_code=200, dependencies=[Depends(verify_sync_key)])
+async def sync_generator_reference_curves(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
+    try:
+        await SyncService.apply_snapshot(db, GeneratorReferenceCurve, int(payload.entity_id), payload.version, payload.data)
+        await db.commit()
+        return {"status": "processed", "id": payload.entity_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/organizations", status_code=200, dependencies=[Depends(verify_sync_key)])
+async def sync_organizations(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
+    try:
+        await SyncService.apply_snapshot(db, Organization, int(payload.entity_id), payload.version, payload.data)
+        await db.commit()
+        return {"status": "processed", "id": payload.entity_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/role-permissions", status_code=200, dependencies=[Depends(verify_sync_key)])
+async def sync_role_permissions(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
+    try:
+        await SyncService.apply_snapshot(db, RolePermission, int(payload.entity_id), payload.version, payload.data)
+        await db.commit()
+        return {"status": "processed", "id": payload.entity_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/vessel-generator", status_code=200, dependencies=[Depends(verify_sync_key)])
+async def sync_vessel_generator(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
+    try:
+        await SyncService.apply_snapshot(db, VesselGenerator, int(payload.entity_id), payload.version, payload.data)
+        await db.commit()
+        return {"status": "processed", "id": payload.entity_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/vessel-info", status_code=200, dependencies=[Depends(verify_sync_key)])
+async def sync_vessel_info(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
+    try:
+        await SyncService.apply_snapshot(db, VesselInfo, int(payload.entity_id), payload.version, payload.data)
+        await db.commit()
+        return {"status": "processed", "id": payload.entity_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/shop-trial-session", status_code=200, dependencies=[Depends(verify_sync_key)])
+async def sync_shop_trial_session(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
+    try:
+        await SyncService.apply_snapshot(db, ShopTrialSession, int(payload.entity_id), payload.version, payload.data)
+        await db.commit()
+        return {"status": "processed", "id": payload.entity_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/shop-trial-performance", status_code=200, dependencies=[Depends(verify_sync_key)])
+async def sync_shop_trial_performance(payload: SyncPayload, db: AsyncSession = Depends(get_db)):
+    try:
+        await SyncService.apply_snapshot(db, ShopTrialPerformanceData, int(payload.entity_id), payload.version, payload.data)
+        await db.commit()
+        return {"status": "processed", "id": payload.entity_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 # ─────────────────────────────────────────────────────────────────────────────
 # CHANGES FEED  (vessel pulls from shore, or shore pulls from vessel)
 # GET /engine-sync/changes?since=<iso-datetime>
@@ -295,20 +430,31 @@ async def get_engine_changes(
         since = since.astimezone(timezone.utc).replace(tzinfo=None)
 
     models = {
-        "monthly_report_header": MonthlyReportHeader,
-        "monthly_iso_performance_data": MonthlyISOPerformanceData,
-        "me_alert_summary": MEAlertSummary,
-        "me_critical_alert": MECriticalAlert,
-        "me_warning_alert": MEWarningAlert,
-        "me_normal_status": MENormalStatus,
-        "me_deviation_history": MEDeviationHistory,
-        "vessel_info": VesselInfo,
-        "shop_trial_session": ShopTrialSession,
-        "shop_trial_performance_data": ShopTrialPerformanceData,
-        "generator_monthly_report_header": GeneratorMonthlyReportHeader,
-        "generator_performance_graph_data": GeneratorMonthlyPerformanceData,
-        "ae_alert_summary": AEAlertSummary,
-        "ae_deviation_history": AEDeviationHistory,
+        "monthly_report_header":                  MonthlyReportHeader,
+        "monthly_report_details_jsonb":           MonthlyReportDetailsJsonb,
+        "monthly_iso_performance_data":           MonthlyISOPerformanceData,
+        "me_alert_summary":                       MEAlertSummary,
+        "me_critical_alert":                      MECriticalAlert,
+        "me_warning_alert":                       MEWarningAlert,
+        "me_normal_status":                       MENormalStatus,
+        "me_deviation_history":                   MEDeviationHistory,
+        "vessel_info":                            VesselInfo,
+        "shop_trial_session":                     ShopTrialSession,
+        "shop_trial_performance_data":            ShopTrialPerformanceData,
+        "baseline_performance_data":              BaselinePerformanceData,
+        "organizations":                          Organization,
+        "role_permissions":                       RolePermission,
+        "vessel_generator":                       VesselGenerator,
+        "generator_monthly_report_header":        GeneratorMonthlyReportHeader,
+        "generator_monthly_report_details_jsonb": GeneratorMonthlyReportDetailsJsonb,
+        "generator_performance_graph_data":       GeneratorMonthlyPerformanceData,
+        "generator_baseline_data":               GeneratorBaselineData,
+        "generator_reference_curves":            GeneratorReferenceCurve,
+        "ae_alert_summary":                       AEAlertSummary,
+        "ae_deviation_history":                   AEDeviationHistory,
+        "ae_critical_alert":                      AECriticalAlert,
+        "ae_normal_status":                       AENormalStatus,
+        "ae_warning_alert":                       AEWarningAlert,
     }
 
     results = {}

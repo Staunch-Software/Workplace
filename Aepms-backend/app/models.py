@@ -79,7 +79,7 @@ class Organization(Base):
     domain = Column(String, unique=True, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     # Relationship
     users = relationship("User", back_populates="organization")
 
@@ -105,6 +105,8 @@ class User(Base):
 class RolePermission(Base):
     __tablename__ = "role_permissions"
     id = Column(Integer, primary_key=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     role = Column(String, unique=True)
     can_view_performance = Column(Boolean, default=False)
     can_manage_users = Column(Boolean, default=False)
@@ -459,7 +461,7 @@ class MonthlyReportDetailsJsonb(Base):
     section_name = Column(String(100), nullable=False)
     data_jsonb = Column(JSONB(none_as_null=True, astext_type=TEXT), nullable=False, comment="JSONB column to store flexible, detailed data for a section")
     created_at = Column(TIMESTAMP, default=func.current_timestamp(), nullable=False)
-
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=False)
     # Relationships
     header = relationship("MonthlyReportHeader", back_populates="details")
 
@@ -575,7 +577,7 @@ class MEBaseAlert(Base):
     deviation = Column(Float, nullable=False)
     deviation_pct = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 class MENormalStatus(MEBaseAlert):
     """Main Engine metrics with normal deviation (≤5%)"""
@@ -750,7 +752,7 @@ class MEDeviationHistory(Base):
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     # Constraints and Indexes
     __table_args__ = (
         CheckConstraint('load_percentage >= 0 AND load_percentage <= 110', 

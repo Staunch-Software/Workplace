@@ -27,7 +27,8 @@ class VesselGenerator(Base):
     mcr_power_kw = Column(DECIMAL(8, 2), nullable=True)
     mcr_rpm = Column(DECIMAL(6, 2), nullable=True)
     shop_trial_report_url = Column(String, nullable=True) # <--- Add this line
-
+    created_at = Column(TIMESTAMP, default=func.current_timestamp(), nullable=False)
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=False)
     vessel = relationship("VesselInfo", back_populates="generators")
     baseline_data = relationship(
         "GeneratorBaselineData",
@@ -103,7 +104,8 @@ class GeneratorBaselineData(Base):
     sfoc_g_kwh = Column(DECIMAL(6, 2), nullable=True)
     fuel_consumption_total_kg_h = Column(DECIMAL(8, 2), nullable=True)
     cylinder_readings = Column(JSON, nullable=True)
-    
+    created_at = Column(TIMESTAMP, default=func.current_timestamp(), nullable=False)
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=False)
     vessel = relationship("VesselInfo")
     generator = relationship("VesselGenerator", back_populates="baseline_data")
 
@@ -129,7 +131,8 @@ class GeneratorReferenceCurve(Base):
     
     # The value at that load
     value = Column(DECIMAL(10, 2), nullable=False)       
-
+    created_at = Column(TIMESTAMP, default=func.current_timestamp(), nullable=False)
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=False)
     # Relationship back to generator (using 'reference_curves' defined in VesselGenerator)
     generator = relationship("VesselGenerator", back_populates="reference_curves")
 
@@ -171,7 +174,7 @@ class GeneratorMonthlyReportDetailsJsonb(Base):
     report_id = Column(Integer, ForeignKey('generator_monthly_report_header.report_id', ondelete='CASCADE'), nullable=False, unique=True)
     data_jsonb = Column(JSONB, nullable=False)
     created_at = Column(TIMESTAMP, default=func.current_timestamp(), nullable=False)
-
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=False)
     header = relationship("GeneratorMonthlyReportHeader", back_populates="details_json")
 
 
@@ -223,7 +226,7 @@ class AENormalStatus(Base):
     deviation = Column(DECIMAL(10, 2), nullable=True)
     deviation_pct = Column(DECIMAL(6, 2), nullable=True)
     created_at = Column(TIMESTAMP, default=func.current_timestamp(), nullable=False)
-
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=False)
 
 class AEWarningAlert(Base):
     __tablename__ = 'ae_warning_alert'
@@ -237,7 +240,7 @@ class AEWarningAlert(Base):
     deviation = Column(DECIMAL(10, 2), nullable=True)
     deviation_pct = Column(DECIMAL(6, 2), nullable=True)
     created_at = Column(TIMESTAMP, default=func.current_timestamp(), nullable=False)
-
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=False)
 
 class AECriticalAlert(Base):
     __tablename__ = 'ae_critical_alert'
@@ -251,7 +254,7 @@ class AECriticalAlert(Base):
     deviation = Column(DECIMAL(10, 2), nullable=True)
     deviation_pct = Column(DECIMAL(6, 2), nullable=True)
     created_at = Column(TIMESTAMP, default=func.current_timestamp(), nullable=False)
-
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=False)
 
 class AEAlertSummary(Base):
     __tablename__ = 'ae_alert_summary'
@@ -342,3 +345,4 @@ class AEDeviationHistory(Base):
     foc_dev_pct = Column(DECIMAL(8,2))
 
     created_at = Column(TIMESTAMP, default=func.current_timestamp(), nullable=False)
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=False)
