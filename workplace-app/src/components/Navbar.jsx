@@ -661,9 +661,15 @@ const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
         );
 
         const errCount = log?.failed_items_count ?? 0;
-        const lastPush = log?.vessel_reported_push ?? null;
+        const push = log?.vessel_reported_push ?? null;
+        const pull = log?.vessel_reported_pull ?? null;
+
+        // Use whichever is more recent
+        const lastSync = push && pull
+            ? (new Date(push) > new Date(pull) ? push : pull)
+            : push ?? pull ?? null;
         const isActive = drawer?.vessel?.imo === vessel.imo && drawer?.moduleKey === moduleKey;
-        const age = ageClass(lastPush);
+        const age = ageClass(lastSync);
 
         const CHIP = {
             fresh: { bg: '#eaf3de', border: '#97c459', color: '#27500a', errBg: '#27500a' },
@@ -695,7 +701,7 @@ const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
                 <Clock size={12} color={c.color} strokeWidth={2} />
 
                 {/* Sync time */}
-                {formatAgo(lastPush)}
+                {formatAgo(lastSync)}
 
                 {errCount > 0 && (
                     <span style={{
