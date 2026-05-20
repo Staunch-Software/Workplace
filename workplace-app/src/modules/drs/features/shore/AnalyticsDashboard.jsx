@@ -142,12 +142,12 @@ function VesselMultiSelector({ vessels, selected, onChange }) {
             >
                 <Ship size={14} color="#ea580c" />
                 <span style={{ flex: 1, textAlign: 'left' }}>{label}</span>
-                <ChevronDown size={13} style={{ flexShrink: 0 }} />
+                <ChevronDown size={13} style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
             </button>
 
             {open && (
                 <div style={{
-                    position: 'absolute', top: '110%', left: 0, zIndex: 999,
+                    position: 'absolute', top: '110%', left: '-25px', zIndex: 999,
                     background: 'white', border: '1px solid #e2e8f0',
                     borderRadius: '8px', boxShadow: '0 4px 20px rgba(0,0,0,.12)',
                     minWidth: 240, maxHeight: 300, overflowY: 'auto',
@@ -482,6 +482,7 @@ function SectionCard({ title, subtitle, icon, accentColor, bgColor, borderColor,
                     cursor: 'pointer',
                     userSelect: 'none',
                     overflow: 'visible',
+                    borderRadius:isOpen ? `13px 13px 0px 0px` : '13px',
                 }}
             >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -646,9 +647,16 @@ const AnalyticsDashboard = () => {
 
     const equipBreakdown = useMemo(() => {
         const map = {};
-        vesselFilteredDefects.forEach(d => { const k = d.equipment_name || 'Unknown'; map[k] = (map[k] || 0) + 1; });
+
+        vesselFilteredDefects.forEach(d => {
+            const k = d.equipment_name?.trim().toUpperCase() || 'UNKNOWN';
+
+            map[k] = (map[k] || 0) + 1;
+        });
+
         return Object.entries(map).sort((a, b) => b[1] - a[1]);
     }, [vesselFilteredDefects]);
+
     const maxEquip = useMemo(() => Math.max(...equipBreakdown.map(e => e[1]), 1), [equipBreakdown]);
 
     const sourceBreakdown = useMemo(() => {
@@ -1159,12 +1167,12 @@ const AnalyticsDashboard = () => {
             // onOpen={() => setTimeout(buildTrendChart, 0)}
             >
                 {/* Donut row */}
-                <div className="stats-donut-grid" style={{ display: 'grid',overflowX:"auto", gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                <div className="stats-donut-grid" style={{ display: 'grid', overflowX: "auto", gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
                     <div className="table-card " style={{ padding: 0 }}>
                         <div className="defect-card-header" style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
                             <span className="defect-card-title">Status Distribution</span>
                         </div>
-                        <div  style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
+                        <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
                             <DonutChart size={100} label="total" data={[
                                 { label: 'Open', value: fleetStats.open, color: STATUS_COLORS.OPEN },
                                 { label: 'Pending', value: fleetStats.pending, color: STATUS_COLORS.PENDING_CLOSURE },
@@ -1604,41 +1612,59 @@ const AnalyticsDashboard = () => {
                 <div className="breakdown-grid-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
                     {/* Top Areas of Concern */}
                     <div className="table-card" style={{ padding: 0 }}>
-                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Top Areas of Concern</span>
+                            {equipBreakdown.length > 10 && (
+                                <span style={{ fontSize: 11, color: '#94a3b8' }}>{equipBreakdown.length} areas · scroll for more</span>
+                            )}
                         </div>
                         <div style={{ padding: 16 }}>
                             {equipBreakdown.length === 0
                                 ? <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: 20 }}>No data</div>
-                                : equipBreakdown.map(([eq, cnt], i) => (
-                                    <HBar key={eq} label={eq} value={cnt} max={maxEquip} count={cnt}
-                                        color={['#ea580c', '#f97316', '#dc2626', '#2563eb', '#16a34a', '#9333ea', '#0891b2', '#b45309'][i % 8]} />
-                                ))
+                                : <div style={{
+                                    maxHeight: equipBreakdown.length > 10 ? 280 : 'none',
+                                    overflowY: equipBreakdown.length > 10 ? 'auto' : 'visible',
+                                    paddingRight: equipBreakdown.length > 10 ? 4 : 0,
+                                }}>
+                                    {equipBreakdown.map(([eq, cnt], i) => (
+                                        <HBar key={eq} label={eq} value={cnt} max={maxEquip} count={cnt}
+                                            color={['#ea580c', '#f97316', '#dc2626', '#2563eb', '#16a34a', '#9333ea', '#0891b2', '#b45309'][i % 8]} />
+                                    ))}
+                                </div>
                             }
                         </div>
                     </div>
 
                     {/* Defect Sources */}
                     <div className="table-card" style={{ padding: 0 }}>
-                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Defect Sources</span>
+                            {sourceBreakdown.length > 10 && (
+                                <span style={{ fontSize: 11, color: '#94a3b8' }}>{sourceBreakdown.length} sources · scroll for more</span>
+                            )}
                         </div>
                         <div style={{ padding: 16 }}>
                             {sourceBreakdown.length === 0
                                 ? <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: 20 }}>No data</div>
-                                : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                    {sourceBreakdown.map(([src, cnt], i) => {
-                                        const color = ['#ea580c', '#f97316', '#dc2626', '#2563eb', '#16a34a', '#9333ea'][i % 6];
-                                        return (
-                                            <div key={src} style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <span style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>{src}</span>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    <span style={{ fontSize: 11, color: '#94a3b8' }}>{pct(cnt, vesselStats.total)}</span>
-                                                    <span style={{ fontSize: 13, fontWeight: 700, color, background: color + '18', padding: '2px 9px', borderRadius: '10px' }}>{cnt}</span>
+                                : <div style={{
+                                    maxHeight: sourceBreakdown.length > 10 ? 280 : 'none',
+                                    overflowY: sourceBreakdown.length > 10 ? 'auto' : 'visible',
+                                    paddingRight: sourceBreakdown.length > 10 ? 4 : 0,
+                                }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        {sourceBreakdown.map(([src, cnt], i) => {
+                                            const color = ['#ea580c', '#f97316', '#dc2626', '#2563eb', '#16a34a', '#9333ea'][i % 6];
+                                            return (
+                                                <div key={src} style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>{src}</span>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                        <span style={{ fontSize: 11, color: '#94a3b8' }}>{pct(cnt, vesselStats.total)}</span>
+                                                        <span style={{ fontSize: 13, fontWeight: 700, color, background: color + '18', padding: '2px 9px', borderRadius: '10px' }}>{cnt}</span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             }
                         </div>

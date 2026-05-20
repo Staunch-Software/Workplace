@@ -127,6 +127,8 @@ async def get_all_vessel_sync_status(
                 "last_sync_success": (drs_count == 0 and len(active_errors) == 0),
                 "failed_items_count": drs_count,
                 "latest_error": active_errors[0] if active_errors else None,
+                "vessel_reported_push": state.last_push_at if state else None,
+                "vessel_reported_pull": state.last_pull_at if state else None,
             }
             
         return result # Indented correctly outside the loop

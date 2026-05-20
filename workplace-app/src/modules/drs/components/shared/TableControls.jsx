@@ -177,6 +177,7 @@ export const FilterHeader = ({
                   )}
                 </>
               )}
+
               {/* // Inside FilterHeader component, under type === 'multi-select' */}
               {type === 'multi-select' && (
                 <div
@@ -885,12 +886,14 @@ export function EquipmentFilter({
 }) {
 
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const ref = useRef(null);
 
   useEffect(() => {
     const handleClick = (e) => {
       if (ref.current && !ref.current.contains(e.target)) {
         setOpen(false);
+        setSearch('');
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -904,6 +907,10 @@ export function EquipmentFilter({
       onChange([...selectedValues, value]);
     }
   };
+  const filteredOptions = options.filter(opt =>
+    opt.toLowerCase().includes(search.toLowerCase())
+  );
+
 
   return (
     <div
@@ -990,25 +997,59 @@ export function EquipmentFilter({
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              {options.map(opt => (
-                <label
-                  key={opt}
+              {/* ── Search box ── */}
+              <div style={{ padding: '8px', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Search..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  onClick={e => e.stopPropagation()}
                   style={{
-                    display: 'flex',
-                    gap: 8,
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    padding: '4px 0'
+                    width: '100%',
+                    padding: '5px 8px',
+                    fontSize: '12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '4px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
                   }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedValues.includes(opt)}
-                    onChange={() => toggleValue(opt)}
-                  />
-                  {opt}
-                </label>
-              ))}
+                />
+              </div>
+              <div style={{
+                overflowY: 'auto',
+                flex: 1,
+                padding: '6px 10px',
+                // ← ADD THESE:
+                scrollbarWidth: 'thin',                    // Firefox
+                scrollbarColor: '#cbd5e1 transparent',     // Firefox
+              }}
+                // ← ADD THIS for Chrome/Safari:
+                className="thin-scroll"
+              >
+                {filteredOptions.length === 0 ? (
+                  <div style={{ fontSize: 12, color: '#94a3b8', padding: '8px', textAlign: 'center' }}>No results</div>
+                ) : filteredOptions.map(opt => (
+                  <label
+                    key={opt}
+                    style={{
+                      display: 'flex',
+                      gap: 8,
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      padding: '4px 0'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedValues.includes(opt)}
+                      onChange={() => toggleValue(opt)}
+                    />
+                    {opt}
+                  </label>
+                ))}
+              </div>
 
               {selectedValues.length > 0 && (
                 <div
@@ -1044,12 +1085,14 @@ export function DefectSourceFilter({
   sortState
 }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const ref = useRef(null);
 
   useEffect(() => {
     const handleClick = (e) => {
       if (ref.current && !ref.current.contains(e.target)) {
         setOpen(false);
+        setSearch('');
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -1063,6 +1106,10 @@ export function DefectSourceFilter({
       onChange([...selectedValues, value]);
     }
   };
+
+  const filteredOptions = options.filter(opt =>
+    getDefectSourceLabel(opt).toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="filter-header" ref={ref} style={{ width, position: 'relative' }}>
@@ -1142,7 +1189,21 @@ export function DefectSourceFilter({
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              {options.map(opt => (
+              <div style={{ padding: '8px', borderBottom: '1px solid #f1f5f9' }}>
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Search..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  onClick={e => e.stopPropagation()}
+                  style={{ width: '100%', padding: '5px 8px', fontSize: '12px', border: '1px solid #e2e8f0', borderRadius: '4px', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              {filteredOptions.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#94a3b8', padding: '8px', textAlign: 'center' }}>No results</div>
+              ) : filteredOptions.map(opt => (
                 <label
                   key={opt}
                   style={{

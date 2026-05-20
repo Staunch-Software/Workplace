@@ -673,43 +673,43 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
   // ── Responsive visible month count — declared FIRST before maxOffset uses it ──
   const tableContainerRef = useRef(null);
 
-const calculateVisibleMonths = () => {
-  if (!tableContainerRef.current) {
-    const w = window.innerWidth;
-    if (w <= 480)  return 3;
-    if (w <= 768)  return 5;
-    if (w <= 1024) return 7;
-    return 12;
-  }
-  const containerWidth = tableContainerRef.current.getBoundingClientRect().width;
-  // Fixed columns: Vessel(160) + LastReport(100) + Days(65) + Load(70) + NavLeft(45) + NavRight(45) = 485px
-  const FIXED_COLS_WIDTH = 485;
-  const MONTH_COL_WIDTH = 75;
-  const available = containerWidth - FIXED_COLS_WIDTH;
-  const count = Math.floor(available / MONTH_COL_WIDTH);
-  return Math.max(2, Math.min(count, 12));
-};
-
-const [visibleMonthCount, setVisibleMonthCount] = useState(10);
-
-useEffect(() => {
-  const updateCount = () => {
-    setVisibleMonthCount(calculateVisibleMonths());
+  const calculateVisibleMonths = () => {
+    if (!tableContainerRef.current) {
+      const w = window.innerWidth;
+      if (w <= 480) return 3;
+      if (w <= 768) return 5;
+      if (w <= 1024) return 7;
+      return 12;
+    }
+    const containerWidth = tableContainerRef.current.getBoundingClientRect().width;
+    // Fixed columns: Vessel(160) + LastReport(100) + Days(65) + Load(70) + NavLeft(45) + NavRight(45) = 485px
+    const FIXED_COLS_WIDTH = 485;
+    const MONTH_COL_WIDTH = 75;
+    const available = containerWidth - FIXED_COLS_WIDTH;
+    const count = Math.floor(available / MONTH_COL_WIDTH);
+    return Math.max(2, Math.min(count, 12));
   };
 
-  updateCount(); // Run on mount
+  const [visibleMonthCount, setVisibleMonthCount] = useState(10);
 
-  const resizeObserver = new ResizeObserver(updateCount);
-  if (tableContainerRef.current) {
-    resizeObserver.observe(tableContainerRef.current);
-  }
+  useEffect(() => {
+    const updateCount = () => {
+      setVisibleMonthCount(calculateVisibleMonths());
+    };
 
-  window.addEventListener("resize", updateCount);
-  return () => {
-    resizeObserver.disconnect();
-    window.removeEventListener("resize", updateCount);
-  };
-}, []);
+    updateCount(); // Run on mount
+
+    const resizeObserver = new ResizeObserver(updateCount);
+    if (tableContainerRef.current) {
+      resizeObserver.observe(tableContainerRef.current);
+    }
+
+    window.addEventListener("resize", updateCount);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateCount);
+    };
+  }, []);
   const maxOffset = useMemo(() => {
     const today = new Date();
     const startYear = 2025;
@@ -756,7 +756,7 @@ useEffect(() => {
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const detailsSectionRef = useRef(null);
   const tableRowRef = useRef(null);
-const [actualRowHeight, setActualRowHeight] = useState(48);
+  const [actualRowHeight, setActualRowHeight] = useState(48);
   const propellerCardRef = useRef(null); // Add this
   const [consoleShipId, setConsoleShipId] = useState("");
   const daysElapsedCardRef = useRef(null);
@@ -775,11 +775,11 @@ const [actualRowHeight, setActualRowHeight] = useState(48);
   );
   const [isDaysDropdownOpen, setIsDaysDropdownOpen] = useState(false);
   const daysDropdownRef = useRef(null);
-const [daysSortConfig, setDaysSortConfig] = useState({
-  key: "vessel_name",
-  direction: "asc",
-});
- const [aeRefreshTrigger, setAeRefreshTrigger] = useState(0);
+  const [daysSortConfig, setDaysSortConfig] = useState({
+    key: "vessel_name",
+    direction: "asc",
+  });
+  const [aeRefreshTrigger, setAeRefreshTrigger] = useState(0);
 
 
   // ===== NEW: Download State =====
@@ -821,8 +821,8 @@ const [daysSortConfig, setDaysSortConfig] = useState({
   const filteredPropellerData =
     selectedVesselsFilter.length > 0
       ? propellerTrendData.filter((v) =>
-          selectedVesselsFilter.some((s) => s.imo_number === v.imo_number),
-        )
+        selectedVesselsFilter.some((s) => s.imo_number === v.imo_number),
+      )
       : [];
 
   // Auto-scroll for Propeller Card
@@ -837,7 +837,7 @@ const [daysSortConfig, setDaysSortConfig] = useState({
       }, 150); // Slightly longer timeout to allow chart rendering
     }
   }, [isPropellerCardOpen, selectedVesselsFilter]); // Added selectedVesselsFilter here
-  
+
   useEffect(() => {
     if (unifiedEngineType === "mainEngine" && consoleShipId) {
       const vessel = daysElapsedData.find(
@@ -855,17 +855,17 @@ const [daysSortConfig, setDaysSortConfig] = useState({
   }, [consoleShipId, daysElapsedData, unifiedEngineType]);
   // Auto-scroll for Report Status Card
   // Auto-scroll for Report Status Card
-useEffect(() => {
-  if (isReportStatusOpen && selectedDaysVesselsFilter.length > 0 && daysElapsedCardRef.current) {
-    setTimeout(() => {
-      daysElapsedCardRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 350);
-  }
-}, [selectedDaysVesselsFilter]);
-  
+  useEffect(() => {
+    if (isReportStatusOpen && selectedDaysVesselsFilter.length > 0 && daysElapsedCardRef.current) {
+      setTimeout(() => {
+        daysElapsedCardRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 350);
+    }
+  }, [selectedDaysVesselsFilter]);
+
   // --- PDF GENERATION ---
   const handlePdfAction = async (actionType) => {
     try {
@@ -1084,10 +1084,10 @@ useEffect(() => {
     let data =
       selectedDaysVesselsFilter.length > 0
         ? daysElapsedData.filter((v) =>
-            selectedDaysVesselsFilter.some(
-              (s) => s.imo_number === v.imo_number,
-            ),
-          )
+          selectedDaysVesselsFilter.some(
+            (s) => s.imo_number === v.imo_number,
+          ),
+        )
         : [...daysElapsedData];
 
     // 2. Sort the data
@@ -1189,13 +1189,13 @@ useEffect(() => {
   }, []);
 
   useEffect(() => {
-  if (tableRowRef.current) {
-    const firstRow = tableRowRef.current.querySelector('tbody tr');
-    if (firstRow) {
-      setActualRowHeight(firstRow.getBoundingClientRect().height);
+    if (tableRowRef.current) {
+      const firstRow = tableRowRef.current.querySelector('tbody tr');
+      if (firstRow) {
+        setActualRowHeight(firstRow.getBoundingClientRect().height);
+      }
     }
-  }
-}, [filteredDaysElapsedData]);
+  }, [filteredDaysElapsedData]);
   // const fetchAlertHistory = async (vessels) => {
   //     const historyMap = {};
   //     const monthBuckets = getLast12Months();
@@ -1723,7 +1723,7 @@ useEffect(() => {
                         {selectedVesselsFilter.length === 0
                           ? "Select the vessel"
                           : selectedVesselsFilter.length ===
-                              propellerTrendData.length
+                            propellerTrendData.length
                             ? "✓ All"
                             : selectedVesselsFilter.length === 1
                               ? `✓ ${selectedVesselsFilter[0]?.vessel_name?.toUpperCase() || "1 Vessel Selected"}`
@@ -1754,7 +1754,7 @@ useEffect(() => {
                               className="vessel-checkbox"
                               checked={
                                 selectedVesselsFilter.length ===
-                                  propellerTrendData.length &&
+                                propellerTrendData.length &&
                                 propellerTrendData.length > 0
                               }
                               readOnly // Changed to readOnly
@@ -1960,7 +1960,7 @@ useEffect(() => {
                 ) : (
                   <div className="propeller-empty-state">
                     <p>
-                       Select one or more vessels above to view their
+                      Select one or more vessels above to view their
                       propeller margin performance
                     </p>
                   </div>
@@ -1986,7 +1986,7 @@ useEffect(() => {
               onUploadSuccess={() => {
                 // If ME is active, refresh ME data silently. If AE, bump AE trigger.
                 if (unifiedEngineType === "mainEngine") {
-                  fetchDashboardData(true); 
+                  fetchDashboardData(true);
                 } else {
                   setAeRefreshTrigger(prev => prev + 1);
                 }
@@ -2042,10 +2042,10 @@ useEffect(() => {
                             {selectedDaysVesselsFilter.length === 0
                               ? "Select the vessel"
                               : selectedDaysVesselsFilter.length ===
-                                  daysElapsedData.length
+                                daysElapsedData.length
                                 ? "✓ All"
                                 : selectedDaysVesselsFilter.length === 1
-                                    ? `✓ ${selectedDaysVesselsFilter[0]?.vessel_name?.toUpperCase() || "1 Vessel Selected"}`
+                                  ? `✓ ${selectedDaysVesselsFilter[0]?.vessel_name?.toUpperCase() || "1 Vessel Selected"}`
                                   : `✓ ${selectedDaysVesselsFilter.length} Vessels Selected`}
                           </span>
                         </div>
@@ -2073,7 +2073,7 @@ useEffect(() => {
                                   className="vessel-checkbox"
                                   checked={
                                     selectedDaysVesselsFilter.length ===
-                                      daysElapsedData.length &&
+                                    daysElapsedData.length &&
                                     daysElapsedData.length > 0
                                   }
                                   readOnly
@@ -2141,15 +2141,15 @@ useEffect(() => {
                     {consoleShipId && selectedDaysVesselsFilter.length > 0 ? (
                       /* 1. WRAPPER: Height set to approx 380px to show ~6 vessels cleanly */
                       <div
-  className="performance-table-wrapper days-table-wrapper"
-  ref={(el) => { tableRowRef.current = el; tableContainerRef.current = el; }}
-  style={{
-    maxHeight: filteredDaysElapsedData.length > 6
-      ? `${(6 * actualRowHeight) + 42 + 36}px`
-      : 'none',
-    overflowY: filteredDaysElapsedData.length > 6 ? 'auto' : 'hidden'
-  }}
->
+                        className="performance-table-wrapper days-table-wrapper"
+                        ref={(el) => { tableRowRef.current = el; tableContainerRef.current = el; }}
+                        style={{
+                          maxHeight: filteredDaysElapsedData.length > 6
+                            ? `${(6 * actualRowHeight) + 42 + 36}px`
+                            : 'none',
+                          overflowY: filteredDaysElapsedData.length > 6 ? 'auto' : 'hidden'
+                        }}
+                      >
                         <table className="performance-table-modern days-table">
                           <thead className="days-thead">
                             <tr>
@@ -2174,7 +2174,7 @@ useEffect(() => {
                                       size={10}
                                       className={
                                         daysSortConfig.key === "days_elapsed" &&
-                                        daysSortConfig.direction === "asc"
+                                          daysSortConfig.direction === "asc"
                                           ? "days-sort-arrow--active"
                                           : "days-sort-arrow--inactive"
                                       }
@@ -2183,7 +2183,7 @@ useEffect(() => {
                                       size={10}
                                       className={
                                         daysSortConfig.key === "days_elapsed" &&
-                                        daysSortConfig.direction === "desc"
+                                          daysSortConfig.direction === "desc"
                                           ? "days-sort-arrow--active"
                                           : "days-sort-arrow--inactive"
                                       }
@@ -2407,7 +2407,7 @@ useEffect(() => {
                     ) : (
                       <div className="days-empty-state">
                         <p>
-                           Select one or more vessels above to view Report
+                          Select one or more vessels above to view Report
                           Status
                         </p>
                       </div>
@@ -2459,217 +2459,217 @@ useEffect(() => {
                 ) : (
                   /* FIX 1: tableLayout: 'fixed' ensures strict column widths */
                   <div className="detail-table-wrapper">
-                  <table className="detail-table">
-                    <thead>
-                      <tr>
-                        {/* Metadata Columns */}
-                        <th title="Report Date" className="detail-th-date">Date</th>
-                        <th title="Engine Power (kW)" className="detail-th-power">Power</th>
-                        <th title="MCR Power Limit (kW)" className="detail-th-mcr">MCR Lim</th>
-                        <th title="Engine Load Percentage" className="detail-th-load">Load%</th>
-                        <th title="Report Status (Critical/Warning/Normal)" className="detail-th-status">Sts</th>
-                        <th title="Raw Report" className="detail-th-raw">Raw</th>
-                        <th title="Analytical Report" className="detail-th-ana">Ana</th>
+                    <table className="detail-table">
+                      <thead>
+                        <tr>
+                          {/* Metadata Columns */}
+                          <th title="Report Date" className="detail-th-date">Date</th>
+                          <th title="Engine Power (kW)" className="detail-th-power">Power</th>
+                          <th title="MCR Power Limit (kW)" className="detail-th-mcr">MCR Lim</th>
+                          <th title="Engine Load Percentage" className="detail-th-load">Load%</th>
+                          <th title="Report Status (Critical/Warning/Normal)" className="detail-th-status">Sts</th>
+                          <th title="Raw Report" className="detail-th-raw">Raw</th>
+                          <th title="Analytical Report" className="detail-th-ana">Ana</th>
 
-                        {/* Parameter Columns */}
-                        {/* <th title="Engine Speed (RPM)" style={{ width: '5.25%', padding: '10px 2px', borderBottom: '1px solid #e5e7eb', fontWeight: '700', cursor: 'help' }}>RPM</th> */}
-                        <th title="Power Margin"                      className="detail-th-param">Power</th>
-                        <th title="Turbocharger Speed"                className="detail-th-param">T/C</th>
-                        <th title="Fuel Index Pump Indicator"         className="detail-th-param">FIPI</th>
-                        <th title="Maximum Pressure (Pmax)"           className="detail-th-param">Pmax</th>
-                        <th title="Pmax Deviation"                    className="detail-th-param">ΔPmx</th>
-                        <th title="Compression Pressure (Pcomp)"      className="detail-th-param">Pcomp</th>
-                        <th title="Pcomp Deviation"                   className="detail-th-param">ΔPcp</th>
-                        <th title="Scavenge Air Pressure"             className="detail-th-param">Scav</th>
-                        <th title="Exhaust Gas Temp - T/C Inlet"      className="detail-th-param">TC In</th>
-                        <th title="Exhaust Gas Temp - T/C Outlet"     className="detail-th-param">TC Out</th>
-                        <th title="Exhaust Gas Temp - Cylinder Outlet" className="detail-th-param">Cyl Out</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedVesselDetails.reports.map((r, i) => {
-                        const details = r.formatted_actuals || {};
-                        const power =
-                          details.power || r.shaft_power_kw || r.power_kw;
-                        const load =
-                          details.load_percentage || r.load_percentage;
-                        const powerValue = power ? Number(power) : null;
-                        const mcrLimit = r.mcr_limit_kw
-                          ? Number(r.mcr_limit_kw)
-                          : null;
+                          {/* Parameter Columns */}
+                          {/* <th title="Engine Speed (RPM)" style={{ width: '5.25%', padding: '10px 2px', borderBottom: '1px solid #e5e7eb', fontWeight: '700', cursor: 'help' }}>RPM</th> */}
+                          <th title="Power Margin" className="detail-th-param">Power</th>
+                          <th title="Turbocharger Speed" className="detail-th-param">T/C</th>
+                          <th title="Fuel Index Pump Indicator" className="detail-th-param">FIPI</th>
+                          <th title="Maximum Pressure (Pmax)" className="detail-th-param">Pmax</th>
+                          <th title="Pmax Deviation" className="detail-th-param">ΔPmx</th>
+                          <th title="Compression Pressure (Pcomp)" className="detail-th-param">Pcomp</th>
+                          <th title="Pcomp Deviation" className="detail-th-param">ΔPcp</th>
+                          <th title="Scavenge Air Pressure" className="detail-th-param">Scav</th>
+                          <th title="Exhaust Gas Temp - T/C Inlet" className="detail-th-param">TC In</th>
+                          <th title="Exhaust Gas Temp - T/C Outlet" className="detail-th-param">TC Out</th>
+                          <th title="Exhaust Gas Temp - Cylinder Outlet" className="detail-th-param">Cyl Out</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedVesselDetails.reports.map((r, i) => {
+                          const details = r.formatted_actuals || {};
+                          const power =
+                            details.power || r.shaft_power_kw || r.power_kw;
+                          const load =
+                            details.load_percentage || r.load_percentage;
+                          const powerValue = power ? Number(power) : null;
+                          const mcrLimit = r.mcr_limit_kw
+                            ? Number(r.mcr_limit_kw)
+                            : null;
 
-                        const rowBg = i % 2 === 0 ? "#fff" : "#fafafa";
-                        let isRedAlert = false;
-                        if (powerValue !== null && mcrLimit !== null) {
-                          const diff = mcrLimit - powerValue;
-                          const tenPercentThreshold = mcrLimit * 0.1;
+                          const rowBg = i % 2 === 0 ? "#fff" : "#fafafa";
+                          let isRedAlert = false;
+                          if (powerValue !== null && mcrLimit !== null) {
+                            const diff = mcrLimit - powerValue;
+                            const tenPercentThreshold = mcrLimit * 0.1;
 
-                          // Only triggers if Power is LOWER than the limit by more than 10%
-                          if (diff > tenPercentThreshold) {
-                            isRedAlert = true;
-                          }
-                        }
-
-                        const renderParamCell = (paramKey) => {
-                          const actualVal = details[paramKey];
-                          if (actualVal === null || actualVal === undefined) {
-                            return <span className="detail-null">-</span>;
+                            // Only triggers if Power is LOWER than the limit by more than 10%
+                            if (diff > tenPercentThreshold) {
+                              isRedAlert = true;
+                            }
                           }
 
-                          const actualNum = Number(actualVal);
-                          const currentLoad = load ? Number(load) : 0;
-                          let status = "Normal";
-                          let tooltipText = "";
+                          const renderParamCell = (paramKey) => {
+                            const actualVal = details[paramKey];
+                            if (actualVal === null || actualVal === undefined) {
+                              return <span className="detail-null">-</span>;
+                            }
 
-                          // --- 1. SET REFERENCE KEY FOR STATUS LOGIC ---
-                          // If the key is a Delta column, we point the logic to the Parent parameter
-                          let referenceKey = paramKey;
-                          if (paramKey === "pmax_dev") referenceKey = "pmax";
-                          if (paramKey === "pcomp_dev") referenceKey = "pcomp";
+                            const actualNum = Number(actualVal);
+                            const currentLoad = load ? Number(load) : 0;
+                            let status = "Normal";
+                            let tooltipText = "";
 
-                          // --- 2. CALCULATE STATUS & TOOLTIP ---
+                            // --- 1. SET REFERENCE KEY FOR STATUS LOGIC ---
+                            // If the key is a Delta column, we point the logic to the Parent parameter
+                            let referenceKey = paramKey;
+                            if (paramKey === "pmax_dev") referenceKey = "pmax";
+                            if (paramKey === "pcomp_dev") referenceKey = "pcomp";
 
-                          // Special Logic for Power Margin (Propeller)
-                          if (paramKey === "propeller") {
-                            const baseline = 100.0;
-                            const diff = actualNum;
-                            const devPct = actualNum;
-                            status = getParamStatus(
-                              paramKey,
-                              devPct,
-                              diff,
-                              actualNum,
-                            );
+                            // --- 2. CALCULATE STATUS & TOOLTIP ---
 
-                            tooltipText = `Actual: ${(100 + actualNum).toFixed(2)} (Dev: ${actualNum >= 0 ? "+" : ""}${actualNum.toFixed(1)}%) - ${status}`;
-                          }
-                          // Logic for Standard Metrics AND Deviation Columns
-                          else {
-                            // We always fetch the baseline for the referenceKey (e.g., Shop Trial Pmax)
-                            const baseline = getInterpolatedBaseline(
-                              selectedVesselDetails.baselineData,
-                              referenceKey,
-                              currentLoad,
-                            );
-
-                            if (baseline !== null && baseline !== 0) {
-                              // For Delta columns, the 'diff' is the actualNum (e.g., +9.0 Bar).
-                              // For Main columns, we calculate diff as Actual - Baseline.
-                              const diff =
-                                paramKey === "pmax_dev" ||
-                                paramKey === "pcomp_dev"
-                                  ? actualNum
-                                  : actualNum - baseline;
-
-                              const devPct = (diff / baseline) * 100;
-
-                              // We pass referenceKey to getParamStatus so Pmax and ΔPMX run the exact same logic
+                            // Special Logic for Power Margin (Propeller)
+                            if (paramKey === "propeller") {
+                              const baseline = 100.0;
+                              const diff = actualNum;
+                              const devPct = actualNum;
                               status = getParamStatus(
-                                referenceKey,
+                                paramKey,
                                 devPct,
                                 diff,
                                 actualNum,
                               );
 
-                              if (
-                                paramKey === "pmax_dev" ||
-                                paramKey === "pcomp_dev"
-                              ) {
-                                tooltipText = `${actualNum >= 0 ? "+" : ""}${actualNum.toFixed(2)} Bar (${status})`;
-                              } else {
-                                tooltipText = `${actualNum.toFixed(2)} (Dev: ${devPct >= 0 ? "+" : ""}${devPct.toFixed(1)}%) - ${status}`;
-                              }
-                            } else {
-                              tooltipText = `${actualNum.toFixed(2)} - No Baseline`;
+                              tooltipText = `Actual: ${(100 + actualNum).toFixed(2)} (Dev: ${actualNum >= 0 ? "+" : ""}${actualNum.toFixed(1)}%) - ${status}`;
                             }
-                          }
+                            // Logic for Standard Metrics AND Deviation Columns
+                            else {
+                              // We always fetch the baseline for the referenceKey (e.g., Shop Trial Pmax)
+                              const baseline = getInterpolatedBaseline(
+                                selectedVesselDetails.baselineData,
+                                referenceKey,
+                                currentLoad,
+                              );
 
-                          // --- 3. RENDER DOT ---
-                          let dotColor = "#10b981"; // Green
-                          if (status === "Critical")
-                            dotColor = "#ef4444"; // Red
-                          else if (status === "Warning") dotColor = "#f59e0b"; // Amber
+                              if (baseline !== null && baseline !== 0) {
+                                // For Delta columns, the 'diff' is the actualNum (e.g., +9.0 Bar).
+                                // For Main columns, we calculate diff as Actual - Baseline.
+                                const diff =
+                                  paramKey === "pmax_dev" ||
+                                    paramKey === "pcomp_dev"
+                                    ? actualNum
+                                    : actualNum - baseline;
+
+                                const devPct = (diff / baseline) * 100;
+
+                                // We pass referenceKey to getParamStatus so Pmax and ΔPMX run the exact same logic
+                                status = getParamStatus(
+                                  referenceKey,
+                                  devPct,
+                                  diff,
+                                  actualNum,
+                                );
+
+                                if (
+                                  paramKey === "pmax_dev" ||
+                                  paramKey === "pcomp_dev"
+                                ) {
+                                  tooltipText = `${actualNum >= 0 ? "+" : ""}${actualNum.toFixed(2)} Bar (${status})`;
+                                } else {
+                                  tooltipText = `${actualNum.toFixed(2)} (Dev: ${devPct >= 0 ? "+" : ""}${devPct.toFixed(1)}%) - ${status}`;
+                                }
+                              } else {
+                                tooltipText = `${actualNum.toFixed(2)} - No Baseline`;
+                              }
+                            }
+
+                            // --- 3. RENDER DOT ---
+                            let dotColor = "#10b981"; // Green
+                            if (status === "Critical")
+                              dotColor = "#ef4444"; // Red
+                            else if (status === "Warning") dotColor = "#f59e0b"; // Amber
+
+                            return (
+                              <div className="detail-param-dot-wrapper">
+                                <div title={tooltipText} className="detail-param-dot" style={{ backgroundColor: dotColor }} />
+                              </div>
+                            );
+                          };
+
+
+                          let overallColor = "green";
+                          if (r.status === "Critical") overallColor = "red";
+                          else if (r.status === "Warning")
+                            overallColor = "yellow";
+
+                          const getStatusIcon = (c) => {
+                            if (c === "red")
+                              return <AlertCircle size={16} color="#dc2626" />;
+                            if (c === "yellow")
+                              return <AlertCircle size={16} color="#d97706" />;
+                            return <CheckCircle size={16} color="#16a34a" />;
+                          };
 
                           return (
-  <div className="detail-param-dot-wrapper">
-    <div title={tooltipText} className="detail-param-dot" style={{ backgroundColor: dotColor }} />
-  </div>
-);
-                        };
+                            <tr key={i} style={{ backgroundColor: rowBg }}>
+                              <td className="detail-td--date">{formatDate(r.report_date)}</td>
+                              <td className={`detail-td--num detail-td--power${isRedAlert ? " detail-td--alert" : ""}`}>
+                                {powerValue !== null ? powerValue.toLocaleString() : "-"}
+                              </td>
 
+                              <td className="detail-td--num detail-td--mcr" title={r.mcr_limit_percentage != null ? `MCR Limit Percentage: ${r.mcr_limit_percentage}%` : "No percentage data"}>
+                                {r.mcr_limit_kw != null ? Number(r.mcr_limit_kw).toLocaleString() : "-"}
+                              </td>
+                              <td className="detail-td--num detail-td--load">{load ? Number(load).toFixed(1) + "%" : "-"}</td>
 
-                        let overallColor = "green";
-                        if (r.status === "Critical") overallColor = "red";
-                        else if (r.status === "Warning")
-                          overallColor = "yellow";
+                              <td className="detail-td detail-td--status">
+                                <div className="detail-status-icon" title={r.status}>
+                                  {getStatusIcon(overallColor)}
+                                </div>
+                              </td>
 
-                        const getStatusIcon = (c) => {
-                          if (c === "red")
-                            return <AlertCircle size={16} color="#dc2626" />;
-                          if (c === "yellow")
-                            return <AlertCircle size={16} color="#d97706" />;
-                          return <CheckCircle size={16} color="#16a34a" />;
-                        };
+                              <td className="detail-td detail-td--raw">
+                                {r.raw_report_view_url ? (
+                                  <div className="detail-report-btns">
+                                    <button onClick={() => window.open(r.raw_report_view_url, "_blank")} title="View Raw" className="detail-report-btn">
+                                      <FileText size={14} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="detail-null">-</span>
+                                )}
+                              </td>
 
-                        return (
-                          <tr key={i} style={{ backgroundColor: rowBg }}>
-                            <td className="detail-td--date">{formatDate(r.report_date)}</td>
-                            <td className={`detail-td--num detail-td--power${isRedAlert ? " detail-td--alert" : ""}`}>
-  {powerValue !== null ? powerValue.toLocaleString() : "-"}
-</td>
+                              <td className="detail-td detail-td--ana">
+                                {r.generated_report_view_url ? (
+                                  <div className="detail-report-btns">
+                                    <button onClick={() => window.open(r.generated_report_view_url, "_blank")} title="View Analytical" className="detail-report-btn">
+                                      <FileText size={14} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="detail-null">-</span>
+                                )}
+                              </td>
 
-                            <td className="detail-td--num detail-td--mcr" title={r.mcr_limit_percentage != null ? `MCR Limit Percentage: ${r.mcr_limit_percentage}%` : "No percentage data"}>
-  {r.mcr_limit_kw != null ? Number(r.mcr_limit_kw).toLocaleString() : "-"}
-</td>
-                            <td className="detail-td--num detail-td--load">{load ? Number(load).toFixed(1) + "%" : "-"}</td>
-
-                            <td className="detail-td detail-td--status">
-  <div className="detail-status-icon" title={r.status}>
-    {getStatusIcon(overallColor)}
-  </div>
-</td>
-
-                            <td className="detail-td detail-td--raw">
-  {r.raw_report_view_url ? (
-    <div className="detail-report-btns">
-      <button onClick={() => window.open(r.raw_report_view_url, "_blank")} title="View Raw" className="detail-report-btn">
-        <FileText size={14} />
-      </button>
-    </div>
-  ) : (
-    <span className="detail-null">-</span>
-  )}
-</td>
-
-                            <td className="detail-td detail-td--ana">
-  {r.generated_report_view_url ? (
-    <div className="detail-report-btns">
-      <button onClick={() => window.open(r.generated_report_view_url, "_blank")} title="View Analytical" className="detail-report-btn">
-        <FileText size={14} />
-      </button>
-    </div>
-  ) : (
-    <span className="detail-null">-</span>
-  )}
-</td>
-
-                            {/* <td style={cellStyle}>{renderParamCell('engspeed')}</td> */}
-                            <td className="detail-td--param">{renderParamCell("propeller")}</td>
-                            <td className="detail-td--param">{renderParamCell("turbospeed")}</td>
-                            <td className="detail-td--param">{renderParamCell("fipi")}</td>
-                            <td className="detail-td--param">{renderParamCell("pmax")}</td>
-                            <td className="detail-td--param">{renderParamCell("pmax_dev")}</td>
-                            <td className="detail-td--param">{renderParamCell("pcomp")}</td>
-                            <td className="detail-td--param">{renderParamCell("pcomp_dev")}</td>
-                            <td className="detail-td--param">{renderParamCell("scavair")}</td>
-                            <td className="detail-td--param">{renderParamCell("exh_t/c_inlet")}</td>
-                            <td className="detail-td--param">{renderParamCell("exh_t/c_outlet")}</td>
-                            <td className="detail-td--param">{renderParamCell("exh_cylinder_outlet")}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                              {/* <td style={cellStyle}>{renderParamCell('engspeed')}</td> */}
+                              <td className="detail-td--param">{renderParamCell("propeller")}</td>
+                              <td className="detail-td--param">{renderParamCell("turbospeed")}</td>
+                              <td className="detail-td--param">{renderParamCell("fipi")}</td>
+                              <td className="detail-td--param">{renderParamCell("pmax")}</td>
+                              <td className="detail-td--param">{renderParamCell("pmax_dev")}</td>
+                              <td className="detail-td--param">{renderParamCell("pcomp")}</td>
+                              <td className="detail-td--param">{renderParamCell("pcomp_dev")}</td>
+                              <td className="detail-td--param">{renderParamCell("scavair")}</td>
+                              <td className="detail-td--param">{renderParamCell("exh_t/c_inlet")}</td>
+                              <td className="detail-td--param">{renderParamCell("exh_t/c_outlet")}</td>
+                              <td className="detail-td--param">{renderParamCell("exh_cylinder_outlet")}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>

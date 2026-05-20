@@ -1660,16 +1660,23 @@
     font-size: 10px !important;
   }
 
-  .closure-body, .closure-label, .system-pill, .thread-author, .closure-remark, .closre-btn-accept {
+  .closure-body, .closure-label, .system-pill, .closure-remark, .closre-btn-accept {
     font-size: 10px !important;
   }
 
   .thread-author-time, .closed-thread {
-    font-size: 8px !important;
+    font-size: 10px !important;
   }
 
-  .thread-body, .closure-hearder {
-    font-size: 8px !important;
+   .closure-hearder {
+    font-size: 10px !important;
+  }
+  .thread-body{
+    font-size: 12px !important;
+  }
+
+  .thread-author{
+    font-size: 11px;
   }
 
   .input-thread-text, .closed-defect-td {
@@ -1793,4 +1800,21 @@
   /* Firefox specific */
   scrollbar-color: #cbd5e1 #f1f5f9;
   /* handle color | track color */
+}
+
+.thin-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+
+.thin-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.thin-scroll::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+}
+
+.thin-scroll::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }

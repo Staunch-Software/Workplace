@@ -66,7 +66,9 @@ async def get_all_vessel_sync_status(
                 "name": v.name,
                 "last_sync_success": (jira_count == 0 and len(active_errors) == 0),
                 "failed_items_count": jira_count,
-                "latest_error": active_errors[0] if active_errors else None
+                "latest_error": active_errors[0] if active_errors else None,
+                "vessel_reported_push": state.last_push_at if state else None,
+                "vessel_reported_pull": state.last_pull_at if state else None,
             }
         return result
     

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Building2, Search, Shield, LogOut, ChevronDown, Ship, X, Check, KeyRound, Activity, ChevronRight, Database, Clock, Wifi, WifiOff, FileText, Trello, Droplet, Zap, AlertCircle, Terminal, RefreshCw, ArrowUpRight, ArrowDownLeft, CheckCircle, Ship as ShipIcon, BookOpen } from "lucide-react";
+import { Building2, Search, Shield, LogOut, ChevronDown, Ship, X, Check, KeyRound, Activity, ChevronRight, Database, Clock, Wifi, WifiOff, FileText, Trello, Droplet, Zap, AlertCircle, Terminal, RefreshCw, ArrowUpRight, ArrowDownLeft, CheckCircle, Ship as ShipIcon, BookOpen, AlertTriangle } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getVesselStatus } from '../pages/admin/lib/adminApi';
@@ -62,19 +62,19 @@ function parseErrorMessage(raw) {
 
     // ── 1. Unique Violation ───────────────────────────────────────────────────
     if (raw.includes('UniqueViolationError') || raw.includes('duplicate key value')) {
-        const keyMatch    = raw.match(/Key \((.+?)\)=\((.+?)\)/);
+        const keyMatch = raw.match(/Key \((.+?)\)=\((.+?)\)/);
         const constrMatch = raw.match(/constraint "(.+?)"/);
-        const sqlMatch    = raw.match(/\[SQL: (.+?)\]/s);
-        const paramMatch  = raw.match(/\[parameters: (.+?)\]/s);
-        dev.exception  = 'asyncpg.exceptions.UniqueViolationError';
+        const sqlMatch = raw.match(/\[SQL: (.+?)\]/s);
+        const paramMatch = raw.match(/\[parameters: (.+?)\]/s);
+        dev.exception = 'asyncpg.exceptions.UniqueViolationError';
         dev.constraint = constrMatch?.[1] ?? null;
-        dev.sql        = sqlMatch?.[1]?.trim() ?? null;
-        dev.params     = paramMatch?.[1]?.trim() ?? null;
-        dev.ref        = raw.match(/https:\/\/sqlalche\.me\/\S+/)?.[0] ?? null;
+        dev.sql = sqlMatch?.[1]?.trim() ?? null;
+        dev.params = paramMatch?.[1]?.trim() ?? null;
+        dev.ref = raw.match(/https:\/\/sqlalche\.me\/\S+/)?.[0] ?? null;
         if (keyMatch) {
             dev.key = `${keyMatch[1]} = ${keyMatch[2]}`;
             return {
-                title:  'Duplicate record — already exists',
+                title: 'Duplicate record — already exists',
                 detail: `A record with ${keyMatch[1].replace(/_/g, ' ')} "${keyMatch[2]}" already exists.`,
                 code: keyMatch[2], dev,
             };
@@ -86,9 +86,9 @@ function parseErrorMessage(raw) {
     if (raw.includes('ForeignKeyViolationError') || raw.includes('foreign key constraint')) {
         const tableMatch = raw.match(/table "(.+?)"/);
         dev.exception = 'asyncpg.exceptions.ForeignKeyViolationError';
-        dev.table     = tableMatch?.[1] ?? null;
+        dev.table = tableMatch?.[1] ?? null;
         return {
-            title:  'Linked record missing',
+            title: 'Linked record missing',
             detail: tableMatch
                 ? `A referenced record in "${tableMatch[1]}" no longer exists.`
                 : 'This record references something that no longer exists.',
@@ -98,11 +98,11 @@ function parseErrorMessage(raw) {
 
     // ── 3. Not Null Violation ─────────────────────────────────────────────────
     if (raw.includes('NotNullViolationError') || raw.includes('null value in column')) {
-        const col   = raw.match(/column "(.+?)"/)?.[1];
+        const col = raw.match(/column "(.+?)"/)?.[1];
         const table = raw.match(/relation "(.+?)"/)?.[1];
         dev.exception = 'asyncpg.exceptions.NotNullViolationError';
         return {
-            title:  'Missing required field',
+            title: 'Missing required field',
             detail: col
                 ? `The field "${col.replace(/_/g, ' ')}"${table ? ` in "${table}"` : ''} cannot be empty.`
                 : 'A required field is missing.',
@@ -113,10 +113,10 @@ function parseErrorMessage(raw) {
     // ── 4. Check Constraint Violation ────────────────────────────────────────
     if (raw.includes('CheckViolationError') || raw.includes('check constraint')) {
         const constr = raw.match(/constraint "(.+?)"/)?.[1];
-        dev.exception  = 'asyncpg.exceptions.CheckViolationError';
+        dev.exception = 'asyncpg.exceptions.CheckViolationError';
         dev.constraint = constr ?? null;
         return {
-            title:  'Value not allowed',
+            title: 'Value not allowed',
             detail: constr
                 ? `The value violates the rule "${constr.replace(/_/g, ' ')}".`
                 : 'A field value does not meet the required conditions.',
@@ -128,7 +128,7 @@ function parseErrorMessage(raw) {
     if (raw.includes('ExclusionViolationError') || raw.includes('exclusion constraint')) {
         dev.exception = 'asyncpg.exceptions.ExclusionViolationError';
         return {
-            title:  'Conflicting record exists',
+            title: 'Conflicting record exists',
             detail: 'This record overlaps with an existing record and cannot be saved.',
             code: null, dev,
         };
@@ -137,10 +137,10 @@ function parseErrorMessage(raw) {
     // ── 6. Data Type / Value Error ───────────────────────────────────────────
     if (raw.includes('DataError') || raw.includes('invalid input syntax') || raw.includes('out of range')) {
         const typeMatch = raw.match(/type "(.+?)"/);
-        const valMatch  = raw.match(/value "(.+?)"/);
+        const valMatch = raw.match(/value "(.+?)"/);
         dev.exception = 'sqlalchemy.exc.DataError';
         return {
-            title:  'Invalid data format',
+            title: 'Invalid data format',
             detail: valMatch
                 ? `The value "${valMatch[1]}" is not valid${typeMatch ? ` for type "${typeMatch[1]}"` : ''}.`
                 : 'A field contains data in the wrong format.',
@@ -153,7 +153,7 @@ function parseErrorMessage(raw) {
         const col = raw.match(/column "(.+?)"/)?.[1];
         dev.exception = 'asyncpg.exceptions.StringDataRightTruncationError';
         return {
-            title:  'Text too long',
+            title: 'Text too long',
             detail: col
                 ? `The value for "${col.replace(/_/g, ' ')}" exceeds the maximum allowed length.`
                 : 'One of the fields exceeds the maximum allowed length.',
@@ -165,7 +165,7 @@ function parseErrorMessage(raw) {
     if (raw.includes('DeadlockDetectedError') || raw.includes('deadlock detected')) {
         dev.exception = 'asyncpg.exceptions.DeadlockDetectedError';
         return {
-            title:  'Deadlock detected',
+            title: 'Deadlock detected',
             detail: 'Two operations conflicted with each other. The sync will retry automatically.',
             code: null, dev,
         };
@@ -175,7 +175,7 @@ function parseErrorMessage(raw) {
     if (raw.includes('SerializationFailure') || raw.includes('could not serialize')) {
         dev.exception = 'asyncpg.exceptions.SerializationFailureError';
         return {
-            title:  'Sync conflict',
+            title: 'Sync conflict',
             detail: 'The record was modified by another process at the same time. Will retry.',
             code: null, dev,
         };
@@ -186,7 +186,7 @@ function parseErrorMessage(raw) {
         const obj = raw.match(/relation "(.+?)"/)?.[1] ?? raw.match(/table "(.+?)"/)?.[1];
         dev.exception = 'asyncpg.exceptions.InsufficientPrivilegeError';
         return {
-            title:  'Permission denied',
+            title: 'Permission denied',
             detail: obj
                 ? `The database user does not have access to "${obj}".`
                 : 'The database user does not have permission to perform this action.',
@@ -199,7 +199,7 @@ function parseErrorMessage(raw) {
         const table = raw.match(/relation "(.+?)"/)?.[1];
         dev.exception = 'asyncpg.exceptions.UndefinedTableError';
         return {
-            title:  'Table not found',
+            title: 'Table not found',
             detail: table
                 ? `The table "${table}" does not exist. A migration may be required.`
                 : 'A required database table is missing.',
@@ -211,7 +211,7 @@ function parseErrorMessage(raw) {
         const col = raw.match(/column "(.+?)"/)?.[1];
         dev.exception = 'asyncpg.exceptions.UndefinedColumnError';
         return {
-            title:  'Column not found',
+            title: 'Column not found',
             detail: col
                 ? `The column "${col}" does not exist. A migration may be required.`
                 : 'A required database column is missing.',
@@ -223,7 +223,7 @@ function parseErrorMessage(raw) {
     if (raw.includes('DiskFull') || raw.includes('no space left on device') || raw.includes('out of disk')) {
         dev.exception = 'asyncpg.exceptions.DiskFull';
         return {
-            title:  'Server storage full',
+            title: 'Server storage full',
             detail: 'The database server has run out of disk space. Contact your administrator.',
             code: null, dev,
         };
@@ -232,7 +232,7 @@ function parseErrorMessage(raw) {
     // ── 13. Blob / File Upload ───────────────────────────────────────────────
     if (raw.toLowerCase().includes('blob') || raw.toLowerCase().includes('upload')) {
         return {
-            title:  'File upload failed',
+            title: 'File upload failed',
             detail: 'The file could not be sent to the server. Check the connection and retry.',
             code: null, dev,
         };
@@ -242,7 +242,7 @@ function parseErrorMessage(raw) {
     if (raw.toLowerCase().includes('ssl') || raw.includes('certificate')) {
         dev.exception = 'SSL/TLS Error';
         return {
-            title:  'Secure connection failed',
+            title: 'Secure connection failed',
             detail: 'An SSL certificate or encryption error occurred. Check server configuration.',
             code: null, dev,
         };
@@ -252,7 +252,7 @@ function parseErrorMessage(raw) {
     if (raw.toLowerCase().includes('timeout')) {
         dev.exception = 'ConnectionTimeoutError';
         return {
-            title:  'Connection timed out',
+            title: 'Connection timed out',
             detail: 'The server did not respond in time. The vessel may have poor connectivity.',
             code: null, dev,
         };
@@ -261,7 +261,7 @@ function parseErrorMessage(raw) {
     if (raw.toLowerCase().includes('connection refused') || raw.includes('ECONNREFUSED')) {
         dev.exception = 'ECONNREFUSED';
         return {
-            title:  'Connection refused',
+            title: 'Connection refused',
             detail: 'The server actively refused the connection. The service may be down.',
             code: null, dev,
         };
@@ -270,7 +270,7 @@ function parseErrorMessage(raw) {
     if (raw.includes('ECONNRESET') || raw.includes('connection reset')) {
         dev.exception = 'ECONNRESET';
         return {
-            title:  'Connection was reset',
+            title: 'Connection was reset',
             detail: 'The connection was interrupted mid-transfer. The sync will retry.',
             code: null, dev,
         };
@@ -279,7 +279,7 @@ function parseErrorMessage(raw) {
     if (raw.includes('ENOTFOUND') || raw.includes('getaddrinfo')) {
         dev.exception = 'ENOTFOUND';
         return {
-            title:  'Server not reachable',
+            title: 'Server not reachable',
             detail: 'The server address could not be resolved. Check network or DNS settings.',
             code: null, dev,
         };
@@ -288,7 +288,7 @@ function parseErrorMessage(raw) {
     if (raw.toLowerCase().includes('connection')) {
         dev.exception = 'ConnectionError';
         return {
-            title:  'Connection problem',
+            title: 'Connection problem',
             detail: 'Could not reach the server. The vessel may be offline.',
             code: null, dev,
         };
@@ -298,7 +298,7 @@ function parseErrorMessage(raw) {
     if (raw.includes('password authentication failed') || raw.includes('AuthenticationError')) {
         dev.exception = 'asyncpg.exceptions.AuthenticationError';
         return {
-            title:  'Authentication failed',
+            title: 'Authentication failed',
             detail: 'The database credentials are incorrect or have expired.',
             code: null, dev,
         };
@@ -308,7 +308,7 @@ function parseErrorMessage(raw) {
     if (raw.includes('JSONDecodeError') || raw.includes('invalid json') || raw.includes('JSON parse')) {
         dev.exception = 'JSONDecodeError';
         return {
-            title:  'Invalid data received',
+            title: 'Invalid data received',
             detail: 'The server returned data in an unexpected format.',
             code: null, dev,
         };
@@ -350,7 +350,7 @@ function parseErrorMessage(raw) {
             ?? raw.match(/sqlalchemy\.exc\.(\w+)/)?.[0]
             ?? 'Database error';
         return {
-            title:  'Database error',
+            title: 'Database error',
             detail: firstLine.length < 120 ? firstLine : 'An internal database error occurred.',
             code: null, dev,
         };
@@ -400,7 +400,7 @@ const DevRow = ({ label, value, copyable }) => {
                     {label}
                 </span>
                 {copyable && (
-                    <button onClick={handleCopy}className='fsize-15' style={{
+                    <button onClick={handleCopy} className='fsize-15' style={{
                         fontSize: '11px',
                         color: copied ? '#10b981' : '#64748b',
                         background: copied ? '#ecfdf5' : '#f8fafc',
@@ -419,32 +419,20 @@ const DevRow = ({ label, value, copyable }) => {
     );
 };
 
-const LiveModuleDetail = ({ imo, moduleKey, isInstalled }) => {
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
+const LiveModuleDetail = ({ imo, moduleKey, isInstalled, prefetchedData }) => {
+    const [data, setData] = useState(prefetchedData ?? null);
+    const [loading, setLoading] = useState(!prefetchedData);
     const [devTabs, setDevTabs] = useState({});
+
     const fetchSyncData = async () => {
-        if (!imo || !isInstalled) {
-            setLoading(false);
-            return;
-        }
-
+        if (!imo || !isInstalled) { setLoading(false); return; }
         try {
-            if (moduleKey === 'drs') {
-                const res = await apiDrs.get(`/vessels/${imo}/sync-log`);
-                setData(res.data);
-
-            } else if (moduleKey === 'lubeoil') {
-                const res = await apiLuboil.get(`api/vessels/${imo}/sync-log`);
-                setData(res.data);
-
-            } else if (moduleKey === 'jira') {
-                const res = await axiosJira.get(`api/vessels/${imo}/sync-log`);
-                setData(res.data);
-
-            } else {
-                setData(null);
-            }
+            let res;
+            if (moduleKey === 'drs') res = await apiDrs.get(`/vessels/${imo}/sync-log`);
+            else if (moduleKey === 'lubeoil') res = await apiLuboil.get(`api/vessels/${imo}/sync-log`);
+            else if (moduleKey === 'jira') res = await axiosJira.get(`api/vessels/${imo}/sync-log`);
+            else { setData(null); setLoading(false); return; }
+            setData(res.data);
         } catch (err) {
             console.error("Sync log fetch failed", err);
         } finally {
@@ -452,10 +440,20 @@ const LiveModuleDetail = ({ imo, moduleKey, isInstalled }) => {
         }
     };
 
+    // When drawer switches to a different vessel/module, sync immediately
     useEffect(() => {
-        setLoading(true);
-        fetchSyncData();
-        const interval = setInterval(fetchSyncData, 30000); // 30s Polling
+        if (prefetchedData) {
+            setData(prefetchedData);
+            setLoading(false);
+        } else {
+            setLoading(true);
+            fetchSyncData();
+        }
+    }, [imo, moduleKey, prefetchedData]);
+
+    // Keep polling every 30s to stay fresh
+    useEffect(() => {
+        const interval = setInterval(fetchSyncData, 30000);
         return () => clearInterval(interval);
     }, [imo, moduleKey, isInstalled]);
 
@@ -463,62 +461,68 @@ const LiveModuleDetail = ({ imo, moduleKey, isInstalled }) => {
         <div style={mStyles.notInstalledBox}>
             <Activity size={40} color="#cbd5e1" />
             <h3 style={{ color: THEME.textMuted, margin: '15px 0 5px' }}>Module Not Configured</h3>
-            <p className='fsize-17' style={{ color: THEME.textMuted, fontSize: '13px' }}>This application is not installed on this vessel.</p>
+            <p style={{ color: THEME.textMuted, fontSize: '13px' }}>This application is not installed on this vessel.</p>
         </div>
     );
 
-    if (loading) return <div style={{ padding: 40, textAlign: 'center' }}><RefreshCw className="spin" color={THEME.primary} /></div>;
+    if (loading) return (
+        <div style={{ padding: 40, textAlign: 'center' }}>
+            <RefreshCw className="spin" color={THEME.primary} />
+        </div>
+    );
 
     const activeErrors = data?.active_errors || [];
 
     return (
         <div style={{ animation: 'fadeIn 0.3s ease' }}>
-            <div className='fsize-15' style={mStyles.sectionLabel}>{moduleKey.toUpperCase()} Sync Statistics</div>
+            <div style={mStyles.sectionLabel}>{moduleKey.toUpperCase()} Sync Statistics</div>
             <div style={mStyles.statsRow}>
                 <div style={mStyles.statBox}>
-                    <div className='fsize-15' style={mStyles.statLabel}><ArrowUpRight size={14} /> Vessel → Shore (Push)</div>
-                    <div className='fsize-20' style={{ fontSize: '16px', fontWeight: 800, color: data?.vessel_reported_push ? THEME.success : THEME.danger }}>
-                        {data?.vessel_reported_push ? new Date(data.vessel_reported_push).toLocaleString() : 'Never Synced'}
+                    <div style={mStyles.statLabel}><ArrowUpRight size={14} /> Vessel → Shore (Push)</div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: data?.vessel_reported_push ? THEME.success : THEME.danger }}>
+                        {data?.vessel_reported_push
+                            ? new Date(data.vessel_reported_push).toLocaleString()
+                            : 'Never Synced'}
                     </div>
                 </div>
                 <div style={mStyles.statBox}>
-                    <div className='fsize-15' style={mStyles.statLabel}><ArrowDownLeft size={14} /> Shore → Vessel (Pull)</div>
-                    <div className='fsize-20' style={{ fontSize: '16px', fontWeight: 800, color: data?.vessel_reported_pull ? THEME.success : THEME.danger }}>
-                        {data?.vessel_reported_pull ? new Date(data.vessel_reported_pull).toLocaleString() : 'Never Synced'}
+                    <div style={mStyles.statLabel}><ArrowDownLeft size={14} /> Shore → Vessel (Pull)</div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: data?.vessel_reported_pull ? THEME.success : THEME.danger }}>
+                        {data?.vessel_reported_pull
+                            ? new Date(data.vessel_reported_pull).toLocaleString()
+                            : 'Never Synced'}
                     </div>
                 </div>
             </div>
 
-            <div className='fsize-15' style={{ ...mStyles.sectionLabel, marginTop: 30 }}>Current Active Issues</div>
+            <div style={{ ...mStyles.sectionLabel, marginTop: 24 }}>Current Active Issues</div>
             {activeErrors.length === 0 ? (
                 <div style={mStyles.emptyState}>
                     <CheckCircle size={32} color={THEME.success} />
                     <span style={{ fontWeight: 600, color: THEME.textMain }}>Everything is up to date</span>
-                    <span className='fsize-15' style={{ fontSize: '12px', color: THEME.textMuted }}>No issues found for this module.</span>
+                    <span style={{ fontSize: '12px', color: THEME.textMuted }}>No issues found for this module.</span>
                 </div>
             ) : activeErrors.map((err, i) => {
                 const parsed = parseErrorMessage(err.msg);
                 const view = devTabs[i] ?? 'user';
                 const setView = (v) => setDevTabs(prev => ({ ...prev, [i]: v }));
-
                 return (
-                    <div key={i} style={mStyles.normalErrorCard}>
-                        {/* Header */}
-                        <div className="err-card-header" style={mStyles.errCardHeader}>
+                    <div key={i} style={{ ...mStyles.normalErrorCard, marginBottom: 10 }}>
+                        <div style={mStyles.errCardHeader}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span className="fsize-15" style={{ fontWeight: 700, color: '#b91c1c' }}>
+                                <span style={{ fontWeight: 700, fontSize: 12, color: '#b91c1c' }}>
                                     Sync issue{err.entity ? ` · ${err.entity.toLowerCase()}` : ''}
                                 </span>
                                 {parsed.code && (
-                                    <span className="fsize-13" style={{ fontFamily: 'monospace', background: '#fecdd3', color: '#9f1239', padding: '1px 6px', borderRadius: 4 }}>
+                                    <span style={{ fontFamily: 'monospace', background: '#fecdd3', color: '#9f1239', padding: '1px 6px', borderRadius: 4, fontSize: 11 }}>
                                         {parsed.code}
                                     </span>
                                 )}
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <div style={{ display: 'flex', gap: 2, background: 'rgb(255 212 212)', borderRadius: 6, padding: 3 }}>
                                     {['user', 'dev'].map(tab => (
-                                        <button className='fsize-15' key={tab} onClick={() => setView(tab)} style={{
+                                        <button key={tab} onClick={() => setView(tab)} style={{
                                             fontSize: '11px', fontWeight: 500,
                                             padding: '3px 10px', borderRadius: 4, border: 'none', cursor: 'pointer',
                                             background: view === tab ? '#fff1f2' : 'transparent',
@@ -528,25 +532,23 @@ const LiveModuleDetail = ({ imo, moduleKey, isInstalled }) => {
                                         </button>
                                     ))}
                                 </div>
-                                <span className="fsize-13" style={{ color: THEME.textMuted }}>{formatAgo(err.ts)}</span>
+                                <span style={{ fontSize: 11, color: THEME.textMuted }}>{formatAgo(err.ts)}</span>
                             </div>
                         </div>
 
-                        {/* User view */}
                         {view === 'user' && (
-                            <div className="err-user-body" style={{ padding: '14px 18px' }}>
-                                <div className='fsize-17' style={{ fontWeight: 600, fontSize: '13px', color: '#1e293b', marginBottom: parsed.detail ? 6 : 0 }}>
+                            <div style={{ padding: '12px 16px' }}>
+                                <div style={{ fontWeight: 600, fontSize: '13px', color: '#1e293b', marginBottom: parsed.detail ? 5 : 0 }}>
                                     {parsed.title}
                                 </div>
                                 {parsed.detail && (
-                                    <div className='fsize-15' style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.5 }}>
+                                    <div style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.5 }}>
                                         {parsed.detail}
                                     </div>
                                 )}
                             </div>
                         )}
 
-                        {/* Dev view */}
                         {view === 'dev' && (
                             <div style={{ fontFamily: 'monospace' }}>
                                 <DevRow label="Raw error" value={parsed.dev?.raw ?? err.msg} copyable />
@@ -573,176 +575,357 @@ const LiveModuleDetail = ({ imo, moduleKey, isInstalled }) => {
 
 const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
     const [vessels, setVessels] = useState([]);
-    const [selectedVessel, setSelectedVessel] = useState(null);
-    const [selectedModule, setSelectedModule] = useState('drs');
+    const [moduleErrors, setModuleErrors] = useState({});
+    const [syncLogs, setSyncLogs] = useState({});  // { imo: { drs: {...}, lubeoil: {...}, jira: {...} } }
     const [filter, setFilter] = useState('all');
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
-    const [moduleErrors, setModuleErrors] = useState({});
+    const [drawer, setDrawer] = useState(null); // { vessel, moduleKey }
+    const [syncDetails, setSyncDetails] = useState({});
 
     useEffect(() => {
         getVesselStatus().then(res => {
-            const normalized = (res.data || []).map(v => ({
-                ...v,
-                imo: v.imo || v.imo_number,
-            }));
+            const normalized = (res.data || []).map(v => ({ ...v, imo: v.imo || v.imo_number }));
             setVessels(normalized);
-            if (normalized.length > 0) setSelectedVessel(normalized[0]);
             setLoading(false);
         });
-        const loadAllModuleErrors = async () => {
+
+        const loadAll = async () => {
             const [drsRes, lubRes, jiraRes] = await Promise.allSettled([
                 apiDrs.get("/vessels/sync-status/all"),
                 apiLuboil.get("api/vessels/sync-status/all"),
                 axiosJira.get("api/vessels/sync-status/all"),
             ]);
-            const merged = {};
-            [drsRes, lubRes, jiraRes].forEach(res => {
-                if (res.status !== "fulfilled") return;
+            const mergedErrors = {};
+            const mergedLogs = {};
+            const sources = [
+                { res: drsRes, key: 'drs' },
+                { res: lubRes, key: 'lubeoil' },
+                { res: jiraRes, key: 'jira' },
+            ];
+            sources.forEach(({ res, key }) => {
+                if (res.status !== 'fulfilled') return;
                 Object.entries(res.value.data || {}).forEach(([imo, data]) => {
-                    merged[imo] = (merged[imo] || 0) + (data.failed_items_count || 0);
+                    mergedErrors[imo] = (mergedErrors[imo] || 0) + (data.failed_items_count || 0);
+                    if (!mergedLogs[imo]) mergedLogs[imo] = {};
+                    mergedLogs[imo][key] = data;
                 });
             });
-            setModuleErrors(merged);
+            setModuleErrors(mergedErrors);
+            setSyncLogs(mergedLogs);
         };
-        loadAllModuleErrors();
-        const interval = setInterval(loadAllModuleErrors, 30000);
+
+        loadAll();
+        const interval = setInterval(loadAll, 30000);
         return () => clearInterval(interval);
     }, []);
 
-    const filteredVessels = vessels.filter(v => {
-        const matchesSearch = v.name.toLowerCase().includes(search.toLowerCase());
+    const MODULE_COLS = [
+        { key: 'drs', label: 'DRS' },
+        { key: 'jira', label: 'JIRA' },
+        { key: 'lubeoil', label: 'Lube oil' },
+        { key: 'voyage', label: 'Voyage perf' },
+        { key: 'engine_performance', label: 'Engine perf' },
+    ];
 
-        // Use the live moduleErrors state for the filter
+    function ageClass(iso) {
+        if (!iso) return 'never';
+        const h = (Date.now() - new Date(iso).getTime()) / 3_600_000;
+        if (h < 1) return 'fresh';
+        if (h < 12) return 'stale';
+        return 'old';
+    }
+
+    function formatAgo(iso) {
+        if (!iso) return 'Never';
+        const d = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+        if (d < 60) return `${d}s ago`;
+        if (d < 3600) return `${Math.floor(d / 60)}m ago`;
+        if (d < 86400) return `${Math.floor(d / 3600)}h ago`;
+        return `${Math.floor(d / 86400)}d ago`;
+    }
+
+    const SYNC_STYLE = {
+        fresh: { background: '#eaf3de', border: '1px solid #c0dd97', color: '#27500a' },
+        stale: { background: '#faeeda', border: '1px solid #fac775', color: '#633806' },
+        old: { background: '#fcebeb', border: '1px solid #f7c1c1', color: '#791f1f' },
+        never: { background: '#f8fafc', border: '1px solid #e2e8f0', color: '#94a3b8' },
+    };
+
+    function ModuleBadge({ vessel, moduleKey, isInstalled }) {
+        const imo = String(vessel.imo_number || vessel.imo);
+        const log = syncLogs[imo]?.[moduleKey];
+
+        if (!isInstalled) return (
+            <span style={{ fontSize: 11, color: '#94a3b8' }}>N/A</span>
+        );
+
+        const errCount = log?.failed_items_count ?? 0;
+        const lastPush = log?.vessel_reported_push ?? null;
+        const isActive = drawer?.vessel?.imo === vessel.imo && drawer?.moduleKey === moduleKey;
+        const age = ageClass(lastPush);
+
+        const CHIP = {
+            fresh: { bg: '#eaf3de', border: '#97c459', color: '#27500a', errBg: '#27500a' },
+            stale: { bg: '#faeeda', border: '#ef9f27', color: '#633806', errBg: '#854f0b' },
+            old: { bg: '#fcebeb', border: '#f09595', color: '#791f1f', errBg: '#791f1f' },
+            never: { bg: '#f8fafc', border: '#e2e8f0', color: '#94a3b8', errBg: '#888780' },
+        };
+        const c = CHIP[age];
+
+        return (
+            <div
+                onClick={() => setDrawer(isActive ? null : { vessel, moduleKey })}
+                title="Click to view sync details and errors"
+                style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    padding: '3px 8px 3px 6px',
+                    borderRadius: 6,
+                    background: c.bg,
+                    border: `0.5px solid ${c.border}`,
+                    color: c.color,
+                    fontSize: 11, fontWeight: 500,
+                    cursor: 'pointer', transition: '0.12s',
+                    outline: isActive ? '2px solid #6366f1' : 'none',
+                    outlineOffset: 1,
+                    filter: isActive ? 'brightness(0.94)' : 'none',
+                }}
+            >
+                {/* Clock icon */}
+                <Clock size={12} color={c.color} strokeWidth={2} />
+
+                {/* Sync time */}
+                {formatAgo(lastPush)}
+
+                {errCount > 0 && (
+                    <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 2,
+                        background: '#fee2e2',
+                        color: '#a32d2d',
+                        border: '0.5px solid #fca5a5',
+                        fontSize: 9, fontWeight: 700,
+                        padding: '0px 4px',
+                        borderRadius: 4,
+                        marginLeft: 1,
+                        lineHeight: 1.6,
+                    }}>
+                        <AlertTriangle size={8} color="#a32d2d" strokeWidth={2.5} />
+                        {errCount}
+                    </span>
+                )}
+            </div>
+        );
+    }
+
+
+    const filtered = vessels.filter(v => {
         const totalErrors = moduleErrors[String(v.imo)] || 0;
-
-        if (filter === 'live') return v.online && matchesSearch;
-        if (filter === 'errors') return totalErrors > 0 && matchesSearch;
-
-        return matchesSearch;
+        const matchSearch = v.name.toLowerCase().includes(search.toLowerCase()) ||
+            String(v.imo).includes(search);
+        if (filter === 'live') return v.online && matchSearch;
+        if (filter === 'errors') return totalErrors > 0 && matchSearch;
+        return matchSearch;
     });
 
+    const pillBase = { flex: 1, padding: '6px 16px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: '1px solid', transition: '0.15s' };
+    const pills = {
+        all: { ...pillBase, background: filter === 'all' ? '#eeedfe' : '#fff', color: filter === 'all' ? '#3c3489' : '#64748b', borderColor: filter === 'all' ? '#afa9ec' : '#e2e8f0' },
+        live: { ...pillBase, background: filter === 'live' ? '#eaf3de' : '#fff', color: filter === 'live' ? '#27500a' : '#64748b', borderColor: filter === 'live' ? '#c0dd97' : '#e2e8f0' },
+        errors: { ...pillBase, background: filter === 'errors' ? '#fcebeb' : '#fff', color: filter === 'errors' ? '#791f1f' : '#64748b', borderColor: filter === 'errors' ? '#f7c1c1' : '#e2e8f0' },
+    };
+
     return (
-        <div style={mStyles.overlay}>
-            <div style={mStyles.modalContainer}>
-
-                {/* --- Sidebar: Vessel List --- */}
-                <div style={mStyles.sidebar}>
-                    <div style={mStyles.sidebarHeader}>
-                        <div style={mStyles.searchBox}>
-                            <Search size={14} color={THEME.textMuted} />
-                            <input placeholder="Search vessels..." className='fsize-18' style={mStyles.searchInput} onChange={e => setSearch(e.target.value)} />
-                        </div>
-                        <div style={mStyles.pillRow}>
-                            <button onClick={() => setFilter('all')} className='fsize-16' style={{ ...mStyles.pill, background: filter === 'all' ? THEME.primary : '#fff', color: filter === 'all' ? '#fff' : THEME.textMuted, borderColor: filter === 'all' ? THEME.primary : THEME.border }}>All</button>
-                            <button onClick={() => setFilter('live')} className='fsize-16' style={{ ...mStyles.pill, background: filter === 'live' ? THEME.success : '#fff', color: filter === 'live' ? '#fff' : THEME.textMuted, borderColor: filter === 'live' ? THEME.success : THEME.border }}>Live</button>
-                            <button onClick={() => setFilter('errors')} className='fsize-16' style={{ ...mStyles.pill, background: filter === 'errors' ? THEME.danger : '#fff', color: filter === 'errors' ? '#fff' : THEME.textMuted, borderColor: filter === 'errors' ? THEME.danger : THEME.border }}>Errors</button>
-                        </div>
+        <div style={tStyles.overlay}>
+            <div style={tStyles.modal}>
+                {/* Header */}
+                <div style={tStyles.header}>
+                    <div>
+                        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Vessel status</h2>
+                        <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b' }}>
+                            Sync health across all installed modules
+                        </p>
                     </div>
+                    <button onClick={onClose} style={tStyles.closeBtn}><X size={18} /></button>
+                </div>
 
-                    <div style={mStyles.listArea}>
-                        {filteredVessels.map(v => {
-                            const isSel = selectedVessel?.imo === v.imo;
-                            return (
-                                <div key={v.imo} onClick={() => setSelectedVessel(v)} style={{
-                                    ...mStyles.vesselItem,
-                                    backgroundColor: isSel ? '#f0f7ff' : 'transparent',
-                                    borderLeft: `4px solid ${isSel ? THEME.primary : 'transparent'}`
-                                }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                        <div style={mStyles.statusCircle}>
-                                            <ShipIcon size={18} color={v.online ? THEME.success : THEME.textMuted} />
-                                            {v.online && <div className="pulse-dot" style={{ position: 'absolute', bottom: -2, right: -2, width: 8, height: 8, background: THEME.success, borderRadius: '50%', border: '2px solid #fff' }} />}
-                                        </div>
-                                        <div>
-                                            <div className='fsize-18' style={{ fontSize: '14px', fontWeight: 700, color: THEME.textMain }}>{v.name}</div>
-                                            <div className='fsize-15' style={{ fontSize: '11px', color: THEME.textMuted }}>IMO {v.imo}</div>
-                                        </div>
-                                    </div>
-                                    {/* Minimalist Alert UI: Icon + Number in Red */}
-                                    {(() => {
-                                        const errorCount = moduleErrors[String(v.imo)] || 0;
-                                        if (errorCount === 0) return null;
-                                        return (
-                                            <div style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '4px',
-                                                color: THEME.danger,
-                                                padding: '2px 6px',
-                                            }}>
-                                                <AlertCircle size={15} strokeWidth={3} />
-                                                <span style={{
-                                                    fontSize: '13px',
-                                                    fontWeight: 800,
-                                                    fontFamily: 'sans-serif'
-                                                }}>
-                                                    {errorCount > 99 ? '99+' : errorCount}
-                                                </span>
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-                            );
-                        })}
+                {/* Toolbar */}
+                <div style={tStyles.toolbar}>
+                    <div style={tStyles.searchBox}>
+                        <Search size={14} color="#94a3b8" />
+                        <input
+                            placeholder="Search vessels…"
+                            style={tStyles.searchInput}
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                        <button style={pills.all} onClick={() => setFilter('all')}>All</button>
+                        <button style={pills.live} onClick={() => setFilter('live')}>Live</button>
+                        <button style={pills.errors} onClick={() => setFilter('errors')}>Errors</button>
                     </div>
                 </div>
 
-                {/* --- Main Console: Module Detail --- */}
-                <div style={mStyles.contentPane}>
-                    <header style={mStyles.contentHeader}>
-                        <div>
-                            <h2 className='fsize-24' style={{ margin: 0, fontSize: '20px', fontWeight: 800 }}>{selectedVessel?.name}</h2>
-                            <div className='fsize-15' style={{ display: 'flex', gap: 12, fontSize: '11px', marginTop: 4, fontWeight: 600 }}>
-                                <span style={{ color: selectedVessel?.online ? THEME.success : THEME.textMuted }}>
-                                    {selectedVessel?.online ? '● LIVE CONNECTION' : '○ OFFLINE'}
-                                </span>
-                                <span style={{ color: THEME.border }}>|</span>
-                                <span style={{ color: THEME.textMuted }}>IMO: {selectedVessel?.imo}</span>
+                {/* Table */}
+
+                <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
+                    {/* Table — always full width, never pushed */}
+                    <div style={{ overflowX: 'auto', flex: 1, overflowY: 'auto' }}>
+                        {loading ? (
+                            <div style={{ padding: 60, textAlign: 'center' }}>
+                                <RefreshCw className="spin" color="#6366f1" />
+                            </div>
+                        ) : (
+                            <table style={tStyles.table}>
+                                <thead>
+                                    <tr>
+                                        <th style={tStyles.th}>Vessel</th>
+                                        {MODULE_COLS.map(m => (
+                                            <th key={m.key} style={{ ...tStyles.th, textAlign: 'center' }}>{m.label}</th>
+                                        ))}
+                                        <th style={{ ...tStyles.th, textAlign: 'center' }}>Total errors</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filtered.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={MODULE_COLS.length + 2} style={{ padding: 48, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                                                No vessels match your filter
+                                            </td>
+                                        </tr>
+                                    ) : filtered.map(v => {
+                                        const totalErrors = moduleErrors[String(v.imo)] || 0;
+                                        return (
+                                            <tr key={v.imo} style={tStyles.row}>
+                                                <td style={tStyles.td}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                                                        {v.online && (
+                                                            <span style={{
+                                                                width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                                                                background: '#3b6d11',
+                                                            }} title="Online" />
+                                                        )}
+                                                        {!v.online && (
+                                                            <span style={{ width: 8, height: 8, flexShrink: 0 }} />
+                                                        )}
+                                                        <div>
+                                                            <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{v.name}</div>
+                                                            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>IMO {v.imo}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                {MODULE_COLS.map(m => {
+                                                    const isInstalled = v.modules?.find(mod => mod.key === m.key)?.available;
+                                                    return (
+                                                        <td key={m.key} style={{ ...tStyles.td, textAlign: 'center' }}>
+                                                            <ModuleBadge vessel={v} moduleKey={m.key} isInstalled={isInstalled} />
+                                                        </td>
+                                                    );
+                                                })}
+                                                <td style={{ ...tStyles.td, textAlign: 'center' }}>
+                                                    {totalErrors > 0 ? (
+                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#a32d2d', fontWeight: 700, fontSize: 13 }}>
+                                                            <AlertCircle size={14} strokeWidth={2.5} />
+                                                            {totalErrors > 99 ? '99+' : totalErrors}
+                                                        </span>
+                                                    ) : (
+                                                        <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+
+                    {/* Drawer — floats over the table, doesn't push layout */}
+                    {drawer && (
+                        <div style={{
+                            position: 'absolute', top: 0, right: 0, bottom: 0,
+                            width: 360,
+                            background: '#fff',
+                            borderLeft: '1px solid #e2e8f0',
+                            boxShadow: '-4px 0 24px rgba(15,23,42,0.10)',
+                            display: 'flex', flexDirection: 'column',
+                            zIndex: 10,
+                            animation: 'slideInRight 0.2s ease',
+                        }}>
+                            {/* Drawer Header */}
+                            <div style={{
+                                padding: '14px 18px',
+                                borderBottom: '1px solid #e2e8f0',
+                                display: 'flex', alignItems: 'flex-start',
+                                justifyContent: 'space-between', gap: 8,
+                                flexShrink: 0,
+                            }}>
+                                <div>
+                                    <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                                        {drawer.vessel.name} · {MODULE_COLS.find(m => m.key === drawer.moduleKey)?.label}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 3 }}>
+                                        IMO {drawer.vessel.imo} — sync details & active issues
+                                    </div>
+                                </div>
+                                <button onClick={() => setDrawer(null)} style={{ ...tStyles.closeBtn, padding: 6, flexShrink: 0 }}>
+                                    <X size={14} />
+                                </button>
+                            </div>
+
+                            {/* Drawer Body */}
+                            <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
+                                <LiveModuleDetail
+                                    imo={drawer.vessel.imo_number || drawer.vessel.imo}
+                                    moduleKey={drawer.moduleKey}
+                                    isInstalled={drawer.vessel.modules?.find(m => m.key === drawer.moduleKey)?.available}
+                                    prefetchedData={null}
+                                />
+
                             </div>
                         </div>
-                        <button onClick={onClose} style={mStyles.closeBtn}><X size={20} /></button>
-                    </header>
+                    )}
+                </div>
 
-                    <div style={{ padding: '30px', overflowY: 'auto', flex: 1 }}>
-                        <div className='fsize-15' style={mStyles.sectionLabel}>Installed Applications</div>
-                        <div style={mStyles.moduleGrid}>
-                            {Object.entries(MODULE_META).map(([key, meta]) => {
-                                const isInstalled = selectedVessel?.modules?.find(m => m.key === key)?.available;
-                                const isActive = selectedModule === key;
-                                return (
-                                    <div key={key} onClick={() => isInstalled && setSelectedModule(key)} style={{
-                                        ...mStyles.moduleCard,
-                                        borderColor: isActive ? THEME.primary : THEME.border,
-                                        background: isActive ? '#f5f3ff' : '#fff',
-                                        cursor: isInstalled ? 'pointer' : 'default',
-                                        opacity: isInstalled ? 1 : 0.4
-                                    }}>
-                                        <div style={{ color: isInstalled ? meta.color : THEME.textMuted }}>{meta.icon}</div>
-                                        <div className='fsize-15' style={{ fontSize: '11px', fontWeight: 800, marginTop: 10, textAlign: 'center', color: isInstalled ? THEME.textMain : THEME.textMuted }}>{meta.label}</div>
-                                        <div className='fsize-13' style={{
-                                            marginTop: 6, fontSize: '9px', fontWeight: 900,
-                                            color: isInstalled ? THEME.success : THEME.textMuted,
-                                            background: isInstalled ? '#ecfdf5' : '#f1f5f9',
-                                            padding: '2px 8px', borderRadius: '4px'
-                                        }}>
-                                            {isInstalled ? 'INSTALLED' : 'N/A'}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        <LiveModuleDetail
-                            imo={selectedVessel?.imo_number || selectedVessel?.imo}
-                            moduleKey={selectedModule}
-                            isInstalled={selectedVessel?.modules?.find(m => m.key === selectedModule)?.available}
-                        />
+                {/* Footer / legend */}
+                <div style={tStyles.footer}>
+                    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                        {[['fresh', '#eaf3de', '#c0dd97', '#27500a', '< 1h'],
+                        ['stale', '#faeeda', '#fac775', '#633806', '1–12h'],
+                        ['old', '#fcebeb', '#f7c1c1', '#791f1f', '> 12h']].map(([, bg, br, tx, label]) => (
+                            <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#64748b' }}>
+                                <span style={{ background: bg, border: `1px solid ${br}`, color: tx, padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600 }}>
+                                    {label === '< 1h' ? 'Fresh' : label === '1–12h' ? 'Stale' : 'Old'}
+                                </span>
+                                {label}
+                            </span>
+                        ))}
                     </div>
+                    <span style={{ fontSize: 12, color: '#94a3b8' }}>{filtered.length} vessel{filtered.length !== 1 ? 's' : ''}</span>
                 </div>
             </div>
         </div>
     );
+};
+
+const tStyles = {
+    overlay: { position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    modal: {
+        background: '#fff', width: '95vw', maxWidth: 1300,  // was 1100
+        height: '80vh', borderRadius: 20, display: 'flex',
+        flexDirection: 'column', overflow: 'hidden',
+        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
+    },
+    header: { padding: '20px 28px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+    closeBtn: { border: 'none', background: '#f1f5f9', padding: 10, borderRadius: 10, cursor: 'pointer', display: 'flex' },
+    toolbar: { padding: '12px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+    searchBox: { flex: 1, minWidth: 180, display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '8px 14px' },
+    searchInput: { border: 'none', background: 'transparent', outline: 'none', fontSize: 13, width: '100%' },
+    table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
+    th: { padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 1 },
+    td: { padding: '13px 16px', borderBottom: '1px solid #f1f5f9', verticalAlign: 'middle' },
+    row: { transition: '0.12s' },
+    footer: { padding: '12px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
 };
 const mStyles = {
     overlay: { position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' },

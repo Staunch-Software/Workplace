@@ -534,7 +534,6 @@ const ShellStatusIcon = ({ status, size = 20 }) => {
 };
 const LuboilAnalysis = () => {
   const { user } = useAuth();
-  console.log("DEBUG USER OBJECT:", user);
   const userData = user?.user || user;
   const userAccess = (
     userData?.access_type ||

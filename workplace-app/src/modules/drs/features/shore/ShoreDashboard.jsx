@@ -1400,6 +1400,7 @@ const ShoreDashboard = () => {
     text_sort: { field: null, dir: 'asc' },
     is_flagged: [],  // ✅ NEW
     is_dd: [],       // ✅ NEW
+    defect_number: '',
   });
 
   const EMPTY_FILTERS = {
@@ -1422,6 +1423,7 @@ const ShoreDashboard = () => {
     text_sort: { field: null, dir: 'asc' },
     is_flagged: [],  // ✅ NEW
     is_dd: [],
+    defect_number: '',
   };
 
   // Add this right after your filters useState declaration:
@@ -1713,7 +1715,14 @@ const ShoreDashboard = () => {
 
   const equipmentList = useMemo(() => {
     if (!defects || defects.length === 0) return [];
-    return [...new Set(defects.map(d => d.equipment_name).filter(Boolean))];
+
+    return [
+      ...new Set(
+        defects
+          .map(d => d.equipment_name?.trim().toUpperCase())
+          .filter(Boolean)
+      )
+    ].sort();
   }, [defects]);
 
   const handleFilterChange = (field, value) => {
@@ -1847,7 +1856,9 @@ const ShoreDashboard = () => {
 
       const matchEquip =
         (safeFilters.equipment?.length || 0) === 0 ||
-        safeFilters.equipment.includes(d.equipment_name);
+        safeFilters.equipment.includes(
+          d.equipment_name?.trim().toUpperCase()
+        );
 
       const matchDesc =
         !filters.description ||
@@ -1885,7 +1896,9 @@ const ShoreDashboard = () => {
         (safeFilters.vessel?.length || 0) === 0 ||
         safeFilters.vessel.includes(d.vessel_name);
 
-
+      const matchDefectNumber =
+        !filters.defect_number ||
+        (d.defect_number || '').toLowerCase().includes(filters.defect_number.toLowerCase());
 
       return (
         matchReportDate &&
@@ -1902,7 +1915,8 @@ const ShoreDashboard = () => {
         matchPendingClosure &&
         matchVessel &&
         matchFlagged &&  // ✅ NEW
-        matchDD
+        matchDD &&
+        matchDefectNumber
       );
     });
 
@@ -2753,7 +2767,15 @@ const ShoreDashboard = () => {
                   items={visibleColumns}
                   strategy={horizontalListSortingStrategy}
                 > <tr>
-                    <th style={{ width: 100,paddingLeft:"8px" }}>Defect ID</th>
+                    <th style={{ width: 100, paddingLeft: "8px" }}>
+                      <FilterHeader
+                        label="Defect ID"
+                        field="defect_number"
+                        currentFilter={filters.defect_number}
+                        onFilterChange={handleFilterChange}
+                        type="text"
+                      />
+                    </th>
                     <th style={{ width: 20 }}>
                       <EquipmentFilter
                         label="Vessel"
@@ -3250,7 +3272,7 @@ const ShoreDashboard = () => {
                                       width="160px"
                                     />
                                   ) : (
-                                    <span>{defect.equipment_name}</span>
+                                    <span>{defect.equipment_name?.toUpperCase()}</span>
                                   )}
 
                                 </td>

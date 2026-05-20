@@ -50,7 +50,52 @@ import {
   FloatingSelectText
 } from '@drs/components/shared/TableControls';
 
+const SyncStatusBadge = ({ status }) => {
+  if (!status || status === 'COMPLETED') return null;
+  const normalized = status.toUpperCase();
 
+  const config = {
+    PENDING: {
+      dotColor: '#EF9F27', dotGlow: '#FAEEDA',
+      iconBg: '#FAEEDA', iconColor: '#854F0B',
+      icon: <Clock size={11} />,
+      title: 'Waiting for Online',
+      pulse: true
+    },
+    PROCESSING: {
+      dotColor: '#378ADD', dotGlow: '#E6F1FB',
+      iconBg: '#E6F1FB', iconColor: '#185FA5',
+      icon: <RefreshCcw size={11} className="spin-animation" />,
+      title: 'Syncing to Shore...',
+      pulse: true
+    },
+    FAILED: {
+      dotColor: '#E24B4A', dotGlow: '#FCEBEB',
+      iconBg: '#FCEBEB', iconColor: '#A32D2D',
+      icon: <AlertOctagon size={11} />,
+      title: 'Sync Error',
+      pulse: false
+    },
+  };
+
+  const c = config[normalized] || config.PENDING;
+
+  return (
+    <div
+      title={c.title}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
+    >
+      <span style={{
+        width: '20px', height: '20px', borderRadius: '50%',
+        background: c.iconBg, color: c.iconColor,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0
+      }}>
+        {c.icon}
+      </span>
+    </div>
+  );
+};
 
 // Image Gallery Modal with Navigation
 const ImageGalleryModal = ({ images, initialIndex = 0, onClose }) => {
@@ -473,40 +518,53 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                 }}>
                   <span style={{ fontWeight: '600' }}>{t.author_role}</span>
                   <span>{new Date(t.created_at).toLocaleString()}</span>
+                  {/* <SyncStatusBadge status={t.sync_status} /> */}
+
                 </div>
-                <div style={{
-                  maxWidth: '70%',
-                  padding: '10px 14px',
-                  background: isMine ? '#0084ff' : 'white',
-                  color: isMine ? 'white' : '#1e293b',
-                  borderRadius: isMine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                  wordBreak: 'break-word',
-                  whiteSpace: 'pre-wrap',
-                  overflowWrap: 'anywhere'
-                }}>
-                  <div className='fsize-18' style={{ fontSize: '14px', lineHeight: '1.4' }}>
-                    {messageParts.map((part, idx) => (
-                      part.type === 'mention' ? (
-                        <span key={idx} className='fsize-17' style={{
-                          background: isMine ? 'rgba(255,255,255,0.2)' : '#e3f2fd',
-                          color: isMine ? 'white' : '#1565c0',
-                          padding: '1px 4px',
-                          borderRadius: '3px',
-                          fontWeight: '600',
-                          fontSize: '13px'
-                        }}>
-                          {part.content}
-                        </span>
-                      ) : (
-                        <span key={idx}>{part.content}</span>
-                      )
-                    ))}
-                  </div>
-                  {t.attachments?.length > 0 && (
-                    <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                      {t.attachments.map(a => <AttachmentLink key={a.id} attachment={a} />)}
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
+                  <div style={{
+                    maxWidth: '70%',
+                    padding: '10px 14px',
+                    background: isMine ? '#0084ff' : 'white',
+                    color: isMine ? 'white' : '#1e293b',
+                    borderRadius: isMine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                    wordBreak: 'break-word',
+                    whiteSpace: 'pre-wrap',
+                    overflowWrap: 'anywhere'
+                  }}>
+                    <div className='fsize-18' style={{ fontSize: '14px', lineHeight: '1.4' }}>
+                      {messageParts.map((part, idx) => (
+                        part.type === 'mention' ? (
+                          <span key={idx} className='fsize-17' style={{
+                            background: isMine ? 'rgba(255,255,255,0.2)' : '#e3f2fd',
+                            color: isMine ? 'white' : '#1565c0',
+                            padding: '1px 4px',
+                            borderRadius: '3px',
+                            fontWeight: '600',
+                            fontSize: '13px'
+                          }}>
+                            {part.content}
+                          </span>
+                        ) : (
+                          <span key={idx}>{part.content}</span>
+                        )
+                      ))}
                     </div>
+                    {t.attachments?.length > 0 && (
+                      <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {t.attachments.map(a => (
+                          <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <AttachmentLink attachment={a} />
+                            {/* ✅ ADD THIS: Sync status for the specific file */}
+                            <SyncStatusBadge status={a.sync_status} size={9} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {isMine && t.sync_status && t.sync_status !== 'COMPLETED' && (
+                    <SyncStatusBadge status={t.sync_status} />
                   )}
                 </div>
               </div>
@@ -851,7 +909,15 @@ const ImageSidebar = ({ images, onClose, title }) => {
                     onMouseEnter={(e) => e.currentTarget.parentElement.parentElement.style.borderColor = '#ea580c'}
                     onMouseLeave={(e) => e.currentTarget.parentElement.parentElement.style.borderColor = '#e2e8f0'}
                   />
-
+                  {img.sync_status && img.sync_status !== 'COMPLETED' && (
+                    <div style={{
+                      position: 'absolute', top: '0px', left: '0px',
+                      background: 'white', borderRadius: '0px 0px 13px 0px', padding: '2px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)', zIndex: 5
+                    }}>
+                      <SyncStatusBadge status={img.sync_status} size={10} />
+                    </div>
+                  )}
                   {/* Image name overlay */}
                   <div style={{
                     position: 'absolute',
@@ -1015,6 +1081,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus }) =
     id: img.id,
     url: img.image_url,
     name: img.file_name,
+    sync_status: img.sync_status,
     uploaded: true
   }));
 
@@ -1248,7 +1315,8 @@ const VesselDashboard = () => {
     is_flagged: [],
     is_dd: [],
     pending_closure: '',
-    text_sort: { field: null, dir: 'asc' }
+    text_sort: { field: null, dir: 'asc' },
+    defect_number: '',
   };
 
   const [filters, setFilters] = useState(EMPTY_FILTERS);
@@ -1512,7 +1580,13 @@ const VesselDashboard = () => {
 
   const equipmentList = useMemo(
     () =>
-      [...new Set(defects.map(d => d.equipment_name).filter(Boolean))],
+      [
+        ...new Set(
+          defects
+            .map(d => d.equipment_name?.trim().toUpperCase())
+            .filter(Boolean)
+        )
+      ].sort(),
     [defects]
   );
 
@@ -1668,6 +1742,12 @@ const VesselDashboard = () => {
         (!fromDate || (reportDate && reportDate >= fromDate)) &&
         (!toDate || (reportDate && reportDate <= toDate));
 
+      const matchDefectNumber =
+        !filters.defect_number ||
+        (d.defect_number || '')
+          .toLowerCase()
+          .includes(filters.defect_number.toLowerCase());
+
       const matchDeadline = (() => {
         if (!filters.target_close_date) return true;
         if (!d.target_close_date) return false;
@@ -1686,8 +1766,9 @@ const VesselDashboard = () => {
 
       const matchEquip =
         (safeFilters.equipment?.length || 0) === 0 ||
-        safeFilters.equipment.includes(d.equipment_name);
-
+        safeFilters.equipment.includes(
+          d.equipment_name?.trim().toUpperCase()
+        );
       const matchDesc =
         !filters.description ||
         d.description.toLowerCase().includes(filters.description.toLowerCase());
@@ -1736,7 +1817,8 @@ const VesselDashboard = () => {
         matchPendingClosure &&
         matchVessel &&
         matchFlagged &&  // ✅ NEW
-        matchDD
+        matchDD &&
+        matchDefectNumber
       );
     });
 
@@ -2218,6 +2300,8 @@ const VesselDashboard = () => {
     if (currentPage < totalPages) setCurrentPage(prev => prev + 1);
   };
 
+
+
   const startIndex = (currentPage - 1) * pageSize + 1
   const endIndex = Math.min(currentPage * pageSize, filteredData.length)
 
@@ -2444,7 +2528,15 @@ const VesselDashboard = () => {
                   items={visibleColumns}
                   strategy={horizontalListSortingStrategy}
                 > <tr>
-                    <th style={{ width: 100,paddingLeft:"5px" }}>Defect ID</th>
+                    <th style={{ width: 100, paddingLeft: "8px" }}>
+                      <FilterHeader
+                        label="Defect ID"
+                        field="defect_number"
+                        currentFilter={filters.defect_number}
+                        onFilterChange={handleFilterChange}
+                        type="text"
+                      />
+                    </th>
 
                     {visibleColumns.map((colId) => {
                       switch (colId) {
@@ -2822,7 +2914,14 @@ const VesselDashboard = () => {
 
                         <td style={{ textAlign: "center", fontWeight: 600, fontSize: '12px', color: '#1e293b', whiteSpace: 'nowrap' }}>
                           <div id={`row-${defect.id}`} className="row-anchor" />
-                          {defect.defect_number || `#${(currentPage - 1) * pageSize + index + 1}`}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {/* ✅ THE SYNC BADGE (Passes the new sync_status from backend) */}
+                            <SyncStatusBadge status={defect.sync_status} />
+                            {/* The Defect ID */}
+                            {defect.defect_number || `#${(currentPage - 1) * pageSize + index + 1}`}
+
+
+                          </div>
                         </td>
 
                         {visibleColumns.map(colId => {
@@ -2884,7 +2983,7 @@ const VesselDashboard = () => {
                                       width="160px"
                                     />
                                   ) : (
-                                    <span>{defect.equipment_name}</span>
+                                    <span>{defect.equipment_name?.toUpperCase()}</span>
                                   )}
 
                                 </td>
@@ -3864,34 +3963,26 @@ const VesselDashboard = () => {
 export default VesselDashboard;
 
 const DraggableTh = ({ id, children, disabled, style }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition
-  } = useSortable({ id, disabled });
-
-  const fstyle = {
-    transform: transform ? CSS.Transform.toString(transform) : undefined,
-    transition,
-    opacity: disabled ? 1 : 0.95,
-    ...style
-  };
-
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id, disabled });
 
   return (
-    <th ref={setNodeRef} style={fstyle} >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-        {!disabled && (
-          <span
-            {...attributes}
-            {...listeners}
-            style={{ cursor: 'grab', display: 'flex' }}
-          >
-            <ArrowRightLeft size={10} />
-          </span>
-        )}
+    <th
+      ref={setNodeRef}
+      style={{
+        transform: transform ? CSS.Transform.toString(transform) : undefined,
+        transition,
+        opacity: disabled ? 1 : 0.95,
+        cursor: disabled ? 'default' : 'grab',
+        ...style
+      }}
+      {...(!disabled ? attributes : {})}
+      {...(!disabled ? listeners : {})}
+    >
+      <div
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        style={{ display: 'flex', alignItems: 'center' }}
+      >
         {children}
       </div>
     </th>
