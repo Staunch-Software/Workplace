@@ -138,7 +138,8 @@ app.include_router(dashboard_router)
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(admin.router, tags=["Admin"])  
 app.include_router(aux_router)
-app.include_router(engine_sync_router, prefix="/aepms/api", tags=["Engine Sync"])
+# CHANGE TO
+app.include_router(engine_sync_router, tags=["Engine Sync"])
 
 # Database Initialization
 @app.on_event("startup")
