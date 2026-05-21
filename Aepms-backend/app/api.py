@@ -646,8 +646,12 @@ class AuxPerformanceGraphGenerator:
 @app.post("/upload-monthly-report/", summary="Upload a monthly performance report PDF")
 async def upload_monthly_report(
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
 ):
+    _, role = await get_allowed_vessel_imos(current_user)
+    if role == "VESSEL":
+        raise HTTPException(status_code=403, detail="Upload not permitted for vessel users.")
     """Upload monthly performance PDF, extract data, store in DB, CALC ISO, and return graph data."""
     logger.info(f"Received file upload: {file.filename}")
 
@@ -838,12 +842,15 @@ async def upload_monthly_report(
         raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
 
 
-@app.post("/aux/upload-auxiliary-report/",
-          summary="Upload a monthly AE performance report PDF")
+@app.post("/aux/upload-auxiliary-report/", summary="Upload a monthly AE performance report PDF")
 async def upload_auxiliary_report(
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
 ):
+    _, role = await get_allowed_vessel_imos(current_user)
+    if role == "VESSEL":
+        raise HTTPException(status_code=403, detail="Upload not permitted for vessel users.")
     """
     Handles the upload of the AE PDF, extracts data, and saves it.
     """
@@ -4429,3 +4436,37 @@ async def get_user_assigned_vessels(
         for v in vessels
     ]
 
+ALLOWED_DELETE_EMAILS = {
+    "email1@ozellar.com",  # replace with the 3 actual emails
+    "email2@ozellar.com",
+    "email3@ozellar.com",
+}
+
+@app.delete("/api/performance/delete-report/{report_id}")
+async def delete_report(
+    report_id: int,
+    engine_type: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
+):
+    email = current_user.get("email", "").lower()
+    if email not in ALLOWED_DELETE_EMAILS:
+        raise HTTPException(status_code=403, detail="You are not permitted to delete reports.")
+
+    if engine_type == "mainEngine":
+        result = await db.execute(select(MonthlyReportHeader).where(MonthlyReportHeader.report_id == report_id))
+        report = result.scalar_one_or_none()
+        if not report:
+            raise HTTPException(status_code=404, detail="Report not found")
+        await db.delete(report)
+    elif engine_type == "auxiliaryEngine":
+        result = await db.execute(select(GeneratorMonthlyReportHeader).where(GeneratorMonthlyReportHeader.report_id == report_id))
+        report = result.scalar_one_or_none()
+        if not report:
+            raise HTTPException(status_code=404, detail="Report not found")
+        await db.delete(report)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid engine type")
+
+    await db.commit()
+    return {"message": f"Report {report_id} deleted successfully"}

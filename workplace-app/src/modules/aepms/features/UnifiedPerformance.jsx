@@ -74,6 +74,9 @@ const MultiSelectDropdown = ({
   onChange,
   label,
   isLoading = false,
+  canDeleteReports = false,
+  onDeleteReport,
+  deletingReportId,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeYear, setActiveYear] = useState(null);
@@ -291,56 +294,77 @@ const MultiSelectDropdown = ({
                   {activeYear} Reports
                 </div>
                 {groupedOptions[activeYear].map((option) => (
-                  <div
-                    key={option.value}
-                    onClick={() => toggleOption(option.value)}
-                    style={{
-                      padding: "12px 16px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      backgroundColor: selectedIds.includes(option.value)
-                        ? "#f0f9ff"
-                        : "white",
-                      borderBottom: "1px solid #f1f5f9",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!selectedIds.includes(option.value))
-                        e.currentTarget.style.backgroundColor = "#f8fafc";
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!selectedIds.includes(option.value))
-                        e.currentTarget.style.backgroundColor = "white";
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(option.value)}
-                      readOnly
-                      style={{
-                        width: "16px",
-                        height: "16px",
-                        cursor: "pointer",
-                        accentColor: "#0f172a",
-                      }}
-                    />
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      <span
-                        style={{
-                          fontSize: "0.9rem",
-                          fontWeight: 600,
-                          color: "#334155",
-                        }}
-                      >
-                        {option.label}
-                      </span>
-                      <span style={{ fontSize: "0.75rem", color: "#64748b" }}>
-                        {option.subLabel}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+  <div
+    key={option.value}
+    onClick={() => toggleOption(option.value)}
+    style={{
+      padding: "12px 16px",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: "12px",
+      backgroundColor: selectedIds.includes(option.value)
+        ? "#f0f9ff"
+        : "white",
+      borderBottom: "1px solid #f1f5f9",
+    }}
+    onMouseEnter={(e) => {
+      if (!selectedIds.includes(option.value))
+        e.currentTarget.style.backgroundColor = "#f8fafc";
+    }}
+    onMouseLeave={(e) => {
+      if (!selectedIds.includes(option.value))
+        e.currentTarget.style.backgroundColor = "white";
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={selectedIds.includes(option.value)}
+      readOnly
+      style={{
+        width: "16px",
+        height: "16px",
+        cursor: "pointer",
+        accentColor: "#0f172a",
+      }}
+    />
+    <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+      <span
+        style={{
+          fontSize: "0.9rem",
+          fontWeight: 600,
+          color: "#334155",
+        }}
+      >
+        {option.label}
+      </span>
+      <span style={{ fontSize: "0.75rem", color: "#64748b" }}>
+        {option.subLabel}
+      </span>
+    </div>
+    {canDeleteReports && selectedIds.length === 1 && selectedIds[0] === option.value && (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDeleteReport(option.value);
+        }}
+        disabled={deletingReportId === option.value}
+        style={{
+          background: "none",
+          border: "1px solid #fca5a5",
+          borderRadius: "4px",
+          color: "#dc2626",
+          fontSize: "0.7rem",
+          padding: "2px 8px",
+          cursor: "pointer",
+          flexShrink: 0,
+        }}
+      >
+        {deletingReportId === option.value ? "..." : "Delete"}
+      </button>
+    )}
+  </div>
+))}
               </>
             ) : (
               <div
@@ -2190,6 +2214,7 @@ export default function Performance({
   const [hasAccess, setHasAccess] = useState(false);
   // const [timeFilter, setTimeFilter] = useState("current");
   const [selectedMetric, setSelectedMetric] = useState("all");
+  const [deletingReportId, setDeletingReportId] = useState(null);
   const [monthlyReports, setMonthlyReports] = useState([]);
   const [historicalReports, setHistoricalReports] = useState([]);
   const [baseline, setBaseline] = useState({});
@@ -2231,6 +2256,37 @@ export default function Performance({
   const [activePoint, setActivePoint] = useState(null);
   // Inside Performance component
   const [missingFields, setMissingFields] = useState([]);
+  // Get current user role
+  const currentUserRole = (() => {
+    try {
+      const user = JSON.parse(localStorage.getItem('platform_user') || '{}');
+      return (user.role || '').toUpperCase();
+    } catch {
+      return '';
+    }
+  })();
+  const handleDeleteReport = async (reportId) => {
+    if (!window.confirm("Are you sure you want to delete this report? This cannot be undone.")) return;
+    setDeletingReportId(reportId);
+    try {
+      await axiosAepms.deleteReport(reportId, analysisMode);
+      setAvailableReports(prev => prev.filter(r => (r.report_id || r.value) !== reportId));
+      setSelectedReportIds(prev => prev.filter(id => id !== reportId));
+      alert("✅ Report deleted successfully.");
+    } catch (err) {
+      alert("❌ Delete failed: " + err.message);
+    } finally {
+      setDeletingReportId(null);
+    }
+  };
+  const isVesselUser = currentUserRole === 'VESSEL';
+  const ALLOWED_DELETE_EMAILS = ["techdevops@ozellar.com", "admin@ozellar.com", "keerthana.r@ozellar.com"];
+  const canDeleteReports = (() => {
+    try {
+      const user = JSON.parse(localStorage.getItem('platform_user') || '{}');
+      return ALLOWED_DELETE_EMAILS.includes((user.email || '').toLowerCase());
+    } catch { return false; }
+  })();
   const reportsForDownload = useMemo(() => {
     if (uploadMode === "mainEngine") return availableReports;
     if (!downloadGenId) return [];
@@ -9809,27 +9865,30 @@ export default function Performance({
           )}
 
           {/* 4. DIRECT + UPLOAD ACTION */}
-          <div className="perf-upload-field">
-            <input
-              type="file"
-              accept=".pdf"
-              id="direct-upload-input"
-              style={{ display: "none" }}
-              onChange={handleFileUpload}
-            />
-            <Button
-              onClick={() =>
-                document.getElementById("direct-upload-input").click()
-              }
-              disabled={
-                !shipId ||
-                (analysisMode === "auxiliaryEngine" && !selectedGeneratorId)
-              }
-              className="perf-upload-btn"
-            >
-              + UPLOAD
-            </Button>
-          </div>
+          {/* 4. DIRECT + UPLOAD ACTION — shore users only */}
+          {!isVesselUser && (
+            <div className="perf-upload-field">
+              <input
+                type="file"
+                accept=".pdf"
+                id="direct-upload-input"
+                style={{ display: "none" }}
+                onChange={handleFileUpload}
+              />
+              <Button
+                onClick={() =>
+                  document.getElementById("direct-upload-input").click()
+                }
+                disabled={
+                  !shipId ||
+                  (analysisMode === "auxiliaryEngine" && !selectedGeneratorId)
+                }
+                className="perf-upload-btn"
+              >
+                + UPLOAD
+              </Button>
+            </div>
+          )}
 
           {/* 5. SELECT REPORTS (Preserving MultiSelect and availableReports connection) */}
           <div className="perf-select-reports-field">
@@ -9842,6 +9901,9 @@ export default function Performance({
               selectedIds={selectedReportIds}
               onChange={(ids) => setSelectedReportIds(ids)}
               isLoading={loading && availableReports.length === 0}
+              canDeleteReports={canDeleteReports}
+              onDeleteReport={handleDeleteReport}
+              deletingReportId={deletingReportId}
             />
           </div>
 

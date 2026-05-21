@@ -1196,7 +1196,13 @@ async getVesselMentions(imoNumber, chatMode = 'external') {
     console.log(`🌿 Fetching Emission Details for IMO ${imoNumber}, Year ${year}`);
     return this.request(`/api/voyage/emissions/${imoNumber}/${year}`);
   }
- 
+  async deleteReport(reportId, engineType) {
+    console.log('🗑️ Delete Report:', reportId, engineType);
+    return this.request(`/api/performance/delete-report/${reportId}?engine_type=${engineType}`, {
+      method: 'DELETE',
+    });
+  }
+
 }
 
 
