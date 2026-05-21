@@ -343,26 +343,39 @@ const MultiSelectDropdown = ({
       </span>
     </div>
     {canDeleteReports && selectedIds.length === 1 && String(selectedIds[0]) === String(option.value) && (
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDeleteReport(option.value);
-        }}
-        disabled={String(deletingReportId) === String(option.value)}
-        style={{
-          background: "none",
-          border: "1px solid #fca5a5",
-          borderRadius: "4px",
-          color: "#dc2626",
-          fontSize: "0.7rem",
-          padding: "2px 8px",
-          cursor: "pointer",
-          flexShrink: 0,
-        }}
-      >
-        {String(deletingReportId) === String(option.value) ? "..." : "Delete"}
-      </button>
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      onDeleteReport(option.value);
+    }}
+    disabled={String(deletingReportId) === String(option.value)}
+    style={{
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      flexShrink: 0,
+      padding: "4px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#dc2626",
+      opacity: String(deletingReportId) === String(option.value) ? 0.4 : 1,
+    }}
+    title="Delete report"
+  >
+    {String(deletingReportId) === String(option.value) ? (
+      <span style={{ fontSize: "0.7rem", color: "#dc2626" }}>...</span>
+    ) : (
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+        <path d="M10 11v6" />
+        <path d="M14 11v6" />
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+      </svg>
     )}
+  </button>
+)}
   </div>
 ))}
               </>
@@ -2256,37 +2269,86 @@ export default function Performance({
   const [activePoint, setActivePoint] = useState(null);
   // Inside Performance component
   const [missingFields, setMissingFields] = useState([]);
+  // ── TEMPORARY DEBUG — open browser console to see what's stored ──
+console.log('[DeleteCheck] All localStorage keys:', Object.keys(localStorage));
+console.log('[DeleteCheck] platform_user raw:', localStorage.getItem('platform_user'));
+console.log('[DeleteCheck] app_token raw:', localStorage.getItem('app_token'));
+console.log('[DeleteCheck] platform_token raw:', localStorage.getItem('platform_token'));
+console.log('[DeleteCheck] access_token raw:', localStorage.getItem('access_token'));
+// ── END TEMPORARY DEBUG ──
+
+const ALLOWED_DELETE_EMAILS = [
+  "techdevops@ozellar.com",
+  "admin@ozellar.com",
+  "keerthana.r@ozellar.com"
+];
+
+const canDeleteReports = (() => {
+  try {
+    // Check BOTH localStorage and sessionStorage
+    const rawUser = localStorage.getItem('platform_user') || sessionStorage.getItem('platform_user');
+    const user = JSON.parse(rawUser || '{}');
+    const emailFromUser = (user.email || '').toLowerCase().trim();
+    
+    if (emailFromUser && emailFromUser.includes('@')) {
+      return ALLOWED_DELETE_EMAILS.includes(emailFromUser);
+    }
+
+    // Fallback: check tokens from BOTH storages
+    const tokenKeys = ['platform_token', 'access_token', 'app_token'];
+    for (const key of tokenKeys) {
+      const raw = localStorage.getItem(key) || sessionStorage.getItem(key) || '';
+      if (!raw || !raw.includes('.')) continue;
+      try {
+        const payload = JSON.parse(atob(raw.split('.')[1]));
+        const tokenEmail = (payload.email || '').toLowerCase().trim();
+        if (tokenEmail && tokenEmail.includes('@')) {
+          return ALLOWED_DELETE_EMAILS.includes(tokenEmail);
+        }
+      } catch (e) { continue; }
+    }
+
+    return false;
+  } catch (err) {
+    console.error('Delete check error:', err);
+    return false;
+  }
+})();
   // Get current user role
   const currentUserRole = (() => {
-    try {
-      const user = JSON.parse(localStorage.getItem('platform_user') || '{}');
-      return (user.role || '').toUpperCase();
-    } catch {
-      return '';
-    }
-  })();
-  const handleDeleteReport = async (reportId) => {
-    if (!window.confirm("Are you sure you want to delete this report? This cannot be undone.")) return;
-    setDeletingReportId(reportId);
-    try {
-      await axiosAepms.deleteReport(reportId, analysisMode);
-      setAvailableReports(prev => prev.filter(r => (r.report_id || r.value) !== reportId));
-      setSelectedReportIds(prev => prev.filter(id => id !== reportId));
-      alert("✅ Report deleted successfully.");
-    } catch (err) {
-      alert("❌ Delete failed: " + err.message);
-    } finally {
-      setDeletingReportId(null);
-    }
-  };
+  try {
+    // Check BOTH localStorage and sessionStorage
+    const rawUser = localStorage.getItem('platform_user') || sessionStorage.getItem('platform_user');
+    const user = JSON.parse(rawUser || '{}');
+    return (user.role || '').toUpperCase();
+  } catch {
+    return '';
+  }
+})();
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState({ open: false, reportId: null });
+const [deleteStatus, setDeleteStatus] = useState(null); // 'success' | 'error' | null
+
+const handleDeleteReport = async (reportId) => {
+  setDeleteConfirmModal({ open: true, reportId });
+};
+
+const confirmDelete = async () => {
+  const reportId = deleteConfirmModal.reportId;
+  setDeleteConfirmModal({ open: false, reportId: null });
+  setDeletingReportId(reportId);
+  try {
+    await axiosAepms.deleteReport(reportId, analysisMode);
+    setAvailableReports(prev => prev.filter(r => (r.report_id || r.value) !== reportId));
+    setSelectedReportIds(prev => prev.filter(id => id !== reportId));
+    setDeleteStatus('success');
+  } catch (err) {
+    setDeleteStatus('error');
+  } finally {
+    setDeletingReportId(null);
+    setTimeout(() => setDeleteStatus(null), 3000);
+  }
+};
   const isVesselUser = currentUserRole === 'VESSEL';
-  const ALLOWED_DELETE_EMAILS = ["techdevops@ozellar.com", "admin@ozellar.com", "keerthana.r@ozellar.com"];
-  const canDeleteReports = (() => {
-    try {
-      const user = JSON.parse(localStorage.getItem('platform_user') || '{}');
-      return ALLOWED_DELETE_EMAILS.includes((user.email || '').toLowerCase());
-    } catch { return false; }
-  })();
   const reportsForDownload = useMemo(() => {
     if (uploadMode === "mainEngine") return availableReports;
     if (!downloadGenId) return [];
@@ -12434,6 +12496,77 @@ export default function Performance({
             </div>
           </div>
         )} */}
+        {deleteConfirmModal.open && (
+  <div style={{
+    position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+    backgroundColor: "rgba(0,0,0,0.4)", zIndex: 99999,
+    display: "flex", alignItems: "center", justifyContent: "center"
+  }}>
+    <div style={{
+      background: "white", borderRadius: "16px", padding: "32px",
+      width: "400px", boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
+      display: "flex", flexDirection: "column", gap: "16px"
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div style={{
+          width: "44px", height: "44px", borderRadius: "50%",
+          backgroundColor: "#fee2e2", display: "flex",
+          alignItems: "center", justifyContent: "center", flexShrink: 0
+        }}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            <path d="M10 11v6" /><path d="M14 11v6" />
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+          </svg>
+        </div>
+        <div>
+          <div style={{ fontWeight: "700", fontSize: "1rem", color: "#1e293b" }}>Delete Report</div>
+          <div style={{ fontSize: "0.875rem", color: "#64748b", marginTop: "4px" }}>
+            This action cannot be undone. The report will be permanently removed.
+          </div>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginTop: "8px" }}>
+        <button
+          onClick={() => setDeleteConfirmModal({ open: false, reportId: null })}
+          style={{
+            padding: "10px 20px", borderRadius: "8px", border: "1px solid #e2e8f0",
+            background: "white", color: "#475569", fontWeight: "600",
+            cursor: "pointer", fontSize: "0.9rem"
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={confirmDelete}
+          style={{
+            padding: "10px 20px", borderRadius: "8px", border: "none",
+            background: "#dc2626", color: "white", fontWeight: "600",
+            cursor: "pointer", fontSize: "0.9rem"
+          }}
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+{deleteStatus && (
+  <div style={{
+    position: "fixed", bottom: "24px", right: "24px", zIndex: 99999,
+    padding: "14px 20px", borderRadius: "12px", fontWeight: "600",
+    fontSize: "0.9rem", display: "flex", alignItems: "center", gap: "10px",
+    background: deleteStatus === 'success' ? "#f0fdf4" : "#fef2f2",
+    border: `1px solid ${deleteStatus === 'success' ? "#86efac" : "#fca5a5"}`,
+    color: deleteStatus === 'success' ? "#16a34a" : "#dc2626",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
+  }}>
+    <span style={{ fontSize: "1.1rem" }}>{deleteStatus === 'success' ? "✅" : "❌"}</span>
+    {deleteStatus === 'success' ? "Report deleted successfully." : "Delete failed. Please try again."}
+  </div>
+)}
     </div>
   );
 }

@@ -1204,6 +1204,11 @@ async getVesselMentions(imoNumber, chatMode = 'external') {
   }
 
 }
+// In axiosAepms.js
+const checkUserPermissions = async () => {
+  const response = await api.get('/api/performance/user-permissions');
+  return response.data;
+};
 
 
 export const axiosAepms = new ApiService();

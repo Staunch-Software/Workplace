@@ -11,7 +11,7 @@ def hash_password(password: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
-def create_access_token(subject: str, role: str = "VESSEL", full_name: str = "", permissions: dict = {}) -> str:
+def create_access_token(subject: str, role: str = "VESSEL", full_name: str = "", permissions: dict = {}, email: str = "" ) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
@@ -21,8 +21,11 @@ def create_access_token(subject: str, role: str = "VESSEL", full_name: str = "",
         "role": role,               # ✅ SHORE / VESSEL / ADMIN
         "full_name": full_name,     # ✅ needed by lub_backend
         "permissions": permissions, # ✅ needed by lub_backend
+        "email": email, 
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 def decode_token(token: str) -> dict:
-    return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    # payload will now contain: sub, role, full_name, permissions, email
+    return payload

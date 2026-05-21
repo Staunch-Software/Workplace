@@ -4441,32 +4441,83 @@ ALLOWED_DELETE_EMAILS = {
     "admin@ozellar.com",
     "keerthana.r@ozellar.com",
 }
-
-@app.delete("/api/performance/delete-report/{report_id}")
+@app.delete("/api/performance/delete-report/{report_id}", tags=["Performance"])
 async def delete_report(
     report_id: int,
     engine_type: str,
     db: AsyncSession = Depends(get_db),
+    control_db: AsyncSession = Depends(get_control_db), # <--- Added control_db
     current_user: Any = Depends(auth.get_current_user)
 ):
-    email = current_user.get("email", "").lower()
-    if email not in ALLOWED_DELETE_EMAILS:
-        raise HTTPException(status_code=403, detail="You are not permitted to delete reports.")
+    """
+    Deletes a report. All child data is automatically deleted by PostgreSQL 
+    because of the 'ondelete=CASCADE' rule.
+    """
+    # 1. Safely find the user's email
+    email = ""
+    
+    # Try to find it in the token payload first
+    for claim in ["email", "sub", "username", "preferred_username", "upn"]:
+        val = (current_user.get(claim) or "").lower().strip()
+        if val and "@" in val:
+            email = val
+            break
 
-    if engine_type == "mainEngine":
-        result = await db.execute(select(MonthlyReportHeader).where(MonthlyReportHeader.report_id == report_id))
-        report = result.scalar_one_or_none()
-        if not report:
-            raise HTTPException(status_code=404, detail="Report not found")
-        await db.delete(report)
-    elif engine_type == "auxiliaryEngine":
-        result = await db.execute(select(GeneratorMonthlyReportHeader).where(GeneratorMonthlyReportHeader.report_id == report_id))
-        report = result.scalar_one_or_none()
-        if not report:
-            raise HTTPException(status_code=404, detail="Report not found")
-        await db.delete(report)
-    else:
-        raise HTTPException(status_code=400, detail="Invalid engine type")
+    # If email is STILL missing from the token, query the database directly!
+    if not email:
+        user_id = current_user.get("id") or current_user.get("sub") or current_user.get("user_id")
+        if user_id:
+            try:
+                import uuid as _uuid
+                uid = _uuid.UUID(str(user_id))
+                result = await control_db.execute(select(User).where(User.id == uid))
+                user_record = result.scalar_one_or_none()
+                if user_record:
+                    email = (user_record.email or "").lower().strip()
+            except Exception as e:
+                logger.error(f"Failed to lookup user email in DB: {e}")
 
-    await db.commit()
-    return {"message": f"Report {report_id} deleted successfully"}
+    # 2. Security Check
+    ALLOWED_EMAILS = ["techdevops@ozellar.com", "admin@ozellar.com", "keerthana.r@ozellar.com"]
+    if not email or email not in ALLOWED_EMAILS:
+        logger.warning(f"Unauthorized delete attempt! Email found: '{email}'. Token: {current_user}")
+        raise HTTPException(status_code=403, detail="Not authorized to delete reports")
+
+    # 3. Proceed with Deletion
+    try:
+        if engine_type == "mainEngine":
+            from app.models import MonthlyReportHeader
+            
+            result = await db.execute(select(MonthlyReportHeader).where(MonthlyReportHeader.report_id == report_id))
+            report = result.scalar_one_or_none()
+            
+            if not report:
+                raise HTTPException(status_code=404, detail="Main Engine report not found")
+                
+            await db.delete(report)
+            
+        elif engine_type == "auxiliaryEngine":
+            from app.generator_models import GeneratorMonthlyReportHeader
+            
+            result = await db.execute(select(GeneratorMonthlyReportHeader).where(GeneratorMonthlyReportHeader.report_id == report_id))
+            report = result.scalar_one_or_none()
+            
+            if not report:
+                raise HTTPException(status_code=404, detail="Auxiliary Engine report not found")
+                
+            await db.delete(report)
+            
+        else:
+            raise HTTPException(status_code=400, detail="Invalid engine type")
+
+        # Commit the transaction
+        await db.commit()
+        logger.info(f"✅ Report {report_id} ({engine_type}) successfully deleted by {email}")
+        return {"message": "Report deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"❌ Error deleting report: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal Server Error while deleting report")

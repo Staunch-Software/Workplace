@@ -46,7 +46,8 @@ async def login(
             subject=str(user.id),
             role=user.role,                     # ✅ SHORE/VESSEL/ADMIN from DB
             full_name=user.full_name,
-            permissions=user.permissions or {}
+            permissions=user.permissions or {},
+            email=user.email
         ),
         id=str(user.id),
         full_name=user.full_name,
