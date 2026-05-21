@@ -4437,9 +4437,9 @@ async def get_user_assigned_vessels(
     ]
 
 ALLOWED_DELETE_EMAILS = {
-    "email1@ozellar.com",  # replace with the 3 actual emails
-    "email2@ozellar.com",
-    "email3@ozellar.com",
+    "techdevops@ozellar.com",  
+    "admin@ozellar.com",
+    "keerthana.r@ozellar.com",
 }
 
 @app.delete("/api/performance/delete-report/{report_id}")
