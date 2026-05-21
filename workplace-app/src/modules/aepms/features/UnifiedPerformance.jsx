@@ -342,13 +342,13 @@ const MultiSelectDropdown = ({
         {option.subLabel}
       </span>
     </div>
-    {canDeleteReports && selectedIds.length === 1 && selectedIds[0] === option.value && (
+    {canDeleteReports && selectedIds.length === 1 && String(selectedIds[0]) === String(option.value) && (
       <button
         onClick={(e) => {
           e.stopPropagation();
           onDeleteReport(option.value);
         }}
-        disabled={deletingReportId === option.value}
+        disabled={String(deletingReportId) === String(option.value)}
         style={{
           background: "none",
           border: "1px solid #fca5a5",
@@ -360,7 +360,7 @@ const MultiSelectDropdown = ({
           flexShrink: 0,
         }}
       >
-        {deletingReportId === option.value ? "..." : "Delete"}
+        {String(deletingReportId) === String(option.value) ? "..." : "Delete"}
       </button>
     )}
   </div>
