@@ -8986,45 +8986,34 @@ const confirmDelete = async () => {
               const totalW = itemWidths.reduce((a, b) => a + b, 0);
 
               // Start X — centered if fits, left-aligned otherwise
-              let legX =
-                totalW <= usableW - 8
-                  ? margin + (usableW - totalW) / 2
-                  : margin + 6;
-              let legY = legStripY + 6;
-              let rowUsed = 0;
+              const ITEMS_PER_ROW = 4;
+const rows = [];
+for (let i = 0; i < allLegendItems.length; i += ITEMS_PER_ROW) {
+  rows.push(allLegendItems.slice(i, i + ITEMS_PER_ROW));
+}
 
-              allLegendItems.forEach((item, idx) => {
-                const iw = itemWidths[idx];
-                // Wrap to row 2 if overflow
-                if (legX + iw > margin + usableW - 4 && idx > 0) {
-                  legX = margin + (usableW - iw) / 2;
-                  legY += 7;
-                  rowUsed = 0;
-                }
-                const [r, g, b] = item.color;
-                if (item.isDashed) {
-                  // Dashed line icon for baseline
-                  drawDashedSeg(
-                    legX,
-                    legY - 1.5,
-                    legX + 9,
-                    legY - 1.5,
-                    2.5,
-                    1.5,
-                    r,
-                    g,
-                    b,
-                    1.1,
-                  );
-                } else {
-                  // × icon — size 1.5 matches chart markers
-                  drawX(legX + 4, legY - 1.5, 1.5, r, g, b, 0.9);
-                }
-                pdf.setTextColor(71, 85, 105);
-                pdf.text(item.label, legX + ICON_W, legY);
-                legX += iw;
-                rowUsed += iw;
-              });
+rows.forEach((rowItems, rowIdx) => {
+  const rowTotalW = rowItems.reduce((acc, item) => {
+    const originalIdx = allLegendItems.indexOf(item);
+    return acc + itemWidths[originalIdx];
+  }, 0);
+  let legX = margin + (usableW - rowTotalW) / 2;
+  const legY = legStripY + 6 + rowIdx * 7;
+
+  rowItems.forEach((item) => {
+    const originalIdx = allLegendItems.indexOf(item);
+    const iw = itemWidths[originalIdx];
+    const [r, g, b] = item.color;
+    if (item.isDashed) {
+      drawDashedSeg(legX, legY - 1.5, legX + 9, legY - 1.5, 2.5, 1.5, r, g, b, 1.1);
+    } else {
+      drawX(legX + 4, legY - 1.5, 1.5, r, g, b, 0.9);
+    }
+    pdf.setTextColor(71, 85, 105);
+    pdf.text(item.label, legX + ICON_W, legY);
+    legX += iw;
+  });
+});
 
               // Advance currentY past this full slot
               currentY = legStripY + legStripH + slotGap;
