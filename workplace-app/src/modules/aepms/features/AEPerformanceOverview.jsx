@@ -1671,10 +1671,13 @@ useEffect(() => {
   ref={(el) => { aeTableWrapperRef.current = el; aeTableContainerRef.current = el; }}
   className={`ae-table-wrapper ${isSectionOpen ? "expanded" : "collapsed"}`}
   style={
-    isSectionOpen && filteredGroupedRunningHours.length > 2
-      ? { maxHeight: `${(2 * 3 * 48) + 42 + 36}px`, overflowY: 'auto' }
-      : undefined
-  }
+  isSectionOpen && filteredGroupedRunningHours.length > 0
+    ? { 
+        maxHeight: `${(Math.min(filteredGroupedRunningHours.length, 2) * 3 * 48) + 42 + 36}px`, 
+        overflowY: filteredGroupedRunningHours.length > 2 ? 'auto' : 'hidden' 
+      }
+    : undefined
+}
 >
 
               {(externalVesselId && filteredGroupedRunningHours.length > 0) ? (
