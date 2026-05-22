@@ -8747,7 +8747,7 @@ const confirmDelete = async () => {
 
             const titleH = 10; // title bar height
             const chartBoxH = 85; // pure chart box (plot + axes only)
-            const legStripH = 16; // legend strip height (enough for 2 rows if needed)
+            const legStripH = 20; // legend strip height (enough for 2 rows if needed)
             const slotGap = 5; // gap between slot 1 and slot 2
 
             // Two slots must fit on one page after header
@@ -8977,46 +8977,53 @@ const confirmDelete = async () => {
               pdf.setFont("helvetica", "normal");
               pdf.setFontSize(5.5);
 
-              // Measure items and center in one row; wrap to second row if needed
-              const ICON_W = 8;
-              const GAP = 3;
-              const itemWidths = allLegendItems.map(
-                (item) => ICON_W + pdf.getTextWidth(item.label) + GAP,
-              );
-              const totalW = itemWidths.reduce((a, b) => a + b, 0);
 
               // Start X — centered if fits, left-aligned otherwise
-              const ITEMS_PER_ROW = Math.ceil(Math.sqrt(allLegendItems.length));
-const rows = [];
-for (let i = 0; i < allLegendItems.length; i += ITEMS_PER_ROW) {
-  rows.push(allLegendItems.slice(i, i + ITEMS_PER_ROW));
-}
+              const ICON_W = 14;
+const ITEM_GAP = 6;
+const ROW_H = 8;
+const MAX_ROW_W = usableW - 8;
 
-rows.forEach((rowItems, rowIdx) => {
-  const rowTotalW = rowItems.reduce((acc, item) => {
-    const originalIdx = allLegendItems.indexOf(item);
-    return acc + itemWidths[originalIdx];
-  }, 0);
+const measuredItems = allLegendItems.map((item) => ({
+  ...item,
+  w: ICON_W + pdf.getTextWidth(item.label) + ITEM_GAP,
+}));
+
+const legendRows = [];
+let currentRow = [];
+let currentRowW = 0;
+measuredItems.forEach((item) => {
+  if (currentRowW + item.w > MAX_ROW_W && currentRow.length > 0) {
+    legendRows.push(currentRow);
+    currentRow = [item];
+    currentRowW = item.w;
+  } else {
+    currentRow.push(item);
+    currentRowW += item.w;
+  }
+});
+if (currentRow.length > 0) legendRows.push(currentRow);
+
+legendRows.forEach((row, rowIdx) => {
+  const rowTotalW = row.reduce((acc, item) => acc + item.w, 0) - ITEM_GAP;
   let legX = margin + (usableW - rowTotalW) / 2;
-  const legY = legStripY + 6 + rowIdx * 7;
-
-  rowItems.forEach((item) => {
-    const originalIdx = allLegendItems.indexOf(item);
-    const iw = itemWidths[originalIdx];
+  const legY = legStripY + 6 + rowIdx * ROW_H;
+  row.forEach((item) => {
     const [r, g, b] = item.color;
     if (item.isDashed) {
-      drawDashedSeg(legX, legY - 1.5, legX + 9, legY - 1.5, 2.5, 1.5, r, g, b, 1.1);
+      drawDashedSeg(legX, legY - 1.5, legX + 10, legY - 1.5, 2.5, 1.5, r, g, b, 1.1);
     } else {
-      drawX(legX + 4, legY - 1.5, 1.5, r, g, b, 0.9);
+      drawX(legX + 3, legY - 1.5, 1.5, r, g, b, 0.9);
     }
     pdf.setTextColor(71, 85, 105);
     pdf.text(item.label, legX + ICON_W, legY);
-    legX += iw;
+    legX += item.w;
   });
 });
 
               // Advance currentY past this full slot
-              currentY = legStripY + legStripH + slotGap;
+              const actualLegH = Math.max(legStripH, legendRows.length * ROW_H + 8);
+currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
               chartIndexOnPage++;
             }
 
