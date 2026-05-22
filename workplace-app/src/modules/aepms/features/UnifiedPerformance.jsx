@@ -8978,8 +8978,8 @@ const confirmDelete = async () => {
               pdf.setFontSize(5.5);
 
               // Measure items and center in one row; wrap to second row if needed
-              const ICON_W = 11;
-              const GAP = 7;
+              const ICON_W = 8;
+              const GAP = 3;
               const itemWidths = allLegendItems.map(
                 (item) => ICON_W + pdf.getTextWidth(item.label) + GAP,
               );
