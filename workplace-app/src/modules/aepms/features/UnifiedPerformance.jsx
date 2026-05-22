@@ -8986,7 +8986,7 @@ const confirmDelete = async () => {
               const totalW = itemWidths.reduce((a, b) => a + b, 0);
 
               // Start X — centered if fits, left-aligned otherwise
-              const ITEMS_PER_ROW = 4;
+              const ITEMS_PER_ROW = Math.ceil(Math.sqrt(allLegendItems.length));
 const rows = [];
 for (let i = 0; i < allLegendItems.length; i += ITEMS_PER_ROW) {
   rows.push(allLegendItems.slice(i, i + ITEMS_PER_ROW));
