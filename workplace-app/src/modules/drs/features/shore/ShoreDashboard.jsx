@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-
+import ReactDOM from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle, Clock, ClipboardList, MessageSquare,
@@ -79,7 +79,72 @@ export const OWNER_OPTIONS = [
  * SUB-COMPONENT: ThreadSection
  */
 
+// ─── TOAST SYSTEM ───
+const ToastContext = React.createContext(null);
 
+const ToastProvider = ({ children }) => {
+  const [toasts, setToasts] = useState([]);
+
+  const addToast = (message, type = 'success') => {
+    const id = Math.random().toString(36).slice(2);
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
+  };
+
+  return (
+    <ToastContext.Provider value={addToast}>
+      {children}
+      <div className="toast-wrapper" style={{
+        position: 'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)',
+        display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 99999
+      }}>
+        {toasts.map(t => (
+          <div key={t.id} className="toast-item" style={{
+            background: t.type === 'error' ? '#fef2f2' : t.type === 'warning' ? '#fffbeb' : '#f0fdf4',
+            border: `1px solid ${t.type === 'error' ? '#fca5a5' : t.type === 'warning' ? '#fcd34d' : '#86efac'}`,
+            color: t.type === 'error' ? '#991b1b' : t.type === 'warning' ? '#92400e' : '#166534',
+            padding: '12px 18px', borderRadius: '10px',
+            fontSize: '13px', fontWeight: '600',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+            maxWidth: '340px', lineHeight: '1.4',
+            animation: 'slideIn 0.2s ease'
+          }}>
+            {t.type === 'error' ? '❌ ' : t.type === 'warning' ? '⚠️ ' : '✅ '}{t.message}
+          </div>
+        ))}
+      </div>
+      <style>{`@keyframes slideIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }`}</style>
+    </ToastContext.Provider>
+  );
+};
+
+const useToast = () => React.useContext(ToastContext);
+
+const ConfirmModal = ({ message, onConfirm, onCancel, danger = false }) => (
+  <div className="confirm-overlay" style={{
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999
+  }}>
+    <div className="confirm-box" style={{
+      background: 'white', borderRadius: '12px', padding: '24px 28px',
+      maxWidth: '380px', width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)'
+    }}>
+      <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#1e293b', fontWeight: '600', lineHeight: '1.5' }}>
+        {message}
+      </p>
+      <div className="confirm-btn-row" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+        <button onClick={onCancel} style={{
+          background: 'white', color: '#64748b', border: '1px solid #cbd5e1',
+          padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer'
+        }}>Cancel</button>
+        <button onClick={onConfirm} style={{
+          background: danger ? '#dc2626' : '#16a34a', color: 'white', border: 'none',
+          padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer'
+        }}>Confirm</button>
+      </div>
+    </div>
+  </div>
+);
 
 const useColumnResize = (setColumnWidths) => {
   const startXRef = useRef(0);
@@ -127,6 +192,8 @@ const useColumnResize = (setColumnWidths) => {
 
 const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, closedById, initialChatMode = 'external' }) => {
   const { user } = useAuth();
+  const toast = useToast();
+  const [confirmModal, setConfirmModal] = useState(null);
   const ALLOWED_DELETE_EMAILS = ['gauravsingh.r@ozellar.com', 'admin@ozellar.com', 'techdevops@ozellar.com'];
   const canDelete = ALLOWED_DELETE_EMAILS.includes(user?.email);
   const queryClient = useQueryClient();
@@ -307,24 +374,29 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
       setFiles([]);
       queryClient.invalidateQueries(['threads', defectId]);
     } catch (err) {
-      alert("Failed to send reply: " + err.message);
+      toast("Failed to send reply: " + err.message, 'error');
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleDecision = async (decision) => {
-    if (!window.confirm(`Are you sure you want to ${decision} this closure request?`)) return;
-
-    const newStatus = decision === 'ACCEPT' ? 'CLOSED' : 'OPEN';
-
-    try {
-      await defectApi.updateDefect(defectId, { status: newStatus });
-      queryClient.invalidateQueries(['defects']);
-      queryClient.invalidateQueries(['threads', defectId]);
-    } catch (err) {
-      alert("Action failed: " + err.message);
-    }
+  const handleDecision = (decision) => {
+    const label = decision === 'ACCEPT' ? 'Accept & Close' : 'Reject';
+    setConfirmModal({
+      message: `Are you sure you want to ${label} this closure request?`,
+      danger: decision === 'REJECT',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        const newStatus = decision === 'ACCEPT' ? 'CLOSED' : 'OPEN';
+        try {
+          await defectApi.updateDefect(defectId, { status: newStatus });
+          queryClient.invalidateQueries(['defects']);
+          queryClient.invalidateQueries(['threads', defectId]);
+        } catch (err) {
+          toast("Action failed: " + err.message, 'error');
+        }
+      }
+    });
   };
 
   if (isLoading)
@@ -379,7 +451,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
               // ✅ NEW: Layout for Closure Remarks specifically
               if (t.is_closure_remarks) {
                 return (
-                  <div key={t.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '25px 0' }}>
+                  <div key={t.id} className="toast-item" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '25px 0' }}>
                     <div style={{
                       background: '#f0fdf4',
                       border: '1px solid #bbf7d0',
@@ -781,6 +853,14 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
           <Lock size={14} /> Thread Locked (Defect Closed)
         </div>
       )}
+      {confirmModal && (
+        <ConfirmModal
+          message={confirmModal.message}
+          danger={confirmModal.danger}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      )}
     </div>
   );
 };
@@ -788,6 +868,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
 
 const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onToggleRequired }) => {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [files, setFiles] = useState([]);
   const [previewImages, setPreviewImages] = useState([]);   // ✅ ADDED
   const [isUploading, setIsUploading] = useState(false);
@@ -830,7 +911,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
     });
 
     if (rejectedFiles.length > 0) {
-      alert(`⚠️ Files exceeding 1MB:\n${rejectedFiles.join('\n')}`);
+      toast('Files exceeding 1MB: ' + rejectedFiles.join(', '), 'warning');
     }
     if (validFiles.length > 0) {
       setFiles(prev => [...prev, ...validFiles]);
@@ -862,12 +943,12 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
           blob_path: blobPath
         });
       }
-      alert('✅ Images uploaded successfully!');
+      toast('Images uploaded successfully!');
       setFiles([]);
       setPreviewImages([]);  // ✅ Clear previews after upload
       queryClient.invalidateQueries([`${type}-images`, defectId]);
     } catch (err) {
-      alert('❌ Upload failed: ' + err.message);
+      toast('Upload failed: ' + err.message, 'error');
     } finally {
       setIsUploading(false);
     }
@@ -1135,7 +1216,7 @@ const ImageGalleryModal = ({ images, initialIndex = 0, onClose }) => {
 
 const ImageSidebar = ({ images, onClose, title }) => {
   const [selectedIndex, setSelectedIndex] = useState(null);
-
+  const toast = useToast();
   // ✅ Download image function
   const handleDownload = async (img) => {
     try {
@@ -1160,7 +1241,7 @@ const ImageSidebar = ({ images, onClose, title }) => {
       console.log('✅ Download completed');
     } catch (error) {
       console.error('❌ Download failed:', error);
-      alert('Failed to download image');
+      toast('Failed to download image', 'error');
     }
   };
 
@@ -1332,6 +1413,8 @@ const ShoreDashboard = () => {
   // const [openThreadRow, setOpenThreadRow] = useState(null);
 
   const { user } = useAuth();
+  const toast = useToast();
+  const [confirmModal, setConfirmModal] = useState(null);
   const ALLOWED_DELETE_EMAILS = ['gauravsingh.r@ozellar.com', 'admin@ozellar.com', 'techdevops@ozellar.com'];
   const canDelete = ALLOWED_DELETE_EMAILS.includes(user?.email);
 
@@ -1674,11 +1757,26 @@ const ShoreDashboard = () => {
   }, [filters]);
 
   useEffect(() => {
-    const handleClickOutside = () => setExpandedDescId(null);
+    const handleClickOutside = (e) => {
+      if (e.target && e.target.closest && e.target.closest('.pr-no')) return;
+      setExpandedDescId(null);
+    };
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (!activePrId) return;
+
+    const handleScroll = (e) => {
+      // Don't close if the scroll originated inside the popover itself
+      if (e.target && e.target.closest && e.target.closest('.pr-no')) return;
+      setActivePrId(null);
+    };
+
+    window.addEventListener('scroll', handleScroll, true);
+    return () => window.removeEventListener('scroll', handleScroll, true);
+  }, [activePrId]);
 
   const getDeadlineStatus = (targetCloseDate) => {
     if (!targetCloseDate) return 'NORMAL';
@@ -2100,7 +2198,7 @@ const ShoreDashboard = () => {
         setClosureModalOpen(true);
 
       } catch (error) {
-        alert('❌ Error validating defect: ' + error.message);
+        toast('Error validating defect: ' + error.message, 'error');
       }
       return;
     }
@@ -2278,7 +2376,7 @@ const ShoreDashboard = () => {
       queryClient.invalidateQueries(['defects']);
     },
     onError: (err) => {
-      alert("Failed to delete: " + err.message);
+      toast("Failed to delete: " + err.message, 'error');
     }
   });
 
@@ -2298,7 +2396,7 @@ const ShoreDashboard = () => {
       const data = await defectApi.createEmailDraft(defect.id);
       if (outlookTab) outlookTab.location.href = data.web_link || 'https://outlook.office365.com/mail/drafts';
     } catch (err) {
-      alert('Failed to create email draft. Please try again.');
+      toast('Failed to create email draft. Please try again.', 'error');
       if (outlookTab) outlookTab.close();
     } finally {
       setDraftingId(null);
@@ -2306,11 +2404,14 @@ const ShoreDashboard = () => {
   };
 
   const handleDelete = (id) => {
-    if (!ALLOWED_DELETE_EMAILS.includes(user?.email)) return; // silently block
-    if (window.confirm(
-      "⚠️ Are you sure you want to delete this defect?\n\nThis action cannot be undone."
-    ))
-      deleteMutation.mutate(id);
+    if (!ALLOWED_DELETE_EMAILS.includes(user?.email)) return;
+    setConfirmModal({
+      message: 'Are you sure you want to delete this defect? This action cannot be undone.',
+      onConfirm: () => {
+        setConfirmModal(null);
+        deleteMutation.mutate(id);
+      }
+    });
   };
 
   const handleSaveColumns = async (selectedColumns) => {
@@ -2391,7 +2492,7 @@ const ShoreDashboard = () => {
   // 2. Save Handler
   const handleCreateSave = async () => {
     if (!newDefect.vessel_imo || !newDefect.equipment_name || !newDefect.description) {
-      alert('Vessel, Area of Concern, and Description are required');
+      toast('Vessel, Area of Concern, and Description are required', 'warning');
       return;
     }
 
@@ -2436,12 +2537,12 @@ const ShoreDashboard = () => {
       setShowCreateRow(false);
       setHighlightedId(defectId);
       queryClient.invalidateQueries(['defects']);
-      alert("✅ Defect Created Successfully!");
+      toast("Defect Created Successfully!");
 
       setTimeout(() => setHighlightedId(null), 3000);
     } catch (err) {
       console.error("❌ Creation Failed:", err);
-      alert(`Failed to create defect: ${err.message}`);
+      toast('Failed to create defect: ' + err.message, 'error');
     }
   };
   const getFlagIcon = (value) => (
@@ -3590,17 +3691,23 @@ const ShoreDashboard = () => {
 
                             case "pr_details":
                               return (
-                                <td key="pr_details" style={{ width: 20, position: 'relative', textAlign: 'center' }}>
+                                <td key="pr_details" style={{ width: 20, textAlign: 'center' }}>
                                   <button
+                                    // WITH THIS:
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setActivePrId(defect.id);
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      const popoverHeight = 130; // realistic height for 1-2 PR entries
+                                      const spaceBelow = window.innerHeight - rect.bottom;
+                                      const openUpward = spaceBelow < 150; // only flip if very close to bottom
+
+                                      setActivePrId({
+                                        id: defect.id,
+                                        top: openUpward ? rect.top - popoverHeight : rect.bottom + 4,
+                                        left: rect.left,
+                                      });
                                     }}
-                                    title={
-                                      activePrs.length === 0
-                                        ? 'No PR Numbers'
-                                        : 'View PR Numbers'
-                                    }
+                                    title={activePrs.length === 0 ? 'No PR Numbers' : 'View PR Numbers'}
                                     style={{
                                       border: 'none',
                                       background: 'transparent',
@@ -3616,19 +3723,8 @@ const ShoreDashboard = () => {
                                       color={activePrs.length === 0 ? '#dc2626' : '#475569'}
                                     />
                                   </button>
-
-                                  {/* PR Manager Popover */}
-                                  {activePrId === defect.id && (
-                                    <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100 }}>
-                                      <PrManagerPopover
-                                        defect={defect}
-                                        onClose={() => setActivePrId(null)}
-                                        onRefresh={() => queryClient.invalidateQueries(['defects'])}
-                                      />
-                                    </div>
-                                  )}
                                 </td>
-                              )
+                              );
                             // REPLACE with:
                             case 'flag':
                               return (
@@ -4070,8 +4166,32 @@ const ShoreDashboard = () => {
           availableColumns={SHORE_COLUMN_DEFINITIONS}
           onSave={handleSaveColumns}
         />
-
-
+        {activePrId && ReactDOM.createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              top: Math.max(8, activePrId.top),
+              left: Math.min(activePrId.left, window.innerWidth - 240),
+              zIndex: 9999,
+            }}
+          >
+            <PrManagerPopover
+              defect={defects.find(d => d.id === activePrId.id)}
+              onClose={() => setActivePrId(null)}
+              onRefresh={() => queryClient.invalidateQueries(['defects'])}
+              onToast={toast}
+              onConfirm={setConfirmModal}
+            />
+          </div>,
+          document.body
+        )}
+        {confirmModal && (
+          <ConfirmModal
+            message={confirmModal.message}
+            onConfirm={confirmModal.onConfirm}
+            onCancel={() => setConfirmModal(null)}
+          />
+        )}
         {closureModalOpen && closureDefect && (
           <ShoreClosureModal
             defect={closureDefect}
@@ -4095,7 +4215,10 @@ const ShoreDashboard = () => {
   );
 };
 
-export default ShoreDashboard;
+const ShoreDashboardWithToast = () => (
+  <ToastProvider><ShoreDashboard /></ToastProvider>
+);
+export default ShoreDashboardWithToast;
 
 const DraggableTh = ({ id, children, disabled, style }) => {
   const {

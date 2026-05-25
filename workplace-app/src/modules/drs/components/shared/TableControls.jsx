@@ -5,7 +5,7 @@ import {
   SortableContext,
   useSortable,
 } from '@dnd-kit/sortable';
-
+import ReactDOM from 'react-dom';
 import {
   Filter,
   ArrowUpDown,
@@ -32,6 +32,7 @@ export const FilterHeader = ({
   sortState,
   isFiltered,
   iconRenderer,
+  alignRight = false,
 }) => {
 
 
@@ -39,7 +40,8 @@ export const FilterHeader = ({
   const [tempRange, setTempRange] = useState(currentFilter || { from: '', to: '' });
   const [tempDate, setTempDate] = useState(currentFilter || '');
   const filterRef = useRef(null);
-
+  const portalRef = useRef(null);
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
   // const isActive =
   //   type === 'date-range'
   //     ? !!currentFilter?.from || !!currentFilter?.to
@@ -49,9 +51,9 @@ export const FilterHeader = ({
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (!filterRef.current?.contains(e.target)) {
-        setIsOpen(false);
-      }
+      if (filterRef.current?.contains(e.target)) return;
+      if (portalRef.current?.contains(e.target)) return;
+      setIsOpen(false);
     };
 
     if (isOpen) {
@@ -131,12 +133,27 @@ export const FilterHeader = ({
             size={18}
             className={`filter-icon ${isActive ? 'active' : ''}`}
             style={{ color: filterIconColor }}   // ← ADD THIS LINE
-            onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isOpen && filterRef.current) {
+                const rect = filterRef.current.getBoundingClientRect();
+                const POPOVER_WIDTH = type === 'date-range' ? 320 : 220;
+                let left = rect.right - POPOVER_WIDTH;
+                if (left < 8) left = 8;
+                let top = rect.bottom + 4;
+                const POPOVER_HEIGHT = type === 'date-range' ? 120 : type === 'date' ? 100 : 260;
+                if (top + POPOVER_HEIGHT > window.innerHeight - 8) top = rect.top - POPOVER_HEIGHT - 4;
+                setPopoverPos({ top, left });
+              }
+              setIsOpen(prev => !prev);
+            }}
           />
-          {isOpen && (
+          {isOpen && ReactDOM.createPortal(
             <div
+              ref={portalRef}
               className={`filter-popover ${type === 'date-range' ? 'date-range' : ''}`}
               onClick={(e) => e.stopPropagation()}
+              style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left, zIndex: 99999, width: `${type === 'date-range' ? '270px' : '200px '}` }}
             >
               {type === 'text' && (
                 <>
@@ -548,7 +565,8 @@ export const FilterHeader = ({
                 </div>
               )}
 
-            </div>
+            </div>,
+            document.body
           )}
         </div>
       </div>
@@ -564,10 +582,11 @@ export const FilterHeader = ({
       )} */}
 
     </div>
+
   );
 };
 
-export const PrManagerPopover = ({ defect, onClose, onRefresh }) => {
+export const PrManagerPopover = ({ defect, onClose, onRefresh, onToast, onConfirm }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [inputValue, setInputValue] = useState('');
@@ -575,26 +594,35 @@ export const PrManagerPopover = ({ defect, onClose, onRefresh }) => {
   const [infoTooltip, setInfoTooltip] = useState(null);
   const popoverRef = useRef(null);
   const PR_FORMAT_REGEX = /^[A-Z]{2,5}\/(V|O)-\d{4}\/REQ\d{2}$/;
-
   // Close on click outside
+  // REPLACE your existing useEffect in PrManagerPopover with this:
+
+
+
+  const isInteractingRef = useRef(false);
+
   useEffect(() => {
     const handleClick = (e) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target)) onClose();
+      // If we're mid-interaction, skip
+      if (isInteractingRef.current) return;
+      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+        onClose();
+      }
     };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+
+    document.addEventListener('pointerdown', handleClick);
+    return () => document.removeEventListener('pointerdown', handleClick);
   }, [onClose]);
 
   const handleAdd = async () => {
     if (!inputValue.trim()) return;
     try {
-      // Assuming defectApi has a method to add PR or update defect entries
       await defectApi.createPrEntry({ defect_id: defect.id, pr_number: inputValue });
-
       setInputValue('');
       setIsAdding(false);
       onRefresh();
-    } catch (err) { alert(err.message); }
+      onToast?.('PR number added successfully');
+    } catch (err) { onToast?.(err.message, 'error'); }
   };
 
   const handleUpdate = async (prId) => {
@@ -604,22 +632,29 @@ export const PrManagerPopover = ({ defect, onClose, onRefresh }) => {
       setEditingId(null);
       setInputValue('');
       onRefresh();
-    } catch (err) { alert(err.message); }
+      onToast?.('PR number updated');
+    } catch (err) { onToast?.(err.message, 'error'); }
   };
 
   const [deletingId, setDeletingId] = useState(null);
 
-  const handleDelete = async (prId) => {
-    if (!window.confirm("Delete this PR number?")) return;
+  const handleDelete = (prId) => {
     if (deletingId) return;
-
-    setDeletingId(prId);
-    try {
-      await defectApi.deletePrEntry(prId);
-      onRefresh();
-    } finally {
-      setDeletingId(null);
-    }
+    onConfirm?.({
+      message: 'Are you sure you want to delete this PR number?',
+      onConfirm: async () => {
+        setDeletingId(prId);
+        try {
+          await defectApi.deletePrEntry(prId);
+          onRefresh();
+          onToast?.('PR number deleted');
+        } catch (err) {
+          onToast?.(err.message, 'error');
+        } finally {
+          setDeletingId(null);
+        }
+      }
+    });
   };
 
 
@@ -702,63 +737,44 @@ export const PrManagerPopover = ({ defect, onClose, onRefresh }) => {
                 <>
                   {/* SAVE BUTTON */}
                   <button
+                    onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
                     onClick={() => handleUpdate(pr.id)}
-                    title="Save PR number" // 👈 Tooltip text
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: '2px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
+                    title="Save PR number"
+                    style={{ background: 'none', border: 'none', padding: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                   >
                     <Check size={14} color="#10b981" />
                   </button>
 
                   {/* CANCEL BUTTON */}
                   <button
-                    onClick={() => {
-                      setEditingId(null);
-                      setInputValue('');
-                    }}
-                    title="Cancel editing" // 👈 Tooltip text
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: '2px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
+                    onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                    onClick={() => { setEditingId(null); setInputValue(''); }}
+                    title="Cancel editing"
+                    style={{ background: 'none', border: 'none', padding: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                   >
                     <X size={14} color="#ef4444" />
                   </button>
+
                 </>
               ) : (
                 <>
-                  {/* EDIT BUTTON */}
                   <button
-                    onClick={() => {
-                      setEditingId(pr.id);
-                      setInputValue(pr.pr_number);
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      isInteractingRef.current = true;
+                      setTimeout(() => { isInteractingRef.current = false; }, 100);
                     }}
-                    title="Edit this PR" // 👈 Tooltip text
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: '2px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
+                    onClick={() => { setEditingId(pr.id); setInputValue(pr.pr_number); }}
+                    title="Edit this PR"
+                    style={{ background: 'none', border: 'none', padding: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                   >
                     <Edit3 size={14} color="#2b82fc" />
                   </button>
 
+
                   {/* DELETE BUTTON */}
                   <button
-                    onClick={() => handleDelete(pr.id)}
+                    onMouseDown={(e) => { e.stopPropagation(); handleDelete(pr.id); }}
                     title="Delete PR number" // 👈 Tooltip text
                     style={{
                       background: 'none',
@@ -779,97 +795,103 @@ export const PrManagerPopover = ({ defect, onClose, onRefresh }) => {
         ))}
       </div>
 
-      {isAdding ? (
-        <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <input
-            autoFocus
-            placeholder="PR Number e.g. KIRT/V-0030/REQ26"
-            className="ghost-input"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-          />
-          {inputValue && !PR_FORMAT_REGEX.test(inputValue) && (
-            <span style={{ fontSize: '10px', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '3px' }}>
-              <AlertCircle size={11} color="#ef4444" />
-              PR number format mismatch
-            </span>
-          )}
-          <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-            <button title='Save' onClick={handleAdd} style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '4px', padding: '4px' }}><Check size={14} /></button>
-            <button title='Cancel' onClick={() => { setIsAdding(false); setInputValue(''); }} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '4px' }}><X size={14} /></button>
+      {
+        isAdding ? (
+          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <input
+              autoFocus
+              placeholder="PR Number e.g. KIRT/V-0030/REQ26"
+              className="ghost-input"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+            />
+            {inputValue && !PR_FORMAT_REGEX.test(inputValue) && (
+              <span style={{ fontSize: '10px', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <AlertCircle size={11} color="#ef4444" />
+                PR number format mismatch
+              </span>
+            )}
+            <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+              <button title='Save' onClick={handleAdd} style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '4px', padding: '4px' }}><Check size={14} /></button>
+              <button title='Cancel' onClick={() => { setIsAdding(false); setInputValue(''); }} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '4px' }}><X size={14} /></button>
+            </div>
           </div>
-        </div>
-      ) : (
-        <button
-          onClick={() => setIsAdding(true)}
-          style={{ width: '100%', padding: '6px', fontSize: '11px', fontWeight: '600', color: '#ea580c', background: '#fff7ed', border: '1px dashed #ea580c', borderRadius: '4px', cursor: 'pointer' }}
-        >
-          + Add PR Number
-        </button>
-      )}
+        ) : (
+          <button
+            onClick={() => setIsAdding(true)}
+            style={{ width: '100%', padding: '6px', fontSize: '11px', fontWeight: '600', color: '#ea580c', background: '#fff7ed', border: '1px dashed #ea580c', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            + Add PR Number
+          </button>
+        )
+      }
 
-      {infoTooltip && (
-        <div style={{
-          position: 'fixed',
-          top: infoTooltip.y - 52,
-          left: infoTooltip.x,
-          transform: 'translateX(-50%)',
-          background: '#1e293b',
-          color: '#f8fafc',
-          fontSize: '11px',
-          fontWeight: '500',
-          padding: '6px 10px',
-          borderRadius: '6px',
-          whiteSpace: 'nowrap',
-          zIndex: 9999,
-          pointerEvents: 'none',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          lineHeight: 1.4,
-        }}>
-          PR not found in Mariapps — status unavailable
+      {
+        infoTooltip && (
           <div style={{
-            position: 'absolute',
-            bottom: -4,
-            left: '50%',
-            transform: 'translateX(-50%) rotate(45deg)',
-            width: 8,
-            height: 8,
+            position: 'fixed',
+            top: infoTooltip.y - 52,
+            left: infoTooltip.x,
+            transform: 'translateX(-50%)',
             background: '#1e293b',
-          }} />
-        </div>
-      )}
+            color: '#f8fafc',
+            fontSize: '11px',
+            fontWeight: '500',
+            padding: '6px 10px',
+            borderRadius: '6px',
+            whiteSpace: 'nowrap',
+            zIndex: 9999,
+            pointerEvents: 'none',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            lineHeight: 1.4,
+          }}>
+            PR not found in Mariapps — status unavailable
+            <div style={{
+              position: 'absolute',
+              bottom: -4,
+              left: '50%',
+              transform: 'translateX(-50%) rotate(45deg)',
+              width: 8,
+              height: 8,
+              background: '#1e293b',
+            }} />
+          </div>
+        )
+      }
 
-      {tooltip && (
-        <div style={{
-          position: 'fixed',
-          top: tooltip.y - 52,
-          left: tooltip.x,
-          transform: 'translateX(-50%)',
-          background: '#1e293b',
-          color: '#f8fafc',
-          fontSize: '11px',
-          fontWeight: '500',
-          padding: '6px 10px',
-          borderRadius: '6px',
-          whiteSpace: 'nowrap',
-          zIndex: 9999,
-          pointerEvents: 'none',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          lineHeight: 1.4,
-        }}>
-          PR number format mismatch
+      {
+        tooltip && (
           <div style={{
-            position: 'absolute',
-            bottom: -4,
-            left: '50%',
-            transform: 'translateX(-50%) rotate(45deg)',
-            width: 8,
-            height: 8,
+            position: 'fixed',
+            top: tooltip.y - 52,
+            left: tooltip.x,
+            transform: 'translateX(-50%)',
             background: '#1e293b',
-          }} />
-        </div>
-      )}
-    </div>
+            color: '#f8fafc',
+            fontSize: '11px',
+            fontWeight: '500',
+            padding: '6px 10px',
+            borderRadius: '6px',
+            whiteSpace: 'nowrap',
+            zIndex: 9999,
+            pointerEvents: 'none',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            lineHeight: 1.4,
+          }}>
+            PR number format mismatch
+            <div style={{
+              position: 'absolute',
+              bottom: -4,
+              left: '50%',
+              transform: 'translateX(-50%) rotate(45deg)',
+              width: 8,
+              height: 8,
+              background: '#1e293b',
+            }} />
+          </div>
+        )
+      }
+    </div >
   );
 };
 
@@ -888,14 +910,16 @@ export function EquipmentFilter({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const ref = useRef(null);
-
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
+  const iconRef = useRef(null);
+  const portalRef = useRef(null);
   useEffect(() => {
     const handleClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-        setSearch('');
-      }
-    };
+  if (ref.current?.contains(e.target)) return;
+  if (portalRef.current?.contains(e.target)) return;
+  setOpen(false);
+  setSearch('');
+};
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
@@ -965,7 +989,7 @@ export function EquipmentFilter({
           )}
         </span>
 
-        <div className="filter-wrapper" style={{ position: 'relative' }}>
+        <div ref={iconRef} className="filter-wrapper" style={{ position: 'relative' }}>
           <Filter
             size={18}
             className={`filter-icon ${selectedValues.length ? 'active' : ''}`}
@@ -975,21 +999,33 @@ export function EquipmentFilter({
                   : sortState ? '#2563eb'
                     : undefined
             }}
-            onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!open && iconRef.current) {
+                const rect = iconRef.current.getBoundingClientRect();
+                let left = rect.right - 220;
+                if (left < 8) left = 8;
+                let top = rect.bottom + 4;
+                if (top + 260 > window.innerHeight - 8) top = rect.top - 264;
+                setPopoverPos({ top, left });
+              }
+              setOpen(prev => !prev);
+            }}
           />
 
-          {open && (
+          {open && ReactDOM.createPortal(
             <div
+              ref={portalRef}
               style={{
-                position: 'absolute',
-                top: '120%',
-                left: '50%',
-                transform: 'translateX(-50%)',
+                position: 'fixed',
+                top: popoverPos.top,
+                left: popoverPos.left,
+                // transform: 'translateX(-50%)',
                 background: '#fff',
                 border: '1px solid #e5e7eb',
                 borderRadius: 8,
                 padding: 10,
-                zIndex: 100,
+                zIndex: 9999,
                 minWidth: 220,
                 maxHeight: 260,
                 overflowY: 'auto',
@@ -1066,8 +1102,8 @@ export function EquipmentFilter({
                   Clear
                 </div>
               )}
-            </div>
-          )}
+            </div>,
+            document.body)}
         </div>
       </div>
     </div>
@@ -1087,14 +1123,16 @@ export function DefectSourceFilter({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const ref = useRef(null);
-
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
+  const iconRef = useRef(null);
+  const portalRef = useRef(null);
   useEffect(() => {
     const handleClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-        setSearch('');
-      }
-    };
+  if (ref.current?.contains(e.target)) return;
+  if (portalRef.current?.contains(e.target)) return;
+  setOpen(false);
+  setSearch('');
+};
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
@@ -1157,7 +1195,7 @@ export function DefectSourceFilter({
           )}
         </span>
 
-        <div className="filter-wrapper">
+        <div ref={iconRef} className="filter-wrapper">
           <Filter
             size={18}
             className={`filter-icon ${selectedValues.length ? 'active' : ''}`}
@@ -1167,21 +1205,32 @@ export function DefectSourceFilter({
                   : sortState ? '#2563eb'
                     : undefined
             }}
-            onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!open && iconRef.current) {
+                const rect = iconRef.current.getBoundingClientRect();
+                let left = rect.right - 220;
+                if (left < 8) left = 8;
+                let top = rect.bottom + 4;
+                if (top + 260 > window.innerHeight - 8) top = rect.top - 264;
+                setPopoverPos({ top, left });
+              }
+              setOpen(prev => !prev);
+            }}
           />
 
-          {open && (
+          {open && ReactDOM.createPortal(
             <div
+              ref={portalRef}
               style={{
-                position: 'absolute',
-                top: '120%',
-                left: '50%',
-                transform: 'translateX(-50%)',
+                position: 'fixed',
+                top: popoverPos.top,
+                left: popoverPos.left,
                 background: '#fff',
                 border: '1px solid #e5e7eb',
                 borderRadius: 8,
                 padding: 10,
-                zIndex: 100,
+                zIndex: 9999,
                 minWidth: 240,
                 maxHeight: 260,
                 overflowY: 'auto',
@@ -1238,8 +1287,8 @@ export function DefectSourceFilter({
                   Clear
                 </div>
               )}
-            </div>
-          )}
+            </div>,
+            document.body)}
         </div>
       </div>
 
@@ -1572,12 +1621,15 @@ export function VesselFilter({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
-
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
+  const iconRef = useRef(null);
+  const portalRef = useRef(null);
   useEffect(() => {
     const handleClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
+      if (ref.current?.contains(e.target)) return;
+      if (portalRef.current?.contains(e.target)) return;
+      setOpen(false);
+      // setSearch('');
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -1641,7 +1693,7 @@ export function VesselFilter({
           )}
         </span>
 
-        <div className="filter-wrapper" style={{ position: 'relative' }}>
+        <div ref={iconRef} className="filter-wrapper" style={{ position: 'relative' }}>
           <Filter
             size={18}
             className={`filter-icon ${selectedValues.length ? 'active' : ''}`}
@@ -1651,21 +1703,32 @@ export function VesselFilter({
                   : sortState ? '#2563eb'
                     : undefined
             }}
-            onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!open && iconRef.current) {
+                const rect = iconRef.current.getBoundingClientRect();
+                let left = rect.right - 220;
+                if (left < 8) left = 8;
+                let top = rect.bottom + 4;
+                if (top + 260 > window.innerHeight - 8) top = rect.top - 264;
+                setPopoverPos({ top, left });
+              }
+              setOpen(prev => !prev);
+            }}
           />
 
-          {open && (
+          {open && ReactDOM.createPortal(
             <div
+              ref={portalRef}
               style={{
-                position: 'absolute',
-                top: '120%',
-                left: '50%',
-                transform: 'translateX(-50%)',
+                position: 'fixed',
+                top: popoverPos.top,
+                left: popoverPos.left,
                 background: '#fff',
                 border: '1px solid #e5e7eb',
                 borderRadius: 8,
                 padding: 10,
-                zIndex: 100,
+                zIndex: 9999,
                 minWidth: 220,
                 maxHeight: 260,
                 overflowY: 'auto',
@@ -1708,8 +1771,8 @@ export function VesselFilter({
                   Clear
                 </div>
               )}
-            </div>
-          )}
+            </div>,
+            document.body)}
         </div>
       </div>
     </div>

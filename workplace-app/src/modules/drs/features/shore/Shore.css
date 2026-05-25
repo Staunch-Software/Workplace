@@ -1818,3 +1818,230 @@
 .thin-scroll::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
 }
+
+/* ── TOAST ── */
+.toast-wrapper {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 99999;
+  width: auto;
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .toast-wrapper {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    transform: none;
+    width: calc(100% - 24px);
+  }
+
+  .toast-item {
+    max-width: 100% !important;
+    font-size: 12px !important;
+    padding: 10px 14px !important;
+    border-radius: 8px !important;
+  }
+}
+
+/* Tablet */
+@media (min-width: 481px) and (max-width: 768px) {
+  .toast-wrapper {
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 360px;
+  }
+
+  .toast-item {
+    font-size: 13px !important;
+    padding: 11px 16px !important;
+  }
+}
+
+/* Desktop and above — default, no change needed */
+@media (min-width: 769px) {
+  .toast-wrapper {
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+  }
+}
+
+
+/* ── CONFIRM MODAL ── */
+
+/* Mobile */
+@media (max-width: 480px) {
+  .confirm-overlay {
+    align-items: flex-end !important; /* slides up from bottom on mobile */
+    padding: 0;
+  }
+
+  .confirm-box {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 16px 16px 0 0 !important;
+    padding: 20px 16px !important;
+  }
+
+  .confirm-box p {
+    font-size: 13px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .confirm-box button {
+    flex: 1;
+    padding: 10px 12px !important;
+    font-size: 13px !important;
+  }
+
+  .confirm-btn-row {
+    flex-direction: row !important;
+    gap: 8px !important;
+  }
+}
+
+/* Tablet */
+@media (min-width: 481px) and (max-width: 768px) {
+  .confirm-box {
+    width: 80% !important;
+    max-width: 360px !important;
+    padding: 20px 22px !important;
+  }
+
+  .confirm-box p {
+    font-size: 13px !important;
+  }
+
+  .confirm-box button {
+    padding: 8px 14px !important;
+    font-size: 13px !important;
+  }
+}
+
+/* Desktop — default, no change needed */
+@media (min-width: 769px) {
+  .confirm-box {
+    max-width: 380px;
+    width: 90%;
+    padding: 24px 28px;
+  }
+}
+
+/* ── BIG SCREEN / ULTRA-WIDE (1440px and above) ── */
+@media (min-width: 1440px) {
+  /* TOAST */
+  .toast-wrapper {
+    top: 32px; /* More spacing from the top */
+    gap: 12px;
+  }
+
+  .toast-item {
+    font-size: 15px !important; /* Slightly larger text */
+    padding: 14px 22px !important;
+    min-width: 300px; /* Ensure it has a nice presence */
+  }
+
+  /* CONFIRM MODAL */
+  .confirm-box {
+    max-width: 450px !important; /* Wider modal for big screens */
+    padding: 32px 40px !important; /* More breathing room */
+    border-radius: 12px !important;
+  }
+
+  .confirm-box p {
+    font-size: 16px !important; /* Increased readability */
+    line-height: 1.6;
+    margin-bottom: 24px !important;
+  }
+
+  .confirm-box button {
+    padding: 12px 24px !important;
+    font-size: 15px !important;
+    cursor: pointer;
+  }
+
+  .confirm-btn-row {
+    gap: 16px !important;
+  }
+}
+/* ── 2K RESOLUTION (2560px and above) ── */
+@media (min-width: 1921px) and (max-width: 2560px) {
+  /* Toast Scaling */
+  .toast-wrapper {
+    top: 48px;
+    gap: 16px;
+  }
+
+  .toast-item {
+    font-size: 18px !important;
+    padding: 16px 28px !important;
+    border-radius: 12px !important;
+    min-width: 380px;
+  }
+
+  /* Confirm Modal Scaling */
+  .confirm-box {
+    max-width: 550px !important;
+    padding: 40px 48px !important;
+    border-radius: 20px !important;
+  }
+
+  .confirm-box p {
+    font-size: 18px !important;
+    margin-bottom: 32px !important;
+  }
+
+  .confirm-box button {
+    padding: 14px 28px !important;
+    font-size: 18px !important;
+  }
+}
+
+/* ── 4K RESOLUTION (3840px and above) ── */
+@media (min-width: 2561px) {
+  /* Toast Scaling */
+  .toast-wrapper {
+    top: 80px;
+    gap: 24px;
+  }
+
+  .toast-item {
+    font-size: 24px !important;
+    padding: 24px 40px !important;
+    border-radius: 16px !important;
+    min-width: 500px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2) !important;
+  }
+
+  /* Confirm Modal Scaling */
+  .confirm-box {
+    max-width: 850px !important;
+    padding: 60px 80px !important;
+    border-radius: 32px !important;
+  }
+
+  .confirm-box p {
+    font-size: 28px !important;
+    line-height: 1.5;
+    margin-bottom: 48px !important;
+  }
+
+  .confirm-box button {
+    padding: 20px 40px !important;
+    font-size: 24px !important;
+    border-radius: 12px !important;
+  }
+
+  .confirm-btn-row {
+    gap: 24px !important;
+  }
+}
