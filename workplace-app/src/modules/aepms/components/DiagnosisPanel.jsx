@@ -1188,75 +1188,67 @@ const OverallEngineHealthCard = ({ findings, report, summary }) => {
 
 // ── SFOCInsightCard ───────────────────────────────────────────────────────
 // ── SFOCInsightCard ───────────────────────────────────────────────────────
-// Matches the OverallEngineHealthCard tile pattern exactly.
-// - Header with collapse chevron + "!" summary button
-// - Tile grid (one tile per SFOC metric / linked finding)
-// - Click tile → 3-column detail panel (Observation | Possible Causes | Diagnosis & Remedy)
-// - "!" icon opens a small summary popup in the header (same as OverallEngineHealthCard)
+// Single tile (like one card in OverallEngineHealthCard).
+// Click tile → 3-column detail panel with full numbers inside Observation.
+// ! icon → summary popup with key metrics + bunker price editor.
 
 const SFOCInsightCard = ({ findings, report, baseline, analysisMode, verdicts = [] }) => {
-  const [isExpanded, setIsExpanded]       = useState(true);
-  const [selectedIdx, setSelectedIdx]     = useState(null);
-  const [showSummary, setShowSummary]     = useState(false);
-  const [bunkerPrice, setBunkerPrice]     = useState(600);
-  const [editingPrice, setEditingPrice]   = useState(false);
-  const [priceInput, setPriceInput]       = useState("600");
-  const detailPanelRef                    = useRef(null);
+  const [isExpanded, setIsExpanded]     = useState(true);
+  const [tileSelected, setTileSelected] = useState(false);
+  const [showSummary, setShowSummary]   = useState(false);
+  const [bunkerPrice, setBunkerPrice]   = useState(600);
+  const [editingPrice, setEditingPrice] = useState(false);
+  const [priceInput, setPriceInput]     = useState("600");
+  const detailPanelRef                  = useRef(null);
 
-  // ── scroll detail panel into view when opened ──────────────────────────
   useEffect(() => {
-    if (selectedIdx !== null && detailPanelRef.current) {
+    if (tileSelected && detailPanelRef.current) {
       setTimeout(() => {
-        const el  = detailPanelRef.current;
+        const el   = detailPanelRef.current;
         const rect = el.getBoundingClientRect();
-        const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
-        if (!isVisible) {
+        if (rect.top < 0 || rect.bottom > window.innerHeight) {
           window.scrollTo({ top: window.scrollY + rect.top - window.innerHeight * 0.4, behavior: "smooth" });
         }
       }, 100);
     }
-  }, [selectedIdx]);
+  }, [tileSelected]);
 
   if (!findings || findings.length === 0) return null;
 
   const sfocFinding = findings[0];
 
-  // ── numeric helpers ────────────────────────────────────────────────────
-  const isME   = analysisMode === "mainEngine";
-  const xAxis  = isME ? "load" : "load_percentage";
-  const load   = isME ? report?.load : report?.load_percentage;
-
+  // ── numerics ────────────────────────────────────────────────────────────
+  const isME       = analysisMode === "mainEngine";
+  const xAxis      = isME ? "load" : "load_percentage";
+  const load       = isME ? report?.load : report?.load_percentage;
   const sfocActual = Number(report?.SFOC);
   const sfocBase   = interpolateBaseline(baseline, load, "SFOC", xAxis);
   const sfocDev    = sfocBase != null && sfocBase !== 0
-    ? ((sfocActual - sfocBase) / sfocBase) * 100
-    : null;
+    ? ((sfocActual - sfocBase) / sfocBase) * 100 : null;
 
   const powerKW        = report?.shaft_power_kw || report?.effective_power_kw || 0;
-  const extraSFOC      = sfocBase != null && sfocActual != null && !isNaN(sfocActual) ? sfocActual - sfocBase : null;
+  const extraSFOC      = sfocBase != null && !isNaN(sfocActual) ? sfocActual - sfocBase : null;
   const extraFuelDay   = extraSFOC != null && powerKW ? (extraSFOC * powerKW * 24) / 1_000_000 : null;
   const extraFuelMonth = extraFuelDay  != null ? extraFuelDay  * 30   : null;
   const costPerMonth   = extraFuelMonth != null ? extraFuelMonth * bunkerPrice : null;
   const co2PerMonth    = extraFuelMonth != null ? extraFuelMonth * 3.114 : null;
 
-  const isRed   = sfocDev != null && sfocDev > 10;
-  const isAmber = sfocDev != null && sfocDev > 5 && sfocDev <= 10;
+  const isRed    = sfocDev != null && sfocDev > 10;
   const severity = isRed ? "critical" : "warning";
 
-  // ── colours (mirrors OverallEngineHealthCard getTileColors) ───────────
-  const getTileColors = (sev) => {
-    if (sev === "critical") return {
-      bg: "#1a0a0a", border: "#7f1d1d", titleColor: "#fecaca",
-      subColor: "#f87171", badgeBg: "#7f1d1d", badgeText: "#ffd0d0", badgeLabel: "CRITICAL",
-    };
-    return {
-      bg: "#1a1400", border: "#713f12", titleColor: "#fef08a",
-      subColor: "#fbbf24", badgeBg: "#713f12", badgeText: "#fef08a", badgeLabel: "WARNING",
-    };
+  // ── colours ─────────────────────────────────────────────────────────────
+  const c = severity === "critical" ? {
+    bg: "#1a0a0a", border: "#7f1d1d", titleColor: "#fecaca",
+    subColor: "#f87171", badgeBg: "#7f1d1d", badgeText: "#ffd0d0", badgeLabel: "CRITICAL",
+  } : {
+    bg: "#1a1400", border: "#713f12", titleColor: "#fef08a",
+    subColor: "#fbbf24", badgeBg: "#713f12", badgeText: "#fef08a", badgeLabel: "WARNING",
   };
 
-  // ── linked root-cause tags (pattern-code based) ────────────────────────
-  const activePatterns = verdicts.map(v => v.pattern);
+  const badgeColor = isRed ? "#dc2626" : "#d97706";
+
+  // ── linked root causes ──────────────────────────────────────────────────
+  const activePatterns  = verdicts.map(v => v.pattern);
   const rootCausesFound = [];
   if (activePatterns.includes("TC_FOULING"))         rootCausesFound.push("TC Fouling");
   if (activePatterns.includes("COMPRESSION_LOSS"))   rootCausesFound.push("Compression Loss");
@@ -1269,123 +1261,43 @@ const SFOCInsightCard = ({ findings, report, baseline, analysisMode, verdicts = 
   if (activePatterns.includes("EXH_TC_IN_HIGH"))     rootCausesFound.push("Late Combustion");
   if (activePatterns.includes("EXH_CYL_OUT_HIGH"))   rootCausesFound.push("Cylinder Exhaust High");
 
-  // ── build tiles ────────────────────────────────────────────────────────
-  // Tile 0 – SFOC Deviation overview
-  // Tile 1 – Cost & Fuel Impact
-  // Tile 2 – CO₂ Impact
-  // Tile 3 – Linked Root Causes  (only if any exist)
-  const tiles = [
-    {
-      parameter: "SFOC Deviation",
-      severity,
-      evidence: ["SFOC"],
-      comparedAgainst: "Shop Trial",
-      finding:
-        `SFOC has increased by +${sfocDev != null ? sfocDev.toFixed(1) : "N/A"}% from baseline. ` +
-        `Baseline: ${sfocBase != null ? sfocBase.toFixed(1) : "N/A"} g/kWh, ` +
-        `Actual: ${!isNaN(sfocActual) ? sfocActual.toFixed(1) : "N/A"} g/kWh. ` +
-        `SFOC is the overall efficiency result — it is a consequence of the root causes, not a root cause in itself.`,
-      causes: sfocFinding.causes,
-      remedy: sfocFinding.remedy,
-    },
-    {
-      parameter: "Fuel & Cost Impact",
-      severity,
-      evidence: ["Extra Fuel", "Cost"],
-      comparedAgainst: `$${bunkerPrice}/tonne`,
-      finding:
-        `Extra fuel burned per day: ${extraFuelDay  != null ? extraFuelDay.toFixed(2)  : "N/A"} t. ` +
-        `Per month: ${extraFuelMonth != null ? extraFuelMonth.toFixed(1) : "N/A"} t recoverable if SFOC is restored. ` +
-        `Monthly cost impact at $${bunkerPrice}/tonne: ${costPerMonth != null ? "$" + costPerMonth.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "N/A"}.`,
-      causes: [
-        "TC fouling causing air starvation and incomplete combustion",
-        "Retarded injection timing releasing energy late into exhaust stroke",
-        "Worn fuel pumps or injectors wasting fuel delivery",
-        "Low LCV fuel oil requiring more mass to achieve same energy",
-        "Hull or propeller fouling making engine work harder",
-      ],
-      remedy:
-        `Update bunker price to reflect actual cost. ` +
-        `Address root-cause findings above to recover the ${extraFuelMonth != null ? extraFuelMonth.toFixed(1) : "N/A"} t/month loss. ` +
-        `Check fuel oil calorific value from BDN.`,
-    },
-    {
-      parameter: "CO₂ Excess / Month",
-      severity: isRed ? "critical" : "warning",
-      evidence: ["CO₂", "Emissions"],
-      comparedAgainst: "HFO factor 3.114",
-      finding:
-        `Excess CO₂ from elevated SFOC: ${co2PerMonth != null ? co2PerMonth.toFixed(1) : "N/A"} t/month ` +
-        `(HFO emission factor 3.114 kg CO₂/kg fuel). ` +
-        `Resolving the root-cause faults will eliminate this excess emission.`,
-      causes: [
-        "Any combustion or fuel-delivery fault raises SFOC, which directly raises CO₂",
-        "Hull / propeller fouling increases fuel burn per mile",
-      ],
-      remedy:
-        "Fix SFOC root causes to recover CO₂. " +
-        "Document excess in CII / DCS logs for flag-state reporting.",
-    },
-  ];
-
-  // add linked-root-causes tile only when data exists
-  if (rootCausesFound.length > 0) {
-    tiles.push({
-      parameter: "Linked Root Causes",
-      severity,
-      evidence: rootCausesFound,
-      comparedAgainst: "Engine Health Card",
-      finding:
-        `The SFOC elevation is linked to ${rootCausesFound.length} root-cause finding(s) detected in the Engine Health card: ` +
-        rootCausesFound.join(", ") + `. ` +
-        `Resolving these faults will restore SFOC to baseline.`,
-      causes: rootCausesFound.map(rc => `${rc} — see Engine Health card for detail`),
-      remedy:
-        "Address each linked root cause listed in the Overall Engine Health card above. " +
-        "Re-upload report after corrective action to verify SFOC recovery.",
-    });
-  }
-
-  const selectedItem = selectedIdx !== null ? tiles[selectedIdx] : null;
-
-  // ── header colours ─────────────────────────────────────────────────────
-  const headerBorderColor = isRed ? "#7c2d12" : "#78350f";
-  const headerBg          = isRed ? "#1a0800"  : "#1a1200";
-  const accentColor       = isRed ? "#fb923c"  : "#fbbf24";
-  const badgeColor        = isRed ? "#dc2626"  : "#d97706";
+  // ── observation text (all numbers in one place) ─────────────────────────
+  const observationLines = [
+    `SFOC has increased by +${sfocDev != null ? sfocDev.toFixed(1) : "N/A"}% from baseline.`,
+    `Baseline: ${sfocBase != null ? sfocBase.toFixed(1) : "N/A"} g/kWh  →  Actual: ${!isNaN(sfocActual) ? sfocActual.toFixed(1) : "N/A"} g/kWh.`,
+    extraFuelDay   != null ? `Extra fuel: ${extraFuelDay.toFixed(2)} t/day  |  ${extraFuelMonth.toFixed(1)} t/month.` : null,
+    costPerMonth   != null ? `Cost impact: $${costPerMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}/month @ $${bunkerPrice}/tonne bunker.` : null,
+    co2PerMonth    != null ? `CO\u2082 excess: ${co2PerMonth.toFixed(1)} t/month (HFO factor 3.114).` : null,
+    rootCausesFound.length > 0
+      ? `Linked root causes: ${rootCausesFound.join(", ")} — see Engine Health card above.`
+      : `SFOC is the efficiency result of the root causes listed in the Engine Health card above.`,
+  ].filter(Boolean).join("\n\n");
 
   return (
     <div style={{
-      marginBottom: "24px",
-      borderRadius: "14px",
-      overflow: "hidden",
-      border: `1.5px solid ${headerBorderColor}`,
-      backgroundColor: "#12100a",
+      marginBottom: "24px", borderRadius: "14px", overflow: "hidden",
+      border: "1.5px solid #1e293b", backgroundColor: "#0f172a",
       boxShadow: "0 4px 24px rgba(0,0,0,0.3)",
     }}>
 
-      {/* ── HEADER (matches OverallEngineHealthCard header) ─────────────── */}
+      {/* ── HEADER ─────────────────────────────────────────────────────── */}
       <div
         onClick={() => setIsExpanded(!isExpanded)}
         style={{
           backgroundColor: "#1e293b",
           borderBottom: isExpanded ? "1.5px solid #334155" : "none",
           padding: "14px 24px",
-          display: "flex",
-          flexDirection: "column",
-          cursor: "pointer",
-          userSelect: "none",
+          display: "flex", flexDirection: "column",
+          cursor: "pointer", userSelect: "none",
         }}
       >
-        {/* TOP ROW */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{
             margin: 0, color: "#f1f5f9", fontWeight: "800", fontSize: "1rem",
             display: "flex", alignItems: "center", gap: "10px",
           }}>
-             SFOC Analysis & Savings Impact
+            📊 SFOC Analysis & Savings Impact
 
-            {/* deviation badge */}
             <span style={{
               backgroundColor: `${badgeColor}22`, color: badgeColor,
               fontSize: "0.7rem", fontWeight: "700", padding: "2px 10px",
@@ -1394,16 +1306,12 @@ const SFOCInsightCard = ({ findings, report, baseline, analysisMode, verdicts = 
               {sfocDev != null ? `+${sfocDev.toFixed(1)}% from baseline` : "Elevated"}
             </span>
 
-            {/* PRIORITY badge */}
             <span style={{
               backgroundColor: "#ff8c0022", color: "#ff8c00",
               fontSize: "0.65rem", fontWeight: "800", padding: "2px 10px",
               borderRadius: "20px", border: "1px solid #ff8c0055", letterSpacing: "0.05em",
-            }}>
-              PRIORITY
-            </span>
+            }}>PRIORITY</span>
 
-            {/* ! summary button */}
             <button
               onClick={(e) => { e.stopPropagation(); setShowSummary(!showSummary); }}
               style={{
@@ -1413,10 +1321,8 @@ const SFOCInsightCard = ({ findings, report, baseline, analysisMode, verdicts = 
                 display: "flex", alignItems: "center", justifyContent: "center",
                 flexShrink: 0,
               }}
-              title="View SFOC Summary"
-            >
-              !
-            </button>
+              title="View SFOC summary"
+            >!</button>
           </h3>
 
           <span style={{
@@ -1427,7 +1333,7 @@ const SFOCInsightCard = ({ findings, report, baseline, analysisMode, verdicts = 
           }}>▼</span>
         </div>
 
-        {/* SUMMARY POPUP (opened by !) */}
+        {/* SUMMARY POPUP */}
         {showSummary && (
           <div
             onClick={(e) => e.stopPropagation()}
@@ -1440,24 +1346,23 @@ const SFOCInsightCard = ({ findings, report, baseline, analysisMode, verdicts = 
             <span style={{ fontSize: "0.65rem", fontWeight: "800", color: "#64748b", textTransform: "uppercase", marginRight: "4px" }}>
               SFOC Impact:
             </span>
-
             {[
-              { label: `+${sfocDev != null ? sfocDev.toFixed(1) : "?"}% deviation`, sev: severity },
-              { label: `${extraFuelMonth != null ? extraFuelMonth.toFixed(1) : "?"} t/month extra fuel`, sev: severity },
-              { label: costPerMonth != null ? `$${costPerMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}/month cost` : "Cost N/A", sev: severity },
-              { label: co2PerMonth  != null ? `${co2PerMonth.toFixed(1)} t CO₂/month` : "CO₂ N/A", sev: "warning" },
+              { label: `+${sfocDev != null ? sfocDev.toFixed(1) : "?"}% deviation` },
+              { label: `${extraFuelMonth != null ? extraFuelMonth.toFixed(1) : "?"} t/month extra fuel` },
+              { label: costPerMonth != null ? `$${costPerMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}/month cost` : "Cost N/A" },
+              { label: co2PerMonth  != null ? `${co2PerMonth.toFixed(1)} t CO\u2082/month` : "CO\u2082 N/A" },
             ].map((item, i) => (
               <span key={i} style={{
-                backgroundColor: item.sev === "critical" ? "#7f1d1d22" : "#78350f22",
-                border: `1px solid ${item.sev === "critical" ? "#dc262655" : "#d9770655"}`,
+                backgroundColor: isRed ? "#7f1d1d22" : "#78350f22",
+                border: `1px solid ${isRed ? "#dc262655" : "#d9770655"}`,
                 borderRadius: "20px", padding: "3px 10px",
                 fontSize: "0.72rem", fontWeight: "700",
-                color: item.sev === "critical" ? "#fca5a5" : "#fcd34d",
+                color: isRed ? "#fca5a5" : "#fcd34d",
                 display: "flex", alignItems: "center", gap: "5px",
               }}>
                 <span style={{
                   width: "6px", height: "6px", borderRadius: "50%",
-                  backgroundColor: item.sev === "critical" ? "#dc2626" : "#d97706",
+                  backgroundColor: isRed ? "#dc2626" : "#d97706",
                 }} />
                 {item.label}
               </span>
@@ -1472,7 +1377,7 @@ const SFOCInsightCard = ({ findings, report, baseline, analysisMode, verdicts = 
               </>
             )}
 
-            {/* inline bunker price editor inside summary */}
+            {/* bunker price editor */}
             <div style={{
               marginLeft: "auto", display: "flex", alignItems: "center", gap: "6px",
               borderLeft: "1px solid #334155", paddingLeft: "12px",
@@ -1481,8 +1386,7 @@ const SFOCInsightCard = ({ findings, report, baseline, analysisMode, verdicts = 
               {editingPrice ? (
                 <>
                   <input
-                    type="number"
-                    value={priceInput}
+                    type="number" value={priceInput}
                     onChange={(e) => setPriceInput(e.target.value)}
                     onClick={(e) => e.stopPropagation()}
                     style={{
@@ -1532,174 +1436,142 @@ const SFOCInsightCard = ({ findings, report, baseline, analysisMode, verdicts = 
         )}
       </div>
 
-      {/* ── TILE GRID + DETAIL PANEL (mirrors OverallEngineHealthCard) ─── */}
+      {/* ── BODY ───────────────────────────────────────────────────────── */}
       {isExpanded && (
         <div style={{ padding: "20px 24px" }}>
 
-          {/* TILE GRID */}
+          {/* SINGLE TILE */}
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
             gap: "10px",
-            marginBottom: selectedItem ? "16px" : "0",
+            marginBottom: tileSelected ? "16px" : "0",
             alignItems: "start",
           }}>
-            {tiles.map((tile, idx) => {
-              const c         = getTileColors(tile.severity);
-              const isSelected = selectedIdx === idx;
+            <div
+              onClick={() => setTileSelected(!tileSelected)}
+              style={{
+                backgroundColor: c.bg,
+                border: `1.5px solid ${tileSelected ? "#ffffff44" : c.border}`,
+                borderRadius: "10px", padding: "12px", cursor: "pointer",
+                userSelect: "none", position: "relative",
+                height: "130px", boxSizing: "border-box",
+                display: "flex", flexDirection: "column", justifyContent: "space-between",
+                outline: tileSelected ? `2px solid ${c.border}` : "none",
+                outlineOffset: "2px", transition: "all 0.15s ease",
+                boxShadow: tileSelected ? `0 0 0 2px ${c.border}` : "none",
+                overflow: "hidden",
+              }}
+              onMouseEnter={(e) => { if (!tileSelected) e.currentTarget.style.filter = "brightness(1.2)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.filter = "brightness(1)"; }}
+            >
+              <div style={{
+                position: "absolute", top: "8px", right: "8px",
+                backgroundColor: c.badgeBg, color: c.badgeText,
+                fontSize: "0.5rem", fontWeight: "700", padding: "2px 6px",
+                borderRadius: "4px", textTransform: "uppercase",
+              }}>{c.badgeLabel}</div>
 
-              return (
-                <div
-                  key={idx}
-                  onClick={() => setSelectedIdx(isSelected ? null : idx)}
-                  style={{
-                    backgroundColor: c.bg,
-                    border: `1.5px solid ${isSelected ? "#ffffff44" : c.border}`,
-                    borderRadius: "10px",
-                    padding: "12px",
-                    cursor: "pointer",
-                    userSelect: "none",
-                    position: "relative",
-                    height: "130px",
-                    boxSizing: "border-box",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    outline: isSelected ? `2px solid ${c.border}` : "none",
-                    outlineOffset: "2px",
-                    transition: "all 0.15s ease",
-                    boxShadow: isSelected ? `0 0 0 2px ${c.border}` : "none",
-                    overflow: "hidden",
-                  }}
-                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.filter = "brightness(1.2)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.filter = "brightness(1)"; }}
-                >
-                  {/* severity badge */}
-                  <div style={{
-                    position: "absolute", top: "8px", right: "8px",
-                    backgroundColor: c.badgeBg, color: c.badgeText,
-                    fontSize: "0.5rem", fontWeight: "700", padding: "2px 6px",
-                    borderRadius: "4px", textTransform: "uppercase",
-                  }}>
-                    {c.badgeLabel}
-                  </div>
+              <div style={{
+                color: c.titleColor, fontWeight: "800", fontSize: "0.85rem",
+                lineHeight: "1.3", paddingRight: "60px", marginTop: "4px",
+                overflow: "hidden", display: "-webkit-box",
+                WebkitLineClamp: 3, WebkitBoxOrient: "vertical",
+              }}>SFOC Elevated</div>
 
-                  {/* title */}
-                  <div style={{
-                    color: c.titleColor, fontWeight: "800", fontSize: "0.85rem",
-                    lineHeight: "1.3", paddingRight: "60px", marginTop: "4px",
-                    overflow: "hidden", display: "-webkit-box",
-                    WebkitLineClamp: 3, WebkitBoxOrient: "vertical",
-                  }}>
-                    {tile.parameter}
-                  </div>
-
-                  {/* evidence chips */}
-                  {tile.evidence && tile.evidence.length > 1 && !isSelected && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginTop: "4px" }}>
-                      {tile.evidence.slice(0, 3).map((ev, i) => (
-                        <span key={i} style={{
-                          fontSize: "0.5rem", fontWeight: "700",
-                          backgroundColor: `${c.border}55`, color: c.subColor,
-                          padding: "1px 5px", borderRadius: "3px",
-                        }}>
-                          {ev}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* view / hide label */}
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: "4px",
-                    color: c.subColor, fontSize: "0.65rem", fontWeight: "700", marginTop: "8px",
-                  }}>
-                    <span style={{
-                      transition: "transform 0.2s",
-                      transform: isSelected ? "rotate(90deg)" : "rotate(0deg)",
-                      display: "inline-block",
-                    }}>▶</span>
-                    {isSelected ? "Hide details" : "View details"}
-                  </div>
+              {!tileSelected && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginTop: "4px" }}>
+                  {["SFOC", ...(rootCausesFound.length > 0 ? rootCausesFound.slice(0, 2) : [])].map((ev, i) => (
+                    <span key={i} style={{
+                      fontSize: "0.5rem", fontWeight: "700",
+                      backgroundColor: `${c.border}55`, color: c.subColor,
+                      padding: "1px 5px", borderRadius: "3px",
+                    }}>{ev}</span>
+                  ))}
                 </div>
-              );
-            })}
+              )}
+
+              <div style={{
+                display: "flex", alignItems: "center", gap: "4px",
+                color: c.subColor, fontSize: "0.65rem", fontWeight: "700", marginTop: "8px",
+              }}>
+                <span style={{
+                  transition: "transform 0.2s",
+                  transform: tileSelected ? "rotate(90deg)" : "rotate(0deg)",
+                  display: "inline-block",
+                }}>▶</span>
+                {tileSelected ? "Hide details" : "View details"}
+              </div>
+            </div>
           </div>
 
-          {/* DETAIL PANEL (same 3-column layout as OverallEngineHealthCard) */}
-          {selectedItem && (() => {
-            const c = getTileColors(selectedItem.severity);
-            return (
-              <div ref={detailPanelRef} style={{
-                border: `1.5px solid ${c.border}`, borderRadius: "10px",
-                overflow: "hidden", backgroundColor: c.bg,
+          {/* DETAIL PANEL */}
+          {tileSelected && (
+            <div ref={detailPanelRef} style={{
+              border: `1.5px solid ${c.border}`, borderRadius: "10px",
+              overflow: "hidden", backgroundColor: c.bg,
+            }}>
+              <div style={{
+                padding: "12px 20px", backgroundColor: "#0d0d1a",
+                borderBottom: `1px solid ${c.border}44`,
+                display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center",
               }}>
-                {/* detail header */}
-                <div style={{
-                  padding: "12px 20px", backgroundColor: "#0d0d1a",
-                  borderBottom: `1px solid ${c.border}44`,
-                  display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center",
-                }}>
-                  <span style={{ color: c.titleColor, fontWeight: "800", fontSize: "0.9rem" }}>
-                    {selectedItem.parameter}
-                  </span>
-                  <span style={{
-                    color: c.subColor, fontSize: "0.7rem", fontWeight: "700",
-                    textTransform: "uppercase", opacity: 0.85, textAlign: "center",
-                  }}>
-                    {selectedItem.comparedAgainst ? `vs ${selectedItem.comparedAgainst}` : ""}
-                  </span>
-                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                    <button
-                      onClick={() => setSelectedIdx(null)}
-                      style={{ background: "none", border: "none", color: c.subColor, cursor: "pointer", fontSize: "1rem", lineHeight: 1 }}
-                    >✕</button>
-                  </div>
-                </div>
-
-                {/* 3-column body */}
-                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr" }}>
-                  {/* sub-headers */}
-                  <div style={{
-                    gridColumn: "1 / -1",
-                    display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr",
-                    backgroundColor: "#0d0d1a", borderBottom: `1px solid ${c.border}44`,
-                  }}>
-                    {["Observation", "Possible Causes", "Diagnosis & Remedy"].map((h, i) => (
-                      <div key={h} style={{
-                        padding: "8px 16px", fontSize: "0.65rem", fontWeight: "800",
-                        color: c.subColor, textTransform: "uppercase", letterSpacing: "0.08em",
-                        borderLeft: i > 0 ? `1px solid ${c.border}44` : "none",
-                      }}>{h}</div>
-                    ))}
-                  </div>
-
-                  {/* Observation */}
-                  <div style={{ padding: "16px", fontSize: "0.85rem", fontWeight: "600", color: c.titleColor, lineHeight: "1.5" }}>
-                    {selectedItem.finding}
-                  </div>
-
-                  {/* Possible Causes */}
-                  <div style={{ padding: "16px", borderLeft: `1px solid ${c.border}44` }}>
-                    <ul style={{ margin: 0, paddingLeft: "14px", color: c.subColor, fontSize: "0.82rem", fontWeight: "500", lineHeight: "1.7" }}>
-                      {selectedItem.causes.map((cause, i) => <li key={i}>{cause}</li>)}
-                    </ul>
-                  </div>
-
-                  {/* Diagnosis & Remedy */}
-                  <div style={{ padding: "16px", borderLeft: `1px solid ${c.border}44`, backgroundColor: "#0f1e2a" }}>
-                    <ul style={{ margin: 0, paddingLeft: "14px", color: "#a8d8f0", fontSize: "0.82rem", fontWeight: "600", lineHeight: "1.7" }}>
-                      {selectedItem.remedy
-                        .split(".")
-                        .map(s => s.trim())
-                        .filter(s => s.length > 0)
-                        .map((point, i) => <li key={i}>{point}.</li>)}
-                    </ul>
-                  </div>
+                <span style={{ color: c.titleColor, fontWeight: "800", fontSize: "0.9rem" }}>
+                  SFOC Elevated
+                </span>
+                <span style={{
+                  color: c.subColor, fontSize: "0.7rem", fontWeight: "700",
+                  textTransform: "uppercase", opacity: 0.85, textAlign: "center",
+                }}>vs Shop Trial</span>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button
+                    onClick={() => setTileSelected(false)}
+                    style={{ background: "none", border: "none", color: c.subColor, cursor: "pointer", fontSize: "1rem", lineHeight: 1 }}
+                  >✕</button>
                 </div>
               </div>
-            );
-          })()}
+
+              <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr" }}>
+                <div style={{
+                  gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr",
+                  backgroundColor: "#0d0d1a", borderBottom: `1px solid ${c.border}44`,
+                }}>
+                  {["Observation", "Possible Causes", "Diagnosis & Remedy"].map((h, i) => (
+                    <div key={h} style={{
+                      padding: "8px 16px", fontSize: "0.65rem", fontWeight: "800",
+                      color: c.subColor, textTransform: "uppercase", letterSpacing: "0.08em",
+                      borderLeft: i > 0 ? `1px solid ${c.border}44` : "none",
+                    }}>{h}</div>
+                  ))}
+                </div>
+
+                {/* Observation */}
+                <div style={{ padding: "16px", fontSize: "0.85rem", fontWeight: "600", color: c.titleColor, lineHeight: "1.6" }}>
+                  {observationLines.split("\n\n").map((line, i) => (
+                    <p key={i} style={{ margin: i === 0 ? "0 0 10px 0" : "0 0 8px 0" }}>{line}</p>
+                  ))}
+                </div>
+
+                {/* Possible Causes */}
+                <div style={{ padding: "16px", borderLeft: `1px solid ${c.border}44` }}>
+                  <ul style={{ margin: 0, paddingLeft: "14px", color: c.subColor, fontSize: "0.82rem", fontWeight: "500", lineHeight: "1.7" }}>
+                    {sfocFinding.causes.map((cause, i) => <li key={i}>{cause}</li>)}
+                  </ul>
+                </div>
+
+                {/* Diagnosis & Remedy */}
+                <div style={{ padding: "16px", borderLeft: `1px solid ${c.border}44`, backgroundColor: "#0f1e2a" }}>
+                  <ul style={{ margin: 0, paddingLeft: "14px", color: "#a8d8f0", fontSize: "0.82rem", fontWeight: "600", lineHeight: "1.7" }}>
+                    {sfocFinding.remedy
+                      .split(".")
+                      .map(s => s.trim())
+                      .filter(s => s.length > 0)
+                      .map((point, i) => <li key={i}>{point}.</li>)}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
