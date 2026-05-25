@@ -1187,15 +1187,41 @@ const OverallEngineHealthCard = ({ findings, report, summary }) => {
 };
 
 // ── SFOCInsightCard ───────────────────────────────────────────────────────
+// ── SFOCInsightCard ───────────────────────────────────────────────────────
+// Matches the OverallEngineHealthCard tile pattern exactly.
+// - Header with collapse chevron + "!" summary button
+// - Tile grid (one tile per SFOC metric / linked finding)
+// - Click tile → 3-column detail panel (Observation | Possible Causes | Diagnosis & Remedy)
+// - "!" icon opens a small summary popup in the header (same as OverallEngineHealthCard)
+
 const SFOCInsightCard = ({ findings, report, baseline, analysisMode, verdicts = [] }) => {
-  const [isExpanded, setIsExpanded]   = useState(true);
-  const [bunkerPrice, setBunkerPrice] = useState(600);
-  const [editingPrice, setEditingPrice] = useState(false);
-  const [priceInput, setPriceInput]   = useState("600");
+  const [isExpanded, setIsExpanded]       = useState(true);
+  const [selectedIdx, setSelectedIdx]     = useState(null);
+  const [showSummary, setShowSummary]     = useState(false);
+  const [bunkerPrice, setBunkerPrice]     = useState(600);
+  const [editingPrice, setEditingPrice]   = useState(false);
+  const [priceInput, setPriceInput]       = useState("600");
+  const detailPanelRef                    = useRef(null);
+
+  // ── scroll detail panel into view when opened ──────────────────────────
+  useEffect(() => {
+    if (selectedIdx !== null && detailPanelRef.current) {
+      setTimeout(() => {
+        const el  = detailPanelRef.current;
+        const rect = el.getBoundingClientRect();
+        const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+        if (!isVisible) {
+          window.scrollTo({ top: window.scrollY + rect.top - window.innerHeight * 0.4, behavior: "smooth" });
+        }
+      }, 100);
+    }
+  }, [selectedIdx]);
 
   if (!findings || findings.length === 0) return null;
 
   const sfocFinding = findings[0];
+
+  // ── numeric helpers ────────────────────────────────────────────────────
   const isME   = analysisMode === "mainEngine";
   const xAxis  = isME ? "load" : "load_percentage";
   const load   = isME ? report?.load : report?.load_percentage;
@@ -1206,176 +1232,474 @@ const SFOCInsightCard = ({ findings, report, baseline, analysisMode, verdicts = 
     ? ((sfocActual - sfocBase) / sfocBase) * 100
     : null;
 
-  const powerKW = report?.shaft_power_kw || report?.effective_power_kw || 0;
-
-  const extraSFOC = sfocBase != null && sfocActual != null && !isNaN(sfocActual)
-    ? sfocActual - sfocBase
-    : null;
-  const extraFuelPerDay   = extraSFOC != null && powerKW ? (extraSFOC * powerKW * 24) / 1_000_000 : null;
-  const extraFuelPerMonth = extraFuelPerDay != null ? extraFuelPerDay * 30 : null;
-  const costPerMonth      = extraFuelPerMonth != null ? extraFuelPerMonth * bunkerPrice : null;
-  const co2PerMonth       = extraFuelPerMonth != null ? extraFuelPerMonth * 3.114 : null;
+  const powerKW        = report?.shaft_power_kw || report?.effective_power_kw || 0;
+  const extraSFOC      = sfocBase != null && sfocActual != null && !isNaN(sfocActual) ? sfocActual - sfocBase : null;
+  const extraFuelDay   = extraSFOC != null && powerKW ? (extraSFOC * powerKW * 24) / 1_000_000 : null;
+  const extraFuelMonth = extraFuelDay  != null ? extraFuelDay  * 30   : null;
+  const costPerMonth   = extraFuelMonth != null ? extraFuelMonth * bunkerPrice : null;
+  const co2PerMonth    = extraFuelMonth != null ? extraFuelMonth * 3.114 : null;
 
   const isRed   = sfocDev != null && sfocDev > 10;
   const isAmber = sfocDev != null && sfocDev > 5 && sfocDev <= 10;
-  const headerBg    = isRed ? "#1a0800" : "#1a1200";
-  const accentColor = isRed ? "#fb923c" : "#fbbf24";
-  const borderColor = isRed ? "#7c2d12" : "#78350f";
-  const badgeColor  = isRed ? "#dc2626" : "#d97706";
+  const severity = isRed ? "critical" : "warning";
 
-  // Use pattern codes to identify linked root causes (not string matching)
+  // ── colours (mirrors OverallEngineHealthCard getTileColors) ───────────
+  const getTileColors = (sev) => {
+    if (sev === "critical") return {
+      bg: "#1a0a0a", border: "#7f1d1d", titleColor: "#fecaca",
+      subColor: "#f87171", badgeBg: "#7f1d1d", badgeText: "#ffd0d0", badgeLabel: "CRITICAL",
+    };
+    return {
+      bg: "#1a1400", border: "#713f12", titleColor: "#fef08a",
+      subColor: "#fbbf24", badgeBg: "#713f12", badgeText: "#fef08a", badgeLabel: "WARNING",
+    };
+  };
+
+  // ── linked root-cause tags (pattern-code based) ────────────────────────
   const activePatterns = verdicts.map(v => v.pattern);
-const rootCausesFound = [];
-if (activePatterns.includes("TC_FOULING"))          rootCausesFound.push("TC Fouling");
-if (activePatterns.includes("COMPRESSION_LOSS"))    rootCausesFound.push("Compression Loss");
-if (activePatterns.includes("RETARDED_INJECTION"))  rootCausesFound.push("Retarded Injection");
-if (activePatterns.includes("EARLY_INJECTION"))     rootCausesFound.push("Early Injection");
-if (activePatterns.includes("HULL_FOULING"))        rootCausesFound.push("Hull Fouling");
-if (activePatterns.includes("FUEL_SYSTEM_WEAR"))    rootCausesFound.push("Fuel System Wear");
-if (activePatterns.includes("SCAV_LOW"))            rootCausesFound.push("Air Deficiency");
-if (activePatterns.includes("TURBO_LOW"))           rootCausesFound.push("TC Speed Low");
-if (activePatterns.includes("EXH_TC_IN_HIGH"))      rootCausesFound.push("Late Combustion");
-if (activePatterns.includes("EXH_CYL_OUT_HIGH"))    rootCausesFound.push("Cylinder Exhaust High");
+  const rootCausesFound = [];
+  if (activePatterns.includes("TC_FOULING"))         rootCausesFound.push("TC Fouling");
+  if (activePatterns.includes("COMPRESSION_LOSS"))   rootCausesFound.push("Compression Loss");
+  if (activePatterns.includes("RETARDED_INJECTION")) rootCausesFound.push("Retarded Injection");
+  if (activePatterns.includes("EARLY_INJECTION"))    rootCausesFound.push("Early Injection");
+  if (activePatterns.includes("HULL_FOULING"))       rootCausesFound.push("Hull Fouling");
+  if (activePatterns.includes("FUEL_SYSTEM_WEAR"))   rootCausesFound.push("Fuel System Wear");
+  if (activePatterns.includes("SCAV_LOW"))           rootCausesFound.push("Air Deficiency");
+  if (activePatterns.includes("TURBO_LOW"))          rootCausesFound.push("TC Speed Low");
+  if (activePatterns.includes("EXH_TC_IN_HIGH"))     rootCausesFound.push("Late Combustion");
+  if (activePatterns.includes("EXH_CYL_OUT_HIGH"))   rootCausesFound.push("Cylinder Exhaust High");
 
-  const savingsMetrics = [
-    { label: "Extra Fuel / Day",   value: extraFuelPerDay   != null ? `${extraFuelPerDay.toFixed(2)} t`   : "N/A", sub: "vs shop trial baseline",          icon: "", color: accentColor },
-    { label: "Extra Fuel / Month", value: extraFuelPerMonth != null ? `${extraFuelPerMonth.toFixed(1)} t` : "N/A", sub: "recoverable if SFOC restored",     icon: "", color: accentColor },
-    { label: "Cost Impact / Month",value: costPerMonth      != null ? `$${costPerMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "N/A", sub: `@ $${bunkerPrice}/tonne bunker`, icon: "", color: isRed ? "#f87171" : "#fcd34d" },
-    { label: "CO₂ Excess / Month", value: co2PerMonth       != null ? `${co2PerMonth.toFixed(1)} t`       : "N/A", sub: "HFO emission factor 3.114",         icon: "", color: "#86efac" },
+  // ── build tiles ────────────────────────────────────────────────────────
+  // Tile 0 – SFOC Deviation overview
+  // Tile 1 – Cost & Fuel Impact
+  // Tile 2 – CO₂ Impact
+  // Tile 3 – Linked Root Causes  (only if any exist)
+  const tiles = [
+    {
+      parameter: "SFOC Deviation",
+      severity,
+      evidence: ["SFOC"],
+      comparedAgainst: "Shop Trial",
+      finding:
+        `SFOC has increased by +${sfocDev != null ? sfocDev.toFixed(1) : "N/A"}% from baseline. ` +
+        `Baseline: ${sfocBase != null ? sfocBase.toFixed(1) : "N/A"} g/kWh, ` +
+        `Actual: ${!isNaN(sfocActual) ? sfocActual.toFixed(1) : "N/A"} g/kWh. ` +
+        `SFOC is the overall efficiency result — it is a consequence of the root causes, not a root cause in itself.`,
+      causes: sfocFinding.causes,
+      remedy: sfocFinding.remedy,
+    },
+    {
+      parameter: "Fuel & Cost Impact",
+      severity,
+      evidence: ["Extra Fuel", "Cost"],
+      comparedAgainst: `$${bunkerPrice}/tonne`,
+      finding:
+        `Extra fuel burned per day: ${extraFuelDay  != null ? extraFuelDay.toFixed(2)  : "N/A"} t. ` +
+        `Per month: ${extraFuelMonth != null ? extraFuelMonth.toFixed(1) : "N/A"} t recoverable if SFOC is restored. ` +
+        `Monthly cost impact at $${bunkerPrice}/tonne: ${costPerMonth != null ? "$" + costPerMonth.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "N/A"}.`,
+      causes: [
+        "TC fouling causing air starvation and incomplete combustion",
+        "Retarded injection timing releasing energy late into exhaust stroke",
+        "Worn fuel pumps or injectors wasting fuel delivery",
+        "Low LCV fuel oil requiring more mass to achieve same energy",
+        "Hull or propeller fouling making engine work harder",
+      ],
+      remedy:
+        `Update bunker price to reflect actual cost. ` +
+        `Address root-cause findings above to recover the ${extraFuelMonth != null ? extraFuelMonth.toFixed(1) : "N/A"} t/month loss. ` +
+        `Check fuel oil calorific value from BDN.`,
+    },
+    {
+      parameter: "CO₂ Excess / Month",
+      severity: isRed ? "critical" : "warning",
+      evidence: ["CO₂", "Emissions"],
+      comparedAgainst: "HFO factor 3.114",
+      finding:
+        `Excess CO₂ from elevated SFOC: ${co2PerMonth != null ? co2PerMonth.toFixed(1) : "N/A"} t/month ` +
+        `(HFO emission factor 3.114 kg CO₂/kg fuel). ` +
+        `Resolving the root-cause faults will eliminate this excess emission.`,
+      causes: [
+        "Any combustion or fuel-delivery fault raises SFOC, which directly raises CO₂",
+        "Hull / propeller fouling increases fuel burn per mile",
+      ],
+      remedy:
+        "Fix SFOC root causes to recover CO₂. " +
+        "Document excess in CII / DCS logs for flag-state reporting.",
+    },
   ];
 
+  // add linked-root-causes tile only when data exists
+  if (rootCausesFound.length > 0) {
+    tiles.push({
+      parameter: "Linked Root Causes",
+      severity,
+      evidence: rootCausesFound,
+      comparedAgainst: "Engine Health Card",
+      finding:
+        `The SFOC elevation is linked to ${rootCausesFound.length} root-cause finding(s) detected in the Engine Health card: ` +
+        rootCausesFound.join(", ") + `. ` +
+        `Resolving these faults will restore SFOC to baseline.`,
+      causes: rootCausesFound.map(rc => `${rc} — see Engine Health card for detail`),
+      remedy:
+        "Address each linked root cause listed in the Overall Engine Health card above. " +
+        "Re-upload report after corrective action to verify SFOC recovery.",
+    });
+  }
+
+  const selectedItem = selectedIdx !== null ? tiles[selectedIdx] : null;
+
+  // ── header colours ─────────────────────────────────────────────────────
+  const headerBorderColor = isRed ? "#7c2d12" : "#78350f";
+  const headerBg          = isRed ? "#1a0800"  : "#1a1200";
+  const accentColor       = isRed ? "#fb923c"  : "#fbbf24";
+  const badgeColor        = isRed ? "#dc2626"  : "#d97706";
+
   return (
-    <div style={{ marginBottom: "24px", borderRadius: "14px", overflow: "hidden", border: `1.5px solid ${borderColor}`, backgroundColor: "#12100a", boxShadow: "0 4px 24px rgba(0,0,0,0.3)" }}>
+    <div style={{
+      marginBottom: "24px",
+      borderRadius: "14px",
+      overflow: "hidden",
+      border: `1.5px solid ${headerBorderColor}`,
+      backgroundColor: "#12100a",
+      boxShadow: "0 4px 24px rgba(0,0,0,0.3)",
+    }}>
+
+      {/* ── HEADER (matches OverallEngineHealthCard header) ─────────────── */}
       <div
         onClick={() => setIsExpanded(!isExpanded)}
-        style={{ backgroundColor: headerBg, borderBottom: isExpanded ? `1.5px solid ${borderColor}` : "none", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }}
+        style={{
+          backgroundColor: "#1e293b",
+          borderBottom: isExpanded ? "1.5px solid #334155" : "none",
+          padding: "14px 24px",
+          display: "flex",
+          flexDirection: "column",
+          cursor: "pointer",
+          userSelect: "none",
+        }}
       >
-        <h3 style={{ margin: 0, color: "#fff7ed", fontWeight: "800", fontSize: "1rem", display: "flex", alignItems: "center", gap: "10px" }}>
-           SFOC Analysis & Savings Impact
-          <span style={{ backgroundColor: `${badgeColor}22`, color: badgeColor, fontSize: "0.7rem", fontWeight: "700", padding: "2px 10px", borderRadius: "20px", border: `1px solid ${badgeColor}55` }}>
-            {sfocDev != null ? `+${sfocDev.toFixed(1)}% from baseline` : "Elevated"}
-          </span>
-          <span style={{ backgroundColor: "#ff8c0022", color: "#ff8c00", fontSize: "0.65rem", fontWeight: "800", padding: "2px 10px", borderRadius: "20px", border: "1px solid #ff8c0055", letterSpacing: "0.05em" }}>
-            PRIORITY
-          </span>
-        </h3>
-        <span style={{ fontSize: "1.1rem", color: accentColor, transition: "transform 0.3s ease", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", display: "inline-block" }}>▼</span>
+        {/* TOP ROW */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{
+            margin: 0, color: "#f1f5f9", fontWeight: "800", fontSize: "1rem",
+            display: "flex", alignItems: "center", gap: "10px",
+          }}>
+             SFOC Analysis & Savings Impact
+
+            {/* deviation badge */}
+            <span style={{
+              backgroundColor: `${badgeColor}22`, color: badgeColor,
+              fontSize: "0.7rem", fontWeight: "700", padding: "2px 10px",
+              borderRadius: "20px", border: `1px solid ${badgeColor}55`,
+            }}>
+              {sfocDev != null ? `+${sfocDev.toFixed(1)}% from baseline` : "Elevated"}
+            </span>
+
+            {/* PRIORITY badge */}
+            <span style={{
+              backgroundColor: "#ff8c0022", color: "#ff8c00",
+              fontSize: "0.65rem", fontWeight: "800", padding: "2px 10px",
+              borderRadius: "20px", border: "1px solid #ff8c0055", letterSpacing: "0.05em",
+            }}>
+              PRIORITY
+            </span>
+
+            {/* ! summary button */}
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowSummary(!showSummary); }}
+              style={{
+                width: "20px", height: "20px", borderRadius: "50%",
+                backgroundColor: "#f59e0b", border: "none", color: "#000",
+                fontWeight: "900", fontSize: "0.75rem", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
+              }}
+              title="View SFOC Summary"
+            >
+              !
+            </button>
+          </h3>
+
+          <span style={{
+            fontSize: "1.1rem", color: "#94a3b8",
+            transition: "transform 0.3s ease",
+            transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+            display: "inline-block",
+          }}>▼</span>
+        </div>
+
+        {/* SUMMARY POPUP (opened by !) */}
+        {showSummary && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              marginTop: "10px", padding: "12px 16px", borderRadius: "8px",
+              backgroundColor: "#0f172a", border: "1px solid #334155",
+              display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center",
+            }}
+          >
+            <span style={{ fontSize: "0.65rem", fontWeight: "800", color: "#64748b", textTransform: "uppercase", marginRight: "4px" }}>
+              SFOC Impact:
+            </span>
+
+            {[
+              { label: `+${sfocDev != null ? sfocDev.toFixed(1) : "?"}% deviation`, sev: severity },
+              { label: `${extraFuelMonth != null ? extraFuelMonth.toFixed(1) : "?"} t/month extra fuel`, sev: severity },
+              { label: costPerMonth != null ? `$${costPerMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}/month cost` : "Cost N/A", sev: severity },
+              { label: co2PerMonth  != null ? `${co2PerMonth.toFixed(1)} t CO₂/month` : "CO₂ N/A", sev: "warning" },
+            ].map((item, i) => (
+              <span key={i} style={{
+                backgroundColor: item.sev === "critical" ? "#7f1d1d22" : "#78350f22",
+                border: `1px solid ${item.sev === "critical" ? "#dc262655" : "#d9770655"}`,
+                borderRadius: "20px", padding: "3px 10px",
+                fontSize: "0.72rem", fontWeight: "700",
+                color: item.sev === "critical" ? "#fca5a5" : "#fcd34d",
+                display: "flex", alignItems: "center", gap: "5px",
+              }}>
+                <span style={{
+                  width: "6px", height: "6px", borderRadius: "50%",
+                  backgroundColor: item.sev === "critical" ? "#dc2626" : "#d97706",
+                }} />
+                {item.label}
+              </span>
+            ))}
+
+            {rootCausesFound.length > 0 && (
+              <>
+                <span style={{ color: "#475569", fontSize: "0.9rem" }}>→</span>
+                <span style={{ fontSize: "0.65rem", color: "#64748b", fontWeight: "600" }}>
+                  {rootCausesFound.length} root cause{rootCausesFound.length > 1 ? "s" : ""} linked
+                </span>
+              </>
+            )}
+
+            {/* inline bunker price editor inside summary */}
+            <div style={{
+              marginLeft: "auto", display: "flex", alignItems: "center", gap: "6px",
+              borderLeft: "1px solid #334155", paddingLeft: "12px",
+            }}>
+              <span style={{ fontSize: "0.65rem", color: "#64748b", fontWeight: "700" }}>Bunker:</span>
+              {editingPrice ? (
+                <>
+                  <input
+                    type="number"
+                    value={priceInput}
+                    onChange={(e) => setPriceInput(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      width: "70px", padding: "3px 7px", borderRadius: "6px",
+                      border: "1px solid #16a34a", backgroundColor: "#0f2a14",
+                      color: "#86efac", fontSize: "0.82rem", fontWeight: "700", outline: "none",
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const v = Number(priceInput);
+                        if (v > 0) { setBunkerPrice(v); setPriceInput(String(v)); }
+                        setEditingPrice(false);
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const v = Number(priceInput);
+                      if (v > 0) { setBunkerPrice(v); setPriceInput(String(v)); }
+                      setEditingPrice(false);
+                    }}
+                    style={{
+                      padding: "3px 8px", borderRadius: "5px", border: "none",
+                      backgroundColor: "#16a34a", color: "white",
+                      fontSize: "0.65rem", fontWeight: "700", cursor: "pointer",
+                    }}
+                  >OK</button>
+                </>
+              ) : (
+                <>
+                  <span style={{ fontSize: "0.8rem", fontWeight: "800", color: "#86efac" }}>
+                    ${bunkerPrice.toLocaleString()}
+                  </span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setEditingPrice(true); }}
+                    style={{
+                      padding: "2px 7px", borderRadius: "4px",
+                      border: "1px solid #16a34a55", backgroundColor: "transparent",
+                      color: "#4ade80", fontSize: "0.6rem", fontWeight: "700", cursor: "pointer",
+                    }}
+                  >Edit</button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* ── TILE GRID + DETAIL PANEL (mirrors OverallEngineHealthCard) ─── */}
       {isExpanded && (
-        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-            {/* SFOC Status */}
-            <div style={{ backgroundColor: "#1a1200", borderRadius: "10px", border: `1px solid ${borderColor}`, padding: "16px" }}>
-              <div style={{ fontSize: "0.65rem", fontWeight: "800", color: "#92400e", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.08em" }}>SFOC Status</div>
-              <div style={{ display: "flex", gap: "24px", alignItems: "center", marginBottom: "10px" }}>
-                <div>
-                  <div style={{ fontSize: "0.65rem", color: "#78716c", marginBottom: "2px" }}>Baseline (Shop)</div>
-                  <div style={{ fontSize: "1.1rem", fontWeight: "800", color: "#d6d3d1" }}>
-                    {sfocBase != null ? `${sfocBase.toFixed(1)}` : "N/A"}
-                    <span style={{ fontSize: "0.7rem", color: "#78716c", marginLeft: "3px" }}>g/kWh</span>
-                  </div>
-                </div>
-                <div style={{ fontSize: "1.4rem", color: "#78716c" }}>→</div>
-                <div>
-                  <div style={{ fontSize: "0.65rem", color: "#78716c", marginBottom: "2px" }}>Actual</div>
-                  <div style={{ fontSize: "1.1rem", fontWeight: "800", color: accentColor }}>
-                    {sfocActual ? `${sfocActual.toFixed(1)}` : "N/A"}
-                    <span style={{ fontSize: "0.7rem", color: "#78716c", marginLeft: "3px" }}>g/kWh</span>
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: "0.65rem", color: "#78716c", marginBottom: "2px" }}>Deviation</div>
-                  <div style={{ fontSize: "1.1rem", fontWeight: "800", color: isRed ? "#f87171" : "#fcd34d" }}>
-                    {sfocDev != null ? `+${sfocDev.toFixed(1)}%` : "N/A"}
-                  </div>
-                </div>
-              </div>
-              <div style={{ fontSize: "0.8rem", color: "#a8a29e", lineHeight: "1.6" }}>
-                {sfocFinding.finding?.split(".")[0]}.
-              </div>
-            </div>
+        <div style={{ padding: "20px 24px" }}>
 
-            {/* Linked Root Causes */}
-            <div style={{ backgroundColor: "#0f1a10", borderRadius: "10px", border: "1px solid #14532d", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-              <div style={{ fontSize: "0.65rem", fontWeight: "800", color: "#15803d", textTransform: "uppercase", letterSpacing: "0.08em" }}>Linked Root Causes</div>
-              {rootCausesFound.length > 0 ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                  {rootCausesFound.map((rc, i) => (
-                    <span key={i} style={{ backgroundColor: "#14532d44", color: "#86efac", fontSize: "0.72rem", fontWeight: "700", padding: "3px 10px", borderRadius: "20px", border: "1px solid #16a34a55" }}>
-                      ↑ {rc}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ fontSize: "0.8rem", color: "#6b7280" }}>See Overall Engine Health card above for root causes.</div>
-              )}
-              <div style={{ marginTop: "auto", borderTop: "1px solid #14532d33", paddingTop: "10px" }}>
-                <div style={{ fontSize: "0.65rem", fontWeight: "800", color: "#15803d", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>
-                  Bunker Price (USD/tonne)
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  {editingPrice ? (
-                    <>
-                      <input
-                        type="number"
-                        value={priceInput}
-                        onChange={(e) => setPriceInput(e.target.value)}
-                        style={{ width: "80px", padding: "4px 8px", borderRadius: "6px", border: "1px solid #16a34a", backgroundColor: "#0f2a14", color: "#86efac", fontSize: "0.85rem", fontWeight: "700", outline: "none" }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            const v = Number(priceInput);
-                            if (v > 0) { setBunkerPrice(v); setPriceInput(String(v)); }
-                            setEditingPrice(false);
-                          }
-                        }}
-                      />
-                      <button
-                        onClick={() => { const v = Number(priceInput); if (v > 0) { setBunkerPrice(v); setPriceInput(String(v)); } setEditingPrice(false); }}
-                        style={{ padding: "4px 10px", borderRadius: "6px", border: "none", backgroundColor: "#16a34a", color: "white", fontSize: "0.72rem", fontWeight: "700", cursor: "pointer" }}
-                      >
-                        Apply
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span style={{ fontSize: "1rem", fontWeight: "800", color: "#86efac" }}>${bunkerPrice.toLocaleString()}</span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setEditingPrice(true); }}
-                        style={{ padding: "3px 8px", borderRadius: "5px", border: "1px solid #16a34a55", backgroundColor: "transparent", color: "#4ade80", fontSize: "0.65rem", fontWeight: "700", cursor: "pointer" }}
-                      >
-                        Edit
-                      </button>
-                    </>
+          {/* TILE GRID */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+            gap: "10px",
+            marginBottom: selectedItem ? "16px" : "0",
+            alignItems: "start",
+          }}>
+            {tiles.map((tile, idx) => {
+              const c         = getTileColors(tile.severity);
+              const isSelected = selectedIdx === idx;
+
+              return (
+                <div
+                  key={idx}
+                  onClick={() => setSelectedIdx(isSelected ? null : idx)}
+                  style={{
+                    backgroundColor: c.bg,
+                    border: `1.5px solid ${isSelected ? "#ffffff44" : c.border}`,
+                    borderRadius: "10px",
+                    padding: "12px",
+                    cursor: "pointer",
+                    userSelect: "none",
+                    position: "relative",
+                    height: "130px",
+                    boxSizing: "border-box",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    outline: isSelected ? `2px solid ${c.border}` : "none",
+                    outlineOffset: "2px",
+                    transition: "all 0.15s ease",
+                    boxShadow: isSelected ? `0 0 0 2px ${c.border}` : "none",
+                    overflow: "hidden",
+                  }}
+                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.filter = "brightness(1.2)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.filter = "brightness(1)"; }}
+                >
+                  {/* severity badge */}
+                  <div style={{
+                    position: "absolute", top: "8px", right: "8px",
+                    backgroundColor: c.badgeBg, color: c.badgeText,
+                    fontSize: "0.5rem", fontWeight: "700", padding: "2px 6px",
+                    borderRadius: "4px", textTransform: "uppercase",
+                  }}>
+                    {c.badgeLabel}
+                  </div>
+
+                  {/* title */}
+                  <div style={{
+                    color: c.titleColor, fontWeight: "800", fontSize: "0.85rem",
+                    lineHeight: "1.3", paddingRight: "60px", marginTop: "4px",
+                    overflow: "hidden", display: "-webkit-box",
+                    WebkitLineClamp: 3, WebkitBoxOrient: "vertical",
+                  }}>
+                    {tile.parameter}
+                  </div>
+
+                  {/* evidence chips */}
+                  {tile.evidence && tile.evidence.length > 1 && !isSelected && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginTop: "4px" }}>
+                      {tile.evidence.slice(0, 3).map((ev, i) => (
+                        <span key={i} style={{
+                          fontSize: "0.5rem", fontWeight: "700",
+                          backgroundColor: `${c.border}55`, color: c.subColor,
+                          padding: "1px 5px", borderRadius: "3px",
+                        }}>
+                          {ev}
+                        </span>
+                      ))}
+                    </div>
                   )}
+
+                  {/* view / hide label */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: "4px",
+                    color: c.subColor, fontSize: "0.65rem", fontWeight: "700", marginTop: "8px",
+                  }}>
+                    <span style={{
+                      transition: "transform 0.2s",
+                      transform: isSelected ? "rotate(90deg)" : "rotate(0deg)",
+                      display: "inline-block",
+                    }}>▶</span>
+                    {isSelected ? "Hide details" : "View details"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* DETAIL PANEL (same 3-column layout as OverallEngineHealthCard) */}
+          {selectedItem && (() => {
+            const c = getTileColors(selectedItem.severity);
+            return (
+              <div ref={detailPanelRef} style={{
+                border: `1.5px solid ${c.border}`, borderRadius: "10px",
+                overflow: "hidden", backgroundColor: c.bg,
+              }}>
+                {/* detail header */}
+                <div style={{
+                  padding: "12px 20px", backgroundColor: "#0d0d1a",
+                  borderBottom: `1px solid ${c.border}44`,
+                  display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center",
+                }}>
+                  <span style={{ color: c.titleColor, fontWeight: "800", fontSize: "0.9rem" }}>
+                    {selectedItem.parameter}
+                  </span>
+                  <span style={{
+                    color: c.subColor, fontSize: "0.7rem", fontWeight: "700",
+                    textTransform: "uppercase", opacity: 0.85, textAlign: "center",
+                  }}>
+                    {selectedItem.comparedAgainst ? `vs ${selectedItem.comparedAgainst}` : ""}
+                  </span>
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button
+                      onClick={() => setSelectedIdx(null)}
+                      style={{ background: "none", border: "none", color: c.subColor, cursor: "pointer", fontSize: "1rem", lineHeight: 1 }}
+                    >✕</button>
+                  </div>
+                </div>
+
+                {/* 3-column body */}
+                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr" }}>
+                  {/* sub-headers */}
+                  <div style={{
+                    gridColumn: "1 / -1",
+                    display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr",
+                    backgroundColor: "#0d0d1a", borderBottom: `1px solid ${c.border}44`,
+                  }}>
+                    {["Observation", "Possible Causes", "Diagnosis & Remedy"].map((h, i) => (
+                      <div key={h} style={{
+                        padding: "8px 16px", fontSize: "0.65rem", fontWeight: "800",
+                        color: c.subColor, textTransform: "uppercase", letterSpacing: "0.08em",
+                        borderLeft: i > 0 ? `1px solid ${c.border}44` : "none",
+                      }}>{h}</div>
+                    ))}
+                  </div>
+
+                  {/* Observation */}
+                  <div style={{ padding: "16px", fontSize: "0.85rem", fontWeight: "600", color: c.titleColor, lineHeight: "1.5" }}>
+                    {selectedItem.finding}
+                  </div>
+
+                  {/* Possible Causes */}
+                  <div style={{ padding: "16px", borderLeft: `1px solid ${c.border}44` }}>
+                    <ul style={{ margin: 0, paddingLeft: "14px", color: c.subColor, fontSize: "0.82rem", fontWeight: "500", lineHeight: "1.7" }}>
+                      {selectedItem.causes.map((cause, i) => <li key={i}>{cause}</li>)}
+                    </ul>
+                  </div>
+
+                  {/* Diagnosis & Remedy */}
+                  <div style={{ padding: "16px", borderLeft: `1px solid ${c.border}44`, backgroundColor: "#0f1e2a" }}>
+                    <ul style={{ margin: 0, paddingLeft: "14px", color: "#a8d8f0", fontSize: "0.82rem", fontWeight: "600", lineHeight: "1.7" }}>
+                      {selectedItem.remedy
+                        .split(".")
+                        .map(s => s.trim())
+                        .filter(s => s.length > 0)
+                        .map((point, i) => <li key={i}>{point}.</li>)}
+                    </ul>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Savings metrics */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px" }}>
-            {savingsMetrics.map((m, i) => (
-              <div key={i} style={{ backgroundColor: "#1a1000", borderRadius: "10px", border: `1px solid ${borderColor}`, padding: "14px 12px", display: "flex", flexDirection: "column", gap: "6px" }}>
-                <div style={{ fontSize: "1.2rem" }}>{m.icon}</div>
-                <div style={{ fontSize: "0.6rem", fontWeight: "700", color: "#78716c", textTransform: "uppercase", letterSpacing: "0.06em" }}>{m.label}</div>
-                <div style={{ fontSize: "1.15rem", fontWeight: "800", color: m.color }}>{m.value}</div>
-                <div style={{ fontSize: "0.62rem", color: "#57534e" }}>{m.sub}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Remedy */}
-          <div style={{ backgroundColor: "#0f1e2a", borderRadius: "10px", border: "1px solid #0c4a6e", padding: "14px 16px" }}>
-            <div style={{ fontSize: "0.65rem", fontWeight: "800", color: "#0284c7", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.08em" }}>Diagnosis & Remedy</div>
-            <ul style={{ margin: 0, paddingLeft: "16px", color: "#a8d8f0", fontSize: "0.85rem", fontWeight: "600", lineHeight: "1.8" }}>
-              {sfocFinding.remedy
-                .split(".")
-                .map((s) => s.trim())
-                .filter((s) => s.length > 0)
-                .map((point, i) => <li key={i}>{point}.</li>)}
-            </ul>
-          </div>
+            );
+          })()}
         </div>
       )}
     </div>
