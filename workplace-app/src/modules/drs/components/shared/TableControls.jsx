@@ -640,18 +640,24 @@ export const PrManagerPopover = ({ defect, onClose, onRefresh, onToast, onConfir
 
   const handleDelete = (prId) => {
     if (deletingId) return;
+    isInteractingRef.current = true;  // ✅ block click-outside
     onConfirm?.({
       message: 'Are you sure you want to delete this PR number?',
+      danger: true,
       onConfirm: async () => {
         setDeletingId(prId);
         try {
           await defectApi.deletePrEntry(prId);
           onRefresh();
           onToast?.('PR number deleted');
+          setTooltip(null);
+          setInfoTooltip(null);
+          // ✅ no onClose() — popover stays open
         } catch (err) {
           onToast?.(err.message, 'error');
         } finally {
           setDeletingId(null);
+          isInteractingRef.current = false;  // ✅ release after done
         }
       }
     });
@@ -774,7 +780,7 @@ export const PrManagerPopover = ({ defect, onClose, onRefresh, onToast, onConfir
 
                   {/* DELETE BUTTON */}
                   <button
-                    onMouseDown={(e) => { e.stopPropagation(); handleDelete(pr.id); }}
+                    onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); handleDelete(pr.id); }}
                     title="Delete PR number" // 👈 Tooltip text
                     style={{
                       background: 'none',
@@ -915,11 +921,11 @@ export function EquipmentFilter({
   const portalRef = useRef(null);
   useEffect(() => {
     const handleClick = (e) => {
-  if (ref.current?.contains(e.target)) return;
-  if (portalRef.current?.contains(e.target)) return;
-  setOpen(false);
-  setSearch('');
-};
+      if (ref.current?.contains(e.target)) return;
+      if (portalRef.current?.contains(e.target)) return;
+      setOpen(false);
+      setSearch('');
+    };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
@@ -1128,11 +1134,11 @@ export function DefectSourceFilter({
   const portalRef = useRef(null);
   useEffect(() => {
     const handleClick = (e) => {
-  if (ref.current?.contains(e.target)) return;
-  if (portalRef.current?.contains(e.target)) return;
-  setOpen(false);
-  setSearch('');
-};
+      if (ref.current?.contains(e.target)) return;
+      if (portalRef.current?.contains(e.target)) return;
+      setOpen(false);
+      setSearch('');
+    };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);

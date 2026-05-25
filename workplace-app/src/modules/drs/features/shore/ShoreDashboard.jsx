@@ -137,10 +137,13 @@ const ConfirmModal = ({ message, onConfirm, onCancel, danger = false }) => (
           background: 'white', color: '#64748b', border: '1px solid #cbd5e1',
           padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer'
         }}>Cancel</button>
-        <button onClick={onConfirm} style={{
-          background: danger ? '#dc2626' : '#16a34a', color: 'white', border: 'none',
-          padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer'
-        }}>Confirm</button>
+        <button
+          onClick={() => { onCancel(); onConfirm(); }}  // ✅ dismiss first, then run
+          style={{
+            background: danger ? '#dc2626' : '#16a34a', color: 'white', border: 'none',
+            padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer'
+          }}
+        >Confirm</button>
       </div>
     </div>
   </div>
@@ -386,7 +389,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
       message: `Are you sure you want to ${label} this closure request?`,
       danger: decision === 'REJECT',
       onConfirm: async () => {
-        setConfirmModal(null);
+        // setConfirmModal(null);
         const newStatus = decision === 'ACCEPT' ? 'CLOSED' : 'OPEN';
         try {
           await defectApi.updateDefect(defectId, { status: newStatus });
@@ -2374,6 +2377,7 @@ const ShoreDashboard = () => {
     mutationFn: (id) => defectApi.removeDefect(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['defects']);
+      toast('Defect deleted successfully!');  // ✅ add this
     },
     onError: (err) => {
       toast("Failed to delete: " + err.message, 'error');
@@ -2408,7 +2412,7 @@ const ShoreDashboard = () => {
     setConfirmModal({
       message: 'Are you sure you want to delete this defect? This action cannot be undone.',
       onConfirm: () => {
-        setConfirmModal(null);
+        // setConfirmModal(null);
         deleteMutation.mutate(id);
       }
     });
@@ -3691,9 +3695,17 @@ const ShoreDashboard = () => {
 
                             case "pr_details":
                               return (
-                                <td key="pr_details" style={{ width: 20, textAlign: 'center' }}>
+                                <td
+                                  key="pr_details"
+                                  style={{
+                                    width: 20,
+                                    textAlign: 'center',
+                                    background: activePrId?.id === defect.id ? '#fff7ed' : 'transparent',
+                                    borderBottom: activePrId?.id === defect.id ? '2px solid #ea580c' : '2px solid transparent',
+                                    transition: 'background 0.15s, border-color 0.15s',
+                                  }}
+                                >
                                   <button
-                                    // WITH THIS:
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const rect = e.currentTarget.getBoundingClientRect();
