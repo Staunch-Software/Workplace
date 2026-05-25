@@ -1265,9 +1265,6 @@ const SFOCInsightCard = ({ findings, report, baseline, analysisMode, verdicts = 
   const observationLines = [
     `SFOC has increased by +${sfocDev != null ? sfocDev.toFixed(1) : "N/A"}% from baseline.`,
     `Baseline: ${sfocBase != null ? sfocBase.toFixed(1) : "N/A"} g/kWh  →  Actual: ${!isNaN(sfocActual) ? sfocActual.toFixed(1) : "N/A"} g/kWh.`,
-    extraFuelDay   != null ? `Extra fuel: ${extraFuelDay.toFixed(2)} t/day  |  ${extraFuelMonth.toFixed(1)} t/month.` : null,
-    costPerMonth   != null ? `Cost impact: $${costPerMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}/month @ $${bunkerPrice}/tonne bunker.` : null,
-    co2PerMonth    != null ? `CO\u2082 excess: ${co2PerMonth.toFixed(1)} t/month (HFO factor 3.114).` : null,
     rootCausesFound.length > 0
       ? `Linked root causes: ${rootCausesFound.join(", ")} — see Engine Health card above.`
       : `SFOC is the efficiency result of the root causes listed in the Engine Health card above.`,
