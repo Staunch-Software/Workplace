@@ -59,13 +59,11 @@ const buildCylinderFaultMap = (report) => {
     if (cyl.pmax && pmaxAvg) {
       const dev = Math.abs(Number(cyl.pmax) - pmaxAvg);
       if (dev > 3) faultMap[cylNo].pmax = "critical";
-      else if (dev > 2) faultMap[cylNo].pmax = "warning";
     }
 
     if (cyl.pcomp && pcompAvg) {
       const dev = Math.abs(Number(cyl.pcomp) - pcompAvg);
       if (dev > 3) faultMap[cylNo].pcomp = "critical";
-      else if (dev > 2) faultMap[cylNo].pcomp = "warning";
     }
 
     if (cyl.exhaust_temp && exhAvg) {
