@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import ReactDOM from 'react-dom';
 import {
   AlertTriangle, CheckCircle, Clock, Info, Filter, ChevronDown, ChevronUp,
   MessageSquare, AlertOctagon, Edit, Send, Paperclip, Trash2, UserCircle, Edit3,
@@ -49,6 +50,78 @@ import {
   InlineDateEdit,
   FloatingSelectText
 } from '@drs/components/shared/TableControls';
+
+// ─── TOAST SYSTEM ───
+const ToastContext = React.createContext(null);
+
+const ToastProvider = ({ children }) => {
+  const [toasts, setToasts] = useState([]);
+
+  const addToast = (message, type = 'success') => {
+    const id = Math.random().toString(36).slice(2);
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
+  };
+
+  return (
+    <ToastContext.Provider value={addToast}>
+      {children}
+      <div className="toast-wrapper" style={{
+        position: 'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)',
+        display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 99999
+      }}>
+        {toasts.map(t => (
+          <div key={t.id} className="toast-item" style={{
+            background: t.type === 'error' ? '#fef2f2' : t.type === 'warning' ? '#fffbeb' : '#f0fdf4',
+            border: `1px solid ${t.type === 'error' ? '#fca5a5' : t.type === 'warning' ? '#fcd34d' : '#86efac'}`,
+            color: t.type === 'error' ? '#991b1b' : t.type === 'warning' ? '#92400e' : '#166534',
+            padding: '12px 18px', borderRadius: '10px',
+            fontSize: '13px', fontWeight: '600',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+            maxWidth: '340px', lineHeight: '1.4',
+            animation: 'slideIn 0.2s ease'
+          }}>
+            {t.type === 'error' ? '❌ ' : t.type === 'warning' ? '⚠️ ' : '✅ '}{t.message}
+          </div>
+        ))}
+      </div>
+      <style>{`@keyframes slideIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }`}</style>
+    </ToastContext.Provider>
+  );
+};
+
+const useToast = () => React.useContext(ToastContext);
+
+const ConfirmModal = ({ message, onConfirm, onCancel, danger = false }) => (
+  <div className="confirm-overlay" style={{
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999
+  }}>
+    <div className="confirm-box" style={{
+      background: 'white', borderRadius: '12px', padding: '24px 28px',
+      maxWidth: '380px', width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+      boxSizing: 'border-box', wordBreak: 'break-word', overflowWrap: 'break-word'
+    }}>
+      <p style={{
+        margin: '0 0 20px 0', fontSize: '14px', color: '#1e293b',
+        fontWeight: '600', lineHeight: '1.5',
+        wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal'
+      }}>
+        {message}
+      </p>
+      <div className="confirm-btn-row" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+        <button onClick={onCancel} style={{
+          background: 'white', color: '#64748b', border: '1px solid #cbd5e1',
+          padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer'
+        }}>Cancel</button>
+        <button onClick={onConfirm} style={{
+          background: danger ? '#dc2626' : '#16a34a', color: 'white', border: 'none',
+          padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer'
+        }}>Confirm</button>
+      </div>
+    </div>
+  </div>
+);
 
 const SyncStatusBadge = ({ status }) => {
   if (!status || status === 'COMPLETED') return null;
@@ -207,6 +280,8 @@ const ImageGalleryModal = ({ images, initialIndex = 0, onClose }) => {
 // ✅ UPDATED: Teams-like Thread Section with PENDING_CLOSURE Approval Workflow
 const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
   const { user } = useAuth();
+  const toast = useToast();
+  const [confirmModal, setConfirmModal] = useState(null);
   const queryClient = useQueryClient();
   const [replyText, setReplyText] = useState("");
   const [files, setFiles] = useState([]);
@@ -339,25 +414,29 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
       queryClient.invalidateQueries(['threads', defectId]);
 
     } catch (err) {
-      alert("Failed: " + err.message);
+      toast("Failed: " + err.message, 'error');
     } finally {
       setIsUploading(false);
     }
   };
 
-  // ✅ Handle Approval / Rejection
-  const handleDecision = async (decision) => {
-    if (!window.confirm(`Are you sure you want to ${decision} this closure request?`)) return;
-
-    const newStatus = decision === 'ACCEPT' ? 'CLOSED' : 'OPEN';
-
-    try {
-      await defectApi.updateDefect(defectId, { status: newStatus });
-      queryClient.invalidateQueries(['defects']);
-      queryClient.invalidateQueries(['threads', defectId]);
-    } catch (err) {
-      alert("Action failed: " + err.message);
-    }
+  const handleDecision = (decision) => {
+    const label = decision === 'ACCEPT' ? 'Accept & Close' : 'Reject';
+    setConfirmModal({
+      message: `Are you sure you want to ${label} this closure request?`,
+      danger: decision === 'REJECT',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        const newStatus = decision === 'ACCEPT' ? 'CLOSED' : 'OPEN';
+        try {
+          await defectApi.updateDefect(defectId, { status: newStatus });
+          queryClient.invalidateQueries(['defects']);
+          queryClient.invalidateQueries(['threads', defectId]);
+        } catch (err) {
+          toast("Action failed: " + err.message, 'error');
+        }
+      }
+    });
   };
 
 
@@ -793,6 +872,14 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
           <Lock size={14} /> Thread Locked (Defect Closed)
         </div>
       )}
+      {confirmModal && (
+        <ConfirmModal
+          message={confirmModal.message}
+          danger={confirmModal.danger}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      )}
     </div>
   );
 };
@@ -800,7 +887,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
 // Image Sidebar Component
 const ImageSidebar = ({ images, onClose, title }) => {
   const [selectedIndex, setSelectedIndex] = useState(null);
-
+  const toast = useToast();
   // ✅ Download image function
   const handleDownload = async (img) => {
     try {
@@ -825,7 +912,7 @@ const ImageSidebar = ({ images, onClose, title }) => {
       console.log('✅ Download completed');
     } catch (error) {
       console.error('❌ Download failed:', error);
-      alert('Failed to download image');
+      toast('Failed to download image', 'error');
     }
   };
 
@@ -996,6 +1083,7 @@ const ImageSidebar = ({ images, onClose, title }) => {
 // ✅ UPDATED: Image Upload Component (disabled when closed) 
 const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus }) => {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [files, setFiles] = useState([]);
   const [previewImages, setPreviewImages] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -1021,7 +1109,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus }) =
 
     newFiles.forEach(file => {
       if (file.size > MAX_SIZE) {
-        alert(`⚠️ ${file.name} exceeds 1MB`);
+        toast(`${file.name} exceeds 1MB`, 'warning');
       } else if (file.type.startsWith('image/')) {
         validFiles.push(file);
         const reader = new FileReader();
@@ -1066,12 +1154,13 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus }) =
           blob_path: blobPath
         });
       }
-      alert('✅ Images uploaded successfully!');
+      toast('Images uploaded successfully!');
       setFiles([]);
       setPreviewImages([]);
       queryClient.invalidateQueries([`${type}-images`, defectId]);
     } catch (err) {
-      alert('❌ Upload failed: ' + err.message);
+      toast('Upload failed: ' + err.message, 'error');
+
     } finally {
       setIsUploading(false);
     }
@@ -1265,6 +1354,8 @@ const useColumnResize = (setColumnWidths) => {
 // ✅ Main Dashboard Component
 const VesselDashboard = () => {
   const { user } = useAuth();
+  const toast = useToast();
+  const [confirmModal, setConfirmModal] = useState(null);
   const ALLOWED_DELETE_EMAILS = ['chief.tapi@drs.com'];
   const canDelete = ALLOWED_DELETE_EMAILS.includes(user?.email);
   const queryClient = useQueryClient();
@@ -1548,8 +1639,12 @@ const VesselDashboard = () => {
     setCurrentPage(1);
   }, [filters]);
 
+  // WITH THIS:
   useEffect(() => {
-    const handleClickOutside = () => setExpandedDescId(null);
+    const handleClickOutside = (e) => {
+      if (e.target && e.target.closest && e.target.closest('.pr-no')) return;
+      setExpandedDescId(null);
+    };
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
@@ -1641,7 +1736,7 @@ const VesselDashboard = () => {
         setClosureModalOpen(true);
 
       } catch (error) {
-        alert('❌ Error validating defect: ' + error.message);
+        toast('Error validating defect: ' + error.message, 'error');
       }
       return;
     }
@@ -2037,7 +2132,7 @@ const VesselDashboard = () => {
       queryClient.invalidateQueries(['defects']);
     },
     onError: (err) => {
-      alert("Failed to delete: " + err.message);
+      toast("Failed to delete: " + err.message, 'error');
     }
   });
 
@@ -2054,7 +2149,7 @@ const VesselDashboard = () => {
       });
       setShowEditorModal(true);
     } catch (err) {
-      alert('Failed to load defect details. Please try again.');
+      toast('Failed to load defect details. Please try again.', 'error');
     }
   };
 
@@ -2068,9 +2163,9 @@ const VesselDashboard = () => {
         body_text: editorData.body,
       });
       setShowEditorModal(false);
-      alert('Draft saved. Open your Outlook desktop app to review and send.');
+      toast('Draft saved. Open your Outlook desktop app to review and send.');
     } catch (err) {
-      alert('Failed to save draft. Please try again.');
+      toast('Failed to save draft. Please try again.', 'error');
     } finally {
       setSavingDraft(false);
     }
@@ -2078,20 +2173,22 @@ const VesselDashboard = () => {
 
   const handleDelete = (id) => {
     if (!canDelete) return;
-    const confirmed = window.confirm(
-      "⚠️ Are you sure you want to delete this defect?\n\nThis action cannot be undone."
-    );
-    if (!confirmed) return;
-    deleteMutation.mutate(id);
+    setConfirmModal({
+      message: 'Are you sure you want to delete this defect? This action cannot be undone.',
+      onConfirm: () => {
+        setConfirmModal(null);
+        deleteMutation.mutate(id);
+      }
+    });
   };
 
   const handleCreateSave = async () => {
     if (!newDefect.equipment_name || !newDefect.description) {
-      alert('Area of Concern and Description are required');
+      toast('Area of Concern and Description are required', 'warning');
       return;
     }
     if (!vesselImo) {
-      alert('❌ No vessel assigned to your account. Please contact admin.');
+      toast('No vessel assigned to your account. Please contact admin.', 'error');
       console.error('vesselImo is empty. User object:', user);
       return;
     }
@@ -2153,7 +2250,7 @@ const VesselDashboard = () => {
 
       setHighlightedId(defectId);
       queryClient.invalidateQueries(['defects']);
-      alert("✅ Defect Created Successfully!");
+      toast("Defect Created Successfully!");
 
       setTimeout(() => {
         setHighlightedId(null);
@@ -2161,7 +2258,7 @@ const VesselDashboard = () => {
 
     } catch (err) {
       console.error("❌ Creation Failed:", err);
-      alert(`Failed to create defect: ${err.message}`);
+      toast('Failed to create defect: ' + err.message, 'error');
     }
   };
 
@@ -3317,17 +3414,23 @@ const VesselDashboard = () => {
 
                             case "pr_details":
                               return (
-                                <td key="pr_details" style={{ width: 20, position: 'relative', textAlign: 'center' }}>
+                                <td key="pr_details" style={{ width: 20, textAlign: 'center' }}>
                                   <button
+                                    // WITH THIS:
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setActivePrId(defect.id);
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      const popoverHeight = 130; // realistic height for 1-2 PR entries
+                                      const spaceBelow = window.innerHeight - rect.bottom;
+                                      const openUpward = spaceBelow < 150; // only flip if very close to bottom
+
+                                      setActivePrId({
+                                        id: defect.id,
+                                        top: openUpward ? rect.top - popoverHeight : rect.bottom + 4,
+                                        left: rect.left,
+                                      });
                                     }}
-                                    title={
-                                      activePrs.length === 0
-                                        ? 'No PR Number'
-                                        : 'View PR Numbers'
-                                    }
+                                    title={activePrs.length === 0 ? 'No PR Numbers' : 'View PR Numbers'}
                                     style={{
                                       border: 'none',
                                       background: 'transparent',
@@ -3343,19 +3446,10 @@ const VesselDashboard = () => {
                                       color={activePrs.length === 0 ? '#dc2626' : '#475569'}
                                     />
                                   </button>
-
-                                  {/* PR Manager Popover */}
-                                  {activePrId === defect.id && (
-                                    <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100 }}>
-                                      <PrManagerPopover
-                                        defect={defect}
-                                        onClose={() => setActivePrId(null)}
-                                        onRefresh={() => queryClient.invalidateQueries(['defects'])}
-                                      />
-                                    </div>
-                                  )}
                                 </td>
-                              )
+                              );
+
+
                             default:
                               return null;
                           }
@@ -3843,6 +3937,26 @@ const VesselDashboard = () => {
           onSave={handleSaveColumns}
         />
 
+        {activePrId && ReactDOM.createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              top: Math.max(8, activePrId.top),
+              left: Math.min(activePrId.left, window.innerWidth - 240),
+              zIndex: 9999,
+            }}
+          >
+            <PrManagerPopover
+              defect={defects.find(d => d.id === activePrId.id)}
+              onClose={() => setActivePrId(null)}
+              onRefresh={() => queryClient.invalidateQueries(['defects'])}
+              onToast={toast}
+              onConfirm={setConfirmModal}
+            />
+          </div>,
+          document.body
+        )}
+
 
         {closureModalOpen && closureDefect && (
           <EnhancedClosureModal
@@ -3956,11 +4070,24 @@ const VesselDashboard = () => {
           </div>
         </div>
       )}
+      {confirmModal && (
+        <ConfirmModal
+          message={confirmModal.message}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      )}
     </div >
   );
 };
 
-export default VesselDashboard;
+
+
+// REPLACE:
+const VesselDashboardWithToast = () => (
+  <ToastProvider><VesselDashboard /></ToastProvider>
+);
+export default VesselDashboardWithToast;
 
 const DraggableTh = ({ id, children, disabled, style }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id, disabled });
