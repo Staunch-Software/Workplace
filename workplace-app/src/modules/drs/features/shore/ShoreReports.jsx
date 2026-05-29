@@ -118,6 +118,13 @@ const ShoreReports = () => {
         if (targetDate > filters.target_close_date) return false;
       }
 
+      if (filters.defect_number) {
+        const match = (defect.defect_number || '')
+          .toLowerCase()
+          .includes(filters.defect_number.toLowerCase());
+        if (!match) return false;
+      }
+
       if (filters.defect_source.length > 0) {
         if (!filters.defect_source.includes(defect.defect_source)) return false;
       }
@@ -308,6 +315,7 @@ const ShoreReports = () => {
     if (filters.is_flagged.length > 0) count++;
     if (filters.is_dd.length > 0) count++;
     if (filters.pending_closure) count++;
+    if (filters.defect_number) count++;
     return count;
   }, [filters]);
 
@@ -678,7 +686,13 @@ const ShoreReports = () => {
                 textAlign: 'center',
                 top: "65px"
               }}>
-                Defect ID
+                <FilterHeader
+                  label="Defect ID"
+                  field="defect_number"
+                  currentFilter={filters.defect_number}
+                  onFilterChange={handleFilterChange}
+                  type="text"
+                />
               </th>
               <th style={{
                 width: 100,

@@ -124,6 +124,12 @@ const VesselReports = () => {
       if (filters.equipment.length > 0) {
         if (!filters.equipment.includes(defect.equipment_name)) return false;
       }
+      if (filters.defect_number) {
+        const match = (defect.defect_number || '')
+          .toLowerCase()
+          .includes(filters.defect_number.toLowerCase());
+        if (!match) return false;
+      }
       if (filters.description) {
         const searchText = filters.description.toLowerCase();
         const matchesEquipment = defect.equipment_name?.toLowerCase().includes(searchText);
@@ -285,6 +291,7 @@ const VesselReports = () => {
     if (filters.is_flagged.length > 0) count++;
     if (filters.is_dd.length > 0) count++;
     if (filters.pending_closure) count++;
+    if (filters.defect_number) count++;
     return count;
   }, [filters]);
 
@@ -639,14 +646,20 @@ const VesselReports = () => {
           <thead>
             <tr>
               <th style={{
-                width: 90,
+                width: 85,
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 color: 'white',
                 fontWeight: '600',
                 textAlign: 'center',
                 top: "65px"
               }}>
-                Defect ID
+                <FilterHeader
+                  label="Defect ID"
+                  field="defect_number"
+                  currentFilter={filters.defect_number}
+                  onFilterChange={handleFilterChange}
+                  type="text"
+                />
               </th>
 
               {visibleColumns.map((colId) => {
