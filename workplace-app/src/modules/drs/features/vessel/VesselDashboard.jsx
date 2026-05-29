@@ -3414,9 +3414,17 @@ const VesselDashboard = () => {
 
                             case "pr_details":
                               return (
-                                <td key="pr_details" style={{ width: 20, textAlign: 'center' }}>
+                                <td
+                                  key="pr_details"
+                                  style={{
+                                    width: 20,
+                                    textAlign: 'center',
+                                    background: activePrId?.id === defect.id ? '#fff7ed' : 'transparent',
+                                    borderBottom: activePrId?.id === defect.id ? '2px solid #ea580c' : '2px solid transparent',
+                                    transition: 'background 0.15s, border-color 0.15s',
+                                  }}
+                                >
                                   <button
-                                    // WITH THIS:
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const rect = e.currentTarget.getBoundingClientRect();
