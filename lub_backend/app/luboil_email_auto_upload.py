@@ -146,10 +146,33 @@ async def get_graph_token() -> str:
         raise
 
 
+
+async def find_folder_id(graph_token: str, folder_name: str) -> str:
+    """
+    Finds the Microsoft Graph folder ID for a named Outlook folder.
+    Used to target 'Shell Lubeoil' folder directly instead of inbox.
+    """
+    headers = {"Authorization": f"Bearer {graph_token}"}
+    url = f"https://graph.microsoft.com/v1.0/users/{MAILBOX_EMAIL}/mailFolders"
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers, timeout=30.0)
+        response.raise_for_status()
+        folders = response.json().get("value", [])
+
+    for folder in folders:
+        if folder["displayName"].lower() == folder_name.lower():
+            logger.info(f"📁 Found folder: '{folder['displayName']}' → ID: {folder['id']}")
+            return folder["id"]
+
+    raise ValueError(f"❌ Folder '{folder_name}' not found in mailbox")
+
+
 # ============================================================
 #  STEP 2 — FETCH EMAILS FROM INBOX (LAST 24 HOURS ONLY)
 # ============================================================
-async def fetch_recent_luboil_emails(graph_token: str) -> list:
+# AFTER
+async def fetch_recent_luboil_emails(graph_token: str, folder_id: str = None) -> list:
     """
     Queries the Outlook inbox for emails from the last 24 hours that:
       - Come from ShellLubeAnalyst sender
@@ -169,8 +192,16 @@ async def fetch_recent_luboil_emails(graph_token: str) -> list:
     time_filter_str = time_24h_ago.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Graph API: Get up to 999 messages with attachments from the last 24 hours (Read or Unread)
+    # AFTER
+    if folder_id:
+        base = f"https://graph.microsoft.com/v1.0/users/{MAILBOX_EMAIL}/mailFolders/{folder_id}/messages"
+        logger.info("📁 Searching in 'Shell Lubeoil' folder...")
+    else:
+        base = f"https://graph.microsoft.com/v1.0/users/{MAILBOX_EMAIL}/messages"
+        logger.info("📁 Folder not found — falling back to full mailbox search...")
+
     url = (
-        f"https://graph.microsoft.com/v1.0/users/{MAILBOX_EMAIL}/mailFolders/inbox/messages"
+        f"{base}"
         f"?$filter=hasAttachments eq true and receivedDateTime ge {time_filter_str}"
         f"&$select=id,subject,from,receivedDateTime,hasAttachments"
         f"&$top=999"
@@ -439,7 +470,15 @@ async def run_luboil_email_upload_job():
         graph_token = await get_graph_token()
 
         # ── STEP 2: Find matching emails (Last 24 Hours) ────────
+        # AFTER
         logger.info("📬 STEP 2: Scanning inbox for LubeAnalyst emails (Last 24 hours)...")
+        try:
+            folder_id = await find_folder_id(graph_token, "Shell Lubeoil")
+        except ValueError:
+            logger.warning("⚠️  'Shell Lubeoil' folder not found — falling back to full mailbox search")
+            folder_id = None
+
+        matched_emails = await fetch_recent_luboil_emails(graph_token, folder_id)
         matched_emails = await fetch_recent_luboil_emails(graph_token)
         emails_found = len(matched_emails)
 
