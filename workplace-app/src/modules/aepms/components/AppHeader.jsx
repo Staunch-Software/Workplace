@@ -86,15 +86,15 @@ export default function AppHeader() {
   }, [location.pathname]);
 
   useEffect(() => {
-  if (showSyncModal) {
-    document.body.style.overflow = "hidden";
-  } else {
-    document.body.style.overflow = "";
-  }
-  return () => {
-    document.body.style.overflow = "";
-  };
-}, [showSyncModal]);
+    if (showSyncModal) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showSyncModal]);
 
 
   const toggleTheme = () => {
@@ -150,7 +150,7 @@ export default function AppHeader() {
 
     // 3. Confirmation
     if (!window.confirm(`⚠️ Are you sure you want to sync/overwrite the ${typeLabel} database with this file?`)) {
-        return;
+      return;
     }
 
     setSyncing(true);
@@ -158,19 +158,19 @@ export default function AppHeader() {
       // 4. API Routing - Replaced 'apiService' with 'axiosAepms' 
       // Removed the 'activeTab' logic since this modal is only for standard data sync
       const res = await axiosAepms.adminDataSync(
-          syncConfig.file, 
-          syncConfig.engineType
+        syncConfig.file,
+        syncConfig.engineType
       );
 
       alert(res.message || "Sync successful!");
-      
+
       // 5. Reset State & Close Modal
-      setSyncConfig(prev => ({ 
-          ...prev, 
-          file: null
+      setSyncConfig(prev => ({
+        ...prev,
+        file: null
       }));
       setShowSyncModal(false);
-      
+
     } catch (err) {
       console.error(err);
       // Fallback error reading since it's a standard Error object thrown by your API class
@@ -183,237 +183,237 @@ export default function AppHeader() {
 
   return (
     <>
-    <header className="app-header">
-      <div className="header-container">
-        <div className="header-brand">
-  {/* 9-DOT BACK BUTTON */}
-  <button
-    onClick={() => navigate("/dashboard")}
-    title="Back to Dashboard"
-    aria-label="Back to Dashboard"
-    onMouseEnter={(e) => {
-      e.currentTarget.querySelector(".dots-grid").style.opacity = "0";
-      e.currentTarget.querySelector(".dots-arrow").style.opacity = "1";
-      e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.querySelector(".dots-grid").style.opacity = "1";
-      e.currentTarget.querySelector(".dots-arrow").style.opacity = "0";
-      e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-    }}
-    style={{
-      background: "rgba(255,255,255,0.06)",
-      border: "1px solid rgba(255,255,255,0.1)",
-      borderRadius: "8px",
-      cursor: "pointer",
-      padding: "6px",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      position: "relative",
-      width: "34px",
-      height: "34px",
-      flexShrink: 0,
-      transition: "background 0.2s",
-    }}
-  >
-    {/* DOTS - visible by default */}
-    <div
-      className="dots-grid"
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 7px)",
-        gap: "3px",
-        position: "absolute",
-        transition: "opacity 0.2s",
-        opacity: "1",
-      }}
-    >
-      {[...Array(9)].map((_, i) => (
-        <span
-          key={i}
-          style={{
-            width: "7px",
-            height: "7px",
-            borderRadius: "2px",
-            backgroundColor: "#94a3b8",
-            display: "block",
-          }}
-        />
-      ))}
-    </div>
-
-    {/* ARROW - visible on hover */}
-    <div
-      className="dots-arrow"
-      style={{
-        position: "absolute",
-        opacity: "0",
-        width: "35px",
-        height: "35px",
-        transition: "opacity 0.2s",
-        color: "#94a3b8",
-        fontSize: "1.4rem",
-        fontWeight: "bold",
-        lineHeight: 1,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "white",
-        borderRadius: "20%",
-        border: "1px solid rgba(48, 46, 46, 0.1)",
-      }}
-    >
-      ‹
-    </div>
-  </button>
-
-  {/* <img src={logo} alt="logo" className="brand-logo" /> */}
-  <span className="brand-title">Ship Engine Performance Console</span>
-</div>
-
-        <nav className={`header-nav ${isMobileNavOpen ? "open" : ""}`}>
-          {nav.map((n) => (
-            <Link
-              key={n.href}
-              to={n.href}
-              className={`nav-link ${isActive(n.href) ? "active" : ""}`}
-              onClick={() => setIsMobileNavOpen(false)}
+      <header className="app-header">
+        <div className="header-container">
+          <div className="header-brand">
+            {/* 9-DOT BACK BUTTON */}
+            <button
+              onClick={() => navigate("/dashboard")}
+              title="Back to Dashboard"
+              aria-label="Back to Dashboard"
+              onMouseEnter={(e) => {
+                e.currentTarget.querySelector(".dots-grid").style.opacity = "0";
+                e.currentTarget.querySelector(".dots-arrow").style.opacity = "1";
+                e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.querySelector(".dots-grid").style.opacity = "1";
+                e.currentTarget.querySelector(".dots-arrow").style.opacity = "0";
+                e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+              }}
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: "8px",
+                cursor: "pointer",
+                padding: "6px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                position: "relative",
+                width: "34px",
+                height: "34px",
+                flexShrink: 0,
+                transition: "background 0.2s",
+              }}
             >
-              {n.label}
-            </Link>
-          ))}
-        </nav>
+              {/* DOTS - visible by default */}
+              <div
+                className="dots-grid"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 7px)",
+                  gap: "3px",
+                  position: "absolute",
+                  transition: "opacity 0.2s",
+                  opacity: "1",
+                }}
+              >
+                {[...Array(9)].map((_, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      width: "7px",
+                      height: "7px",
+                      borderRadius: "2px",
+                      backgroundColor: "#94a3b8",
+                      display: "block",
+                    }}
+                  />
+                ))}
+              </div>
 
-        <div className="header-actions">
-          <button
-            className="mobile-nav-toggle"
-            onClick={toggleMobileNav}
-            aria-label="Toggle navigation"
-            aria-expanded={isMobileNavOpen}
-          >
-            ☰
-          </button>
-
-          <div className="user-menu-container" ref={menuRef}>
-            <button className="user-menu-trigger" onClick={toggleMenu}>
-              <User size={18} />
-              <span className="user-menu-name">{user?.full_name || "User"}</span>
-              <ChevronDown
-                size={16}
-                className={`user-menu-chevron ${isMenuOpen ? "open" : "closed"}`}
-              />
+              {/* ARROW - visible on hover */}
+              <div
+                className="dots-arrow"
+                style={{
+                  position: "absolute",
+                  opacity: "0",
+                  width: "35px",
+                  height: "35px",
+                  transition: "opacity 0.2s",
+                  color: "#94a3b8",
+                  fontSize: "1.4rem",
+                  fontWeight: "bold",
+                  lineHeight: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: "white",
+                  borderRadius: "20%",
+                  border: "1px solid rgba(48, 46, 46, 0.1)",
+                }}
+              >
+                ‹
+              </div>
             </button>
 
-            {isMenuOpen && (
-              <div className="user-dropdown-menu">
-                <div className="user-dropdown-header">
-                  <div className="user-dropdown-name">{user?.full_name}</div>
-                  {user?.authType && (
-                    <div className="user-dropdown-auth">
-                      {user.authType === "microsoft"
-                        ? "Microsoft SSO"
-                        : "Local Account"}
-                    </div>
-                  )}
+            {/* <img src={logo} alt="logo" className="brand-logo" /> */}
+            <span className="brand-title">Ship Engine Performance Console</span>
+          </div>
+
+          <nav className={`header-nav ${isMobileNavOpen ? "open" : ""}`}>
+            {nav.map((n) => (
+              <Link
+                key={n.href}
+                to={n.href}
+                className={`nav-link ${isActive(n.href) ? "active" : ""}`}
+                onClick={() => setIsMobileNavOpen(false)}
+              >
+                {n.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="header-actions">
+            <button
+              className="mobile-nav-toggle"
+              onClick={toggleMobileNav}
+              aria-label="Toggle navigation"
+              aria-expanded={isMobileNavOpen}
+            >
+              ☰
+            </button>
+
+            <div className="user-menu-container" ref={menuRef}>
+              <button className="user-menu-trigger" onClick={toggleMenu}>
+                <User size={18} />
+                <span className="user-menu-name">{user?.full_name || "User"}</span>
+                <ChevronDown
+                  size={16}
+                  className={`user-menu-chevron ${isMenuOpen ? "open" : "closed"}`}
+                />
+              </button>
+
+              {isMenuOpen && (
+                <div className="user-dropdown-menu">
+                  <div className="user-dropdown-header">
+                    <div className="user-dropdown-name">{user?.full_name}</div>
+                    {user?.authType && (
+                      <div className="user-dropdown-auth">
+                        {user.authType === "microsoft"
+                          ? "Microsoft SSO"
+                          : "Local Account"}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="user-dropdown-items">
+                    <button
+                      onClick={() => { setIsMenuOpen(false); navigate("/dashboard"); }}
+                      className="user-dropdown-btn"
+                    >
+                      <LayoutDashboard size={18} />
+                      <span>Back to Dashboard</span>
+                    </button>
+
+                    {(user?.role?.toLowerCase() === "admin" || user?.role?.toLowerCase() === "superuser") && (
+                      <button
+                        onClick={() => { setIsMenuOpen(false); setShowSyncModal(true); }}
+                        className="user-dropdown-btn admin"
+                      >
+                        <Database size={18} />
+                        <span>Data Sync</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+      {showSyncModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: "white", display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '12px', width: '450px', maxWidth: '90%', padding: '1.5rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)' }}>
 
-                <div className="user-dropdown-items">
-  <button
-    onClick={() => { setIsMenuOpen(false); navigate("/dashboard"); }}
-    className="user-dropdown-btn"
-  >
-    <LayoutDashboard size={18} />
-    <span>Back to Dashboard</span>
-  </button>
-
-  {(user?.role?.toLowerCase() === "admin" || user?.role?.toLowerCase() === "superuser") && (
-    <button
-      onClick={() => { setIsMenuOpen(false); setShowSyncModal(true); }}
-      className="user-dropdown-btn admin"
-    >
-      <Database size={18} />
-      <span>Data Sync</span>
-    </button>
-  )}
-</div>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Database size={20} color="#0ea5e9" />
+                <span style={{ fontWeight: 600, fontSize: '1rem' }}>System Data Sync</span>
               </div>
-            )}
+              <button onClick={() => setShowSyncModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleDataSync} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div style={{ padding: '0.75rem', backgroundColor: '#f0f9ff', borderRadius: '6px', border: '1px solid #bae6fd', fontSize: '0.85rem', color: '#0369a1' }}>
+                Upload Excel (.xlsx) to directly sync Shop Trial Data To configure the New Vessel.
+              </div>
+
+              {/* Data Type Select */}
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Data Type</label>
+                <select
+                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: 'white', color: '#0f172a', fontSize: '13px' }}
+                  value={syncConfig.engineType}
+                  onChange={(e) => setSyncConfig(prev => ({ ...prev, engineType: e.target.value }))}
+                >
+                  <option value="mainEngine">Main Engine Data</option>
+                  <option value="auxiliaryEngine">Auxiliary Engine Data</option>
+                  {/* <option value="luboilConfig">Lube Oil Configuration</option> */}
+                </select>
+              </div>
+
+              {/* File Upload */}
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Excel File</label>
+                <div style={{ border: '2px dashed #cbd5e1', padding: '1.5rem', textAlign: 'center', borderRadius: '8px', cursor: 'pointer', position: 'relative', backgroundColor: syncConfig.file ? '#f0f9ff' : '#f8fafc', borderColor: syncConfig.file ? '#0ea5e9' : '#cbd5e1' }}>
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls"
+                    onChange={(e) => setSyncConfig(prev => ({ ...prev, file: e.target.files[0] }))}
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                  />
+                  <Upload size={24} style={{ margin: '0 auto 8px', color: syncConfig.file ? '#0ea5e9' : '#94a3b8', display: 'block' }} />
+                  <p style={{ fontSize: '0.85rem', color: '#475569', margin: 0 }}>
+                    {syncConfig.file ? <strong>{syncConfig.file.name}</strong> : "Click to select file"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setShowSyncModal(false)} disabled={syncing}
+                  style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer', fontSize: '13px' }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={syncing || !syncConfig.file}
+                  style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#0ea5e9', color: 'white', cursor: syncing || !syncConfig.file ? 'not-allowed' : 'pointer', fontSize: '13px', opacity: !syncConfig.file ? 0.6 : 1 }}>
+                  {syncing ? '⏳ Syncing...' : 'Start Sync'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </div>
-    </header>
-    {showSyncModal && (
-  <div style={{
-    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: "white", display: 'flex',
-    alignItems: 'center', justifyContent: 'center', zIndex: 9999
-  }}>
-    <div style={{ backgroundColor: 'white', borderRadius: '12px', width: '450px', maxWidth: '90%', padding: '1.5rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)' }}>
-      
-      {/* Modal Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Database size={20} color="#0ea5e9" />
-          <span style={{ fontWeight: 600, fontSize: '1rem' }}>System Data Sync</span>
-        </div>
-        <button onClick={() => setShowSyncModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-          <X size={20} />
-        </button>
-      </div>
-
-      {/* Modal Form */}
-      <form onSubmit={handleDataSync} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        <div style={{ padding: '0.75rem', backgroundColor: '#f0f9ff', borderRadius: '6px', border: '1px solid #bae6fd', fontSize: '0.85rem', color: '#0369a1' }}>
-          Upload Excel (.xlsx) to directly sync Shop Trial Data To configure the New Vessel.
-        </div>
-
-        {/* Data Type Select */}
-        <div>
-          <label style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Data Type</label>
-          <select
-            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: 'white', color: '#0f172a', fontSize: '13px' }}
-            value={syncConfig.engineType}
-            onChange={(e) => setSyncConfig(prev => ({ ...prev, engineType: e.target.value }))}
-          >
-            <option value="mainEngine">Main Engine Data</option>
-            <option value="auxiliaryEngine">Auxiliary Engine Data</option>
-            {/* <option value="luboilConfig">Lube Oil Configuration</option> */}
-          </select>
-        </div>
-
-        {/* File Upload */}
-        <div>
-          <label style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Excel File</label>
-          <div style={{ border: '2px dashed #cbd5e1', padding: '1.5rem', textAlign: 'center', borderRadius: '8px', cursor: 'pointer', position: 'relative', backgroundColor: syncConfig.file ? '#f0f9ff' : '#f8fafc', borderColor: syncConfig.file ? '#0ea5e9' : '#cbd5e1' }}>
-            <input
-              type="file"
-              accept=".xlsx, .xls"
-              onChange={(e) => setSyncConfig(prev => ({ ...prev, file: e.target.files[0] }))}
-              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-            />
-            <Upload size={24} style={{ margin: '0 auto 8px', color: syncConfig.file ? '#0ea5e9' : '#94a3b8', display: 'block' }} />
-            <p style={{ fontSize: '0.85rem', color: '#475569', margin: 0 }}>
-              {syncConfig.file ? <strong>{syncConfig.file.name}</strong> : "Click to select file"}
-            </p>
-          </div>
-        </div>
-
-        {/* Buttons */}
-        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-          <button type="button" onClick={() => setShowSyncModal(false)} disabled={syncing}
-            style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer', fontSize: '13px' }}>
-            Cancel
-          </button>
-          <button type="submit" disabled={syncing || !syncConfig.file}
-            style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#0ea5e9', color: 'white', cursor: syncing || !syncConfig.file ? 'not-allowed' : 'pointer', fontSize: '13px', opacity: !syncConfig.file ? 0.6 : 1 }}>
-            {syncing ? '⏳ Syncing...' : 'Start Sync'}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
-</>
+      )}
+    </>
   );
 }

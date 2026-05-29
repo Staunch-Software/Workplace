@@ -1723,7 +1723,24 @@ const VesselDashboard = () => {
     const defect = defects.find(d => d.id === id);
     if (!defect || defect[field] === value) return;
     if (field === 'is_flagged') return;
+    // In handleInlineUpdate — wrap the date fields:
+    if (field === 'target_close_date') {
+      const reportDate = new Date(defect.date_identified?.split('T')[0]);
+      const newDue = new Date(value);
+      if (newDue <= reportDate) {
+        toast('Due date must be after the report date', 'warning');
+        return;
+      }
+    }
 
+    if (field === 'date_identified') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (new Date(value) > today) {
+        toast('Report date cannot be in the future', 'warning');
+        return;
+      }
+    }
     // ✅ If changing status to CLOSED, open enhanced modal
     if (field === 'status' && value === 'CLOSED') {
       try {
@@ -2226,7 +2243,21 @@ const VesselDashboard = () => {
       }
       console.log('✅ [DASHBOARD] JSON path received:', jsonBackupPath);
 
+      // In handleCreateSave — add before the API call:
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
+      const reportDate = new Date(newDefect.date_identified);
+      if (reportDate > today) {
+        toast('Report date cannot be in the future', 'warning');
+        return;
+      }
+
+      const dueDate = new Date(newDefect.target_close_date);
+      if (dueDate <= reportDate) {
+        toast('Due date must be after the report date', 'warning');
+        return;
+      }
       // -------------------------------------------------------------
       // 3️⃣ Create Defect in API (Passing the JSON Path)
       // -------------------------------------------------------------
@@ -3571,6 +3602,7 @@ const VesselDashboard = () => {
                                 type="date"
                                 className="ghost-input"
                                 value={newDefect.date_identified}
+                                max={new Date().toISOString().split('T')[0]}
                                 onChange={(e) =>
                                   setNewDefect(prev => ({ ...prev, date_identified: e.target.value }))
                                 }
@@ -3586,6 +3618,12 @@ const VesselDashboard = () => {
                                 type="date"
                                 className="ghost-input"
                                 value={newDefect.target_close_date}
+                                min={(() => {
+                                  if (!newDefect.date_identified) return '';
+                                  const d = new Date(newDefect.date_identified);
+                                  d.setDate(d.getDate() + 1);
+                                  return d.toISOString().split('T')[0];
+                                })()}
                                 onChange={(e) =>
                                   setNewDefect(prev => ({ ...prev, target_close_date: e.target.value }))
                                 }

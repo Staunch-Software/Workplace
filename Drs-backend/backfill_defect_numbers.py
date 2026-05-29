@@ -45,17 +45,16 @@ async def backfill():
     print(f"Found {len(vessel_map)} vessels.")
 
     async with DefectSession() as db:
-        # 2. Fetch all non-deleted defects ordered by vessel + created_at
+        # 2. Fetch ALL defects including deleted, ordered by vessel + created_at
         result = await db.execute(text("""
-            SELECT id, vessel_imo, created_at, defect_number
+            SELECT id, vessel_imo, created_at, defect_number, is_deleted
             FROM defects
-            WHERE is_deleted = FALSE
             ORDER BY vessel_imo, created_at ASC
         """))
         defects = result.fetchall()
-        print(f"Found {len(defects)} defects to process.")
+        print(f"Found {len(defects)} total defects (including deleted).")
 
-        # 3. Group by vessel
+        # 3. Group by vessel — include ALL defects
         vessel_defects = {}
         for d in defects:
             vessel_defects.setdefault(d.vessel_imo, []).append(d)
@@ -63,6 +62,7 @@ async def backfill():
         updated = 0
         skipped = 0
         now_utc = datetime.utcnow()
+
         for imo, dlist in vessel_defects.items():
             vessel_name = vessel_map.get(imo)
             if not vessel_name:
@@ -71,23 +71,63 @@ async def backfill():
                 continue
 
             prefix = make_prefix(vessel_name)
-            print(f"  {vessel_name} ({prefix}) — {len(dlist)} defects")
+            total = len(dlist)
+            deleted_count = sum(1 for d in dlist if d.is_deleted)
+            print(f"  {vessel_name} ({prefix}) — {total} defects ({deleted_count} deleted)")
 
-            # Include deleted defects so we never reuse a number covered by the unique constraint
-            taken_rows = await db.execute(
-                text("SELECT defect_number FROM defects WHERE vessel_imo = :imo AND defect_number IS NOT NULL"),
-                {"imo": imo},
-            )
-            taken_numbers = {row.defect_number for row in taken_rows}
+            # Track all assigned numbers to avoid duplicates
+            taken_numbers = set()
+
+            # First pass — collect already assigned numbers
+            for defect in dlist:
+                if defect.defect_number:
+                    taken_numbers.add(defect.defect_number)
 
             seq = 0
             for defect in dlist:
                 seq += 1
+
                 if defect.defect_number:
+                    # Already has a number — just make sure seq stays in sync
+                    # Extract the number from existing defect_number if possible
+                    try:
+                        existing_seq = int(defect.defect_number.split('#')[1].split('-')[0])
+                        if existing_seq > seq:
+                            seq = existing_seq  # Keep seq in sync with highest seen
+                    except (IndexError, ValueError):
+                        pass
                     print(f"    Already has defect_number: {defect.defect_number} — skipping")
                     skipped += 1
                     continue
 
+                # Skip assigning numbers to deleted defects that have none
+                # but still count them in sequence to avoid gaps
+                if defect.is_deleted:
+                    defect_number = f"{prefix}#{str(seq).zfill(4)}"
+                    while defect_number in taken_numbers:
+                        seq += 1
+                        defect_number = f"{prefix}#{str(seq).zfill(4)}"
+                    taken_numbers.add(defect_number)
+
+                    # Assign number even to deleted defects so sequence is consistent
+                    await db.execute(
+                        text("""
+                            UPDATE defects 
+                            SET defect_number = :dn, 
+                                updated_at = :now 
+                            WHERE id = :id
+                        """),
+                        {
+                            "dn": defect_number,
+                            "id": defect.id,
+                            "now": now_utc
+                        }
+                    )
+                    print(f"    Deleted defect assigned: {defect_number}")
+                    updated += 1
+                    continue
+
+                # Assign number to active defect
                 defect_number = f"{prefix}#{str(seq).zfill(4)}"
                 while defect_number in taken_numbers:
                     seq += 1
@@ -102,22 +142,31 @@ async def backfill():
                         WHERE id = :id
                     """),
                     {
-                        "dn": defect_number, 
-                        "id": defect.id, 
+                        "dn": defect_number,
+                        "id": defect.id,
                         "now": now_utc
                     }
                 )
+                print(f"    Assigned: {defect_number}")
                 updated += 1
 
-            # 4. Upsert sequence table with final seq value
+            # 4. Upsert sequence table with final seq + 1
+            # Use max of current seq and existing next_seq to never go backwards
+            seq_rows = await db.execute(
+                text("SELECT next_seq FROM vessel_defect_sequences WHERE vessel_imo = :imo"),
+                {"imo": imo}
+            )
+            existing_seq = seq_rows.scalar()
+            new_next_seq = max(seq + 1, existing_seq or 0)
+
             await db.execute(text("""
                 INSERT INTO vessel_defect_sequences (vessel_imo, next_seq)
                 VALUES (:imo, :next_seq)
                 ON CONFLICT (vessel_imo)
                 DO UPDATE SET next_seq = EXCLUDED.next_seq
-            """), {"imo": imo, "next_seq": seq + 1})
+            """), {"imo": imo, "next_seq": new_next_seq})
 
-            print(f"    Sequence set to {seq + 1} for next defect")
+            print(f"    Sequence set to {new_next_seq} for next defect")
 
         await db.commit()
         print(f"\n✅ Done. Updated: {updated}, Skipped: {skipped}")

@@ -2189,6 +2189,25 @@ const ShoreDashboard = () => {
     if (field === 'is_owner') {
       finalValue = value === true || value === 'true';
     }
+
+    // In handleInlineUpdate — wrap the date fields:
+    if (field === 'target_close_date') {
+      const reportDate = new Date(defect.date_identified?.split('T')[0]);
+      const newDue = new Date(value);
+      if (newDue <= reportDate) {
+        toast('Due date must be after the report date', 'warning');
+        return;
+      }
+    }
+
+    if (field === 'date_identified') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (new Date(value) > today) {
+        toast('Report date cannot be in the future', 'warning');
+        return;
+      }
+    }
     // ✅ If changing status to CLOSED, open enhanced modal
     if (field === 'status' && value === 'CLOSED') {
       try {
@@ -2524,7 +2543,20 @@ const ShoreDashboard = () => {
 
       console.log('📦 Uploading JSON metadata backup...');
       const jsonBackupPath = await blobUploadService.uploadMetadataJSON(fullPackage, defectId);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
+      const reportDate = new Date(newDefect.date_identified);
+      if (reportDate > today) {
+        toast('Report date cannot be in the future', 'warning');
+        return;
+      }
+
+      const dueDate = new Date(newDefect.target_close_date);
+      if (dueDate <= reportDate) {
+        toast('Due date must be after the report date', 'warning');
+        return;
+      }
       await defectApi.createDefect({
         ...fullPackage,
         json_backup_path: jsonBackupPath
@@ -3937,14 +3969,19 @@ const ShoreDashboard = () => {
                         case 'date':
                           return (
                             <td key="date" style={{ width: columnWidths.date_identified }}>
-                              <input type="date" className="ghost-input" value={newDefect.date_identified}
+                              <input type="date" className="ghost-input" value={newDefect.date_identified} max={new Date().toISOString().split('T')[0]}
                                 onChange={(e) => setNewDefect(prev => ({ ...prev, date_identified: e.target.value }))} style={{ width: '100%', boxSizing: 'border-box', maxWidth: '100%' }} />
                             </td>
                           );
                         case 'deadline':
                           return (
                             <td key="deadline" style={{ width: columnWidths.target_close_date }}>
-                              <input type="date" className="ghost-input" value={newDefect.target_close_date}
+                              <input type="date" className="ghost-input" value={newDefect.target_close_date} min={(() => {
+                                if (!newDefect.date_identified) return '';
+                                const d = new Date(newDefect.date_identified);
+                                d.setDate(d.getDate() + 1);
+                                return d.toISOString().split('T')[0];
+                              })()}
                                 onChange={(e) => setNewDefect(prev => ({ ...prev, target_close_date: e.target.value }))} style={{ width: '100%', boxSizing: 'border-box', maxWidth: '100%' }} />
                             </td>
                           );

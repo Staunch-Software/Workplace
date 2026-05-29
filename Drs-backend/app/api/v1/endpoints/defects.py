@@ -1475,26 +1475,13 @@ async def download_import_template(
                 "error_message": "Please use the format: 2023-12-31",
             },
         )
-    start_col = 8 if "Vessel Name" in headers else 7
-    for col_idx in [start_col, start_col + 1]:
-        ws.data_validation(
-            1,
-            col_idx,
-            1000,
-            col_idx,
-            {
-                "validate": "list",
-                "source": ["Yes", "No"],
-                "input_title": "Select Option",
-                "input_message": "Please select Yes or No",
-            },
-        )
-        ws.data_validation(1, 9, 1000, 9, {
+    # KEEP only this — Dry Dock (col 9) only
+    ws.data_validation(1, 9, 1000, 9, {
         "validate": "list",
         "source": ["Yes", "No"],
         "input_title": "Select Option",
         "input_message": "Please select Yes or No",
-        })
+    })
 
     workbook.close()
     output.seek(0)

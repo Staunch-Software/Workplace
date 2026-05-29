@@ -22,7 +22,14 @@ const AeVesselRow = ({ vessel, onViewPdf, onViewData }) => {
         const fetchGens = async () => {
             try {
                 const data = await axiosAepms.getGeneratorsList(vessel.imo || vessel.imo_number);
-                if (isMounted) setGenerators(data || []);
+                if (isMounted) {
+                    // Sort by designation so AE1, AE2, AE3 always appear in order
+                    const sorted = (data || []).sort((a, b) =>
+                        a.designation.localeCompare(b.designation, undefined, { numeric: true, sensitivity: 'base' })
+                    );
+                    setGenerators(sorted);
+                }
+
             } catch (error) {
                 console.error(`Error fetching gens for ${vessel.name}`, error);
             } finally {
@@ -66,11 +73,12 @@ const AeVesselRow = ({ vessel, onViewPdf, onViewData }) => {
 
 
                             <div className="flex-center-gap">
-                                <button onClick={() => onViewData(gen)} className="view-button" title="View Data">
-                                    <Eye size={18} strokeWidth={2.0} /> {/* Consistent size */}
+                                {/* Pass the vessel_name along with the gen object */}
+                                <button onClick={() => onViewData({ ...gen, vessel_name: vessel.name })} className="view-button" title="View Data">
+                                    <Eye size={18} strokeWidth={2.0} />
                                 </button>
-                                <button onClick={() => onViewPdf(gen)} className="view-button" title="View PDF">
-                                    <FileText size={18} strokeWidth={2.0} /> {/* Consistent size */}
+                                <button onClick={() => onViewPdf({ ...gen, vessel_name: vessel.name })} className="view-button" title="View PDF">
+                                    <FileText size={18} strokeWidth={2.0} />
                                 </button>
                             </div>
                         </div>
@@ -82,6 +90,14 @@ const AeVesselRow = ({ vessel, onViewPdf, onViewData }) => {
 };
 
 const ShopTrialModal = ({ isOpen, onClose, data, type }) => {
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = 'hidden';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [isOpen]);
     if (!isOpen || !data) return null;
 
     const meParameters = [
@@ -128,7 +144,7 @@ const ShopTrialModal = ({ isOpen, onClose, data, type }) => {
                             {type === 'AE' ? <Wrench size={28} className="text-purple-600" /> : <Ship size={28} className="text-blue-700" />}
                             {formatVesselName(data.vessel_name)} — {data.engine_no || "Engine"} Data
                         </h3>
-                        <div className="flex-gap-6">
+                        {/* <div className="flex-gap-6">
                             {data.test_date && (
                                 <span className="flex-center-box">
                                     <span className="text-label">Source:</span>
@@ -143,7 +159,7 @@ const ShopTrialModal = ({ isOpen, onClose, data, type }) => {
                                     </span>
                                 </span>
                             )}
-                        </div>
+                        </div> */}
                     </div>
                     <button onClick={onClose} className="X-icon-btn">
                         <X size={24} />
@@ -222,8 +238,8 @@ const CustomDropdown = ({ options, value, onChange, placeholder, disabled }) => 
                 className={`custom-dropdown-trigger ${disabled ? 'disabled' : ''} ${isOpen ? 'open' : ''}`}
                 onClick={() => !disabled && setIsOpen(!isOpen)}
             >
-                <span 
-                    className="custom-dropdown-text" 
+                <span
+                    className="custom-dropdown-text"
                     title={selectedOption ? selectedOption.label : placeholder}
                 >
                     {selectedOption ? selectedOption.label : placeholder}
@@ -279,34 +295,34 @@ export default function Dashboard() {
 
     useEffect(() => {
         const loadData = async () => {
-    try {
-        // Single API call - gets everything
-        const configResponse = await axiosAepms.getFleetConfigurationSummary();
+            try {
+                // Single API call - gets everything
+                const configResponse = await axiosAepms.getFleetConfigurationSummary();
 
-        // 1. Set full fleet from backend (all 9 vessels from control DB)
-        const sortedFleet = (configResponse.fleet || []).sort((a, b) =>
-            formatVesselName(a.name).localeCompare(formatVesselName(b.name))
-        );
-        setFleet(sortedFleet);
+                // 1. Set full fleet from backend (all 9 vessels from control DB)
+                const sortedFleet = (configResponse.fleet || []).sort((a, b) =>
+                    formatVesselName(a.name).localeCompare(formatVesselName(b.name))
+                );
+                setFleet(sortedFleet);
 
-        // 2. Sort unconfigured lists
-        if (configResponse.me_unconfigured_list) {
-            configResponse.me_unconfigured_list.sort((a, b) =>
-                formatVesselName(a.name).localeCompare(formatVesselName(b.name))
-            );
-        }
-        if (configResponse.ae_unconfigured_list) {
-            configResponse.ae_unconfigured_list.sort((a, b) =>
-                formatVesselName(a.name).localeCompare(formatVesselName(b.name))
-            );
-        }
-        setConfigSummary(configResponse);
-    } catch (error) {
-        console.error("Failed to load dashboard data:", error);
-    } finally {
-        setLoading(false);
-    }
-};
+                // 2. Sort unconfigured lists
+                if (configResponse.me_unconfigured_list) {
+                    configResponse.me_unconfigured_list.sort((a, b) =>
+                        formatVesselName(a.name).localeCompare(formatVesselName(b.name))
+                    );
+                }
+                if (configResponse.ae_unconfigured_list) {
+                    configResponse.ae_unconfigured_list.sort((a, b) =>
+                        formatVesselName(a.name).localeCompare(formatVesselName(b.name))
+                    );
+                }
+                setConfigSummary(configResponse);
+            } catch (error) {
+                console.error("Failed to load dashboard data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
         loadData();
     }, []);
 
@@ -353,7 +369,7 @@ export default function Dashboard() {
     const handleCloseConfig = () => {
         setShowMeConfigDetails(false);
         setShowAeConfigDetails(false);
-        
+
         // --- ADD THESE 3 LINES TO RESET DROPDOWNS ---
         setSelectedUploadImo("");
         setSelectedAeUploadShip("");
@@ -426,11 +442,11 @@ export default function Dashboard() {
     const handleViewShopTrialData = async (vessel) => {
         try {
             // Ensure we have a valid IMO
-            const imo = vessel.imo || vessel.imo_number || vessel.id; 
+            const imo = vessel.imo || vessel.imo_number || vessel.id;
             console.log("Fetching ME Data for IMO:", imo); // Debugging
 
             const response = await axiosAepms.getShopTrialDataValues(imo);
-            
+
             // Workplace APIs often wrap data differently. 
             // We check both response and response.data
             const actualData = response?.data || response;
@@ -485,7 +501,7 @@ export default function Dashboard() {
         try {
             console.log("Fetching AE Data for Gen ID:", gen.generator_id);
             const response = await axiosAepms.getAEShopTrialDataValues(gen.generator_id);
-            
+
             const actualData = response?.data || response;
 
             if (actualData && Array.isArray(actualData) && actualData.length > 0) {
@@ -524,9 +540,9 @@ export default function Dashboard() {
                     <table className="vessel-table-enhanced">
                         <thead>
                             <tr>
-                                <th style={{width: '40%', textAlign: 'left'}}>Vessel Name</th>
-                                <th style={{width: '30%', textAlign: 'left'}}>IMO Number</th>
-                                <th style={{width: '30%', textAlign: 'center'}}>Status</th>
+                                <th style={{ width: '40%', textAlign: 'left' }}>Vessel Name</th>
+                                <th style={{ width: '30%', textAlign: 'left' }}>IMO Number</th>
+                                <th style={{ width: '30%', textAlign: 'center' }}>Status</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -556,14 +572,14 @@ export default function Dashboard() {
                 <div className="header-controls-me">
                     <div className="select-wrapper-me">
                         <CustomDropdown
-                        value={selectedUploadImo}
-                        onChange={(val) => setSelectedUploadImo(val)}
-                        placeholder="Select Vessel to Upload PDF..."
-                        options={meConfiguredList.map(ship => ({
-                            value: ship.imo,
-                            label: `${formatVesselName(ship.name)}`
-                        }))}
-                    />
+                            value={selectedUploadImo}
+                            onChange={(val) => setSelectedUploadImo(val)}
+                            placeholder="Select Vessel to Upload PDF..."
+                            options={meConfiguredList.map(ship => ({
+                                value: ship.imo,
+                                label: `${formatVesselName(ship.name)}`
+                            }))}
+                        />
                     </div>
 
                     <button onClick={handleUploadClick} disabled={isUploading || !selectedUploadImo} className="btn-upload-me">
@@ -584,7 +600,7 @@ export default function Dashboard() {
                                         <td className="custom-cell"><div className="vessel-icon"><Ship size={17} /></div>{formatVesselName(vessel.name)}</td>
                                         <td className="vessel-imo">{vessel.imo || vessel.imo_number}</td>
                                         <td><span className="custom-badge"><CheckCircle size={13} /> Configured</span></td>
-                                        <td className="text-center py-4"> 
+                                        <td className="text-center py-4">
                                             <div className="flex items-center justify-center gap-4"> {/* Increased gap to 4 */}
                                                 <button onClick={() => handleViewShopTrialData(vessel)} className="view-button" title="View Shop Trial Data">
                                                     <Eye size={18} strokeWidth={2.0} />
@@ -626,28 +642,28 @@ export default function Dashboard() {
                         {/* VESSEL SELECT */}
                         <div className="ae-select-wrapper-vessel">
                             <CustomDropdown
-                            value={selectedAeUploadShip}
-                            onChange={(val) => setSelectedAeUploadShip(val)}
-                            placeholder="Select Vessel..."
-                            options={aeConfiguredList.map(ship => ({
-                                value: ship.imo,
-                                label: `${formatVesselName(ship.name)}`
-                            }))}
-                        />
+                                value={selectedAeUploadShip}
+                                onChange={(val) => setSelectedAeUploadShip(val)}
+                                placeholder="Select Vessel..."
+                                options={aeConfiguredList.map(ship => ({
+                                    value: ship.imo,
+                                    label: `${formatVesselName(ship.name)}`
+                                }))}
+                            />
                         </div>
 
                         {/* GENERATOR SELECT – Desktop shows here, Mobile hides via CSS */}
                         <div className="ae-select-wrapper-gen">
                             <CustomDropdown
-                            value={selectedAeUploadGen}
-                            onChange={(val) => setSelectedAeUploadGen(val)}
-                            placeholder="Select Generator..."
-                            disabled={!selectedAeUploadShip}
-                            options={availableGenerators.map((gen) => ({
-                                value: gen.generator_id,
-                                label: `${gen.designation} (${gen.engine_model})`
-                            }))}
-                        />
+                                value={selectedAeUploadGen}
+                                onChange={(val) => setSelectedAeUploadGen(val)}
+                                placeholder="Select Generator..."
+                                disabled={!selectedAeUploadShip}
+                                options={availableGenerators.map((gen) => ({
+                                    value: gen.generator_id,
+                                    label: `${gen.designation} (${gen.engine_model})`
+                                }))}
+                            />
                         </div>
 
                         {/* UPLOAD BUTTON */}
@@ -667,27 +683,27 @@ export default function Dashboard() {
 
                         {/* CLOSE BUTTON */}
                         <button
-    className="close-btn-ae"
-    onClick={handleCloseConfig}
-    title="Close AE Configuration"
->
-    <X size={22} />
-</button>
+                            className="close-btn-ae"
+                            onClick={handleCloseConfig}
+                            title="Close AE Configuration"
+                        >
+                            <X size={22} />
+                        </button>
                     </div>
 
                     {/* ROW 2: GENERATOR SELECT (Mobile only - shown via CSS) */}
                     <div className="ae-controls-row-2">
                         <div className="ae-select-wrapper-gen">
                             <CustomDropdown
-                            value={selectedAeUploadGen}
-                            onChange={(val) => setSelectedAeUploadGen(val)}
-                            placeholder="Select Generator..."
-                            disabled={!selectedAeUploadShip}
-                            options={availableGenerators.map((gen) => ({
-                                value: gen.generator_id,
-                                label: `${gen.designation} (${gen.engine_model})`
-                            }))}
-                        />
+                                value={selectedAeUploadGen}
+                                onChange={(val) => setSelectedAeUploadGen(val)}
+                                placeholder="Select Generator..."
+                                disabled={!selectedAeUploadShip}
+                                options={availableGenerators.map((gen) => ({
+                                    value: gen.generator_id,
+                                    label: `${gen.designation} (${gen.engine_model})`
+                                }))}
+                            />
                         </div>
                     </div>
 
