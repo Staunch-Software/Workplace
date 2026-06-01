@@ -2071,6 +2071,7 @@ const ShoreDashboard = () => {
 
         const { field, dir } = filters.text_sort;
         const fieldMap = {
+          defect_number: 'defect_number',
           vessel: 'vessel_name',
           equipment: 'equipment_name',
           source: 'defect_source',
@@ -2621,7 +2622,7 @@ const ShoreDashboard = () => {
   return (
     <div className="dashboard-container defect-dashboard-container">
 
-      <div className="defect-header-row" style={{ display: 'flex', alignItems: 'center', gap: '15px', position: 'sticky', top: 0, zIndex: 50, background: '#f8fafc', padding: '10px 0', marginTop: '-10px' }}>
+      <div className="defect-header-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
         <h1 className="page-title defect-page-title" style={{ marginBottom: "0px" }}>Fleet Overview</h1>
         <button
           onClick={() => setIsEditMode(!isEditMode)}
@@ -2757,6 +2758,24 @@ const ShoreDashboard = () => {
               className="btn-create-defect-main"
             >
               + Create Defect
+            </button>
+            <button
+              onClick={() => setIsEditMode(!isEditMode)}
+              className="defect-edit-btn"
+              style={{
+                background: isEditMode ? '#ea580c' : 'white',
+                color: isEditMode ? 'white' : '#334155',
+                border: '1px solid #cbd5e1',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                fontWeight: '600',
+                gap: '6px',
+                transition: 'all 0.2s'
+              }}
+            >
+              <Edit3 size={16} />
+              {isEditMode ? 'Exit Edit Mode' : 'Enable Edit Mode'}
             </button>
 
             {['admin@ozellar.com', 'techdevops@ozellar.com'].includes(user?.email) && (

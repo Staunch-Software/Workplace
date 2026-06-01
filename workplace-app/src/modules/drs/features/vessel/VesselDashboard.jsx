@@ -1984,6 +1984,7 @@ const VesselDashboard = () => {
 
         const { field, dir } = filters.text_sort;
         const fieldMap = {
+          defect_number: 'defect_number',
           vessel: 'vessel_name',
           equipment: 'equipment_name',
           source: 'defect_source',
@@ -2439,7 +2440,7 @@ const VesselDashboard = () => {
 
   return (
     <div className="dashboard-wrapper">
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center', position: 'sticky', top: 0, zIndex: 50, background: '#f8fafc', padding: '10px 0', marginTop: '-10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center' }}>
         <div className="defect-header-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <h1 className="page-title defect-page-title" style={{ marginBottom: "0px" }}>Vessel Overview</h1>
           <button
@@ -2562,19 +2563,37 @@ const VesselDashboard = () => {
 
       <div className="table-card">
         <div className='table-action-bar'>
-          {/* LEFT: Create Defect Button */}
-          <button
-            onClick={() => {
-              setCurrentPage(1);
-              setShowCreateRow(true);
-            }}
-
-            disabled={showCreateRow}
-            // style={{ maxWidth: "200px" }}
-            className="btn-create-defect-main"
-          >
-            + Create Defect
-          </button>
+          {/* LEFT: Create Defect + Edit Mode Buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              onClick={() => {
+                setCurrentPage(1);
+                setShowCreateRow(true);
+              }}
+              disabled={showCreateRow}
+              className="btn-create-defect-main"
+            >
+              + Create Defect
+            </button>
+            <button
+              onClick={() => setIsEditMode(!isEditMode)}
+              className="defect-edit-btn"
+              style={{
+                background: isEditMode ? '#ea580c' : 'white',
+                color: isEditMode ? 'white' : '#334155',
+                border: '1px solid #cbd5e1',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                fontWeight: '600',
+                gap: '6px',
+                transition: 'all 0.2s'
+              }}
+            >
+              <Edit3 size={16} />
+              {isEditMode ? 'Exit Edit Mode' : 'Enable Edit Mode'}
+            </button>
+          </div>
 
           {/* RIGHT: Legend */}
           <div
