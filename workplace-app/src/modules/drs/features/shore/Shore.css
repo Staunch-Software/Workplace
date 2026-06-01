@@ -1087,6 +1087,7 @@
     justify-content: flex-start;
     gap: 10px;
   }
+
   .action-buttons-group {
     flex: 0 0 auto;
   }
@@ -1334,6 +1335,7 @@
     gap: 4px;
     padding: 5px;
   }
+
   .legend-item {
     gap: 2px;
   }
@@ -1549,13 +1551,14 @@
   }
 }
 
-@media (min-width: 2500px){
-  :root{
+@media (min-width: 2500px) {
+  :root {
     --navbar-height: 88px;
   }
+
   .data-table th, .data-table td {
     --action-bar-height: 60px;
-  } 
+  }
 }
 
 @media (max-width: 1300px) {
@@ -1668,14 +1671,15 @@
     font-size: 10px !important;
   }
 
-   .closure-hearder {
+  .closure-hearder {
     font-size: 10px !important;
   }
-  .thread-body{
+
+  .thread-body {
     font-size: 12px !important;
   }
 
-  .thread-author{
+  .thread-author {
     font-size: 11px;
   }
 
@@ -1803,20 +1807,20 @@
 }
 
 .thin-scroll::-webkit-scrollbar {
-    width: 4px;
+  width: 4px;
 }
 
 .thin-scroll::-webkit-scrollbar-track {
-    background: transparent;
+  background: transparent;
 }
 
 .thin-scroll::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 999px;
+  background: #cbd5e1;
+  border-radius: 999px;
 }
 
 .thin-scroll::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+  background: #94a3b8;
 }
 
 /* ── TOAST ── */
@@ -1881,7 +1885,8 @@
 /* Mobile */
 @media (max-width: 480px) {
   .confirm-overlay {
-    align-items: flex-end !important; /* slides up from bottom on mobile */
+    align-items: flex-end !important;
+    /* slides up from bottom on mobile */
     padding: 0;
   }
 
@@ -1938,27 +1943,34 @@
 
 /* ── BIG SCREEN / ULTRA-WIDE (1440px and above) ── */
 @media (min-width: 1440px) {
+
   /* TOAST */
   .toast-wrapper {
-    top: 32px; /* More spacing from the top */
+    top: 32px;
+    /* More spacing from the top */
     gap: 12px;
   }
 
   .toast-item {
-    font-size: 15px !important; /* Slightly larger text */
+    font-size: 15px !important;
+    /* Slightly larger text */
     padding: 14px 22px !important;
-    min-width: 300px; /* Ensure it has a nice presence */
+    min-width: 300px;
+    /* Ensure it has a nice presence */
   }
 
   /* CONFIRM MODAL */
   .confirm-box {
-    max-width: 450px !important; /* Wider modal for big screens */
-    padding: 32px 40px !important; /* More breathing room */
+    max-width: 450px !important;
+    /* Wider modal for big screens */
+    padding: 32px 40px !important;
+    /* More breathing room */
     border-radius: 12px !important;
   }
 
   .confirm-box p {
-    font-size: 16px !important; /* Increased readability */
+    font-size: 16px !important;
+    /* Increased readability */
     line-height: 1.6;
     margin-bottom: 24px !important;
   }
@@ -1973,8 +1985,10 @@
     gap: 16px !important;
   }
 }
+
 /* ── 2K RESOLUTION (2560px and above) ── */
 @media (min-width: 1921px) and (max-width: 2560px) {
+
   /* Toast Scaling */
   .toast-wrapper {
     top: 48px;
@@ -2008,6 +2022,7 @@
 
 /* ── 4K RESOLUTION (3840px and above) ── */
 @media (min-width: 2561px) {
+
   /* Toast Scaling */
   .toast-wrapper {
     top: 80px;
@@ -2019,7 +2034,7 @@
     padding: 24px 40px !important;
     border-radius: 16px !important;
     min-width: 500px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2) !important;
   }
 
   /* Confirm Modal Scaling */
@@ -2044,4 +2059,15 @@
   .confirm-btn-row {
     gap: 24px !important;
   }
+}
+
+
+.second-edit {
+  padding: 8px 8px !important;
+  font-size: 13px !important;
+  border-radius: 6px !important;
+  gap: 4px !important;
+  height: 38px !important;
+  min-width: 50px !important;
+  justify-content: center !important;
 }

@@ -48,7 +48,8 @@ import {
   DefectSourceFilter,
   FloatingSelectWithIcon,
   InlineDateEdit,
-  FloatingSelectText
+  FloatingSelectText,
+  DefectIdFilter,
 } from '@drs/components/shared/TableControls';
 
 // ─── TOAST SYSTEM ───
@@ -1997,6 +1998,25 @@ const VesselDashboard = () => {
         };
 
         return (a, b) => {
+
+          if (field === 'defect_number') {
+            const parse = (v) => {
+              if (!v) return { prefix: '', num: Infinity };
+              const m = String(v).match(/^([A-Za-z\-]*)(\d+)(.*)$/);
+              if (m) return { prefix: m[1], num: parseInt(m[2], 10), suffix: m[3] };
+              return { prefix: String(v), num: Infinity, suffix: '' };
+            };
+            const pA = parse(a.defect_number);
+            const pB = parse(b.defect_number);
+            // Same prefix family → sort numerically
+            if (pA.prefix === pB.prefix) {
+              return dir === 'asc' ? pA.num - pB.num : pB.num - pA.num;
+            }
+            // Different prefix → fallback to string
+            return dir === 'asc'
+              ? String(a.defect_number || '').localeCompare(String(b.defect_number || ''))
+              : String(b.defect_number || '').localeCompare(String(a.defect_number || ''));
+          }
           const key = fieldMap[field];
           const valA = a[key];
           const valB = b[key];
@@ -2574,24 +2594,6 @@ const VesselDashboard = () => {
             >
               + Create Defect
             </button>
-            <button
-              onClick={() => setIsEditMode(!isEditMode)}
-              className="defect-edit-btn"
-              style={{
-                background: isEditMode ? '#ea580c' : 'white',
-                color: isEditMode ? 'white' : '#334155',
-                border: '1px solid #cbd5e1',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                fontWeight: '600',
-                gap: '6px',
-                transition: 'all 0.2s'
-              }}
-            >
-              <Edit3 size={16} />
-              {isEditMode ? 'Exit Edit Mode' : 'Enable Edit Mode'}
-            </button>
           </div>
 
           {/* RIGHT: Legend */}
@@ -2675,12 +2677,9 @@ const VesselDashboard = () => {
                   strategy={horizontalListSortingStrategy}
                 > <tr>
                     <th style={{ width: 100, paddingLeft: "8px" }}>
-                      <FilterHeader
-                        label="Defect ID"
-                        field="defect_number"
+                      <DefectIdFilter
                         currentFilter={filters.defect_number}
                         onFilterChange={handleFilterChange}
-                        type="text"
                         onSort={() => handleTextSort('defect_number')}
                         sortState={filters.text_sort.field === 'defect_number' ? filters.text_sort.dir : null}
                       />

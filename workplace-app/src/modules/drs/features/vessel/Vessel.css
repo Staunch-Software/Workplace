@@ -275,7 +275,7 @@
 .filter-popover {
   position: absolute;
   top: 100%;
-  right: -95px;
+  right: -20px;
   margin-top: 11px;
   background: white;
   border: 1px solid var(--border-color);

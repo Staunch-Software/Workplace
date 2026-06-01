@@ -21,7 +21,8 @@ import {
   FilterHeader,
   EquipmentFilter,
   DefectSourceFilter,
-  VesselFilter
+  VesselFilter,
+  DefectIdFilter
 } from '@drs/components/shared/TableControls';
 import {
   STATUS_OPTIONS,
@@ -55,6 +56,7 @@ const ShoreReports = () => {
     is_flagged: [],
     is_dd: [],
     pending_closure: '',
+    defect_number: '',
     text_sort: { field: null, dir: 'asc' }
   });
 
@@ -182,6 +184,7 @@ const ShoreReports = () => {
       const { field, dir } = filters.text_sort;
       // REPLACE WITH
       const fieldMap = {
+        defect_number: 'defect_number',
         vessel: 'vessel_name',
         equipment: 'equipment_name',
         source: 'defect_source',
@@ -197,6 +200,24 @@ const ShoreReports = () => {
       const key = fieldMap[field];
       if (key) {
         result.sort((a, b) => {
+
+          if (field === 'defect_number') {
+            const parse = (v) => {
+              if (!v) return { prefix: '', num: Infinity };
+              const m = String(v).match(/^([A-Za-z\-]*)(\d+)(.*)$/);
+              if (m) return { prefix: m[1], num: parseInt(m[2], 10) };
+              return { prefix: String(v), num: Infinity };
+            };
+            const pA = parse(a.defect_number);
+            const pB = parse(b.defect_number);
+            if (pA.prefix === pB.prefix) {
+              return dir === 'asc' ? pA.num - pB.num : pB.num - pA.num;
+            }
+            return dir === 'asc'
+              ? String(a.defect_number || '').localeCompare(String(b.defect_number || ''))
+              : String(b.defect_number || '').localeCompare(String(a.defect_number || ''));
+          }
+
           // 1. Handle Dates
           if (field === 'date' || field === 'deadline') {
             const valA = a[key] ? new Date(a[key]).getTime() : 0;
@@ -275,6 +296,7 @@ const ShoreReports = () => {
       is_flagged: [],
       is_dd: [],
       pending_closure: '',
+      defect_number: '',
       text_sort: { field: null, dir: 'asc' }
     });
   };
@@ -686,12 +708,11 @@ const ShoreReports = () => {
                 textAlign: 'center',
                 top: "65px"
               }}>
-                <FilterHeader
-                  label="Defect ID"
-                  field="defect_number"
+                <DefectIdFilter
                   currentFilter={filters.defect_number}
                   onFilterChange={handleFilterChange}
-                  type="text"
+                  onSort={() => handleTextSort('defect_number')}
+                  sortState={filters.text_sort.field === 'defect_number' ? filters.text_sort.dir : null}
                 />
               </th>
               <th style={{

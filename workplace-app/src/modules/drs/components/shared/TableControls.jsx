@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 
 
-// Filter Header Component
 export const FilterHeader = ({
   label,
   field,
@@ -32,7 +31,6 @@ export const FilterHeader = ({
   sortState,
   isFiltered,
   iconRenderer,
-  alignRight = false,
 }) => {
 
 
@@ -40,8 +38,7 @@ export const FilterHeader = ({
   const [tempRange, setTempRange] = useState(currentFilter || { from: '', to: '' });
   const [tempDate, setTempDate] = useState(currentFilter || '');
   const filterRef = useRef(null);
-  const portalRef = useRef(null);
-  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
+
   // const isActive =
   //   type === 'date-range'
   //     ? !!currentFilter?.from || !!currentFilter?.to
@@ -51,9 +48,9 @@ export const FilterHeader = ({
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (filterRef.current?.contains(e.target)) return;
-      if (portalRef.current?.contains(e.target)) return;
-      setIsOpen(false);
+      if (!filterRef.current?.contains(e.target)) {
+        setIsOpen(false);
+      }
     };
 
     if (isOpen) {
@@ -133,27 +130,12 @@ export const FilterHeader = ({
             size={18}
             className={`filter-icon ${isActive ? 'active' : ''}`}
             style={{ color: filterIconColor }}   // ← ADD THIS LINE
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!isOpen && filterRef.current) {
-                const rect = filterRef.current.getBoundingClientRect();
-                const POPOVER_WIDTH = type === 'date-range' ? 320 : 220;
-                let left = rect.right - POPOVER_WIDTH;
-                if (left < 8) left = 8;
-                let top = rect.bottom + 4;
-                const POPOVER_HEIGHT = type === 'date-range' ? 120 : type === 'date' ? 100 : 260;
-                if (top + POPOVER_HEIGHT > window.innerHeight - 8) top = rect.top - POPOVER_HEIGHT - 4;
-                setPopoverPos({ top, left });
-              }
-              setIsOpen(prev => !prev);
-            }}
+            onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
           />
-          {isOpen && ReactDOM.createPortal(
+          {isOpen && (
             <div
-              ref={portalRef}
               className={`filter-popover ${type === 'date-range' ? 'date-range' : ''}`}
               onClick={(e) => e.stopPropagation()}
-              style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left, zIndex: 99999, width: `${type === 'date-range' ? '270px' : '200px '}` }}
             >
               {type === 'text' && (
                 <>
@@ -565,8 +547,7 @@ export const FilterHeader = ({
                 </div>
               )}
 
-            </div>,
-            document.body
+            </div>
           )}
         </div>
       </div>
@@ -582,7 +563,6 @@ export const FilterHeader = ({
       )} */}
 
     </div>
-
   );
 };
 
@@ -916,15 +896,13 @@ export function EquipmentFilter({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const ref = useRef(null);
-  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
-  const iconRef = useRef(null);
-  const portalRef = useRef(null);
+
   useEffect(() => {
     const handleClick = (e) => {
-      if (ref.current?.contains(e.target)) return;
-      if (portalRef.current?.contains(e.target)) return;
-      setOpen(false);
-      setSearch('');
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+        setSearch('');
+      }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -995,7 +973,7 @@ export function EquipmentFilter({
           )}
         </span>
 
-        <div ref={iconRef} className="filter-wrapper" style={{ position: 'relative' }}>
+        <div className="filter-wrapper" style={{ position: 'relative' }}>
           <Filter
             size={18}
             className={`filter-icon ${selectedValues.length ? 'active' : ''}`}
@@ -1005,33 +983,21 @@ export function EquipmentFilter({
                   : sortState ? '#2563eb'
                     : undefined
             }}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!open && iconRef.current) {
-                const rect = iconRef.current.getBoundingClientRect();
-                let left = rect.right - 220;
-                if (left < 8) left = 8;
-                let top = rect.bottom + 4;
-                if (top + 260 > window.innerHeight - 8) top = rect.top - 264;
-                setPopoverPos({ top, left });
-              }
-              setOpen(prev => !prev);
-            }}
+            onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
           />
 
-          {open && ReactDOM.createPortal(
+          {open && (
             <div
-              ref={portalRef}
               style={{
-                position: 'fixed',
-                top: popoverPos.top,
-                left: popoverPos.left,
-                // transform: 'translateX(-50%)',
+                position: 'absolute',
+                top: '120%',
+                left: '50%',
+                transform: 'translateX(-50%)',
                 background: '#fff',
                 border: '1px solid #e5e7eb',
                 borderRadius: 8,
                 padding: 10,
-                zIndex: 9999,
+                zIndex: 100,
                 minWidth: 220,
                 maxHeight: 260,
                 overflowY: 'auto',
@@ -1108,8 +1074,8 @@ export function EquipmentFilter({
                   Clear
                 </div>
               )}
-            </div>,
-            document.body)}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1129,15 +1095,13 @@ export function DefectSourceFilter({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const ref = useRef(null);
-  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
-  const iconRef = useRef(null);
-  const portalRef = useRef(null);
+
   useEffect(() => {
     const handleClick = (e) => {
-      if (ref.current?.contains(e.target)) return;
-      if (portalRef.current?.contains(e.target)) return;
-      setOpen(false);
-      setSearch('');
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+        setSearch('');
+      }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -1201,7 +1165,7 @@ export function DefectSourceFilter({
           )}
         </span>
 
-        <div ref={iconRef} className="filter-wrapper">
+        <div className="filter-wrapper">
           <Filter
             size={18}
             className={`filter-icon ${selectedValues.length ? 'active' : ''}`}
@@ -1211,32 +1175,21 @@ export function DefectSourceFilter({
                   : sortState ? '#2563eb'
                     : undefined
             }}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!open && iconRef.current) {
-                const rect = iconRef.current.getBoundingClientRect();
-                let left = rect.right - 220;
-                if (left < 8) left = 8;
-                let top = rect.bottom + 4;
-                if (top + 260 > window.innerHeight - 8) top = rect.top - 264;
-                setPopoverPos({ top, left });
-              }
-              setOpen(prev => !prev);
-            }}
+            onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
           />
 
-          {open && ReactDOM.createPortal(
+          {open && (
             <div
-              ref={portalRef}
               style={{
-                position: 'fixed',
-                top: popoverPos.top,
-                left: popoverPos.left,
+                position: 'absolute',
+                top: '120%',
+                left: '50%',
+                transform: 'translateX(-50%)',
                 background: '#fff',
                 border: '1px solid #e5e7eb',
                 borderRadius: 8,
                 padding: 10,
-                zIndex: 9999,
+                zIndex: 100,
                 minWidth: 240,
                 maxHeight: 260,
                 overflowY: 'auto',
@@ -1293,8 +1246,8 @@ export function DefectSourceFilter({
                   Clear
                 </div>
               )}
-            </div>,
-            document.body)}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1627,15 +1580,12 @@ export function VesselFilter({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
-  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
-  const iconRef = useRef(null);
-  const portalRef = useRef(null);
+
   useEffect(() => {
     const handleClick = (e) => {
-      if (ref.current?.contains(e.target)) return;
-      if (portalRef.current?.contains(e.target)) return;
-      setOpen(false);
-      // setSearch('');
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -1699,7 +1649,7 @@ export function VesselFilter({
           )}
         </span>
 
-        <div ref={iconRef} className="filter-wrapper" style={{ position: 'relative' }}>
+        <div className="filter-wrapper" style={{ position: 'relative' }}>
           <Filter
             size={18}
             className={`filter-icon ${selectedValues.length ? 'active' : ''}`}
@@ -1709,32 +1659,21 @@ export function VesselFilter({
                   : sortState ? '#2563eb'
                     : undefined
             }}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!open && iconRef.current) {
-                const rect = iconRef.current.getBoundingClientRect();
-                let left = rect.right - 220;
-                if (left < 8) left = 8;
-                let top = rect.bottom + 4;
-                if (top + 260 > window.innerHeight - 8) top = rect.top - 264;
-                setPopoverPos({ top, left });
-              }
-              setOpen(prev => !prev);
-            }}
+            onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
           />
 
-          {open && ReactDOM.createPortal(
+          {open && (
             <div
-              ref={portalRef}
               style={{
-                position: 'fixed',
-                top: popoverPos.top,
-                left: popoverPos.left,
+                position: 'absolute',
+                top: '120%',
+                left: '50%',
+                transform: 'translateX(-50%)',
                 background: '#fff',
                 border: '1px solid #e5e7eb',
                 borderRadius: 8,
                 padding: 10,
-                zIndex: 9999,
+                zIndex: 100,
                 minWidth: 220,
                 maxHeight: 260,
                 overflowY: 'auto',
@@ -1777,10 +1716,129 @@ export function VesselFilter({
                   Clear
                 </div>
               )}
-            </div>,
-            document.body)}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
+
+export const DefectIdFilter = ({
+  currentFilter,
+  onFilterChange,
+  onSort,
+  sortState,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setIsOpen(false);
+    };
+    if (isOpen) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [isOpen]);
+
+  const isActive = !!currentFilter;
+
+  const labelColor = isActive && sortState ? '#7c3aed'
+    : sortState ? '#2563eb'
+      : isActive ? '#ea580c'
+        : undefined;
+
+  return (
+    <div className="filter-header" ref={ref} style={{ position: 'relative' }}>
+      <div className="header-content">
+        <span
+          onClick={(e) => { e.stopPropagation(); onSort?.(); }}
+          title={
+            !onSort ? undefined
+              : sortState === 'asc' ? 'Sorted A → Z (click for Z → A)'
+                : sortState === 'desc' ? 'Sorted Z → A (click to clear)'
+                  : 'Click to sort'
+          }
+          style={{
+            cursor: onSort ? 'pointer' : 'default',
+            color: labelColor,
+            fontWeight: isActive || sortState ? 600 : undefined,
+            textDecorationLine: sortState ? 'underline' : 'none',
+            textDecorationStyle: sortState ? 'dotted' : 'none',
+            textUnderlineOffset: '2px',
+            transition: 'color 0.2s',
+          }}
+        >
+          Defect ID
+          {sortState && (
+            <span style={{ marginLeft: 3, fontSize: '10px' }}>
+              {sortState === 'asc' ? '↑' : '↓'}
+            </span>
+          )}
+        </span>
+
+        <div className="filter-wrapper" style={{ position: 'relative' }}>
+          <Filter
+            size={18}
+            className={`filter-icon ${isActive ? 'active' : ''}`}
+            style={{ color: labelColor }}
+            onClick={(e) => { e.stopPropagation(); setIsOpen(prev => !prev); }}
+          />
+
+          {isOpen && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                top: '150%',
+                left: '250%',
+                transform: 'translateX(-50%)',
+                background: '#fff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                padding: '10px',
+                zIndex: 100,
+                minWidth: '200px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+              }}
+            >
+              <input
+                autoFocus
+                type="text"
+                placeholder="Filter Defect ID..."
+                value={currentFilter || ''}
+                onChange={(e) => onFilterChange('defect_number', e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Escape') setIsOpen(false); }}
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  fontSize: '12px',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '4px',
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                }}
+              />
+
+              {currentFilter && (
+                <div
+                  onClick={() => { onFilterChange('defect_number', ''); setIsOpen(false); }}
+                  style={{
+                    marginTop: '8px',
+                    textAlign: 'right',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: '#ea580c',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Clear
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
