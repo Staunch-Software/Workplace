@@ -2439,7 +2439,7 @@ const VesselDashboard = () => {
 
   return (
     <div className="dashboard-wrapper">
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center', position: 'sticky', top: 0, zIndex: 50, background: '#f8fafc', padding: '10px 0', marginTop: '-10px' }}>
         <div className="defect-header-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <h1 className="page-title defect-page-title" style={{ marginBottom: "0px" }}>Vessel Overview</h1>
           <button
@@ -2663,6 +2663,8 @@ const VesselDashboard = () => {
                         currentFilter={filters.defect_number}
                         onFilterChange={handleFilterChange}
                         type="text"
+                        onSort={() => handleTextSort('defect_number')}
+                        sortState={filters.text_sort.field === 'defect_number' ? filters.text_sort.dir : null}
                       />
                     </th>
 

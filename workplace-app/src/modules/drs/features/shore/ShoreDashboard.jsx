@@ -2621,7 +2621,7 @@ const ShoreDashboard = () => {
   return (
     <div className="dashboard-container defect-dashboard-container">
 
-      <div className="defect-header-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+      <div className="defect-header-row" style={{ display: 'flex', alignItems: 'center', gap: '15px', position: 'sticky', top: 0, zIndex: 50, background: '#f8fafc', padding: '10px 0', marginTop: '-10px' }}>
         <h1 className="page-title defect-page-title" style={{ marginBottom: "0px" }}>Fleet Overview</h1>
         <button
           onClick={() => setIsEditMode(!isEditMode)}
@@ -2911,6 +2911,8 @@ const ShoreDashboard = () => {
                         currentFilter={filters.defect_number}
                         onFilterChange={handleFilterChange}
                         type="text"
+                        onSort={() => handleTextSort('defect_number')}
+                        sortState={filters.text_sort.field === 'defect_number' ? filters.text_sort.dir : null}
                       />
                     </th>
                     <th style={{ width: 20 }}>
