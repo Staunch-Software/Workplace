@@ -1686,9 +1686,8 @@ const VesselDashboard = () => {
   );
 
   const openCount = defects.filter(d => d.status === 'OPEN').length;
-  const highPriorityCount = defects.filter(d => d.priority === 'HIGH').length;
-
-  const criticalCount = defects.filter(d => d.priority === 'CRITICAL').length;
+  const highPriorityCount = defects.filter(d => d.priority === 'HIGH' && d.status === 'OPEN').length;
+  const criticalCount = defects.filter(d => d.priority === 'CRITICAL' && d.status === 'OPEN').length;
   const closedCount = defects.filter(d => d.status === 'CLOSED').length;
 
 
