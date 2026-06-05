@@ -591,28 +591,37 @@ const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
         });
 
         const loadAll = async () => {
-            const [drsRes, lubRes, jiraRes] = await Promise.allSettled([
-                apiDrs.get("/vessels/sync-status/all"),
-                apiLuboil.get("api/vessels/sync-status/all"),
-                axiosJira.get("api/vessels/sync-status/all"),
-            ]);
-            const mergedErrors = {};
-            const mergedLogs = {};
             const sources = [
-                { res: drsRes, key: 'drs' },
-                { res: lubRes, key: 'lubeoil' },
-                { res: jiraRes, key: 'jira' },
+                { promise: apiDrs.get("/vessels/sync-status/all"), key: 'drs' },
+                { promise: apiLuboil.get("api/vessels/sync-status/all"), key: 'lubeoil' },
+                { promise: axiosJira.get("api/vessels/sync-status/all"), key: 'jira' },
             ];
-            sources.forEach(({ res, key }) => {
-                if (res.status !== 'fulfilled') return;
-                Object.entries(res.value.data || {}).forEach(([imo, data]) => {
-                    mergedErrors[imo] = (mergedErrors[imo] || 0) + (data.failed_items_count || 0);
-                    if (!mergedLogs[imo]) mergedLogs[imo] = {};
-                    mergedLogs[imo][key] = data;
-                });
+
+            // Fire all requests, update state as each one resolves
+            sources.forEach(({ promise, key }) => {
+                promise
+                    .then(res => {
+                        const data = res.data || {};
+                        setModuleErrors(prev => {
+                            const next = { ...prev };
+                            Object.entries(data).forEach(([imo, d]) => {
+                                next[imo] = (next[imo] || 0) + (d.failed_items_count || 0);
+                            });
+                            return next;
+                        });
+                        setSyncLogs(prev => {
+                            const next = { ...prev };
+                            Object.entries(data).forEach(([imo, d]) => {
+                                next[imo] = { ...next[imo], [key]: d };
+                            });
+                            return next;
+                        });
+                    })
+                    .catch(err => {
+                        console.warn(`Sync status failed for ${key}:`, err);
+                        // Silently skip — other modules still render
+                    });
             });
-            setModuleErrors(mergedErrors);
-            setSyncLogs(mergedLogs);
         };
 
         loadAll();
