@@ -19,9 +19,10 @@ from dateutil.relativedelta import relativedelta
 from sqlalchemy import desc
 from sqlalchemy.orm import aliased
 from fastapi import Query 
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, status, Form
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, status, Form, Body
 from app.services.ae_pdf_extractor import extract_and_save_ae_pdf
 from fastapi.middleware.cors import CORSMiddleware
+from app.services.gemini_service import extract_data_with_gemini
 if sys.platform == 'win32':
     try:
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -124,7 +125,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -4419,23 +4420,32 @@ async def download_reports_zip(
 @app.get("/api/v1/user/vessels", tags=["User"])
 async def get_user_assigned_vessels(
     current_user: Any = Depends(auth.get_current_user),
-    control_db: AsyncSession = Depends(get_control_db)  # inject properly as async dependency
+    control_db: AsyncSession = Depends(get_control_db)
 ):
-    from app.model.control.vessel import Vessel as ControlVessel
-    from sqlalchemy import select
+    try:
+        from app.model.control.vessel import Vessel as ControlVessel
+        
+        # 1. Get IMOs (usually returned as integers from permissions logic)
+        allowed_imos, role = await get_allowed_vessel_imos(current_user)
+        
+        # 2. Convert IMOs to strings for the Control DB query
+        imo_strings = [str(imo) for imo in allowed_imos]
 
-    allowed_imos, role = await get_allowed_vessel_imos(current_user)
+        # 3. Execute query
+        result = await control_db.execute(
+            select(ControlVessel).where(ControlVessel.imo.in_(imo_strings))
+        )
+        vessels = result.scalars().all()
 
-    result = await control_db.execute(
-        select(ControlVessel).where(ControlVessel.imo.in_(allowed_imos))
-    )
-    vessels = result.scalars().all()
-
-    return [
-        {"imo": v.imo, "name": v.name}
-        for v in vessels
-    ]
-
+        return [
+            {"imo": v.imo, "name": v.name}
+            for v in vessels
+        ]
+    except Exception as e:
+        logger.error(f"❌ Crash in vessels route: {str(e)}")
+        # This will show the actual error in your terminal
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+    
 ALLOWED_DELETE_EMAILS = {
     "techdevops@ozellar.com",  
     "admin@ozellar.com",
@@ -4521,3 +4531,201 @@ async def delete_report(
         await db.rollback()
         logger.error(f"❌ Error deleting report: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal Server Error while deleting report")
+    
+@app.post("/api/performance/ai-auto-analyze")
+async def ai_auto_analyze(
+    file: UploadFile = File(...),
+    vessel_imo: int = Form(...),
+    engine_type: str = Form(...), # 'mainEngine' or 'auxiliaryEngine'
+    db: AsyncSession = Depends(get_db)
+):
+    # 1. Extract raw text from the uploaded PDF
+    # (You can use your existing PdfReader logic here)
+    contents = await file.read()
+    raw_text = extract_text_from_pdf(contents) 
+
+    # 2. Call the AI Service
+    analyzer = AIPerformanceAnalyzer(db)
+    analysis_result = await analyzer.generate_analysis(vessel_imo, raw_text, engine_type)
+
+    # 3. Extract the JSON part from analysis_result 
+    # and use your EXISTING database logic to store it
+    extracted_data = parse_json_from_ai(analysis_result)
+    
+    # This is where you call your existing save logic:
+    # Example: await save_monthly_report(...) 
+    # But instead of parsing the PDF manually, you pass the 'extracted_data' from AI.
+    
+    return {
+        "report_text": analysis_result, # For the UI display
+        "status": "Success",
+        "data_stored": True
+    }
+
+
+    
+@app.post("/api/performance/save-confirmed-json")
+async def save_confirmed_json(
+    data: list = Body(...), # NOW EXPECTS A LIST
+    engine_type: str = Body(...),
+    vessel_id: str = Body(...),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        # 1. Create a Session (like your Shop Trial)
+        # Note: Depending on your schema, you might save these to 
+        # ShopTrialPerformanceData instead of MonthlyReportHeader
+        
+        for entry in data:
+            cleaned_entry = {k: (None if v == "" else v) for k, v in entry.items()}
+            
+            if engine_type == "mainEngine":
+                # Logic to save each load point...
+                # new_point = ShopTrialPerformanceData(**cleaned_entry, session_id=...)
+                pass
+            
+        await db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==========================================================
+# FINAL AI EXTRACTION & BASELINE CONFIGURATION ENDPOINTS
+# ==========================================================
+
+@app.get("/api/v1/user/vessels", tags=["User"])
+async def get_user_assigned_vessels(
+    current_user: Any = Depends(auth.get_current_user),
+    control_db: AsyncSession = Depends(get_control_db) 
+):
+    """Fetches vessels from Control DB based on user permissions."""
+    try:
+        from app.model.control.vessel import Vessel as ControlVessel
+        allowed_imos, _ = await get_allowed_vessel_imos(current_user)
+        imo_strings = [str(imo) for imo in allowed_imos]
+
+        result = await control_db.execute(
+            select(ControlVessel).where(ControlVessel.imo.in_(imo_strings))
+        )
+        vessels = result.scalars().all()
+        return [{"imo": v.imo, "name": v.name} for v in vessels]
+    except Exception as e:
+        logger.error(f"Vessel Fetch Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch vessels")
+
+from app.services.gemini_service import extract_data_with_gemini
+
+@app.post("/api/performance/extract-pdf")
+async def extract_pdf_route(
+    file: UploadFile = File(...),
+    engine_type: str = Form("mainEngine"),
+    db: AsyncSession = Depends(get_db)
+):
+    """Receives PDF and returns JSON Matrix extracted by Gemini."""
+    try:
+        pdf_bytes = await file.read()
+        logger.info(f"Extracting PDF data for Engine Type: {engine_type} using Gemini (Flash)")
+        
+        # We now use Gemini API
+        extracted_json = await extract_data_with_gemini(pdf_bytes, engine_type)
+        return {"status": "success", "data": extracted_json}
+    except Exception as e:
+        logger.error(f"AI Extraction Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/admin/save-ai-baseline")
+async def save_ai_baseline(data: dict = Body(...), db: AsyncSession = Depends(get_db)):
+    """Saves Vessel Specs, Session Header, and Performance Matrix Points."""
+    try:
+        engine_type = data.get("engine_type", "mainEngine")
+        generator_id = data.get("generator_id")
+        v_data = data.get("vessel_info", {})
+        s_data = data.get("session_info", {})
+        p_table = data.get("performance_table", [])
+
+        if engine_type == "auxiliaryEngine":
+            from app.generator_models import GeneratorBaselineData
+            from sqlalchemy import delete
+            
+            if not generator_id:
+                raise ValueError("generator_id is required for Auxiliary Engine baseline")
+            
+            # Clear old baseline for this specific generator
+            await db.execute(delete(GeneratorBaselineData).where(GeneratorBaselineData.generator_id == int(generator_id)))
+            
+            for i, point in enumerate(p_table):
+                # Clean values: convert empty UI strings to None
+                import re
+                clean_point = {}
+                for k, v in point.items():
+                    if k == 'load_point_no': continue
+                    if v == "":
+                        clean_point[k] = None
+                    elif k == 'load_percentage' and isinstance(v, str):
+                        # Extract first number from "25% (T/C Cut-off)" -> 25.0
+                        m = re.search(r"(\d+(\.\d+)?)", v)
+                        clean_point[k] = float(m.group(1)) if m else None
+                    else:
+                        clean_point[k] = v
+
+                db.add(GeneratorBaselineData(
+                    **clean_point,
+                    generator_id=int(generator_id),
+                    imo_number=int(v_data.get('imo_number'))
+                ))
+            
+            await db.commit()
+            return {"status": "success", "message": f"Successfully configured AE Baseline"}
+            
+        else:
+            # 1. UPSERT Vessel Specs
+            res = await db.execute(select(VesselInfo).where(VesselInfo.imo_number == int(v_data['imo_number'])))
+            vessel = res.scalar_one_or_none()
+            
+            if vessel:
+                for k, v in v_data.items(): 
+                    if v is not None and v != "": setattr(vessel, k, v)
+            else:
+                vessel = VesselInfo(**v_data)
+                db.add(vessel)
+            await db.flush() 
+
+            # 2. CREATE Session Header
+            new_session = ShopTrialSession(
+                engine_no=vessel.engine_no,
+                trial_date=datetime.now().date(),
+                conducted_by=s_data.get('conducted_by', 'AI Extractor'),
+                remarks=s_data.get('remarks', 'Direct AI Extraction'),
+                status='COMPLETED'
+            )
+            db.add(new_session)
+            await db.flush()
+
+            # 3. CREATE Performance points (The Matrix columns)
+            for i, point in enumerate(p_table):
+                import re
+                clean_point = {}
+                for k, v in point.items():
+                    if k == 'load_point_no': continue
+                    if v == "":
+                        clean_point[k] = None
+                    elif k == 'load_percentage' and isinstance(v, str):
+                        m = re.search(r"(\d+(\.\d+)?)", v)
+                        clean_point[k] = float(m.group(1)) if m else None
+                    else:
+                        clean_point[k] = v
+
+                db.add(ShopTrialPerformanceData(
+                    **clean_point,
+                    session_id=new_session.session_id,
+                    test_sequence=i+1
+                ))
+
+            await db.commit()
+            return {"status": "success", "message": f"Successfully configured {vessel.vessel_name}"}
+
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Save Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database commit failed: {str(e)}")
