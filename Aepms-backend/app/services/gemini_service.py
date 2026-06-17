@@ -266,8 +266,7 @@ async def extract_data_with_gemini(pdf_bytes: bytes, engine_type: str):
     models_to_try = [
         "gemini-2.5-flash",
         "gemini-2.0-flash",
-        "gemini-2.5-pro",
-        "gemini-1.5-pro"
+        "gemini-2.5-pro"
     ]
 
     if engine_type == 'auxiliaryEngine':
@@ -275,59 +274,59 @@ async def extract_data_with_gemini(pdf_bytes: bytes, engine_type: str):
         You are a Marine Engineer. Extract the Engine Performance Table from this Auxiliary Engine PDF.
 
         PMAX / CYLINDER PRESSURE EXTRACTION:
-        - Identify cylinder maximum combustion pressure. In Japanese shop trials, this is typically written as "気筒内最高圧力" or "Max. Combustion Press. of Cylinder" (or "Pmax") [12].
-        - If Pmax is listed in MPa (e.g. 17.7 MPa), populate it directly in `pmax_raw_mpa` [12]. 
+        - Identify cylinder maximum combustion pressure. In Japanese shop trials, this is typically written as "気筒内最高圧力" or "Max. Combustion Press. of Cylinder" (or "Pmax").
+        - If Pmax is listed in MPa (e.g. 17.7 MPa), populate it directly in `pmax_raw_mpa`. 
         - If it is listed in bar (e.g. 177 bar), populate it in `max_combustion_pressure_bar`. 
 
         MULTIPLE ENGINES/GENERATORS EXTRACTION INSTRUCTIONS:
-        - The PDF may contain performance sheets for multiple distinct Auxiliary Engines / Generators (e.g. No.1 Gen, No.2 Gen, No.3 Gen or Engine Numbers like 11988, 11989, 11990) [12].
-        - You MUST extract every column for every generator present in the PDF file [12].
-        - For each PerformancePoint object, populate the 'engine_no' field with the specific engine serial number (e.g., "11988") or designation (e.g. "Aux Engine No.1") extracted from the header of that generator's test page [12].
-        - If the PDF only contains a single generator, populate the 'engine_no' with that single engine's number [12].
-        - ONLY extract columns and load points that are explicitly listed as operational parameters in the main summary trial tables. Ignore theoretical values or single limit values mentioned in passing on description or vibration pages [12].
+        - The PDF may contain performance sheets for multiple distinct Auxiliary Engines / Generators (e.g. No.1 Gen, No.2 Gen, No.3 Gen or Engine Numbers like 11988, 11989, 11990).
+        - You MUST extract every column for every generator present in the PDF file.
+        - For each PerformancePoint object, populate the 'engine_no' field with the specific engine serial number (e.g., "11988") or designation (e.g. "Aux Engine No.1") extracted from the header of that generator's test page.
+        - If the PDF only contains a single generator, populate the 'engine_no' with that single engine's number.
+        - ONLY extract columns and load points that are explicitly listed as operational parameters in the main summary trial tables. Ignore theoretical values or single limit values mentioned in passing on description or vibration pages.
 
         Map the data to the provided schema using these semantic mapping rules:
         - "load_percentage"                    (Look for: "Load", "%", "Load Factor")
         - "load_kw"                            (Look for: "Generator Output", "Load", "kW", "Brake Power")
         - "engine_output_kw"                   (Look for: "Load", "Output", "Power", "kW")
-        - "engine_speed_rpm"                   (Look for: "Speed", "RPM", "min-1") [12]
-        - "pmax_raw_mpa"                       (Look for: 気筒内最高圧力, Max. Combustion Press of Cylinder, Cylinder Press, MPa) [12]
-        - "max_combustion_pressure_bar"        (Look for: Pmax, Max. Press, bar) [12]
-        - "compression_pressure_bar"           (Look for: Pcomp, Comp. Press) [12]
-        - "boost_air_pressure_raw_mpa"         (Look for: Boost Air Press., Charge Air Press., MPa) [12]
-        - "scav_air_pressure_bar"              (Look for: Scav Air Pressure, Scav. Press, Charge Air Press, bar) [12]
-        - "exh_temp_tc_inlet_graph_c"          (Look for: TC Inlet Temp, Turbine Inlet, °C) [12]
-        - "exh_temp_cyl_outlet_avg_graph_c"    (Look for: Cylinder Outlet Temp Average, Cyl. Avg, °C) [12]
-        - "exh_temp_tc_outlet_graph_c"         (Look for: TC Outlet Temp, Turbine Outlet, °C) [12]
-        - "fuel_pump_index_graph"              (Look for: Fuel Pump Index, Rack Position, mm, Fuel Notch) [12]
-        - "sfoc_graph_g_kwh"                   (Look for: Specific Fuel Consumption, SFOC, g/kWh) [12]
-        - "exh_temp_cylinder_outlet_ave_c"     (Look for: "Exh Temp (Cyl Avg)", "Cyl Out Temp", "Exhaust Cyl Avg") [12]
-        - "exhaust_gas_temp_before_tc_c"       (Look for: "Exh Temp Before TC", "T/C Inlet", "Turbine Inlet", "Average of inlet banks") [12]
-        - "exhaust_gas_temp_after_tc_c"        (Look for: "Exh Temp After TC", "T/C Outlet", "Turbine Outlet") [12]
-        - "turbocharger_speed_rpm"             (Look for: "T/C Speed", "Blower Speed") [12]
-        - "fuel_rack_position_mm"              (Look for: "Fuel Rack", "Rack Position", "Fuel Index", "Index") [12]
-        - "sfoc_g_kwh"                         (Look for: "SFOC", "Specific Fuel Cons.", "g/kWh") [12]
-        - "fuel_consumption_total_kg_h"        (Look for: "Total Fuel Cons.", "Fuel Consumption", "FOC kg/h") [12]
-        - "tc_exhaust_inlet_bank_1_3_c"        (Look for: "T/C Inlet 1~3 Cyl", "T/C Exhaust Inlet Bank 1-3") [12]
-        - "tc_exhaust_inlet_bank_4_6_c"        (Look for: "T/C Inlet 4~6 Cyl", "T/C Exhaust Inlet Bank 4-6") [12]
+        - "engine_speed_rpm"                   (Look for: "Speed", "RPM", "min-1")
+        - "pmax_raw_mpa"                       (Look for: 気筒内最高圧力, Max. Combustion Press of Cylinder, Cylinder Press, MPa)
+        - "max_combustion_pressure_bar"        (Look for: Pmax, Max. Press, bar)
+        - "compression_pressure_bar"           (Look for: Pcomp, Comp. Press)
+        - "boost_air_pressure_raw_mpa"         (Look for: Boost Air Press., Charge Air Press., MPa)
+        - "scav_air_pressure_bar"              (Look for: Scav Air Pressure, Scav. Press, Charge Air Press, bar)
+        - "exh_temp_tc_inlet_graph_c"          (Look for: TC Inlet Temp, Turbine Inlet, °C)
+        - "exh_temp_cyl_outlet_avg_graph_c"    (Look for: Cylinder Outlet Temp Average, Cyl. Avg, °C)
+        - "exh_temp_tc_outlet_graph_c"         (Look for: TC Outlet Temp, Turbine Outlet, °C)
+        - "fuel_pump_index_graph"              (Look for: Fuel Pump Index, Rack Position, mm, Fuel Notch)
+        - "sfoc_graph_g_kwh"                   (Look for: Specific Fuel Consumption, SFOC, g/kWh)
+        - "exh_temp_cylinder_outlet_ave_c"     (Look for: "Exh Temp (Cyl Avg)", "Cyl Out Temp", "Exhaust Cyl Avg")
+        - "exhaust_gas_temp_before_tc_c"       (Look for: "Exh Temp Before TC", "T/C Inlet", "Turbine Inlet", "Average of inlet banks")
+        - "exhaust_gas_temp_after_tc_c"        (Look for: "Exh Temp After TC", "T/C Outlet", "Turbine Outlet")
+        - "turbocharger_speed_rpm"             (Look for: "T/C Speed", "Blower Speed")
+        - "fuel_rack_position_mm"              (Look for: "Fuel Rack", "Rack Position", "Fuel Index", "Index")
+        - "sfoc_g_kwh"                         (Look for: "SFOC", "Specific Fuel Cons.", "g/kWh")
+        - "fuel_consumption_total_kg_h"        (Look for: "Total Fuel Cons.", "Fuel Consumption", "FOC kg/h")
+        - "tc_exhaust_inlet_bank_1_3_c"        (Look for: "T/C Inlet 1~3 Cyl", "T/C Exhaust Inlet Bank 1-3")
+        - "tc_exhaust_inlet_bank_4_6_c"        (Look for: "T/C Inlet 4~6 Cyl", "T/C Exhaust Inlet Bank 4-6")
 
         Rules:
-        - Clean numeric values: remove units (bar, kW, RPM, °C, etc.) [12].
-        - Provide null for missing/blank values. DO NOT omit keys entirely [12].
+        - Clean numeric values: remove units (bar, kW, RPM, °C, etc.).
+        - Provide null for missing/blank values. DO NOT omit keys entirely.
         """
     else:
         prompt = """
         You are a Marine Engineer. Extract the Engine Performance Table from this Main Engine PDF.
 
         CRITICAL TABLE EXTRACTION INSTRUCTIONS:
-        1. The PDF contains a Shop Trial Performance Matrix [12].
-        2. You MUST extract EVERY column from the table. Typically there are columns for 25%, 50%, 75%, 90% (or 85%), 100% (1st run / 100-1), 100% (2nd run / 100-2), and 110% loads. Do not skip any columns, and ensure both 100% runs are extracted as separate sequential records [12].
-        3. Do NOT extract arbitrary percentages or load limits mentioned in passing text or vibration documents (e.g. "misfiring cylinder at 79% load" or "vibration range 41-50 rpm"). Only extract fully populated columns belonging to the official trial run tables (e.g. Page 42 or Page 62) [12].
-        4. "fuel_injection_pump_index_mm" (Fuel Index) and "fuel_oil_consumption_kg_h" (Fuel Consumption) are extremely important [12].
-        5. Strictly align numbers to their row parameters. The PDF table has rows for parameters and columns for loads. You must transpose this so each load column becomes an object in the JSON array [12].
-        6. Double check every parameter column so values are not swapped or shifted between adjacent load points [12].
-        7. Extract the "test_sequence" for each load point column sequential index (e.g. 1, 2, 3, 4, 5, 6, 7) [12].
-        8. ONLY extract load percentage columns that have fully populated performance rows on the summary page. If a load point (such as '70%' or '83% MCR') is mentioned as a reference, vibrating condition, or general spec on early drawing or description pages but contains no actual logged trial data, you MUST ignore it completely [12].
+        1. The PDF contains a Shop Trial Performance Matrix.
+        2. You MUST extract EVERY column from the table. Typically there are columns for 25%, 50%, 75%, 90% (or 85%), 100% (1st run / 100-1), 100% (2nd run / 100-2), and 110% loads. Do not skip any columns, and ensure both 100% runs are extracted as separate sequential records.
+        3. Do NOT extract arbitrary percentages or load limits mentioned in passing text or vibration documents (e.g. "misfiring cylinder at 79% load" or "vibration range 41-50 rpm"). Only extract fully populated columns belonging to the official trial run tables (e.g. Page 42 or Page 62).
+        4. "fuel_injection_pump_index_mm" (Fuel Index) and "fuel_oil_consumption_kg_h" (Fuel Consumption) are extremely important.
+        5. Strictly align numbers to their row parameters. The PDF table has rows for parameters and columns for loads. You must transpose this so each load column becomes an object in the JSON array.
+        6. Double check every parameter column so values are not swapped or shifted between adjacent load points.
+        7. Extract the "test_sequence" for each load point column sequential index (e.g. 1, 2, 3, 4, 5, 6, 7).
+        8. ONLY extract load percentage columns that have fully populated performance rows on the summary page. If a load point (such as '70%' or '83% MCR') is mentioned as a reference, vibrating condition, or general spec on early drawing or description pages but contains no actual logged trial data, you MUST ignore it completely.
 
         EXAMPLE OF HOW TO TRANSPOSE AND PAIR THE DATA:
         If the PDF table has rows:
@@ -342,40 +341,40 @@ async def extract_data_with_gemini(pdf_bytes: bytes, engine_type: str):
         ]
 
         Map the data to the provided schema using these semantic mapping rules for the performance_table:
-        - "load_percentage"                    (Look for: Load, %, Load Factor. Keep descriptive text intact, e.g., "25% (T/C Cut-off)" or "100-1") [12]
-        - "engine_output_kw"                   (Look for: Output, Power, Brake Power, kW, BHP) [12]
-        - "engine_speed_rpm"                   (Look for: Speed, RPM, Ne) [12]
-        - "max_combustion_pressure_bar"        (Look for: Pmax, Max. Press, Maximum Pressure, P.max. Standard measured value.) [12]
-        - "compression_pressure_bar"           (Look for: Pcomp, Comp. Press, Compression Press. Standard measured value.) [12]
-        - "mean_effective_pressure_bar"        (Look for: Pmean, Pme, Mean Eff. Press, Pi) [12]
-        - "scav_air_pressure_bar"              (Look for: Scav. Air Press, Charge Air Press, Pscav) [12]
-        - "scav_air_temperature_c"             (Look for: Scav. Temp, Charge Air Temp, Cooler Outlet Temp) [12]
-        - "exh_temp_cylinder_outlet_ave_c"     (Look for: Cyl Out Temp, Exhaust Cyl Avg, Exh. Gas Temp Cyl.) [12]
-        - "exh_temp_tc_inlet_c"                (Look for: T/C Inlet, Turbine Inlet, Exh Temp Before Blower) [12]
-        - "exh_temp_tc_outlet_c"               (Look for: T/C Outlet, Turbine Outlet, Exh Temp After Blower) [12]
-        - "turbocharger_speed_x1000_rpm"       (Look for: T/C Speed, Blower Speed. IMPORTANT: If the extracted value is a raw whole number > 100 (e.g. 5759), divide by 1000 and return a single-decimal string, e.g. "5.8". If it is already scaled as a single decimal like "5.9", extract it directly as is.) [12]
-        - "fuel_injection_pump_index_mm"       (Look for: Fuel Index, F.I.P. Index, Fuel Pump Index, Rack Position, F.Pump Mark, Fuel injection pump index) [12]
-        - "fuel_oil_consumption_kg_h"          (Look for: Fuel Consumption, Fuel Oil Consumption, FOC, Fuel Cons., Fuel Oil Cons. kg/h) [12]
-        - "fuel_oil_consumption_iso_g_kwh"     (Look for: Fuel oil consumption (ISO) g/kWh, or ISO SFOC, or Converted value based on ISO. Extract ONLY the ISO corrected fuel rate, not the raw measured SFOC.) [12]
-        - "tc_inlet_temp_c"                    (Look for: Before Turbine °C) [12]
-        - "tc_outlet_back_press_mmaq"          (Look for: Press Drop mmAq or Back Pressure mmAq) [12]
-        - "room_temperature_c"                 (Look for: Test Room Temperature °C) [12]
-        - "room_humidity_percent"              (Look for: Test Room Humidity %) [12]
-        - "barometer_pressure_mbar"            (Look for: Atmospheric/Barometric Pressure mbar) [12]
-        - "fuel_oil_temperature_c"             (Look for: Fuel Oil Temperature °C) [12]
-        - "fuel_oil_consumption_g_kwh"         (Look for: Fuel Oil Consumption g/kWh or Measured SFOC g/kWh) [12]
-        - "max_combustion_pressure_iso_bar"    (Look for: ISO corrected Pmax bar) [12]
-        - "compression_pressure_iso_bar"       (Look for: ISO corrected Pcomp bar) [12]
-        - "scav_air_pressure_iso_kg_cm2"       (Look for: ISO corrected Scav Air Pressure kg/cm² or bar) [12]
-        - "turbocharger_gas_inlet_press_kg_cm2" (Look for: Turbocharger gas inlet press kg/cm2 or bar) [12]
-        - "exh_temp_tc_inlet_iso_c"            (Look for: ISO corrected Exh Temp Before T/C °C) [12]
-        - "exh_temp_tc_outlet_iso_c"           (Look for: ISO corrected Exh Temp After T/C °C) [12]
-        - "turbocharger_speed_x1000_iso_rpm"   (Look for: ISO corrected T/C Speed x1000 rpm) [12]
+        - "load_percentage"                    (Look for: Load, %, Load Factor. Keep descriptive text intact, e.g., "25% (T/C Cut-off)" or "100-1")
+        - "engine_output_kw"                   (Look for: Output, Power, Brake Power, kW, BHP)
+        - "engine_speed_rpm"                   (Look for: Speed, RPM, Ne)
+        - "max_combustion_pressure_bar"        (Look for: Pmax, Max. Press, Maximum Pressure, P.max. Standard measured value.)
+        - "compression_pressure_bar"           (Look for: Pcomp, Comp. Press, Compression Press. Standard measured value.)
+        - "mean_effective_pressure_bar"        (Look for: Pmean, Pme, Mean Eff. Press, Pi)
+        - "scav_air_pressure_bar"              (Look for: Scav. Air Press, Charge Air Press, Pscav)
+        - "scav_air_temperature_c"             (Look for: Scav. Temp, Charge Air Temp, Cooler Outlet Temp)
+        - "exh_temp_cylinder_outlet_ave_c"     (Look for: Cyl Out Temp, Exhaust Cyl Avg, Exh. Gas Temp Cyl.)
+        - "exh_temp_tc_inlet_c"                (Look for: T/C Inlet, Turbine Inlet, Exh Temp Before Blower)
+        - "exh_temp_tc_outlet_c"               (Look for: T/C Outlet, Turbine Outlet, Exh Temp After Blower)
+        - "turbocharger_speed_x1000_rpm"       (Look for: T/C Speed, Blower Speed. IMPORTANT: If the extracted value is a raw whole number > 100 (e.g. 5759), divide by 1000 and return a single-decimal string, e.g. "5.8". If it is already scaled as a single decimal like "5.9", extract it directly as is.)
+        - "fuel_injection_pump_index_mm"       (Look for: Fuel Index, F.I.P. Index, Fuel Pump Index, Rack Position, F.Pump Mark, Fuel injection pump index)
+        - "fuel_oil_consumption_kg_h"          (Look for: Fuel Consumption, Fuel Oil Consumption, FOC, Fuel Cons., Fuel Oil Cons. kg/h)
+        - "fuel_oil_consumption_iso_g_kwh"     (Look for: Fuel oil consumption (ISO) g/kWh, or ISO SFOC, or Converted value based on ISO. Extract ONLY the ISO corrected fuel rate, not the raw measured SFOC.)
+        - "tc_inlet_temp_c"                    (Look for: Before Turbine °C)
+        - "tc_outlet_back_press_mmaq"          (Look for: Press Drop mmAq or Back Pressure mmAq)
+        - "room_temperature_c"                 (Look for: Test Room Temperature °C)
+        - "room_humidity_percent"              (Look for: Test Room Humidity %)
+        - "barometer_pressure_mbar"            (Look for: Atmospheric/Barometric Pressure mbar)
+        - "fuel_oil_temperature_c"             (Look for: Fuel Oil Temperature °C)
+        - "fuel_oil_consumption_g_kwh"         (Look for: Fuel Oil Consumption g/kWh or Measured SFOC g/kWh)
+        - "max_combustion_pressure_iso_bar"    (Look for: ISO corrected Pmax bar)
+        - "compression_pressure_iso_bar"       (Look for: ISO corrected Pcomp bar)
+        - "scav_air_pressure_iso_kg_cm2"       (Look for: ISO corrected Scav Air Pressure kg/cm² or bar)
+        - "turbocharger_gas_inlet_press_kg_cm2" (Look for: Turbocharger gas inlet press kg/cm2 or bar)
+        - "exh_temp_tc_inlet_iso_c"            (Look for: ISO corrected Exh Temp Before T/C °C)
+        - "exh_temp_tc_outlet_iso_c"           (Look for: ISO corrected Exh Temp After T/C °C)
+        - "turbocharger_speed_x1000_iso_rpm"   (Look for: ISO corrected T/C Speed x1000 rpm)
 
         Rules:
-        - Clean numeric values: remove units (bar, kW, RPM, °C, etc.) [12].
-        - Provide null for missing/blank values (such as '-' placeholders). DO NOT omit keys entirely [12].
-        - Ensure every row parameter matches its respective load column [12].
+        - Clean numeric values: remove units (bar, kW, RPM, °C, etc.).
+        - Provide null for missing/blank values (such as '-' placeholders). DO NOT omit keys entirely.
+        - Ensure every row parameter matches its respective load column.
         """
 
     last_error = None
@@ -413,7 +412,7 @@ async def extract_data_with_gemini(pdf_bytes: bytes, engine_type: str):
                         )
                     )
 
-                    # SAFETY CHECK: Prevent Google SDK "IndexError: string index out of range" crash on empty/blocked replies [3.1.2]
+                    # SAFETY CHECK: Prevent Google SDK "IndexError: string index out of range" crash on empty/blocked replies
                     if (
                         not response.candidates 
                         or len(response.candidates) == 0 
@@ -604,52 +603,52 @@ def post_process_extraction(result: dict) -> dict:
         # Note: MPa is converted from bar (divided by 10) on standard database insertion [12]
         if not point.get("pmax_raw_mpa") and point.get("max_combustion_pressure_bar"):
             try:
-                point["pmax_raw_mpa"] = str(round(float(point.get("max_combustion_pressure_bar")) / 10.0, 3)) [12]
+                point["pmax_raw_mpa"] = str(round(float(point.get("max_combustion_pressure_bar")) / 10.0, 3))
             except Exception:
                 pass
         elif not point.get("max_combustion_pressure_bar") and point.get("pmax_raw_mpa"):
             try:
-                point["max_combustion_pressure_bar"] = str(round(float(point.get("pmax_raw_mpa")) * 10.0, 1)) [12]
+                point["max_combustion_pressure_bar"] = str(round(float(point.get("pmax_raw_mpa")) * 10.0, 1))
             except Exception:
                 pass
                 
         # AUXILIARY SPECIFIC SCAV / BOOST AIR SAFETY MERGE:
         if not point.get("boost_air_pressure_raw_mpa") and point.get("scav_air_pressure_bar"):
             try:
-                point["boost_air_pressure_raw_mpa"] = str(round(float(point.get("scav_air_pressure_bar")) / 10.0, 3)) [12]
+                point["boost_air_pressure_raw_mpa"] = str(round(float(point.get("scav_air_pressure_bar")) / 10.0, 3))
             except Exception:
                 pass
         elif not point.get("scav_air_pressure_bar") and point.get("boost_air_pressure_raw_mpa"):
             try:
-                point["scav_air_pressure_bar"] = str(round(float(point.get("boost_air_pressure_raw_mpa")) * 10.0, 2)) [12]
+                point["scav_air_pressure_bar"] = str(round(float(point.get("boost_air_pressure_raw_mpa")) * 10.0, 2))
             except Exception:
                 pass
                 
         # AUXILIARY SPECIFIC TEMPERATURE MERGES:
         if not point.get("exh_temp_tc_inlet_graph_c") and point.get("exhaust_gas_temp_before_tc_c"):
-            point["exh_temp_tc_inlet_graph_c"] = point.get("exhaust_gas_temp_before_tc_c") [12]
+            point["exh_temp_tc_inlet_graph_c"] = point.get("exhaust_gas_temp_before_tc_c")
         elif not point.get("exhaust_gas_temp_before_tc_c") and point.get("exh_temp_tc_inlet_graph_c"):
-            point["exhaust_gas_temp_before_tc_c"] = point.get("exh_temp_tc_inlet_graph_c") [12]
+            point["exhaust_gas_temp_before_tc_c"] = point.get("exh_temp_tc_inlet_graph_c")
             
         if not point.get("exh_temp_cyl_outlet_avg_graph_c") and point.get("exh_temp_cylinder_outlet_ave_c"):
-            point["exh_temp_cyl_outlet_avg_graph_c"] = point.get("exh_temp_cylinder_outlet_ave_c") [12]
+            point["exh_temp_cyl_outlet_avg_graph_c"] = point.get("exh_temp_cylinder_outlet_ave_c")
         elif not point.get("exh_temp_cylinder_outlet_ave_c") and point.get("exh_temp_cyl_outlet_avg_graph_c"):
-            point["exh_temp_cylinder_outlet_ave_c"] = point.get("exh_temp_cyl_outlet_avg_graph_c") [12]
+            point["exh_temp_cylinder_outlet_ave_c"] = point.get("exh_temp_cyl_outlet_avg_graph_c")
             
         if not point.get("exh_temp_tc_outlet_graph_c") and point.get("exhaust_gas_temp_after_tc_c"):
-            point["exh_temp_tc_outlet_graph_c"] = point.get("exhaust_gas_temp_after_tc_c") [12]
+            point["exh_temp_tc_outlet_graph_c"] = point.get("exhaust_gas_temp_after_tc_c")
         elif not point.get("exhaust_gas_temp_after_tc_c") and point.get("exh_temp_tc_outlet_graph_c"):
-            point["exhaust_gas_temp_after_tc_c"] = point.get("exh_temp_tc_outlet_graph_c") [12]
+            point["exhaust_gas_temp_after_tc_c"] = point.get("exh_temp_tc_outlet_graph_c")
 
-        # Consolidated Fallback Calculation: Map split TC Inlet bank readings into one unified TC Inlet value [12]
+        # Consolidated Fallback Calculation: Map split TC Inlet bank readings into one unified TC Inlet value
         if not point.get("exh_temp_tc_inlet_graph_c") or point.get("exh_temp_tc_inlet_graph_c") == "":
             b1 = point.get("tc_exhaust_inlet_bank_1_3_c")
             b4 = point.get("tc_exhaust_inlet_bank_4_6_c")
             if b1 and b4:
                 try:
-                    avg_val = str(round((float(b1) + float(b4)) / 2.0, 1)) [12]
-                    point["exh_temp_tc_inlet_graph_c"] = avg_val [12]
-                    point["exhaust_gas_temp_before_tc_c"] = avg_val [12]
+                    avg_val = str(round((float(b1) + float(b4)) / 2.0, 1))
+                    point["exh_temp_tc_inlet_graph_c"] = avg_val
+                    point["exhaust_gas_temp_before_tc_c"] = avg_val
                 except Exception:
                     pass
 

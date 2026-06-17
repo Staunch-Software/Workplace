@@ -4636,7 +4636,7 @@ async def extract_pdf_route(
 
 @app.post("/api/admin/save-ai-baseline")
 async def save_ai_baseline(data: dict = Body(...), db: AsyncSession = Depends(get_db)):
-    """Saves Vessel Specs, Session Header, and Performance Matrix Points."""
+    """Saves Vessel Specs, Session Header, and Performance Matrix Points safely."""
     try:
         engine_type = data.get("engine_type", "mainEngine")
         generator_id = data.get("generator_id")
@@ -4644,35 +4644,55 @@ async def save_ai_baseline(data: dict = Body(...), db: AsyncSession = Depends(ge
         s_data = data.get("session_info", {})
         p_table = data.get("performance_table", [])
 
+        # Defensive helpers to ensure we don't crash when casting empty/null numbers
+        def safe_int(v):
+            if v is None or str(v).strip() == "":
+                return None
+            try:
+                return int(float(v))
+            except (ValueError, TypeError):
+                return None
+
+        # Clean specs dictionaries to match target schema format
+        v_data_cleaned = {}
+        for k, v in v_data.items():
+            if v == "" or v is None:
+                v_data_cleaned[k] = None
+            else:
+                v_data_cleaned[k] = str(v).strip()
+
         if engine_type == "auxiliaryEngine":
             from app.generator_models import GeneratorBaselineData
             from sqlalchemy import delete
             
-            if not generator_id:
+            gen_id_int = safe_int(generator_id)
+            if not gen_id_int:
                 raise ValueError("generator_id is required for Auxiliary Engine baseline")
             
+            imo_num_int = safe_int(v_data.get('imo_number'))
+            if not imo_num_int:
+                raise ValueError("imo_number is required for Auxiliary Engine baseline")
+
             # Clear old baseline for this specific generator
-            await db.execute(delete(GeneratorBaselineData).where(GeneratorBaselineData.generator_id == int(generator_id)))
+            await db.execute(delete(GeneratorBaselineData).where(GeneratorBaselineData.generator_id == gen_id_int))
             
             for i, point in enumerate(p_table):
-                # Clean values: convert empty UI strings to None
                 import re
                 clean_point = {}
                 for k, v in point.items():
                     if k == 'load_point_no': continue
-                    if v == "":
+                    if v == "" or v is None:
                         clean_point[k] = None
                     elif k == 'load_percentage' and isinstance(v, str):
-                        # Extract first number from "25% (T/C Cut-off)" -> 25.0
                         m = re.search(r"(\d+(\.\d+)?)", v)
-                        clean_point[k] = float(m.group(1)) if m else None
+                        clean_point[k] = m.group(1) if m else None
                     else:
-                        clean_point[k] = v
+                        clean_point[k] = str(v).strip()
 
                 db.add(GeneratorBaselineData(
                     **clean_point,
-                    generator_id=int(generator_id),
-                    imo_number=int(v_data.get('imo_number'))
+                    generator_id=gen_id_int,
+                    imo_number=imo_num_int
                 ))
             
             await db.commit()
@@ -4680,14 +4700,21 @@ async def save_ai_baseline(data: dict = Body(...), db: AsyncSession = Depends(ge
             
         else:
             # 1. UPSERT Vessel Specs
-            res = await db.execute(select(VesselInfo).where(VesselInfo.imo_number == int(v_data['imo_number'])))
+            imo_num_int = safe_int(v_data.get('imo_number'))
+            if not imo_num_int:
+                raise ValueError("imo_number is required for Vessel Info specs")
+
+            res = await db.execute(select(VesselInfo).where(VesselInfo.imo_number == imo_num_int))
             vessel = res.scalar_one_or_none()
             
+            # Align cleaned values with corrected integer structure
+            v_data_cleaned['imo_number'] = imo_num_int
+            
             if vessel:
-                for k, v in v_data.items(): 
-                    if v is not None and v != "": setattr(vessel, k, v)
+                for k, v in v_data_cleaned.items(): 
+                    if v is not None: setattr(vessel, k, v)
             else:
-                vessel = VesselInfo(**v_data)
+                vessel = VesselInfo(**v_data_cleaned)
                 db.add(vessel)
             await db.flush() 
 
@@ -4708,13 +4735,13 @@ async def save_ai_baseline(data: dict = Body(...), db: AsyncSession = Depends(ge
                 clean_point = {}
                 for k, v in point.items():
                     if k == 'load_point_no': continue
-                    if v == "":
+                    if v == "" or v is None:
                         clean_point[k] = None
                     elif k == 'load_percentage' and isinstance(v, str):
                         m = re.search(r"(\d+(\.\d+)?)", v)
-                        clean_point[k] = float(m.group(1)) if m else None
+                        clean_point[k] = m.group(1) if m else None
                     else:
-                        clean_point[k] = v
+                        clean_point[k] = str(v).strip()
 
                 db.add(ShopTrialPerformanceData(
                     **clean_point,

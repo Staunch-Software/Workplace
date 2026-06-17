@@ -1,4 +1,4 @@
-# Node
+﻿# Node
 node_modules
 dist
 build
@@ -16,10 +16,14 @@ __pycache__
 
 *.log
 
-.claude 
+.claude
 
 # OS
 .DS_Store
 Thumbs.db
 
+# Office temp files
 ~$*
+
+# Virtual env
+Aepms-backend/venv_new/
