@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   Card,
   CardHeader,
@@ -47,6 +47,14 @@ import "../styles/dashboard.css"; // Reusing dashboard styles
 import "../styles/luboil.css"; // Specific styles for luboil page
 import "../styles/luboil-responsive.css";
 import "../styles/luboil-fix.css"
+
+const getSourceBadgeStyle = (source) => {
+  const s = (source || "").toLowerCase();
+  if (s.includes("shell")) return { bg: "#fef3c7", text: "#d97706", border: "#fde68a" }; // Amber/Yellow
+  if (s.includes("tribocare")) return { bg: "#f0f9ff", text: "#0284c7", border: "#bae6fd" }; // Light Blue
+  if (s.includes("gulf")) return { bg: "#ffedd5", text: "#ea580c", border: "#fed7aa" }; // Orange
+  return { bg: "#f1f5f9", text: "#475569", border: "#e2e8f0" }; // Default Gray
+};
 
 const OverdueVesselRow = ({
   v,
@@ -119,20 +127,20 @@ const OverdueVesselRow = ({
       >
         <div
           onClick={() => {
-  const next = !isExpanded;
-  setIsExpanded(next);
-  if (next && rowRef.current) {
-    setTimeout(() => {
-  const container = document.querySelector(".vessel-modal-scroll-area");
-  if (container && rowRef.current) {
-    const containerTop = container.getBoundingClientRect().top;
-    const rowTop = rowRef.current.getBoundingClientRect().top;
-    const offset = rowTop - containerTop - 12;
-    container.scrollBy({ top: offset, behavior: "smooth" });
-  }
-}, 50);
-  }
-}}
+            const next = !isExpanded;
+            setIsExpanded(next);
+            if (next && rowRef.current) {
+              setTimeout(() => {
+                const container = document.querySelector(".vessel-modal-scroll-area");
+                if (container && rowRef.current) {
+                  const containerTop = container.getBoundingClientRect().top;
+                  const rowTop = rowRef.current.getBoundingClientRect().top;
+                  const offset = rowTop - containerTop - 12;
+                  container.scrollBy({ top: offset, behavior: "smooth" });
+                }
+              }, 50);
+            }
+          }}
           className="lub-list-row-header-left"
           style={{
             display: "flex",
@@ -171,6 +179,38 @@ const OverdueVesselRow = ({
               }}
             >
               <span>{v.name}</span>
+              
+              {/* SOURCE COUNTERS */}
+              {(() => {
+                if (!v.overdueItems || v.overdueItems.length === 0) return null;
+                const sourceCounts = {};
+                v.overdueItems.forEach(item => {
+                  const source = item.oilSource || "UNKNOWN";
+                  sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+                });
+                return Object.entries(sourceCounts).map(([source, count], idx) => {
+                  const style = getSourceBadgeStyle(source);
+                  return (
+                    <span 
+                      key={idx}
+                      style={{
+                        fontSize: "0.55rem",
+                        background: style.bg,
+                        color: style.text,
+                        padding: "1px 4px",
+                        borderRadius: "4px",
+                        marginLeft: idx === 0 ? "8px" : "4px",
+                        fontWeight: "700",
+                        display: "inline-block",
+                        verticalAlign: "middle"
+                      }}
+                      title={`${count} equipment from ${source.toUpperCase()}`}
+                    >
+                      {source.substring(0, 3).toUpperCase()}: {count}
+                    </span>
+                  );
+                });
+              })()}
 
               {/* 🔥 NEW: "+" BUTTON TO ADD REMARK (Hidden if pending or accepted) */}
               {!isConfiguredView &&
@@ -317,20 +357,20 @@ const OverdueVesselRow = ({
         {/* Right Side: Item Count and Chevron - Logic Preserved */}
         <div
           onClick={() => {
-  const next = !isExpanded;
-  setIsExpanded(next);
-  if (next && rowRef.current) {
-    setTimeout(() => {
-  const container = document.querySelector(".vessel-modal-scroll-area");
-  if (container && rowRef.current) {
-    const containerTop = container.getBoundingClientRect().top;
-    const rowTop = rowRef.current.getBoundingClientRect().top;
-    const offset = rowTop - containerTop - 12;
-    container.scrollBy({ top: offset, behavior: "smooth" });
-  }
-}, 50);
-  }
-}}
+            const next = !isExpanded;
+            setIsExpanded(next);
+            if (next && rowRef.current) {
+              setTimeout(() => {
+                const container = document.querySelector(".vessel-modal-scroll-area");
+                if (container && rowRef.current) {
+                  const containerTop = container.getBoundingClientRect().top;
+                  const rowTop = rowRef.current.getBoundingClientRect().top;
+                  const offset = rowTop - containerTop - 12;
+                  container.scrollBy({ top: offset, behavior: "smooth" });
+                }
+              }, 50);
+            }
+          }}
           style={{
             display: "flex",
             alignItems: "center",
@@ -414,19 +454,42 @@ const OverdueVesselRow = ({
                   <span className="lub-list-equip-name">
                     {item.fullName} {item.overdueText || ""}
                   </span>
+                  {/* Container for Date and Badge */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                    {!isConfiguredView && (
+                      <span className="lub-list-report-date" style={{ marginTop: 0 }}>
+                        Report Date:{" "}
+                        {item.reportDate
+                          ? new Date(item.reportDate).toLocaleDateString(
+                              "en-GB",
+                              { day: "2-digit", month: "short", year: "numeric" },
+                            )
+                          : "N/A"}
+                      </span>
+                    )}
 
-                  {/* ðŸ”¥ ONLY SHOW REPORT DATE LINE IF NOT CONFIGURED MODAL */}
-                  {!isConfiguredView && (
-                    <span className="lub-list-report-date">
-                      Report Date:{" "}
-                      {item.reportDate
-                        ? new Date(item.reportDate).toLocaleDateString(
-                          "en-GB",
-                          { day: "2-digit", month: "short", year: "numeric" },
-                        )
-                        : "N/A"}
-                    </span>
-                  )}
+                    {item.oilSource && (() => {
+                      const style = getSourceBadgeStyle(item.oilSource);
+                      return (
+                        <span 
+                            className="lub-list-source-badge" 
+                            style={{
+                                fontSize: "0.65rem", 
+                                background: style.bg, 
+                                color: style.text, 
+                                border: `1px solid ${style.border}`,
+                                padding: "2px 8px", 
+                                borderRadius: "12px",
+                                display: "inline-block",
+                                verticalAlign: "middle",
+                                fontWeight: "600",
+                                letterSpacing: "0.5px"
+                            }}>
+                          {item.oilSource.toUpperCase()}
+                        </span>
+                      );
+                    })()}
+                  </div>
                 </div>
 
                 {/* Right Side Action/Status Area */}
@@ -583,6 +646,9 @@ const LuboilAnalysis = () => {
   const [trendModal, setTrendModal] = useState({
     isOpen: false,
     data: [],
+    allData: [],       // full unfiltered data from API
+    sources: [],       // unique sources found e.g. ['SHELL', 'TRIBOCARE']
+    activeSource: null, // currently selected source tab
     title: "",
   });
   // const [hiddenNotifIds, setHiddenNotifIds] = useState(() => {
@@ -684,6 +750,7 @@ const LuboilAnalysis = () => {
   const [selectedVesselsFilter, setSelectedVesselsFilter] = useState([]);
   const [isVesselDropdownOpen, setIsVesselDropdownOpen] = useState(false);
   const vesselDropdownRef = useRef(null);
+  const [selectedSource, setSelectedSource] = useState("shell");
   const rawJobTitle = (user?.job_title || user?.user?.job_title || "")
     .toLowerCase()
     .replace(/\s+/g, "");
@@ -939,22 +1006,58 @@ const LuboilAnalysis = () => {
       .map((name) => ({
         vessel_name: name,
         imo: matrixData?.data?.[name]?.imo,
+        // Collect all source keys from every machinery's by_source map
+        all_sources: [
+          ...new Set(
+            Object.values(matrixData?.data?.[name]?.machineries || {})
+              .flatMap((m) => Object.keys(m.by_source || {}))
+          )
+        ],
       }))
       .sort((a, b) => a.vessel_name.localeCompare(b.vessel_name));
   }, [normalizedTable.rows, matrixData]);
 
-  // PLACE THIS NEW ONE HERE:
-  useEffect(() => {
-    // Only auto-select if we haven't done it yet and we have vessels
-    if (availableVessels.length > 0 && !hasInitiallySelected.current) {
-      const myAssignedShips = availableVessels.map((v) => v.vessel_name);
-      setSelectedVesselsFilter(myAssignedShips);
-      setIsTableOpen(true);
+  // Derive unique lab sources from ALL machinery across ALL vessels (no "ALL" option)
+  const availableSources = useMemo(() => {
+    const sources = new Set();
+    Object.values(matrixData?.data || {}).forEach((vData) => {
+      Object.values(vData?.machineries || {}).forEach((m) => {
+        if (m.oil_source && m.oil_source.trim() !== "") sources.add(m.oil_source);
+      });
+    });
+    const orderMap = { shell: 1, gulf: 2 };
+    return [...Array.from(sources)].sort((a, b) => {
+      const aLower = a.toLowerCase();
+      const bLower = b.toLowerCase();
+      const aRank = orderMap[Object.keys(orderMap).find(k => aLower.includes(k))] || 99;
+      const bRank = orderMap[Object.keys(orderMap).find(k => bLower.includes(k))] || 99;
+      if (aRank !== bRank) return aRank - bRank;
+      return a.localeCompare(b);
+    });
+  }, [matrixData]);
 
-      // ðŸ”¥ Mark as done so the user can manually change things later
+  // A vessel is visible if ANY of its machinery matches the selected source
+  const sourceFilteredVessels = useMemo(() => {
+    if (!selectedSource) return availableVessels;
+    return availableVessels.filter((v) =>
+      v.all_sources.some((s) =>
+        s.toLowerCase().includes(selectedSource.toLowerCase())
+      )
+    );
+  }, [availableVessels, selectedSource]);
+
+  // Always keep selectedVesselsFilter in sync with sourceFilteredVessels.
+  // Fires on: initial load, source pill change, new PDF upload (data refresh).
+  useEffect(() => {
+    if (sourceFilteredVessels.length === 0) return;
+    setSelectedVesselsFilter(sourceFilteredVessels.map((v) => v.vessel_name));
+    // Only open the table on the very first load
+    if (!hasInitiallySelected.current) {
+      setIsTableOpen(true);
       hasInitiallySelected.current = true;
     }
-  }, [availableVessels]); // Remove selectedVesselsFilter.length from here!
+  }, [sourceFilteredVessels]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Add this to LuboilAnalysis.js to auto-refresh the modal content when matrix data changes
   useEffect(() => {
     if (
@@ -1622,6 +1725,9 @@ const LuboilAnalysis = () => {
     setTrendModal({
       isOpen: true,
       data: [],
+      allData: [],
+      sources: [],
+      activeSource: null,
       title: `${vesselName} - ${description}`,
     });
     try {
@@ -1632,35 +1738,72 @@ const LuboilAnalysis = () => {
 
       const processedData = rawData.map((item) => {
         const dateObj = new Date(item.date);
+        // Helper: parse to float, return 0 if missing as requested by user
+        const _n = (v) => (v !== null && v !== undefined && v !== "" ? parseFloat(v) : 0);
         return {
           ...item,
-          // Numeric timestamp for vertical stacking
+          oil_source: (item.oil_source || "UNKNOWN").toUpperCase(),
           timestamp: dateObj.getTime(),
-          // Readable string for the Tooltip (e.g., "25 Oct 2025")
           dateLabel: item.date,
-          viscosity_40c: parseFloat(item.viscosity_40c) || 0,
-          iron: parseFloat(item.iron) || 0,
-          water: parseFloat(item.water) || 0,
-          tan: parseFloat(item.tan) || 0,
-          tbn: parseFloat(item.tbn) || 0,
-          copper: parseFloat(item.copper) || 0,
-          aluminium: parseFloat(item.aluminium) || 0,
-          sodium: parseFloat(item.sodium) || 0,
-          silicon: parseFloat(item.silicon) || 0,
-          calcium: parseFloat(item.calcium) || 0,
-          magnesium: parseFloat(item.magnesium) || 0,
-          zinc: parseFloat(item.zinc) || 0,
+          viscosity_40c: _n(item.viscosity_40c),
+          iron: _n(item.iron),
+          water: _n(item.water),
+          tan: _n(item.tan),
+          tbn: _n(item.tbn),
+          copper: _n(item.copper),
+          aluminium: _n(item.aluminium),
+          sodium: _n(item.sodium),
+          silicon: _n(item.silicon),
+          calcium: _n(item.calcium),
+          magnesium: _n(item.magnesium),
+          zinc: _n(item.zinc),
         };
       });
 
+
       processedData.sort((a, b) => a.timestamp - b.timestamp);
-      setTrendModal((prev) => ({ ...prev, data: processedData }));
+
+      // Collect unique sources present in this machinery's history
+      let uniqueSources = [...new Set(processedData.map((d) => d.oil_source))].filter(Boolean);
+
+      // Add 'ALL' option if there are multiple sources
+      if (uniqueSources.length > 1) {
+        uniqueSources = ["ALL", ...uniqueSources];
+      }
+
+      // Default: sync with selectedSource from main view, or fallback to ALL / SHELL / first
+      let defaultSource = null;
+      if (selectedSource) {
+        const uppercaseSelected = selectedSource.toUpperCase();
+        if (uniqueSources.includes(uppercaseSelected)) {
+          defaultSource = uppercaseSelected;
+        }
+      }
+      
+      if (!defaultSource) {
+        if (uniqueSources.includes("ALL")) defaultSource = "ALL";
+        else if (uniqueSources.includes("SHELL")) defaultSource = "SHELL";
+        else defaultSource = uniqueSources[0] || null;
+      }
+
+      const filteredData = (defaultSource && defaultSource !== "ALL")
+        ? processedData.filter((d) => d.oil_source === defaultSource)
+        : processedData;
+
+      setTrendModal((prev) => ({
+        ...prev,
+        allData: processedData,
+        data: filteredData,
+        sources: uniqueSources,
+        activeSource: defaultSource,
+      }));
     } catch (err) {
       console.error(err);
     } finally {
       setLoadingTrend(false);
     }
   };
+
   const handleTextareaChange = async (val) => {
     // Determine which buffer to update
     if (chatMode === "internal") {
@@ -1802,16 +1945,9 @@ const LuboilAnalysis = () => {
             return (
               <div
                 key={index}
-                style={{ display: "flex", gap: "12px", paddingLeft: "10px" }}
+                style={{ display: "flex", gap: "12px" }}
               >
-                <span
-                  style={{
-                    color: "#2563eb",
-                    fontWeight: "bold",
-                    minWidth: "20px",
-                  }}
-                ></span>
-                <span style={{ color: "#475569", lineHeight: "1.6" }}>
+                <span style={{ lineHeight: "1.6" }}>
                   {trimmedPart}
                 </span>
               </div>
@@ -1824,8 +1960,6 @@ const LuboilAnalysis = () => {
               key={index}
               style={{
                 margin: 0,
-                fontWeight: "500",
-                color: "#1e293b",
                 marginBottom: "8px",
               }}
             >
@@ -2775,13 +2909,29 @@ const LuboilAnalysis = () => {
     const matchingVessels = [];
 
     Object.entries(matrixData.data).forEach(([vesselName, vesselData]) => {
+      // Create an array of machineries with the active source overlay applied
+      const sourceFilteredMachineries = Object.values(vesselData.machineries || {}).map((rawM) => {
+        if (selectedSource && rawM?.by_source?.[selectedSource]) {
+          return {
+            ...rawM,
+            ...rawM.by_source[selectedSource],
+            is_configured: rawM.is_configured,
+            description: rawM.description,
+            history: (rawM.history || []).filter(h => (h.oil_source || "").toLowerCase().includes(selectedSource)),
+            by_source: rawM.by_source
+          };
+        }
+        return rawM;
+      });
+
       // --- CASE 1: Configured Vessels ---
       if (statusType === "Configured") {
-        const configuredItems = Object.values(vesselData.machineries || {})
+        const configuredItems = sourceFilteredMachineries
           .filter((m) => m.is_configured)
           .map((m) => ({
             fullName: m.description || m.code,
             shortCode: m.analyst_code || m.code,
+            oilSource: m.oil_source,
           }));
 
         if (configuredItems.length > 0) {
@@ -2808,7 +2958,7 @@ const LuboilAnalysis = () => {
 
       // --- CASE 2: Pending / Unresolved ---
       if (statusType === "PendingUnresolved") {
-        const items = Object.values(vesselData.machineries || {})
+        const items = sourceFilteredMachineries
           .filter((m) => {
             const hasReport = m.has_report === true;
             const isNotResolved = !m.is_resolved;
@@ -2833,6 +2983,7 @@ const LuboilAnalysis = () => {
               status: m.status,
               rawData: m,
               state: state,
+              oilSource: m.oil_source,
             };
           });
 
@@ -2853,7 +3004,7 @@ const LuboilAnalysis = () => {
       let vesselIsOverdueOver30 = false;
       let vesselIsOverdueUnder30 = false;
 
-      Object.values(vesselData.machineries || {}).forEach((m) => {
+      sourceFilteredMachineries.forEach((m) => {
         if (!m.is_configured || !m.has_report || !m.last_sample) return;
         hasReport = true;
 
@@ -2882,9 +3033,9 @@ const LuboilAnalysis = () => {
           rawData: m,
           overdueText: `(Overdue by ${daysOverdue} days)`,
           state: daysOverdue > 30 ? "danger" : "warning",
-          // 🔥 ADDED THESE TWO LINES
           report_overdue_remarks: m.report_overdue_remarks,
           report_is_overdue_accepted: m.report_is_overdue_accepted,
+          oilSource: m.oil_source,
         };
 
         if (daysOverdue > 30) {
@@ -2952,7 +3103,7 @@ const LuboilAnalysis = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = (await axiosLub.get("/api/v1/fleet/luboil-overview")).data;
+      const res = (await axiosLub.get(`/api/v1/fleet/luboil-overview?t=${new Date().getTime()}`)).data;
 
       // 1. Store the Matrix Data directly
       setMatrixData(res);
@@ -2961,8 +3112,7 @@ const LuboilAnalysis = () => {
       setTableColumns(res.columns || []);
       setColumnLabels(res.column_labels || {});
       processTableData(res);
-      // 3. Calculate Stats (using the new logic below)
-      calculateMachineryStats(res);
+      // Stats are now calculated by the useEffect on matrixData & selectedSource
     } catch (err) {
       console.error("Failed to load luboil data", err);
     } finally {
@@ -2973,6 +3123,13 @@ const LuboilAnalysis = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Recalculate top four cards whenever source filter or matrix data changes
+  useEffect(() => {
+    if (matrixData) {
+      calculateMachineryStats(matrixData);
+    }
+  }, [matrixData, selectedSource]);
 
   const handleFileUpload = async (e) => {
     // 1. Convert FileList to an Array
@@ -3414,29 +3571,29 @@ const LuboilAnalysis = () => {
   };
 
   const tryCollapsePanel = (isCollapsed, setCollapsed, otherCollapsedStates, otherSetters) => {
-  const isMobile = window.innerWidth <= 900;
-  const openCount = [isCollapsed, ...otherCollapsedStates].filter(c => !c).length;
+    const isMobile = window.innerWidth <= 900;
+    const openCount = [isCollapsed, ...otherCollapsedStates].filter(c => !c).length;
 
-  // Block closing the last open panel
-  if (!isCollapsed && openCount <= 1) {
-    setPanelToast(true);
-    setTimeout(() => setPanelToast(false), 2500);
-    return;
-  }
-
-  // On mobile: opening a panel when 2 are already open → auto-collapse the first open other panel
-  if (isMobile && isCollapsed) {
-    const currentlyOpen = otherCollapsedStates
-      .map((c, i) => ({ collapsed: c, index: i }))
-      .filter(x => !x.collapsed);
-
-    if (currentlyOpen.length >= 2 && otherSetters) {
-      otherSetters[currentlyOpen[0].index](true);
+    // Block closing the last open panel
+    if (!isCollapsed && openCount <= 1) {
+      setPanelToast(true);
+      setTimeout(() => setPanelToast(false), 2500);
+      return;
     }
-  }
 
-  setCollapsed(prev => !prev);
-};
+    // On mobile: opening a panel when 2 are already open → auto-collapse the first open other panel
+    if (isMobile && isCollapsed) {
+      const currentlyOpen = otherCollapsedStates
+        .map((c, i) => ({ collapsed: c, index: i }))
+        .filter(x => !x.collapsed);
+
+      if (currentlyOpen.length >= 2 && otherSetters) {
+        otherSetters[currentlyOpen[0].index](true);
+      }
+    }
+
+    setCollapsed(prev => !prev);
+  };
   // --- LOGIC FOR RESOLUTION GATING ---
   const isVesselUser = !amIShore;
   const currentSampleDate = new Date(
@@ -4173,8 +4330,8 @@ const LuboilAnalysis = () => {
                           <input
                             type="checkbox"
                             checked={
-                              availableVessels.length > 0 &&
-                              availableVessels.every((v) =>
+                              sourceFilteredVessels.length > 0 &&
+                              sourceFilteredVessels.every((v) =>
                                 selectedVesselsFilter.includes(v.vessel_name),
                               )
                             }
@@ -4186,7 +4343,7 @@ const LuboilAnalysis = () => {
 
                       {/* SCROLLABLE LIST AREA */}
                       <div className="vessel-dropdown-scroll">
-                        {availableVessels.map((v) => (
+                        {sourceFilteredVessels.map((v) => (
                           <div key={v.vessel_name} className="vessel-menu-item">
                             <label className="vessel-checkbox-label">
                               <input
@@ -4209,16 +4366,51 @@ const LuboilAnalysis = () => {
                 </div>
               </div>
 
-              {/* RIGHT SIDE: COLLAPSE BUTTON */}
+              {/* RIGHT SIDE: SOURCE FILTER + COLLAPSE BUTTON */}
               <div
-                className="lub-matrix-collapse-icon"
-                onClick={() => setIsTableOpen(!isTableOpen)}
+                className="lub-matrix-header-right"
+                style={{ display: "flex", alignItems: "center", gap: "16px" }}
               >
-                {isTableOpen ? (
-                  <ChevronUp size={20} />
-                ) : (
-                  <ChevronDown size={20} />
-                )}
+                {/* --- SOURCE FILTER PILLS --- */}
+                <div className="lub-source-filter-group">
+                  {availableSources.map((src) => {
+                    const label = src.toLowerCase().includes("shell")
+                      ? "Shell"
+                      : src.toLowerCase().includes("gulf")
+                        ? "Gulf"
+                        : src.toLowerCase().includes("tribocare")
+                          ? "Tribocare"
+                          : src;
+                    
+                    const sourceKey = label.toLowerCase();
+                    const isActive = selectedSource === sourceKey;
+                    
+                    return (
+                      <button
+                        key={src}
+                        className={`lub-source-pill ${isActive ? "active" : ""}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Click active pill again to deselect (show all)
+                          setSelectedSource(isActive ? "" : sourceKey);
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div
+                  className="lub-matrix-collapse-icon"
+                  onClick={() => setIsTableOpen(!isTableOpen)}
+                >
+                  {isTableOpen ? (
+                    <ChevronUp size={20} />
+                  ) : (
+                    <ChevronDown size={20} />
+                  )}
+                </div>
               </div>
             </CardHeader>
 
@@ -4278,17 +4470,17 @@ const LuboilAnalysis = () => {
                             const uniqueSources = [
                               ...new Set(
                                 Object.values(vesselData?.machineries || {})
-                                  .map((m) => m.oil_source) // 🟢 Look at the new oil_source from backend
-                                  .filter(
-                                    (source) => source && source.trim() !== "",
-                                  ), // Remove nulls/blanks
+                                  .flatMap((m) => Object.keys(m.by_source || {}))
                               ),
                             ];
 
-                            // 2. Condition: If same, it shows one. If different, it joins them. Fallback if empty.
+                            const displayedSources = selectedSource
+                              ? uniqueSources.filter(s => s.toLowerCase().includes(selectedSource))
+                              : uniqueSources;
+
                             const labNameDisplay =
-                              uniqueSources.length > 0
-                                ? uniqueSources.join(" / ")
+                              displayedSources.length > 0
+                                ? displayedSources.join(" / ").toUpperCase()
                                 : "Unknown Source";
 
                             return (
@@ -4344,15 +4536,16 @@ const LuboilAnalysis = () => {
                           const visibleColumns = tableColumns.filter(
                             (colCode) => {
                               // Return true if ANY of the selected vessels has a report for this equipment
+                              // AND (if source is filtered) that cell's source matches
                               return selectedVesselsFilter.some(
                                 (vesselName) => {
                                   const cell =
                                     normalizedTable.rows[vesselName]?.[colCode];
-                                  return (
-                                    cell &&
-                                    cell.is_configured &&
-                                    cell.has_report === true
-                                  );
+                                  if (!cell || !cell.is_configured || cell.has_report !== true) return false;
+                                  if (!selectedSource) return true;
+                                  return (cell.oil_source || "")
+                                    .toLowerCase()
+                                    .includes(selectedSource.toLowerCase());
                                 },
                               );
                             },
@@ -4398,8 +4591,25 @@ const LuboilAnalysis = () => {
 
                                 {/* DATA CELLS */}
                                 {selectedVesselsFilter.map((vesselName) => {
-                                  const cell =
+                                  const rawCell =
                                     normalizedTable.rows[vesselName]?.[colCode];
+
+                                  // When a source filter is active, use that source's
+                                  // own latest sample instead of the global latest
+                                  const cell = (selectedSource && rawCell?.by_source?.[selectedSource])
+                                    ? {
+                                        ...rawCell,
+                                        ...rawCell.by_source[selectedSource],
+                                        // Keep these from the raw cell (they are cell-level, not sample-level)
+                                        is_configured: rawCell.is_configured,
+                                        description: rawCell.description,
+                                        history: (rawCell.history || []).filter(h => 
+                                          (h.oil_source || "").toLowerCase().includes(selectedSource)
+                                        ),
+                                        by_source: rawCell.by_source,
+                                      }
+                                    : rawCell;
+
                                   const isResolved = cell?.is_resolved === true;
                                   const isLatestReport =
                                     cell?.sample_id ===
@@ -4425,6 +4635,25 @@ const LuboilAnalysis = () => {
 
                                   // --- CONDITION 1: N/A ---
                                   if (!cell || !cell.is_configured) {
+                                    return (
+                                      <td
+                                        key={vesselName}
+                                        className="lub-data-cell empty-cell"
+                                      >
+                                        <span className="na-text">N/A</span>
+                                      </td>
+                                    );
+                                  }
+
+                                  // --- CONDITION 1b: WRONG SOURCE ---
+                                  // If source filter active and this cell is from a different lab, show N/A
+                                  if (
+                                    selectedSource &&
+                                    cell.has_report &&
+                                    !(cell.oil_source || "")
+                                      .toLowerCase()
+                                      .includes(selectedSource.toLowerCase())
+                                  ) {
                                     return (
                                       <td
                                         key={vesselName}
@@ -4632,7 +4861,9 @@ const LuboilAnalysis = () => {
                                             <div className="loading-spinner-small"></div>
                                           </div>
                                         ) : (
-                                          footerReports.map((report, idx) => (
+                                          footerReports
+                                            .filter((r) => !selectedSource || (r.oil_source || "").toLowerCase().includes(selectedSource))
+                                            .map((report, idx) => (
                                             <label
                                               key={idx}
                                               className="lub-footer-popover-item"
@@ -6131,7 +6362,6 @@ const LuboilAnalysis = () => {
                         {isDiagExpanded && (
                           <div className="lub-accordion-content">
                             <div style={{ position: "relative" }}>
-                              <div className="quote-mark">"</div>
                               <div className="lub-diagnosis-text">
                                 {formatDiagnosisAsList(
                                   selectedCell.data.diagnosis,
@@ -6141,7 +6371,8 @@ const LuboilAnalysis = () => {
                             <div className="lub-source-tag">
                               SOURCE:{" "}
                               {selectedCell.data.lab_name ||
-                                "SHELL LUBEANALYST"}
+                                selectedCell.data.oil_source ||
+                                "LAB ANALYSIS"}
                             </div>
                           </div>
                         )}
@@ -6787,8 +7018,8 @@ const LuboilAnalysis = () => {
                             <span className="type-label">Extracted Page</span>
                           </div>
                           <iframe
-                            src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
-                            // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                            // src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                            src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
                             style={{ width: "100%", flex: 1, border: "none" }}
                             title="Opened View"
                           />
@@ -6817,8 +7048,8 @@ const LuboilAnalysis = () => {
                                 </span>
                               </div>
                               <iframe
-                                src={`/lub/api/luboil/view-specific-page/${targetId}`}
-                                // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
+                                // src={`/lub/api/luboil/view-specific-page/${targetId}`}
+                                src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
                                 style={{
                                   width: "100%",
                                   flex: 1,
@@ -6832,8 +7063,8 @@ const LuboilAnalysis = () => {
                       </div>
                     ) : selectedCell.data.report_url ? (
                       <iframe
-                        src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
-                        // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                        // src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                        src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
                         style={{ width: "100%", flex: 1, border: "none" }}
                         title="Original Report"
                       />
@@ -7296,7 +7527,7 @@ const LuboilAnalysis = () => {
                               >
                                 <textarea
                                   ref={chatInputRef}
-                                  style={{scrollbarWidth:'thin'}}
+                                  style={{ scrollbarWidth: 'thin' }}
                                   value={
                                     chatMode === "internal"
                                       ? internalDraft
@@ -7561,42 +7792,96 @@ const LuboilAnalysis = () => {
               className="lub-trend-header"
               style={{
                 borderBottom: "1px solid #e2e8f0",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
                 backgroundColor: "#f8fafc",
               }}
             >
-              <div>
-                <h3
-                  className="lub-trend-title"
-                  style={{ margin: 0, color: "#0f172a", fontWeight: "700" }}
+              {/* Top row: title + close */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <h3
+                    className="lub-trend-title"
+                    style={{ margin: 0, color: "#0f172a", fontWeight: "700" }}
+                  >
+                    {trendModal.title}
+                  </h3>
+                  <p
+                    className="lub-trend-subtitle"
+                    style={{ margin: "2px 0 0 0", color: "#64748b" }}
+                  >
+                    Historical Trend Analysis
+                  </p>
+                </div>
+                <button
+                  onClick={() => setTrendModal({ ...trendModal, isOpen: false })}
+                  className="modal-close-btn"
+                  style={{
+                    cursor: "pointer",
+                    border: "none",
+                    background: "none",
+                    color: "#94a3b8",
+                    transition: "color 0.2s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
                 >
-                  {trendModal.title}
-                </h3>
-                <p
-                  className="lub-trend-subtitle"
-                  style={{ margin: "2px 0 0 0", color: "#64748b" }}
-                >
-                  Historical Trend Analysis
-                </p>
+                  <X size={20} />
+                </button>
               </div>
-              <button
-                onClick={() => setTrendModal({ ...trendModal, isOpen: false })}
-                className="modal-close-btn"
-                style={{
-                  cursor: "pointer",
-                  border: "none",
-                  background: "none",
-                  color: "#94a3b8",
-                  transition: "color 0.2s",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
-              >
-                <X size={20} />
-              </button>
+
+              {/* Source filter tabs — only show if more than one source */}
+              {trendModal.sources && trendModal.sources.length > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    paddingTop: "10px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {trendModal.sources.map((src) => {
+                    const isActive = trendModal.activeSource === src;
+                    // Distinct colours per source
+                    const srcColour =
+                      src === "ALL"
+                        ? { bg: "#f1f5f9", border: "#475569", text: "#334155", activeBg: "#475569", activeText: "#fff" }
+                        : src === "SHELL"
+                        ? { bg: "#fef3c7", border: "#f59e0b", text: "#92400e", activeBg: "#f59e0b", activeText: "#fff" }
+                        : src === "TRIBOCARE"
+                        ? { bg: "#ede9fe", border: "#7c3aed", text: "#4c1d95", activeBg: "#7c3aed", activeText: "#fff" }
+                        : src === "GULF"
+                        ? { bg: "#dcfce7", border: "#16a34a", text: "#14532d", activeBg: "#16a34a", activeText: "#fff" }
+                        : { bg: "#f1f5f9", border: "#64748b", text: "#334155", activeBg: "#64748b", activeText: "#fff" };
+                    return (
+                      <button
+                        key={src}
+                        onClick={() => {
+                          const filtered = src === "ALL" 
+                            ? trendModal.allData 
+                            : trendModal.allData.filter((d) => d.oil_source === src);
+                          setTrendModal((prev) => ({ ...prev, activeSource: src, data: filtered }));
+                        }}
+                        style={{
+                          padding: "4px 14px",
+                          borderRadius: "20px",
+                          border: `1.5px solid ${srcColour.border}`,
+                          cursor: "pointer",
+                          fontWeight: "600",
+                          fontSize: "0.75rem",
+                          letterSpacing: "0.04em",
+                          transition: "all 0.18s",
+                          backgroundColor: isActive ? srcColour.activeBg : srcColour.bg,
+                          color: isActive ? srcColour.activeText : srcColour.text,
+                          boxShadow: isActive ? `0 0 0 3px ${srcColour.border}33` : "none",
+                        }}
+                      >
+                        {src}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
+
 
             {/* Body */}
             <div
@@ -7649,8 +7934,8 @@ const LuboilAnalysis = () => {
                           />
                           <XAxis
                             dataKey="timestamp"
-                            // type="number"
-                            // domain={["dataMin", "dataMax"]}
+                            type="number"
+                            domain={["dataMin", "dataMax"]}
                             tickFormatter={(t) =>
                               new Date(t).toLocaleDateString("en-GB", {
                                 day: "2-digit",
@@ -7746,8 +8031,8 @@ const LuboilAnalysis = () => {
                           />
                           <XAxis
                             dataKey="timestamp"
-                            // type="number"
-                            // domain={["dataMin", "dataMax"]}
+                            type="number"
+                            domain={["dataMin", "dataMax"]}
                             tickFormatter={(t) =>
                               new Date(t).toLocaleDateString("en-GB", {
                                 day: "2-digit",
@@ -7828,8 +8113,8 @@ const LuboilAnalysis = () => {
                           />
                           <XAxis
                             dataKey="timestamp"
-                            // type="number"
-                            // domain={["dataMin", "dataMax"]}
+                            type="number"
+                            domain={["dataMin", "dataMax"]}
                             tickFormatter={(t) =>
                               new Date(t).toLocaleDateString("en-GB", {
                                 day: "2-digit",
@@ -7923,8 +8208,8 @@ const LuboilAnalysis = () => {
                           />
                           <XAxis
                             dataKey="timestamp"
-                            // type="number"
-                            // domain={["dataMin", "dataMax"]}
+                            type="number"
+                            domain={["dataMin", "dataMax"]}
                             tickFormatter={(t) =>
                               new Date(t).toLocaleDateString("en-GB", {
                                 day: "2-digit",

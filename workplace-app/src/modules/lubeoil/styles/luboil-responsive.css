@@ -4979,7 +4979,7 @@ div.section-header-enhanced {
 }
 
 .lub-accordion-content {
-  padding: 15px !important;
+  padding: 10px 8px !important;
   background-color: white !important;
   border: 1px solid #e2e8f0 !important;
   border-top: none !important;
@@ -5000,7 +5000,8 @@ div.section-header-enhanced {
 .lub-diagnosis-text {
   font-size: 0.75rem !important;
   line-height: 1.7 !important;
-  color: #475569 !important;
+  color: #0f172a !important;
+  font-weight: 500 !important;
   position: relative !important;
   z-index: 1 !important;
 }
@@ -5011,6 +5012,44 @@ div.section-header-enhanced {
   font-weight: 800 !important;
   text-align: right !important;
   margin-top: 10px !important;
+}
+
+/* ── SOURCE FILTER PILLS ─────────────────────────────── */
+.lub-source-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.lub-source-pill {
+  display: flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.lub-source-pill:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.lub-source-pill.active {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.35);
 }
 
 /* Evidence Buttons */
@@ -5151,7 +5190,7 @@ div.section-header-enhanced {
   }
 
   .lub-accordion-content {
-    padding: 40px !important;
+    padding: 20px 12px !important;
     border-radius: 0 0 15px 15px !important;
   }
 
@@ -5736,7 +5775,7 @@ div.section-header-enhanced {
 }
 
 .lub-accordion-content {
-  padding: 14px !important;
+  padding: 10px 8px !important;
   background-color: #fff !important;
   border-top: 1px solid #f1f5f9 !important;
 }
@@ -5756,7 +5795,8 @@ div.section-header-enhanced {
   margin: 0 !important;
   font-size: 0.75rem !important;
   line-height: 1.7 !important;
-  color: #475569 !important;
+  color: #0f172a !important;
+  font-weight: 500 !important;
   white-space: pre-wrap !important;
   position: relative !important;
   z-index: 1 !important;
@@ -5840,7 +5880,7 @@ div.section-header-enhanced {
 
   /* Accordion Content Scaling */
   .lub-accordion-content {
-    padding: 40px !important;
+    padding: 20px 12px !important;
   }
 
   .lub-diagnosis-text {
@@ -9152,7 +9192,7 @@ div.section-header-enhanced {
   }
 
   .lub-accordion-content {
-    padding: 18px !important;
+    padding: 12px 8px !important;
     border-radius: 0 0 8px 8px !important;
   }
 

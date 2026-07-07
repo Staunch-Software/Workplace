@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle, Clock, ClipboardList, MessageSquare,
   ChevronDown, ChevronUp, CheckCircle, ShieldAlert, Send, Paperclip,
-  X, Check, Edit2, Save, Edit3, Filter, Edit, Flower, Ship, AlertOctagon, MessageCircle, MoreHorizontal, Trash2, ArrowRightLeft, UserCircle, Download, Flag, RefreshCw, ArrowUp, ArrowDown, Mail
+  X, Check, Edit2, Save, Edit3, Filter, Edit, Flower, Ship, AlertOctagon, MessageCircle, MoreHorizontal, Trash2, ArrowRightLeft, UserCircle, Download, Flag, RefreshCw, ArrowUp, ArrowDown, Mail, Loader2
 } from 'lucide-react';
 import { Image as ImageIcon, Eye, Upload } from 'lucide-react';
 import ColumnCustomizationModal from '@drs/components/modals/ColumnCustomizationModal';
@@ -1435,7 +1435,7 @@ const ShoreDashboard = () => {
   const [closureValidation, setClosureValidation] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [autoChatModes, setAutoChatModes] = useState({});
-
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const isShoreUser = user?.role === 'SHORE' || user?.job_title?.toLowerCase().includes('superintendent');
 
@@ -1781,6 +1781,36 @@ const ShoreDashboard = () => {
     window.addEventListener('scroll', handleScroll, true);
     return () => window.removeEventListener('scroll', handleScroll, true);
   }, [activePrId]);
+
+  useEffect(() => {
+    const containers = [
+      document.querySelector('.page-content'),
+      document.querySelector('.main-viewport'),
+      document.querySelector('.shore-shell-topnav'),
+      document.documentElement,
+      document.body
+    ].filter(Boolean);
+
+    const handleScroll = () => {
+      const scrollTop =
+        document.querySelector('.page-content')?.scrollTop ||
+        document.querySelector('.main-viewport')?.scrollTop ||
+        document.querySelector('.shore-shell-topnav')?.scrollTop ||
+        window.scrollY ||
+        document.documentElement.scrollTop ||
+        0;
+
+      setIsScrolled(scrollTop > 0);
+    };
+
+    containers.forEach(c => c.addEventListener('scroll', handleScroll));
+    window.addEventListener('scroll', handleScroll);
+
+    return () => {
+      containers.forEach(c => c.removeEventListener('scroll', handleScroll));
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   const getDeadlineStatus = (targetCloseDate) => {
     if (!targetCloseDate) return 'NORMAL';
@@ -2501,6 +2531,7 @@ const ShoreDashboard = () => {
   };
   // Inside ShoreDashboard component, add these hooks:
   const [showCreateRow, setShowCreateRow] = useState(false);
+  const [isCreatingDefect, setIsCreatingDefect] = useState(false);
   const [showPrSync, setShowPrSync] = useState(false);
   const [newDefect, setNewDefect] = useState(INITIAL_NEW_DEFECT);
   const createRowRef = useRef(null);
@@ -2532,14 +2563,35 @@ const ShoreDashboard = () => {
     }
   }, [showCreateRow]);
 
-  // 2. Save Handler
   const handleCreateSave = async () => {
+    if (isCreatingDefect) return;
     if (!newDefect.vessel_imo || !newDefect.equipment_name || !newDefect.description) {
       toast('Vessel, Area of Concern, and Description are required', 'warning');
       return;
     }
 
+    // Duplicate check: same report date + equipment + source + description on the same vessel
+    const duplicate = defects.find(d => {
+      // Convert DB datetime to local YYYY-MM-DD for accurate comparison
+      const dbDate = d.date_identified
+        ? new Date(d.date_identified).toLocaleDateString('en-CA')
+        : null;
+      return (
+        d.vessel_imo === newDefect.vessel_imo &&
+        d.equipment_name?.toLowerCase().trim() === newDefect.equipment_name.toLowerCase().trim() &&
+        d.description?.toLowerCase().trim() === newDefect.description.toLowerCase().trim() &&
+        d.defect_source?.toLowerCase().trim() === newDefect.defect_source?.toLowerCase().trim() &&
+        dbDate === newDefect.date_identified &&
+        !d.is_deleted
+      );
+    });
+    if (duplicate) {
+      toast(`Duplicate defect found: ${duplicate.defect_number || 'existing record'} has the same Report Date, Area of Concern, Source, and Description`, 'error');
+      return;
+    }
+
     const defectId = generateId();
+    setIsCreatingDefect(true);
     try {
       const selectedVessel = allVessels.find(v => v.imo_number === newDefect.vessel_imo);
       const vesselName = selectedVessel?.name || 'Unknown Vessel';
@@ -2567,6 +2619,7 @@ const ShoreDashboard = () => {
       today.setHours(0, 0, 0, 0);
 
       const reportDate = new Date(newDefect.date_identified);
+      reportDate.setHours(0, 0, 0, 0);
       if (reportDate > today) {
         toast('Report date cannot be in the future', 'warning');
         return;
@@ -2600,7 +2653,11 @@ const ShoreDashboard = () => {
       console.error("❌ Creation Failed:", err);
       toast('Failed to create defect: ' + err.message, 'error');
     }
+    finally {
+      setIsCreatingDefect(false);
+    }
   };
+
   const getFlagIcon = (value) => (
     <Flag
       size={18}
@@ -2643,23 +2700,26 @@ const ShoreDashboard = () => {
 
       <div className="defect-header-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
         <h1 className="page-title defect-page-title" style={{ marginBottom: "0px" }}>Fleet Overview</h1>
-        <button
-          onClick={() => setIsEditMode(!isEditMode)}
-          className="defect-edit-btn"
-          style={{
-            background: isEditMode ? '#ea580c' : 'white',
-            color: isEditMode ? 'white' : '#334155',
-            border: '1px solid #cbd5e1',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            fontWeight: "600",
-            transition: 'all 0.2s'
-          }}
-        >
-          <Edit3 size={16} className="defect-btn-icon" />
-          {isEditMode ? 'Exit Edit Mode' : 'Enable Edit Mode'}
-        </button>
+        {!isScrolled && (
+          <button
+            onClick={() => setIsEditMode(!isEditMode)}
+            className="defect-edit-btn"
+            style={{
+              background: isEditMode ? '#ea580c' : 'white',
+              color: isEditMode ? 'white' : '#334155',
+              border: '1px solid #cbd5e1',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              fontWeight: "600",
+              transition: 'all 0.2s'
+            }}
+          >
+            <Edit3 size={16} className="defect-btn-icon" />
+            {isEditMode ? 'Exit Edit Mode' : 'Enable Edit Mode'}
+          </button>
+        )}
+
       </div>
 
       {/* KPI CARDS */}
@@ -2778,6 +2838,25 @@ const ShoreDashboard = () => {
             >
               + Create Defect
             </button>
+            {isScrolled && (
+              <button
+                onClick={() => setIsEditMode(!isEditMode)}
+                className="second-edit"
+                style={{
+                  background: isEditMode ? '#ea580c' : 'white',
+                  color: isEditMode ? 'white' : '#334155',
+                  border: '1px solid #cbd5e1',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontWeight: "600",
+                  transition: 'all 0.2s',
+                }}
+              >
+                <Edit3 size={16} className="defect-btn-icon" />
+                {isEditMode ? 'Exit Edit Mode' : 'Enable Edit Mode'}
+              </button>
+            )}
 
             {['admin@ozellar.com', 'techdevops@ozellar.com'].includes(user?.email) && (
               <div className="pr-sync-wrapper">
@@ -4025,7 +4104,7 @@ const ShoreDashboard = () => {
                           );
                         case 'description':
                           return (
-                            <td key="description" style={{ width: columnWidths.description, minWidth: "10px", position: 'relative' }}>
+                            <td key="description" className='desc_width' style={{ maxWidth: '250px', width: columnWidths.description, minWidth: "10px", position: 'relative', whiteSpace: "normal" }}>
                               <div onClick={(e) => { e.stopPropagation(); setExpandedDescId('CREATE_NEW'); }}
                                 style={{ cursor: 'pointer', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.4', maxHeight: '2.8em', textDecoration: 'underline', textDecorationStyle: 'dashed', textDecorationColor: '#cbd5e1', textUnderlineOffset: '2px', textTransform: 'uppercase', minHeight: '2.8em', color: newDefect.description ? '#1e293b' : '#94a3b8' }}>
                                 {newDefect.description || 'Click to enter description…'}
@@ -4121,10 +4200,21 @@ const ShoreDashboard = () => {
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
                         <button
                           onClick={handleCreateSave}
-                          title="Save Defect"
-                          style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                          disabled={isCreatingDefect}
+                          title={isCreatingDefect ? "Saving..." : "Save Defect"}
+                          style={{
+                            background: isCreatingDefect ? '#6ee7b7' : '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '6px 10px',
+                            cursor: isCreatingDefect ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            opacity: isCreatingDefect ? 0.7 : 1,
+                          }}
                         >
-                          <Check size={16} />
+                          {isCreatingDefect ? <Loader2 size={16} className="spin-animation" /> : <Check size={16} />}
                         </button>
 
                         <button
