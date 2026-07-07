@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   Card,
   CardHeader,
@@ -179,9 +179,8 @@ const OverdueVesselRow = ({
               }}
             >
               <span>{v.name}</span>
-              
-              {/* SOURCE COUNTERS */}
-              {(() => {
+              {/* SOURCE COUNTERS (Hidden on Configured Vessels view) */}
+              {!isConfiguredView && (() => {
                 if (!v.overdueItems || v.overdueItems.length === 0) return null;
                 const sourceCounts = {};
                 v.overdueItems.forEach(item => {
@@ -468,7 +467,7 @@ const OverdueVesselRow = ({
                       </span>
                     )}
 
-                    {item.oilSource && (() => {
+                    {!isConfiguredView && item.oilSource && (() => {
                       const style = getSourceBadgeStyle(item.oilSource);
                       return (
                         <span 
@@ -2793,6 +2792,7 @@ const LuboilAnalysis = () => {
                   } catch (e) {
                     msg_date_str = datePart;
                   }
+
                 }
 
                 const uniqueKey = `${msg_date_str}|${role}|${msg_text}`;
