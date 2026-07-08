@@ -38,6 +38,7 @@ import "../styles/performance-responsive.css";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import html2canvas from "html2canvas";
+import toast from "react-hot-toast";
 // import ozellarLogo from "../assets/250714_OzellarMarine-Logo-Final.png";
 const SUMMARY_TABLE_SCHEMA = {
   mainEngine: [
@@ -3565,6 +3566,22 @@ const confirmDelete = async () => {
   const handleModeChange = (value) => {
     const newMode =
       typeof value === "string" ? value : value?.target?.value || value;
+
+    // --- ADDED CHECK FOR TUFMAX ---
+    if (newMode === "auxiliaryEngine" && shipId) {
+        const currentShip = fleet.find(s => String(s.id) === String(shipId));
+        if (currentShip && String(currentShip.name).toUpperCase().includes("TUFMAX")) {
+            toast.error(currentShip.name.toUpperCase() + " has no Auxiliary Engine.", { 
+                duration: 5000, 
+                position: "top-center",
+                style: { marginTop: '80px', maxWidth: '350px', fontSize: '14px', padding: '10px' }
+            });
+            setShipId(""); // Reset the ship dropdown
+            if (onShipChange) onShipChange(null);
+        }
+    }
+    // ------------------------------
+
     setAnalysisMode(newMode);
     setBaselineSource(null);
     setUploadMode(newMode);
@@ -9875,9 +9892,11 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
               value={shipId}
               onChange={(val) => handleShipChange(val)}
               placeholder="SELECT VESSEL"
-              options={fleet.map((ship) => ({
-                value: ship.id,
-                label: formatVesselName(ship.name)?.toUpperCase() || "",
+              options={fleet
+                .filter((ship) => !(analysisMode === "auxiliaryEngine" && String(ship.name).toUpperCase().includes("TUFMAX")))
+                .map((ship) => ({
+                  value: ship.id,
+                  label: formatVesselName(ship.name)?.toUpperCase() || "",
               }))}
             />
           </div>
