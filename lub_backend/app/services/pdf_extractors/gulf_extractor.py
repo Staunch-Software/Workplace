@@ -215,8 +215,8 @@ def extract(pdf) -> Optional[Dict[str, Any]]:
         # Physical
         phys["viscosity_40c"]  = _regex_val(block, r"KV@40[°C\s\u00b0]+\[mm[²2]/s\]\s+([<>]?[\d.]+)")
         phys["viscosity_100c"] = _regex_val(block, r"KV@100[°C\s\u00b0]+\[mm[²2]/s\]\s+([<>]?[\d.]+)")
-        phys["tbn"]            = _regex_val(block, r"(?:BN|TBN|Base Number).*?(?:\[mgKOH/g\]|ASTM[^\)]*\))?\s*([<>]?[\d.]+)")
-        phys["tan"]            = _regex_val(block, r"(?:AN|TAN|Acid Number).*?(?:\[mgKOH/g\]|ASTM[^\)]*\))?\s*([<>]?[\d.]+)")
+        phys["tbn"]            = _regex_val(block, r"(?:\bTBN\b|\bBN\b|\bBase Number\b)(?:\(.*?\)|\[.*?\]|[^\d\n])*([<>]?[0-9]*\.[0-9]+|[<>]?[0-9]+)")
+        phys["tan"]            = _regex_val(block, r"(?:\bTAN\b|\bAN\b|\bAcid Number\b)(?:\(.*?\)|\[.*?\]|[^\d\n])*([<>]?[0-9]*\.[0-9]+|[<>]?[0-9]+)")
         fp_m = re.search(r"Flash Point\s*\[.C\]\s+([<>]?[\d.A-Za-z]+)", block, re.IGNORECASE)
         if fp_m:
             phys["flash_point"] = _clean_number(fp_m.group(1))
@@ -246,8 +246,11 @@ def extract(pdf) -> Optional[Dict[str, Any]]:
         adds["molybdenum"] = _regex_val(block, r"Molybdenum\s*\(Mo\)\s+([<>]?[\d.]+)")
         adds["barium"]     = _regex_val(block, r"Barium\s*\(Ba\)\s+([<>]?[\d.]+)")
         adds["calcium"]    = _regex_val(block, r"Calcium\s*\(Ca\)\s+([<>]?[\d.]+)")
+        if adds["calcium"] is not None: adds["calcium"] = round(adds["calcium"] / 10000.0, 3)
         adds["zinc"]       = _regex_val(block, r"Zinc\s*\(Zn\)\s+([<>]?[\d.]+)")
+        if adds["zinc"] is not None: adds["zinc"] = round(adds["zinc"] / 10000.0, 3)
         adds["phosphorus"] = _regex_val(block, r"Phosphorus\s*\(P\)\s+([<>]?[\d.]+)")
+        if adds["phosphorus"] is not None: adds["phosphorus"] = round(adds["phosphorus"] / 10000.0, 3)
         adds["boron"]      = _regex_val(block, r"Boron\s*\(B\)\s+([<>]?[\d.]+)")
         adds["magnesium"]  = _regex_val(block, r"Magnesium\s*\(Mg\)\s+([<>]?[\d.]+)")
 

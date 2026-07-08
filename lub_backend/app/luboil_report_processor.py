@@ -22,9 +22,10 @@ def standardize_name(text: str) -> str:
     if not text: return ""
     s = text.lower().strip()
 
+    # PASS 0: Normalize punctuation to spaces (critical for stripping out parentheticals like (CRANKCASE))
+    s = s.replace("(", " ").replace(")", " ").replace("[", " ").replace("]", " ").replace("-", " ")
+
     # PASS 1: Directional keywords — MUST run before anything else
-    # Reason: "after" contains "aft" which gets destroyed in synonym pass
-    # Longer phrases must come before shorter ones to avoid partial matches
     directional = [
         ("before fine filter", "in"),
         ("after fine filter",  "out"),
@@ -35,14 +36,12 @@ def standardize_name(text: str) -> str:
         s = s.replace(old, new)
 
     # PASS 2: Equipment synonyms
-    # Reason: longer/more specific phrases must come before shorter ones
-    # e.g. "windlass & mooring winch" before "windlass" and "mooring winch"
-    # e.g. "hose handling crane" before "deck crane" 
     synonyms = [
         ("windlass & mooring winch", "winch"),
         ("windlass",                 "winch"),
         ("mooring winch",            "winch"),
         ("auxiliary diesel engine",  "ae"),
+        ("auxiliary engine",         "ae"),
         ("aux engine",               "ae"),
         ("main engine",              "me"),
         ("hydraulic power system",   "hyd"),
@@ -54,31 +53,32 @@ def standardize_name(text: str) -> str:
         ("provision crane",          "prov crane"),
         ("remote control valve",     "rc valve"),
         ("cylinders",                "cyl"),
+        ("emergency diesel generator engine", "ge"),
+        ("emergency diesel engine",  "ge"),
+        ("emergency diesel",         "ge"),
+        ("emergency generator",      "ge"),
+        ("deck machinery fwd",       "winch fwd"),
+        ("deck machinery aft",       "winch aft"),
+        ("deck machinery",           "dk machinery"),
     ]
     for old, new in synonyms:
         s = s.replace(old, new)
 
     # PASS 3: Directional abbreviations using word boundaries
-    # Reason: plain .replace("aft", "aft") would match inside "after", "shaft" etc.
-    # We do this AFTER synonyms so "aft" standalone is preserved as a position token
     s = re.sub(r'\bfwd\b', 'fwd', s)
     s = re.sub(r'\baft\b', 'aft', s)
 
     # PASS 4: Noise removal using word boundaries
-    # Reason: plain .replace("no", "") would destroy "normal", "note", "crankcase" etc.
-    # "(hps)" stripped here after hydraulic power system already converted to "hyd"
     noise_patterns = [
         r'\bsystem\b',
         r'\bunit\b',
         r'\blife\b',
         r'\bbearings\b',
         r'\bseals\b',
-        r'\bno\.\b',
-        r'\bno\b',
+        r'\bno[\.\s]*',
+        r'\band\b',
         r'#',
-        r'\(hps\)',
-        r'\(hps\s*\)',
-        r'-\s*',
+        r'\bhps\b',
         r'&\s*',
     ]
     for pattern in noise_patterns:

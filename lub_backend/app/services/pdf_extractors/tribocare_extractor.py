@@ -287,8 +287,11 @@ def extract(pdf) -> Optional[Dict[str, Any]]:
         adds["molybdenum"] = _first_col(block, r"Molybdenum\s*\(Mo\)\s+([<>]?[\d.]+)")
         adds["barium"]     = _first_col(block, r"Barium\s*\(Ba\)\s+([<>]?[\d.]+)")
         adds["calcium"]    = _first_col(block, r"Calcium\s*\(Ca\)\s+([<>]?[\d.]+)")
+        if adds["calcium"] is not None: adds["calcium"] = round(adds["calcium"] / 10000.0, 3)
         adds["zinc"]       = _first_col(block, r"Zinc\s*\(Zn\)\s+([<>]?[\d.]+)")
+        if adds["zinc"] is not None: adds["zinc"] = round(adds["zinc"] / 10000.0, 3)
         adds["phosphorus"] = _first_col(block, r"Phosphorus\s*\(P\)\s+([<>]?[\d.]+)")
+        if adds["phosphorus"] is not None: adds["phosphorus"] = round(adds["phosphorus"] / 10000.0, 3)
         adds["boron"]      = _first_col(block, r"Boron\s*\(B\)\s+([<>]?[\d.]+)")
         adds["magnesium"]  = _first_col(block, r"Magnesium\s*\(Mg\)\s+([<>]?[\d.]+)")
 

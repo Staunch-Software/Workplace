@@ -407,8 +407,8 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
                 phys['viscosity_100c'] = extract_value_by_regex(text, r"Viscosity 100.*?C.*?\s+([\d.]+)")
                 phys['viscosity_40c']  = extract_value_by_regex(text, r"Viscosity 40.*?C.*?\s+([\d.]+)")
                 phys['flash_point']    = extract_value_by_regex(text, r"Flash Point.*?\s+([>\d.]+)")
-                phys['tbn']            = extract_value_by_regex(text, r"(?:TBN|BN|Base Number).*?(?:mg\s*KOH/g|ASTM[^\)]*\)|\[mgKOH/g\])?\s*([\d.]+)")
-                phys['tan']            = extract_value_by_regex(text, r"(?:TAN|AN|Acid Number).*?(?:mg\s*KOH/g|ASTM[^\)]*\)|\[mgKOH/g\])?\s*([\d.]+)")
+                phys['tbn']            = extract_value_by_regex(text, r"(?:\bTBN\b|\bBN\b|\bBase Number\b)(?:\(.*?\)|\[.*?\]|[^\d\n])*([0-9]*\.[0-9]+|[0-9]+)")
+                phys['tan']            = extract_value_by_regex(text, r"(?:\bTAN\b|\bAN\b|\bAcid Number\b)(?:\(.*?\)|\[.*?\]|[^\d\n])*([0-9]*\.[0-9]+|[0-9]+)")
 
                 # B. Wear Metals
                 wear = machine['chemistry']['wear']
@@ -445,6 +445,7 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
                 adds['boron']      = extract_value_by_regex(text, r"Boron \(B\) ppm\s+([\d.]+)")
                 adds['molybdenum'] = extract_value_by_regex(text, r"Molybdenum \(Mo\) ppm\s+([\d.]+)")
                 adds['barium']     = extract_value_by_regex(text, r"Barium \(Ba\).*?%\s+([\d.]+)")
+                if adds['barium'] is not None: adds['barium'] = int(adds['barium'] * 10000)
                 
                 
                 if not full_report['metadata'].get('oil_source'):
