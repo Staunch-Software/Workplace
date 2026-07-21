@@ -775,7 +775,7 @@ export default function AppHeader() {
               </form>
             ) : (
               /* ── Review extracted data ── */
-              <div className="review-container">
+              <div className="review-container" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
                 <div className="review-tabs">
                   {syncConfig.engineType === 'mainEngine' ? (
                     <>
@@ -791,7 +791,7 @@ export default function AppHeader() {
                   )}
                 </div>
 
-                <div className="review-panel">
+                <div className="review-panel" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
                   {/* Main Engine — Vessel Specs */}
                   {syncConfig.engineType === 'mainEngine' && activeReviewTab === "vessel" && (
                     <div>
@@ -862,11 +862,11 @@ export default function AppHeader() {
 
                   {/* Performance Matrix */}
                   {activeReviewTab === "performance" && (
-                    <div>
+                    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
                       <div className="review-section-title">
                         {syncConfig.engineType === 'auxiliaryEngine' ? 'Aux Engine Shop Trial Performance Matrix' : 'Shop Trial Performance Matrix'}
                       </div>
-                      <div style={{ overflow: 'auto', maxHeight: '65vh', position: 'relative' }}>
+                      <div style={{ overflow: 'auto', flex: 1, minHeight: 0, position: 'relative' }}>
                         <table className="perf-table" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
                           <thead>
                             <tr>
@@ -945,6 +945,11 @@ export default function AppHeader() {
                               { label: 'SFOC (ISO)', unit: 'g/kWh', key: 'fuel_oil_consumption_iso_g_kwh' },
                               { label: 'T/C Inlet Temp', unit: '°C', key: 'tc_inlet_temp_c' },
                               { label: 'T/C Outlet Back Press', unit: 'mmAq', key: 'tc_outlet_back_press_mmaq' },
+                              { label: 'Air Cooler Pressure Drop', unit: 'mmAq', key: 'air_cooler_press_drop_mmaq' },
+                              { label: 'Air Cooler Air Inlet Temp', unit: '°C', key: 'air_cooler_air_inlet_temp_c' },
+                              { label: 'Air Cooler Air Outlet Temp', unit: '°C', key: 'air_cooler_air_outlet_temp_c' },
+                              { label: 'Air Cooler CW Inlet Temp', unit: '°C', key: 'air_cooler_cw_inlet_temp_c' },
+                              { label: 'Air Cooler CW Outlet Temp', unit: '°C', key: 'air_cooler_cw_outlet_temp_c' },
                               { label: 'Test Room Temp', unit: '°C', key: 'room_temperature_c' },
                               { label: 'Test Room Humidity', unit: '%', key: 'room_humidity_percent' },
                               { label: 'Barometric Pressure', unit: 'mbar', key: 'barometer_pressure_mbar' },

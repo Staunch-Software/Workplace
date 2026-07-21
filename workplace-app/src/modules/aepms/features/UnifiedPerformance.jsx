@@ -1742,7 +1742,12 @@ const MAIN_METRIC_MAPPING = {
   SFOC: "sfoc_g_kwh",
   EngSpeed: "engine_speed_rpm",
   Exh_Cylinder_outlet: "cyl_exhaust_gas_temp_outlet_c",
-  // "FOC": "fuel_consumption_total_kg_h"
+  // "FOC": "fuel_consumption_total_kg_h",
+  air_cooler_dp_mmaq: "air_cooler_dp_mmaq",
+  air_cooler_air_in: "air_cooler_air_in",
+  air_cooler_air_out: "air_cooler_air_out",
+  air_cooler_cw_in: "air_cooler_cw_in",
+  air_cooler_cw_out: "air_cooler_cw_out"
 };
 
 // const AUX_METRIC_MAPPING = {

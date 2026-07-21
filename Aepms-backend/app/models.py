@@ -276,6 +276,33 @@ class ShopTrialPerformanceData(Base):
     scav_air_pressure_bar = Column(DECIMAL(4, 2), nullable=True)
     turbocharger_gas_inlet_press_kg_cm2 = Column(DECIMAL(4, 2), nullable=True)
 
+    # ── Air Cooler Cluster (Shop Trial Baseline) ──────────────────────────
+    air_cooler_press_drop_mmaq = Column(
+        DECIMAL(6, 1),
+        nullable=True,
+        comment="Pressure Drop Across Air Cooler (mmAq) at this load point"
+    )
+    air_cooler_air_inlet_temp_c = Column(
+        DECIMAL(5, 1),
+        nullable=True,
+        comment="Air Cooler Air Inlet Temperature (°C) at this load point"
+    )
+    air_cooler_air_outlet_temp_c = Column(
+        DECIMAL(5, 1),
+        nullable=True,
+        comment="Air Cooler Air Outlet Temperature (°C) at this load point"
+    )
+    air_cooler_cw_inlet_temp_c = Column(
+        DECIMAL(5, 1),
+        nullable=True,
+        comment="Air Cooler Cooling Water Inlet Temperature (°C) at this load point"
+    )
+    air_cooler_cw_outlet_temp_c = Column(
+        DECIMAL(5, 1),
+        nullable=True,
+        comment="Air Cooler Cooling Water Outlet Temperature (°C) at this load point"
+    )
+
     # Fuel System
     fuel_oil_temperature_c = Column(DECIMAL(3, 0), nullable=True)
     fuel_oil_consumption_kg_h = Column(DECIMAL(7, 1), nullable=True)
@@ -314,17 +341,29 @@ class ShopTrialPerformanceData(Base):
 
     @validates('load_percentage')
     def validate_load_percentage(self, key, load_percentage):
-        if not (0 <= load_percentage <= 110):
+        if load_percentage is None:
+            return load_percentage
+        try:
+            val = float(load_percentage)
+        except (ValueError, TypeError):
+            return load_percentage
+        if not (0 <= val <= 110):
             raise ValueError("Load percentage must be between 0 and 110")
-        return load_percentage
+        return val
 
     @validates('fuel_oil_consumption_g_kwh')
     def validate_sfoc(self, key, sfoc):
-        if sfoc is not None and sfoc <= 0:
+        if sfoc is None:
+            return sfoc
+        try:
+            val = float(sfoc)
+        except (ValueError, TypeError):
+            return sfoc
+        if val <= 0:
             raise ValueError("SFOC must be positive")
-        if sfoc is not None and sfoc > 300: # Arbitrary high limit
+        if val > 300:
             raise ValueError("SFOC seems unrealistically high (>300 g/kWh)")
-        return sfoc
+        return val
 
     def __repr__(self):
         return f"<ShopTrialPerformanceData(session_id={self.session_id}, load_percentage={self.load_percentage}%)>"
@@ -381,6 +420,11 @@ class MonthlyReportHeader(Base):
 
     # Exhaust Gas Boiler
     egb_pressure_drop_mmh2o = Column(DECIMAL(10, 2), nullable=True) 
+    air_cooler_dp_mmaq = Column(DECIMAL(6, 2), nullable=True, comment="Pressure Drop Across Air Cooler (mmAq/mmWG)")
+    air_cooler_air_inlet_temp_c = Column(DECIMAL(5, 1), nullable=True, comment="Air Temp Air Cooler Inlet (°C)")
+    air_cooler_air_outlet_temp_c = Column(DECIMAL(5, 1), nullable=True, comment="Air Temp Air Cooler Outlet (°C)")
+    air_cooler_cw_inlet_temp_c = Column(DECIMAL(5, 1), nullable=True, comment="CW Temp Air Cooler Inlet (°C)")
+    air_cooler_cw_outlet_temp_c = Column(DECIMAL(5, 1), nullable=True, comment="CW Temp Air Cooler Outlet (°C)")
     # Vessel Conditions
     ship_condition = Column(String(50), nullable=True)
     displacement_mt = Column(DECIMAL(10, 2), nullable=True)

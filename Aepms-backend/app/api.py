@@ -1273,7 +1273,14 @@ async def get_performance_history(
                     "exh_temp_tc_outlet_c_raw": get_raw(report.tc_exhaust_gas_temp_out_c),
                     "cyl_exhaust_gas_temp_outlet_c_raw": get_raw(report.exh_temp_cylinder_outlet_ave_c),
                     "fuel_inj_pump_index_mm_raw": get_raw(report.fuel_injection_pump_index_mm),
-                    "fuel_consumption_total_kg_h_raw": foc_raw_kg
+                    "fuel_consumption_total_kg_h_raw": foc_raw_kg,
+
+                    # Air Cooler Cluster actuals
+                    "air_cooler_dp_mmaq":  float(report.air_cooler_dp_mmaq)            if report.air_cooler_dp_mmaq            else None,
+                    "air_cooler_air_in":   float(report.air_cooler_air_inlet_temp_c)   if report.air_cooler_air_inlet_temp_c   else None,
+                    "air_cooler_air_out":  float(report.air_cooler_air_outlet_temp_c)  if report.air_cooler_air_outlet_temp_c  else None,
+                    "air_cooler_cw_in":    float(report.air_cooler_cw_inlet_temp_c)    if report.air_cooler_cw_inlet_temp_c    else None,
+                    "air_cooler_cw_out":   float(report.air_cooler_cw_outlet_temp_c)   if report.air_cooler_cw_outlet_temp_c   else None,
                 }
                
                 monthly_performance_list.append(performance_data)
@@ -2884,7 +2891,14 @@ async def get_me_alert_details_api(
             "foc": foc_actual,
             "propeller": get_val(iso_data.propeller_margin_percent) if iso_data else None,
             "load_percentage": get_val(iso_data.load_percentage) if iso_data else get_val(raw_report.load_percent),
-            "power": get_val(raw_report.shaft_power_kw) or get_val(raw_report.effective_power_kw)
+            "power": get_val(raw_report.shaft_power_kw) or get_val(raw_report.effective_power_kw),
+
+            # Air Cooler Cluster actuals
+            "air_cooler_dp_mmaq":  get_val(raw_report.air_cooler_dp_mmaq),
+            "air_cooler_air_in":   get_val(raw_report.air_cooler_air_inlet_temp_c),
+            "air_cooler_air_out":  get_val(raw_report.air_cooler_air_outlet_temp_c),
+            "air_cooler_cw_in":    get_val(raw_report.air_cooler_cw_inlet_temp_c),
+            "air_cooler_cw_out":   get_val(raw_report.air_cooler_cw_outlet_temp_c),
         }
 
         # 5. Fetch the Alert Statuses
@@ -3188,7 +3202,14 @@ async def get_me_baseline_reference(
                 "engspeed": float(r.engine_speed_rpm) if r.engine_speed_rpm else None,
                 "sfoc": get_val(r.fuel_oil_consumption_iso_g_kwh, r.fuel_oil_consumption_g_kwh),
                 "foc": float(r.fuel_oil_consumption_kg_h) if r.fuel_oil_consumption_kg_h else None,
-                "fipi": float(r.fuel_injection_pump_index_mm) if r.fuel_injection_pump_index_mm else None
+                "fipi": float(r.fuel_injection_pump_index_mm) if r.fuel_injection_pump_index_mm else None,
+
+                # Air Cooler Cluster baseline
+                "air_cooler_dp_mmaq": float(r.air_cooler_press_drop_mmaq)   if r.air_cooler_press_drop_mmaq   else None,
+                "air_cooler_air_in":  float(r.air_cooler_air_inlet_temp_c)  if r.air_cooler_air_inlet_temp_c  else None,
+                "air_cooler_air_out": float(r.air_cooler_air_outlet_temp_c) if r.air_cooler_air_outlet_temp_c else None,
+                "air_cooler_cw_in":   float(r.air_cooler_cw_inlet_temp_c)   if r.air_cooler_cw_inlet_temp_c   else None,
+                "air_cooler_cw_out":  float(r.air_cooler_cw_outlet_temp_c)  if r.air_cooler_cw_outlet_temp_c  else None,
             })
 
         # Debug print to server logs (Optional)
@@ -4710,15 +4731,67 @@ async def save_ai_baseline(data: dict = Body(...), db: AsyncSession = Depends(ge
             # Align cleaned values with corrected integer structure
             v_data_cleaned['imo_number'] = imo_num_int
             
+            ALLOWED_VESSEL_KEYS = {c.key for c in VesselInfo.__table__.columns}
+
+            # Rename mismatched key from gemini extraction
+            if 'sfoc_target_g_kwh' in v_data_cleaned:
+                v_data_cleaned['sfoc_target_gm_kwh'] = v_data_cleaned.pop('sfoc_target_g_kwh')
+
+            INTEGER_VESSEL_KEYS = {'number_of_cylinders', 'display_order', 'vessel_id', 'imo_number'}
+            NUMERIC_VESSEL_KEYS = {
+                'propeller_pitch_mm', 'sfoc_target_gm_kwh', 'mcr_power_kw', 'mcr_rpm',
+                'mcr_limit_kw', 'mcr_limit_percentage', 'csr_power_kw',
+                'barred_speed_rpm_start', 'barred_speed_rpm_end'
+            }
+
+            clean_vessel = {}
+            for k, v in v_data_cleaned.items():
+                if k not in ALLOWED_VESSEL_KEYS:
+                    continue
+                if v is None or v == "":
+                    clean_vessel[k] = None
+                elif k in INTEGER_VESSEL_KEYS:
+                    clean_vessel[k] = safe_int(v)
+                elif k in NUMERIC_VESSEL_KEYS:
+                    try:
+                        clean_vessel[k] = float(v)
+                    except (ValueError, TypeError):
+                        clean_vessel[k] = None
+                else:
+                    clean_vessel[k] = str(v).strip()
+
+            # Force imo_number as integer regardless of what clean_vessel built
+            clean_vessel['imo_number'] = imo_num_int
+
             if vessel:
-                for k, v in v_data_cleaned.items(): 
+                for k, v in clean_vessel.items():
                     if v is not None: setattr(vessel, k, v)
             else:
-                vessel = VesselInfo(**v_data_cleaned)
+                vessel = VesselInfo(**clean_vessel)
                 db.add(vessel)
             await db.flush() 
 
             # 2. CREATE Session Header
+            from sqlalchemy import delete as sql_delete
+
+            # Delete existing session for this engine on today's date if exists
+            existing_session = await db.execute(
+                select(ShopTrialSession).where(
+                    ShopTrialSession.engine_no == vessel.engine_no,
+                    ShopTrialSession.trial_date == datetime.now().date()
+                )
+            )
+            existing_session = existing_session.scalar_one_or_none()
+
+            if existing_session:
+                await db.execute(
+                    sql_delete(ShopTrialPerformanceData).where(
+                        ShopTrialPerformanceData.session_id == existing_session.session_id
+                    )
+                )
+                await db.delete(existing_session)
+                await db.flush()
+
             new_session = ShopTrialSession(
                 engine_no=vessel.engine_no,
                 trial_date=datetime.now().date(),
@@ -4743,8 +4816,20 @@ async def save_ai_baseline(data: dict = Body(...), db: AsyncSession = Depends(ge
                     else:
                         clean_point[k] = str(v).strip()
 
+                ALLOWED_KEYS = {c.key for c in ShopTrialPerformanceData.__table__.columns}
+                filtered_point = {}
+                for k, v in clean_point.items():
+                    if k not in ALLOWED_KEYS or k == 'test_sequence':
+                        continue
+                    if k == 'load_percentage' and v is not None:
+                        try:
+                            filtered_point[k] = float(v)
+                        except (ValueError, TypeError):
+                            filtered_point[k] = None
+                    else:
+                        filtered_point[k] = v
                 db.add(ShopTrialPerformanceData(
-                    **clean_point,
+                    **filtered_point,
                     session_id=new_session.session_id,
                     test_sequence=i+1
                 ))

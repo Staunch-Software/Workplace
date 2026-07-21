@@ -162,6 +162,16 @@ class PerformancePoint(BaseModel):
     tc_exhaust_inlet_bank_1_3_c_Unit: Optional[str] = None
     tc_exhaust_inlet_bank_4_6_c: Optional[str] = None
     tc_exhaust_inlet_bank_4_6_c_Unit: Optional[str] = None
+    air_cooler_press_drop_mmaq: Optional[str] = None
+    air_cooler_press_drop_mmaq_Unit: Optional[str] = None
+    air_cooler_air_inlet_temp_c: Optional[str] = None
+    air_cooler_air_inlet_temp_c_Unit: Optional[str] = None
+    air_cooler_air_outlet_temp_c: Optional[str] = None
+    air_cooler_air_outlet_temp_c_Unit: Optional[str] = None
+    air_cooler_cw_inlet_temp_c: Optional[str] = None
+    air_cooler_cw_inlet_temp_c_Unit: Optional[str] = None
+    air_cooler_cw_outlet_temp_c: Optional[str] = None
+    air_cooler_cw_outlet_temp_c_Unit: Optional[str] = None
 
 class ExtractionResult(BaseModel):
     vessel_info: VesselInfo
@@ -254,6 +264,11 @@ class PerformancePointExtract(BaseModel):
     fuel_consumption_total_kg_h: Optional[str] = None
     tc_exhaust_inlet_bank_1_3_c: Optional[str] = None
     tc_exhaust_inlet_bank_4_6_c: Optional[str] = None
+    air_cooler_press_drop_mmaq: Optional[str] = None
+    air_cooler_air_inlet_temp_c: Optional[str] = None
+    air_cooler_air_outlet_temp_c: Optional[str] = None
+    air_cooler_cw_inlet_temp_c: Optional[str] = None
+    air_cooler_cw_outlet_temp_c: Optional[str] = None
 
 class ExtractionResultExtract(BaseModel):
     vessel_info: VesselInfoExtract
@@ -322,12 +337,18 @@ async def extract_data_with_gemini(pdf_bytes: bytes, engine_type: str):
         1. The PDF contains a Shop Trial Performance Matrix.
         2. You MUST extract EVERY column from the table. Typically there are columns for 25%, 50%, 75%, 90% (or 85%), 100% (1st run / 100-1), 100% (2nd run / 100-2), and 110% loads. Do not skip any columns, and ensure both 100% runs are extracted as separate sequential records.
         3. Do NOT extract arbitrary percentages or load limits mentioned in passing text or vibration documents (e.g. "misfiring cylinder at 79% load" or "vibration range 41-50 rpm"). Only extract fully populated columns belonging to the official trial run tables (e.g. Page 42 or Page 62).
+        3a. The PDF may contain TWO separate tables — a main performance table AND a separate ISO correction reference table. Extract data ONLY from the single main performance summary table. Do NOT extract from ISO correction reference tables, heat balance tables, or any secondary tables that repeat the same load percentages. If you see the same load percentages appearing in a second table, ignore that second table entirely.
         4. "fuel_injection_pump_index_mm" (Fuel Index) and "fuel_oil_consumption_kg_h" (Fuel Consumption) are extremely important.
         5. Strictly align numbers to their row parameters. The PDF table has rows for parameters and columns for loads. You must transpose this so each load column becomes an object in the JSON array.
         6. Double check every parameter column so values are not swapped or shifted between adjacent load points.
         7. Extract the "test_sequence" for each load point column sequential index (e.g. 1, 2, 3, 4, 5, 6, 7).
-        8. ONLY extract load percentage columns that have fully populated performance rows on the summary page. If a load point (such as '70%' or '83% MCR') is mentioned as a reference, vibrating condition, or general spec on early drawing or description pages but contains no actual logged trial data, you MUST ignore it completely.
-
+        8. ONLY extract standard numeric load percentage columns (e.g. 25%, 50%, 75%, 100%, 110%) that have FULLY populated performance rows on the main summary trial table.
+           STRICTLY IGNORE these special test condition columns even if they appear in the table:
+           - "T/C Cut-off" or "Turbocharger Cut-off"
+           - "One Cyl. Cut" or "One Cylinder Cut-out"
+           - Any column whose header is not a plain number (e.g. 25.0, 50.0, 75.0, 100.0, 110.0)
+           If load_percentage cannot be parsed as a plain number, SKIP that column entirely.
+           
         EXAMPLE OF HOW TO TRANSPOSE AND PAIR THE DATA:
         If the PDF table has rows:
         Load (%)           | 25.0  | 50.0  |
@@ -341,7 +362,7 @@ async def extract_data_with_gemini(pdf_bytes: bytes, engine_type: str):
         ]
 
         Map the data to the provided schema using these semantic mapping rules for the performance_table:
-        - "load_percentage"                    (Look for: Load, %, Load Factor. Keep descriptive text intact, e.g., "25% (T/C Cut-off)" or "100-1")
+        - "load_percentage"                    (Look for: Load, %, Load Factor. Extract only the plain numeric value e.g. "25.0", "100.0". For two 100% runs use "100" for both — test_sequence distinguishes them.)       
         - "engine_output_kw"                   (Look for: Output, Power, Brake Power, kW, BHP)
         - "engine_speed_rpm"                   (Look for: Speed, RPM, Ne)
         - "max_combustion_pressure_bar"        (Look for: Pmax, Max. Press, Maximum Pressure, P.max. Standard measured value.)
@@ -358,6 +379,11 @@ async def extract_data_with_gemini(pdf_bytes: bytes, engine_type: str):
         - "fuel_oil_consumption_iso_g_kwh"     (Look for: Fuel oil consumption (ISO) g/kWh, or ISO SFOC, or Converted value based on ISO. Extract ONLY the ISO corrected fuel rate, not the raw measured SFOC.)
         - "tc_inlet_temp_c"                    (Look for: Before Turbine °C)
         - "tc_outlet_back_press_mmaq"          (Look for: Press Drop mmAq or Back Pressure mmAq)
+        - "air_cooler_press_drop_mmaq"         (Look for: Pressure Drop Across Air Cooler, Diff. Pressure Air Cooler, Air Cooler DP, mmAq, mmH2O)
+        - "air_cooler_air_inlet_temp_c"        (Look for: Air Cooler Inlet Temp, Cooler Inlet Air Temp, Air Temp Air Cooler Inlet, Cooler inlet °C)
+        - "air_cooler_air_outlet_temp_c"       (Look for: Air Cooler Outlet Temp, Cooler Outlet Air Temp, Air Temp Air Cooler Outlet, Cooler outlet °C)
+        - "air_cooler_cw_inlet_temp_c"         (Look for: Cooling Water Inlet Temp, CW Inlet, Cooler CW Inlet, CW Temp Air Cooler Inlet °C)
+        - "air_cooler_cw_outlet_temp_c"        (Look for: Cooling Water Outlet Temp, CW Outlet, Cooler CW Outlet, CW Temp Air Cooler Outlet °C)
         - "room_temperature_c"                 (Look for: Test Room Temperature °C)
         - "room_humidity_percent"              (Look for: Test Room Humidity %)
         - "barometer_pressure_mbar"            (Look for: Atmospheric/Barometric Pressure mbar)
@@ -700,6 +726,11 @@ def post_process_extraction(result: dict) -> dict:
         point["fuel_consumption_total_kg_h_Unit"] = "kg/h"
         point["tc_exhaust_inlet_bank_1_3_c_Unit"] = "°C"
         point["tc_exhaust_inlet_bank_4_6_c_Unit"] = "°C"
+        point["air_cooler_press_drop_mmaq_Unit"] = "mmAq"
+        point["air_cooler_air_inlet_temp_c_Unit"] = "°C"
+        point["air_cooler_air_outlet_temp_c_Unit"] = "°C"
+        point["air_cooler_cw_inlet_temp_c_Unit"] = "°C"
+        point["air_cooler_cw_outlet_temp_c_Unit"] = "°C"
 
         # ISO Fallback Merges (Calculated -> ISO columns)
         if not point.get("max_combustion_pressure_iso_bar"):
