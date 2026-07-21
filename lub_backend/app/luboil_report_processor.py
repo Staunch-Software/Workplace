@@ -51,6 +51,7 @@ def standardize_name(text: str) -> str:
         ("deck crane",               "dk crane"),
         ("cargo oil pump",           "cop"),
         ("provision crane",          "prov crane"),
+        ("valve remote control",     "rc valve"),
         ("remote control valve",     "rc valve"),
         ("cylinders",                "cyl"),
         ("emergency diesel generator engine", "ge"),
@@ -80,6 +81,9 @@ def standardize_name(text: str) -> str:
         r'#',
         r'\bhps\b',
         r'&\s*',
+        r'\bfilter\b',       
+        r'\bcrankcase\b',    
+        r'\bcylinders\b',
     ]
     for pattern in noise_patterns:
         s = re.sub(pattern, ' ', s)
