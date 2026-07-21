@@ -1,4 +1,4 @@
-﻿import sys  
+import sys  
 from pydantic import BaseModel
 import asyncio
 import multiprocessing 
@@ -372,7 +372,8 @@ async def get_luboil_reports(
                 LuboilReport.report_id,
                 LuboilReport.file_name,
                 LuboilReport.report_url,
-                LuboilReport.report_date
+                LuboilReport.report_date,
+                LuboilReport.oil_source
             )
             .where(LuboilReport.imo_number == str(imo_number))
             .order_by(desc(LuboilReport.report_date))
@@ -395,7 +396,8 @@ async def get_luboil_reports(
                 "report_date": r.report_date.isoformat() if r.report_date else None,
                 "report_id": r.report_id,
                 "file_name": r.file_name,
-                "report_url": secure_url
+                "report_url": secure_url,
+                "oil_source": r.oil_source
             })
 
         return data
@@ -538,11 +540,13 @@ async def upload_luboil_report(
         }
 
     except ValueError as e:
-        logger.error(f"Validation Error: {e}")
+        logger.error(f"Validation Error during upload: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.exception(f"System Error processing Lube Oil PDF: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error during processing.")
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"System Error processing Lube Oil PDF: {e}\n{tb}")
+        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
 
         
 # Request Schema for updating remarks
@@ -1115,6 +1119,7 @@ async def get_luboil_fleet_overview(
                 LuboilReport.report_url,
                 LuboilSample.equipment_code,
                 LuboilReport.oil_source,
+                LuboilReport.lab_name,
                 LuboilSample.machinery_name,
                 LuboilSample.status,
                 LuboilSample.sample_date,
@@ -1230,10 +1235,30 @@ async def get_luboil_fleet_overview(
 
             for eq in visible_equipment:
                 code = eq.code
-                is_configured = (v.imo, code) in config_map
-                history_list = sample_map.get((v.imo, code), [])
+                v_imo_str = str(v.imo)   # ControlVessel.imo is int; maps use string keys
+                is_configured = (v_imo_str, code) in config_map
+                history_list = sample_map.get((v_imo_str, code), [])
                 latest_sample = history_list[0] if history_list else None
-                analyst_code = config_map.get((v.imo, code))
+                analyst_code = config_map.get((v_imo_str, code))
+
+                # Build per-source latest: keyed by lowercase source name
+                by_source_map = {}
+                for h in history_list:
+                    src_raw = (h.oil_source or "").strip()
+                    if not src_raw:
+                        continue
+                    # Normalize to lowercase key e.g. "shell", "tribocare", "gulf"
+                    if "shell" in src_raw.lower():
+                        src_key = "shell"
+                    elif "tribocare" in src_raw.lower():
+                        src_key = "tribocare"
+                    elif "gulf" in src_raw.lower():
+                        src_key = "gulf"
+                    else:
+                        src_key = src_raw.lower()
+                    # Only keep the first (latest) sample per source
+                    if src_key not in by_source_map:
+                        by_source_map[src_key] = h
 
                 cell_data = {
                     "code": code,
@@ -1337,13 +1362,15 @@ async def get_luboil_fleet_overview(
                             ))
                             await db.commit()
                     # =========================================================
-                    
+
                     processed_history = [
                         {
                             "date": h.sample_date.strftime("%Y-%m-%d"), 
                             "report_date": h.report_date.strftime("%Y-%m-%d") if h.report_date else None,
                             "status": h.status,
                             "sample_id": h.sample_id,
+                            "lab_name": h.lab_name,
+                            "oil_source": h.oil_source,
                             "officer_remarks": h.officer_remarks,
                             "office_remarks": h.office_remarks,
                             "internal_remarks": h.internal_remarks,
@@ -1362,6 +1389,34 @@ async def get_luboil_fleet_overview(
                         } for h in history_list[:10]
                     ]
 
+                    # Build by_source cell data (each source's own latest sample)
+                    def make_source_cell(s):
+                        return {
+                            "has_report": True,
+                            "sample_id": s.sample_id,
+                            "status": s.status,
+                            "oil_source": s.oil_source,
+                            "lab_name": s.lab_name,
+                            "diagnosis": s.lab_diagnosis,
+                            "summary_error": s.summary_error,
+                            "last_sample": s.sample_date.strftime("%Y-%m-%d"),
+                            "report_date": s.report_date.strftime("%Y-%m-%d") if s.report_date else None,
+                            "report_url": generate_sas_url(s.report_url) if s.report_url else None,
+                            "viscosity": float(s.viscosity_100c) if s.viscosity_100c else None,
+                            "water": float(s.water_content_pct) if s.water_content_pct else None,
+                            "is_resolved": s.is_resolved,
+                            "is_resampling_required": s.is_resampling_required,
+                            "is_approval_pending": s.is_approval_pending,
+                            "is_image_required": s.is_image_required,
+                            "pdf_page_index": s.pdf_page_index,
+                            "officer_remarks": s.officer_remarks,
+                            "office_remarks": s.office_remarks,
+                            "internal_remarks": s.internal_remarks,
+                            "status_change_log": s.status_change_log,
+                            "conversation": build_full_conversation([s])
+                        }
+                    by_source = {k: make_source_cell(v) for k, v in by_source_map.items()}
+
                     secure_report_url = generate_sas_url(latest_sample.report_url) if latest_sample.report_url else None
                     full_conversation = build_full_conversation([latest_sample])
 
@@ -1369,6 +1424,7 @@ async def get_luboil_fleet_overview(
                         "sample_id": latest_sample.sample_id,
                         "status": latest_sample.status,
                         "oil_source": latest_sample.oil_source,
+                        "lab_name": latest_sample.lab_name,
                         "diagnosis": latest_sample.lab_diagnosis,
                         "summary_error": latest_sample.summary_error, 
                         "last_sample": latest_sample.sample_date.strftime("%Y-%m-%d"),
@@ -1390,7 +1446,8 @@ async def get_luboil_fleet_overview(
                         "is_resampling_required": latest_sample.is_resampling_required,
                         "is_resolved": latest_sample.is_resolved,
                         "resolution_remarks": latest_sample.resolution_remarks,
-                        "is_approval_pending": latest_sample.is_approval_pending
+                        "is_approval_pending": latest_sample.is_approval_pending,
+                        "by_source": by_source,
                     })
                 else:
                     cell_data.update({
@@ -1623,32 +1680,55 @@ async def get_luboil_machinery_trend(
     )
     results = res.scalars().all()
 
+    # ONE batch query for oil_source — no N+1 loop
+    report_ids = list({s.report_id for s in results})
+    source_map = {}
+    if report_ids:
+        rpt_res = await db.execute(
+            sa_select(LuboilReport.report_id, LuboilReport.oil_source).where(
+                LuboilReport.report_id.in_(report_ids)
+            )
+        )
+        for row in rpt_res.all():
+            source_map[row.report_id] = (row.oil_source or "UNKNOWN").upper()
+
+    def _f(val):
+        """Float or None — never coerce None to 0 (avoids fake zero-points on chart)."""
+        if val is None:
+            return None
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return None
+
     # Format the data for charting libraries
     history = []
     for s in results:
         history.append({
             "date": s.sample_date.isoformat(),
             "status": s.status,
+            "oil_source": source_map.get(s.report_id, "UNKNOWN"),
             # Physical
-            "viscosity_40c": float(s.viscosity_40c) if s.viscosity_40c else None,
-            "tan": float(s.tan) if s.tan else None,
-            "tbn": float(s.tbn) if s.tbn else None,
+            "viscosity_40c": _f(s.viscosity_40c),
+            "tan": _f(s.tan),
+            "tbn": _f(s.tbn),
             # Wear
-            "iron": s.iron,
-            "copper": s.copper,
-            "aluminium": s.aluminium,
-            "wpi_index": s.wpi_index,
+            "iron": _f(s.iron),
+            "copper": _f(s.copper),
+            "aluminium": _f(s.aluminium),
+            "wpi_index": _f(s.wpi_index),
             # Contamination
-            "water": float(s.water_content_pct) if s.water_content_pct else 0,
-            "sodium": s.sodium,
-            "silicon": s.silicon,
+            "water": _f(s.water_content_pct),
+            "sodium": _f(s.sodium),
+            "silicon": _f(s.silicon),
             # Additives
-            "calcium": float(s.calcium) if s.calcium else None,
-            "zinc": float(s.zinc) if s.zinc else None,
-            "magnesium": s.magnesium
+            "calcium": _f(s.calcium),
+            "zinc": _f(s.zinc),
+            "magnesium": _f(s.magnesium),
         })
-    
+
     return history
+
 
 @app.post("/api/luboil/upload-attachment")
 async def upload_luboil_attachment(
@@ -1810,17 +1890,18 @@ async def get_specific_page_pdf(
     if not report:
         raise HTTPException(status_code=404, detail="Report file not found")
 
-    # 2. PDF PROCESSING (Preserved exactly as before)
+    # 2. PDF PROCESSING
     try:
-        from app.blob_storage import download_blob_bytes 
+        from app.blob_storage import download_blob_bytes
         full_pdf_bytes = download_blob_bytes(report.report_url)
-        
+
         reader = PdfReader(io.BytesIO(full_pdf_bytes))
         writer = PdfWriter()
-        
-        # Add the specific page (0-based index)
-        writer.add_page(reader.pages[sample.pdf_page_index]) 
-        
+
+        # Clamp to valid page range
+        page_idx = min(sample.pdf_page_index, len(reader.pages) - 1)
+        writer.add_page(reader.pages[page_idx])
+
         output_stream = io.BytesIO()
         writer.write(output_stream)
         output_stream.seek(0)
@@ -1830,9 +1911,11 @@ async def get_specific_page_pdf(
             media_type="application/pdf",
             headers={"Content-Disposition": "inline"}
         )
+
     except Exception as e:
         logger.error(f"Slicing error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to process PDF")
+
 
 
 # --- ADD THIS TO app/api.py ---

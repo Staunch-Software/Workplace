@@ -1580,11 +1580,11 @@ async def get_fleet_configuration_summary_live(db: AsyncSession = Depends(get_db
         if str(v.imo) not in me_configured_imos
     ]
 
-    # AE unconfigured = vessels in control DB but NOT in ae_configured_imos
+    # AE unconfigured = vessels in control DB but NOT in ae_configured_imos (and exclude TUFMAX)
     ae_unconfigured_list = [
         {"imo": str(v.imo), "name": v.name}
         for v in all_control_vessels
-        if str(v.imo) not in ae_configured_imos
+        if str(v.imo) not in ae_configured_imos and "TUFMAX" not in str(v.name).upper()
     ]
 
     return {

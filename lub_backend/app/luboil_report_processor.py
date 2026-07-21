@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 import json
 import re
 import difflib  # Standard library for comparison
@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from sqlalchemy import select
 from datetime import date as date_type
-# Import extractor
-from app.luboil_pdf_extractor import extract_lube_oil_report_data
+# Import extractor — Factory auto-routes to Shell / Gulf Marine / Tribocare
+from app.services.pdf_extractors.factory import extract_lube_oil_report_data
 
 # Import models
 from app.luboil_model import LuboilReport, LuboilSample, LuboilEquipmentType, LuboilNameMapping, LuboilVesselConfig
@@ -22,9 +22,10 @@ def standardize_name(text: str) -> str:
     if not text: return ""
     s = text.lower().strip()
 
+    # PASS 0: Normalize punctuation to spaces (critical for stripping out parentheticals like (CRANKCASE))
+    s = s.replace("(", " ").replace(")", " ").replace("[", " ").replace("]", " ").replace("-", " ")
+
     # PASS 1: Directional keywords — MUST run before anything else
-    # Reason: "after" contains "aft" which gets destroyed in synonym pass
-    # Longer phrases must come before shorter ones to avoid partial matches
     directional = [
         ("before fine filter", "in"),
         ("after fine filter",  "out"),
@@ -35,14 +36,12 @@ def standardize_name(text: str) -> str:
         s = s.replace(old, new)
 
     # PASS 2: Equipment synonyms
-    # Reason: longer/more specific phrases must come before shorter ones
-    # e.g. "windlass & mooring winch" before "windlass" and "mooring winch"
-    # e.g. "hose handling crane" before "deck crane" 
     synonyms = [
         ("windlass & mooring winch", "winch"),
         ("windlass",                 "winch"),
         ("mooring winch",            "winch"),
         ("auxiliary diesel engine",  "ae"),
+        ("auxiliary engine",         "ae"),
         ("aux engine",               "ae"),
         ("main engine",              "me"),
         ("hydraulic power system",   "hyd"),
@@ -54,31 +53,32 @@ def standardize_name(text: str) -> str:
         ("provision crane",          "prov crane"),
         ("remote control valve",     "rc valve"),
         ("cylinders",                "cyl"),
+        ("emergency diesel generator engine", "ge"),
+        ("emergency diesel engine",  "ge"),
+        ("emergency diesel",         "ge"),
+        ("emergency generator",      "ge"),
+        ("deck machinery fwd",       "winch fwd"),
+        ("deck machinery aft",       "winch aft"),
+        ("deck machinery",           "dk machinery"),
     ]
     for old, new in synonyms:
         s = s.replace(old, new)
 
     # PASS 3: Directional abbreviations using word boundaries
-    # Reason: plain .replace("aft", "aft") would match inside "after", "shaft" etc.
-    # We do this AFTER synonyms so "aft" standalone is preserved as a position token
     s = re.sub(r'\bfwd\b', 'fwd', s)
     s = re.sub(r'\baft\b', 'aft', s)
 
     # PASS 4: Noise removal using word boundaries
-    # Reason: plain .replace("no", "") would destroy "normal", "note", "crankcase" etc.
-    # "(hps)" stripped here after hydraulic power system already converted to "hyd"
     noise_patterns = [
         r'\bsystem\b',
         r'\bunit\b',
         r'\blife\b',
         r'\bbearings\b',
         r'\bseals\b',
-        r'\bno\.\b',
-        r'\bno\b',
+        r'\bno[\.\s]*',
+        r'\band\b',
         r'#',
-        r'\(hps\)',
-        r'\(hps\s*\)',
-        r'-\s*',
+        r'\bhps\b',
         r'&\s*',
     ]
     for pattern in noise_patterns:
@@ -200,8 +200,11 @@ async def save_luboil_report(
     try:
         extracted_data = extract_lube_oil_report_data(pdf_file_stream)
     except Exception as e:
-        logger.error(f"Extraction failed for {filename}: {e}")
-        raise ValueError("Failed to parse PDF structure.")
+        logger.error(f"PDF Extraction Failed: {e}", exc_info=True)
+        raise
+
+    if not extracted_data:
+        raise ValueError(f"PDF parser returned no data for '{filename}'. The file may be corrupted, password-protected, or in an unsupported format.")
 
     meta = extracted_data.get('metadata', {})
     vessel_name_extracted = meta.get('vessel_name')
@@ -334,7 +337,17 @@ async def save_luboil_report(
                     )
                 )
                 report = existing_report_result.scalars().first()
-                report.file_name = filename
+                # Only update file_name if this filename is not already owned by a different report
+                if report.file_name != filename:
+                    conflict_check = await session.execute(
+                        select(LuboilReport).where(
+                            LuboilReport.imo_number == vessel_imo,
+                            LuboilReport.file_name == filename,
+                            LuboilReport.report_id != report.report_id
+                        )
+                    )
+                    if not conflict_check.scalars().first():
+                        report.file_name = filename
                 report.full_json_data = extracted_data
                 report.oil_source = oil_source_extracted
                 existing_map = {s.sample_number: s for s in existing_samples}
@@ -367,26 +380,89 @@ async def save_luboil_report(
                 # EXACT DUPLICATE — same vessel + same date + same content
                 is_duplicate = True
                 report = existing_report
-                report.file_name = filename
+                # Only update file_name if this filename is not already owned by a different report
+                if report.file_name != filename:
+                    conflict_check2 = await session.execute(
+                        select(LuboilReport).where(
+                            LuboilReport.imo_number == vessel_imo,
+                            LuboilReport.file_name == filename,
+                            LuboilReport.report_id != report.report_id
+                        )
+                    )
+                    if not conflict_check2.scalars().first():
+                        report.file_name = filename
                 report.full_json_data = extracted_data
                 report.oil_source = oil_source_extracted
                 existing_map = {s.sample_number: s for s in existing_samples_list}
                 logger.info(f"SAFETY CATCH DUPLICATE: reusing report_id={existing_report.report_id}")
             else:
-                # Same vessel + same date BUT content changed → new row
-                logger.info(f"SAFETY CATCH: content changed → creating new row")
+                # Same vessel + same date BUT content changed.
+                # CHECK: does the same filename already exist? If so, UPDATE in place
+                # to avoid violating the uq_luboil_file_per_vessel unique constraint.
+                filename_check = await session.execute(
+                    select(LuboilReport).where(
+                        LuboilReport.imo_number == vessel_imo,
+                        LuboilReport.file_name == filename
+                    )
+                )
+                existing_by_filename = filename_check.scalars().first()
+
+                if existing_by_filename:
+                    # Same file re-uploaded with improved extraction → update existing record
+                    is_duplicate = True
+                    report = existing_by_filename
+                    report.full_json_data = extracted_data
+                    report.oil_source = oil_source_extracted
+                    report.report_date = report_date_parsed
+                    report.lab_name = meta.get('lab_name', report.lab_name)
+                    existing_samples_re2 = await session.execute(
+                        select(LuboilSample).where(
+                            LuboilSample.report_id == existing_by_filename.report_id
+                        )
+                    )
+                    existing_map = {s.sample_number: s for s in existing_samples_re2.scalars().all()}
+                    logger.info(f"FILENAME MATCH: same file re-uploaded with new content, updating report_id={report.report_id}")
+                else:
+                    # Truly new report: different content AND different filename
+                    logger.info(f"SAFETY CATCH: content changed → creating new row")
 
         if not is_duplicate:
-            report = LuboilReport(
-                imo_number=vessel_imo,
-                file_name=filename,
-                lab_name=meta.get('lab_name', 'Shell LubeAnalyst'),
-                report_date=report_date_parsed,
-                full_json_data=extracted_data,
-                oil_source=oil_source_extracted
+            # Final guard: check if this exact filename already exists (catches edge cases)
+            filename_guard = await session.execute(
+                select(LuboilReport).where(
+                    LuboilReport.imo_number == vessel_imo,
+                    LuboilReport.file_name == filename
+                )
             )
-            session.add(report)
-            logger.info(f"NEW report created for {vessel_display_name} date={report_date_str}")
+            existing_by_filename_guard = filename_guard.scalars().first()
+
+            if existing_by_filename_guard:
+                # Filename already exists — update instead of insert to avoid UniqueViolationError
+                is_duplicate = True
+                report = existing_by_filename_guard
+                report.full_json_data = extracted_data
+                report.oil_source = oil_source_extracted
+                report.report_date = report_date_parsed
+                report.lab_name = meta.get('lab_name', report.lab_name)
+                existing_samples_re3 = await session.execute(
+                    select(LuboilSample).where(
+                        LuboilSample.report_id == existing_by_filename_guard.report_id
+                    )
+                )
+                existing_map = {s.sample_number: s for s in existing_samples_re3.scalars().all()}
+                logger.info(f"FILENAME GUARD: filename already exists, updating report_id={report.report_id}")
+            else:
+                report = LuboilReport(
+                    imo_number=vessel_imo,
+                    file_name=filename,
+                    lab_name=meta.get('lab_name', 'Shell LubeAnalyst'),
+                    report_date=report_date_parsed,
+                    full_json_data=extracted_data,
+                    oil_source=oil_source_extracted
+                )
+                session.add(report)
+                logger.info(f"NEW report created for {vessel_display_name} date={report_date_str}")
+
 
     await session.flush()
     
@@ -534,6 +610,28 @@ async def save_luboil_report(
             )
             session.add(new_sample)
             logger.info(f"➕ New report: inserted fresh sample for {clean_name}")
+
+            # ── AUTO-CREATE VesselConfig if not already present ──────────
+            # This ensures Gulf/Tribocare equipment shows in the UI matrix
+            # without requiring manual configuration after first upload.
+            if equipment_code:
+                try:
+                    existing_cfg = await session.execute(
+                        select(LuboilVesselConfig).where(
+                            LuboilVesselConfig.imo_number == vessel_imo,
+                            LuboilVesselConfig.equipment_code == equipment_code
+                        )
+                    )
+                    if not existing_cfg.scalars().first():
+                        session.add(LuboilVesselConfig(
+                            imo_number=vessel_imo,
+                            equipment_code=equipment_code,
+                            is_active=True
+                        ))
+                        logger.info(f"🔧 Auto-created VesselConfig: IMO={vessel_imo} → {equipment_code}")
+                except Exception as cfg_err:
+                    logger.warning(f"⚠️ Could not auto-create VesselConfig for {equipment_code}: {cfg_err}")
+
 
     await session.commit()
 

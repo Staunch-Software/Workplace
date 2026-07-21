@@ -407,8 +407,8 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
                 phys['viscosity_100c'] = extract_value_by_regex(text, r"Viscosity 100.*?C.*?\s+([\d.]+)")
                 phys['viscosity_40c']  = extract_value_by_regex(text, r"Viscosity 40.*?C.*?\s+([\d.]+)")
                 phys['flash_point']    = extract_value_by_regex(text, r"Flash Point.*?\s+([>\d.]+)")
-                phys['tbn']            = extract_value_by_regex(text, r"TBN.*?mg KOH/g\s+([\d.]+)")
-                phys['tan']            = extract_value_by_regex(text, r"TAN.*?mg KOH/g\s+([\d.]+)")
+                phys['tbn']            = extract_value_by_regex(text, r"(?:\bTBN\b|\bBN\b|\bBase Number\b)(?:\(.*?\)|\[.*?\]|[^\d\n])*([0-9]*\.[0-9]+|[0-9]+)")
+                phys['tan']            = extract_value_by_regex(text, r"(?:\bTAN\b|\bAN\b|\bAcid Number\b)(?:\(.*?\)|\[.*?\]|[^\d\n])*([0-9]*\.[0-9]+|[0-9]+)")
 
                 # B. Wear Metals
                 wear = machine['chemistry']['wear']
@@ -445,6 +445,7 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
                 adds['boron']      = extract_value_by_regex(text, r"Boron \(B\) ppm\s+([\d.]+)")
                 adds['molybdenum'] = extract_value_by_regex(text, r"Molybdenum \(Mo\) ppm\s+([\d.]+)")
                 adds['barium']     = extract_value_by_regex(text, r"Barium \(Ba\).*?%\s+([\d.]+)")
+                if adds['barium'] is not None: adds['barium'] = int(adds['barium'] * 10000)
                 
                 
                 if not full_report['metadata'].get('oil_source'):
@@ -465,12 +466,19 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
                 if machine['name']:
                     exists = False
                     for existing in full_report['machineries']:
-                        # CHANGE: Check both name AND sample number to allow multiple ME samples
-                        if existing['name'] == machine['name'] and existing['sample_info']['number'] == machine['sample_info']['number']:
+                        # Check LA Code first (most reliable), fallback to name, and ensure sample number matches
+                        has_same_la = (
+                            existing.get('lube_analyst_code') and 
+                            machine.get('lube_analyst_code') and 
+                            existing['lube_analyst_code'] == machine['lube_analyst_code']
+                        )
+                        has_same_name = existing['name'] == machine['name']
+                        
+                        if (has_same_la or has_same_name) and existing['sample_info']['number'] == machine['sample_info']['number']:
                             exists = True
-                            # Only update if the existing one was missing data
-                            if (not existing['chemistry']['wear'].get('iron') and machine['chemistry']['wear'].get('iron')):
-                                existing.update(machine)
+                            # The first page encountered is the Data page.
+                            # Subsequent pages are Graphs/Supplementary.
+                            # We should NOT overwrite the Data page's information (including its page_index).
                             break
                     if not exists:
                         full_report['machineries'].append(machine)
@@ -483,7 +491,7 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
 
     except Exception as e:
         logger.error(f"PDF Extraction Failed: {e}", exc_info=True)
-        return None
+        raise  # Re-raise so processor can show the real error to the user
 
 
 # ==========================================

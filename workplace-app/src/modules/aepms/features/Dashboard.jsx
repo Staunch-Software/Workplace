@@ -763,9 +763,9 @@ export default function Dashboard() {
                         {/* KPI Cards and other content */}
                         <div className="kpi-grid-enhanced mb-8">
                             {renderKpiCard(<Ship size={32} />, "Total Fleet Ships", fleetShips, "Active vessels in system", 0)}
-                            {renderKpiCard(<Cpu size={32} />, "ME Configured", meConfiguredCount, `${fleetShips - meConfiguredCount} pending setup`, 1, 'ME_CONFIG')}
-                            {renderKpiCard(<Wrench size={32} />, "AE Configured", aeConfiguredCount, `${fleetShips - aeConfiguredCount} pending setup`, 2, 'AE_CONFIG')}
-                            {renderKpiCard(<Clock size={32} />, "Config. Gaps", (fleetShips - meConfiguredCount) + (fleetShips - aeConfiguredCount), "Total configurations needed", 3)}
+                            {renderKpiCard(<Cpu size={32} />, "ME Configured", meConfiguredCount, `${meUnconfiguredList.length} pending setup`, 1, 'ME_CONFIG')}
+                            {renderKpiCard(<Wrench size={32} />, "AE Configured", aeConfiguredCount, `${aeUnconfiguredList.length} pending setup`, 2, 'AE_CONFIG')}
+                            {renderKpiCard(<Clock size={32} />, "Config. Gaps", (meUnconfiguredList.length) + (aeUnconfiguredList.length), "Total configurations needed", 3)}
                         </div>
 
                         {showMeConfigDetails ? renderMeConfigurationDetails() : showAeConfigDetails ? renderAeConfigurationDetails() : (

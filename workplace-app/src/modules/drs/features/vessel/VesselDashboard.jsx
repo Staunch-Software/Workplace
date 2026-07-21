@@ -7,7 +7,7 @@ import {
   MessageSquare, AlertOctagon, Edit, Send, Paperclip, Trash2, UserCircle, Edit3,
   Image as ImageIcon, Eye, X, Upload, Lock, ArrowUpDown,
   ArrowRight, Flag,
-  ArrowRightLeft, Move, Download
+  ArrowRightLeft, Move, Download, Loader2
 } from 'lucide-react';
 import { Flower2, Flower, RefreshCcw } from "lucide-react";
 import { MessageCircle } from "lucide-react";
@@ -1365,12 +1365,13 @@ const VesselDashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const vesselImo = user?.assigned_vessels?.[0] || '';
   const [showCreateRow, setShowCreateRow] = useState(false);
+  const [isCreatingDefect, setIsCreatingDefect] = useState(false);
   const rowRefs = useRef({});
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [activeDescDefect, setActiveDescDefect] = useState(null);
   const [descDraft, setDescDraft] = useState('');
-
+  const [isScrolled, setIsScrolled] = useState(false);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState([
     'date',
@@ -1672,6 +1673,19 @@ const VesselDashboard = () => {
       }));
     }
   }, [newDefect.date_identified, showCreateRow]);
+
+  useEffect(() => {
+    const container = document.querySelector('.defect-main-shell');
+    if (!container) return;
+
+    const handleScroll = () => {
+      setIsScrolled(container.scrollTop > 0);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
 
 
   const equipmentList = useMemo(
@@ -2220,6 +2234,7 @@ const VesselDashboard = () => {
   };
 
   const handleCreateSave = async () => {
+    if (isCreatingDefect) return;
     if (!newDefect.equipment_name || !newDefect.description) {
       toast('Area of Concern and Description are required', 'warning');
       return;
@@ -2230,7 +2245,27 @@ const VesselDashboard = () => {
       return;
     }
 
+    // Duplicate check: same report date + equipment + source + description on the same vessel
+    const duplicate = defects.find(d => {
+      // Convert DB datetime to local YYYY-MM-DD for accurate comparison
+      const dbDate = d.date_identified
+        ? new Date(d.date_identified).toLocaleDateString('en-CA')
+        : null;
+      return (
+        d.equipment_name?.toLowerCase().trim() === newDefect.equipment_name.toLowerCase().trim() &&
+        d.description?.toLowerCase().trim() === newDefect.description.toLowerCase().trim() &&
+        d.defect_source?.toLowerCase().trim() === newDefect.defect_source?.toLowerCase().trim() &&
+        dbDate === newDefect.date_identified &&
+        !d.is_deleted
+      );
+    });
+    if (duplicate) {
+      toast(`Duplicate defect found: ${duplicate.defect_number || 'existing record'} has the same Report Date, Area of Concern, Source, and Description`, 'error');
+      return;
+    }
+
     const defectId = generateId(); // ✅ DEFINE ONCE
+    setIsCreatingDefect(true);
 
     try {
       // -------------------------------------------------------------
@@ -2268,6 +2303,7 @@ const VesselDashboard = () => {
       today.setHours(0, 0, 0, 0);
 
       const reportDate = new Date(newDefect.date_identified);
+      reportDate.setHours(0, 0, 0, 0);
       if (reportDate > today) {
         toast('Report date cannot be in the future', 'warning');
         return;
@@ -2311,7 +2347,11 @@ const VesselDashboard = () => {
       console.error("❌ Creation Failed:", err);
       toast('Failed to create defect: ' + err.message, 'error');
     }
+    finally {
+      setIsCreatingDefect(false);
+    }
   };
+
 
   const handleKpiFilter = (type) => {
     setCurrentPage(1);
@@ -2462,26 +2502,25 @@ const VesselDashboard = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center' }}>
         <div className="defect-header-row" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <h1 className="page-title defect-page-title" style={{ marginBottom: "0px" }}>Vessel Overview</h1>
-          <button
-            onClick={() => setIsEditMode(!isEditMode)}
-            className="defect-edit-btn"
-            style={{
-              background: isEditMode ? '#ea580c' : 'white',
-              color: isEditMode ? 'white' : '#334155',
-              border: '1px solid #cbd5e1',
-              // padding: '8px 16px',
-              // borderRadius: '6px',
-              // fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s'
-            }}
-          >
-            <Edit3 size={16} />
-            {isEditMode ? 'Exit Edit Mode' : 'Enable Edit Mode'}
-          </button>
+          {!isScrolled && (
+            <button
+              onClick={() => setIsEditMode(!isEditMode)}
+              className="defect-edit-btn"
+              style={{
+                background: isEditMode ? '#ea580c' : 'white',
+                color: isEditMode ? 'white' : '#334155',
+                border: '1px solid #cbd5e1',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                fontWeight: "600",
+                transition: 'all 0.2s'
+              }}
+            >
+              <Edit3 size={16} className="defect-btn-icon" />
+              {isEditMode ? 'Exit Edit Mode' : 'Enable Edit Mode'}
+            </button>
+          )}
         </div>
         {/* <div style={{ display: 'flex', gap: '10px' }}>
           <span className="badge badge-normal">Total: {filteredData.length}</span>
@@ -2583,7 +2622,7 @@ const VesselDashboard = () => {
       <div className="table-card">
         <div className='table-action-bar'>
           {/* LEFT: Create Defect + Edit Mode Buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="action-buttons-group">
             <button
               onClick={() => {
                 setCurrentPage(1);
@@ -2594,6 +2633,26 @@ const VesselDashboard = () => {
             >
               + Create Defect
             </button>
+
+            {isScrolled && (
+              <button
+                onClick={() => setIsEditMode(!isEditMode)}
+                className="second-edit"
+                style={{
+                  background: isEditMode ? '#ea580c' : 'white',
+                  color: isEditMode ? 'white' : '#334155',
+                  border: '1px solid #cbd5e1',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontWeight: "600",
+                  transition: 'all 0.2s',
+                }}
+              >
+                <Edit3 size={16} className="defect-btn-icon" />
+                {isEditMode ? 'Exit Edit Mode' : 'Enable Edit Mode'}
+              </button>
+            )}
           </div>
 
           {/* RIGHT: Legend */}
@@ -3692,7 +3751,7 @@ const VesselDashboard = () => {
 
                         case 'description':
                           return (
-                            <td key="description" style={{ width: columnWidths.description, minWidth: "10px", position: 'relative' }}>
+                            <td key="description" className='desc_width' style={{ maxWidth: '250px', width: columnWidths.description, minWidth: "10px", position: 'relative', whiteSpace: "normal" }}>
                               <div
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -3865,19 +3924,21 @@ const VesselDashboard = () => {
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
                         <button
                           onClick={handleCreateSave}
-                          title="Save Defect"
+                          disabled={isCreatingDefect}
+                          title={isCreatingDefect ? "Saving..." : "Save Defect"}
                           style={{
-                            background: '#10b981',
+                            background: isCreatingDefect ? '#6ee7b7' : '#10b981',
                             color: 'white',
                             border: 'none',
                             borderRadius: '6px',
                             padding: '6px 10px',
-                            cursor: 'pointer',
+                            cursor: isCreatingDefect ? 'not-allowed' : 'pointer',
                             display: 'flex',
-                            alignItems: 'center'
+                            alignItems: 'center',
+                            opacity: isCreatingDefect ? 0.7 : 1,
                           }}
                         >
-                          <Check size={16} />
+                          {isCreatingDefect ? <Loader2 size={16} className="spin-animation" /> : <Check size={16} />}
                         </button>
 
                         <button

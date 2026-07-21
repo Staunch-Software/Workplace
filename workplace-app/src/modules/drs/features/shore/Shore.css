@@ -939,8 +939,11 @@
     transform: rotate(360deg);
   }
 }
+.spin-animation {
+  animation: spin 2s linear infinite;
+}
 
-/* 9-DOT GRID BUTTON (Odoo-style app switcher) */
+/* 9-DOT GRID BUTTON */
 .nine-dot-btn {
   background: transparent;
   border: none;
@@ -1341,7 +1344,7 @@
   }
 
   .legend-icons {
-    gap: 7px;
+    gap: 4px;
   }
 
   .legend-icons label {
@@ -1413,7 +1416,7 @@
 }
 
 
-@media (min-width: 1024px) and (max-width: 1335px) {
+@media (min-width: 1024px) and (max-width: 1366px) {
   .kpi-icon {
     width: 35px !important;
     height: 35px !important;
@@ -2068,6 +2071,12 @@
   border-radius: 6px !important;
   gap: 4px !important;
   height: 38px !important;
-  min-width: 50px !important;
+  min-width: 102px !important;
   justify-content: center !important;
 }
+
+/* @media (min-width: 1200px) {
+  .legend-container{
+    gap: 0px !important;
+  }
+} */
