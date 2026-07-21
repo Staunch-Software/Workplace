@@ -253,8 +253,10 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
                                 candidate = candidate.split("  ")[-1].strip()
                                 
                             # 2. Strip out merged equipment prefixes using regex
-                            noise_pattern = r"(?i).*(?:bearings and seals|crankcase|system|filter|pump|crane|gear|winch|tube|engine)\s*"
+                            noise_pattern = r"(?i).*(?:bearings and seals|crankcase|system|filter|pump|crane|gear|winch|tube|engine|settling tank|top sample)\s*"
                             candidate = re.sub(noise_pattern, "", candidate).strip()
+                            if len(candidate.split()) > 2:
+                                candidate = " ".join(candidate.split()[-2:])
 
                             bad_keywords = [
                                 "Manufacturer", "Model", "LubeAnalyst", "Code",
