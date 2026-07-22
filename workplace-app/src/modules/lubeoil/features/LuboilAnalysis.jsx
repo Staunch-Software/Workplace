@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   Card,
   CardHeader,
@@ -430,9 +430,9 @@ const OverdueVesselRow = ({
                         Report Date:{" "}
                         {item.reportDate
                           ? new Date(item.reportDate).toLocaleDateString(
-                              "en-GB",
-                              { day: "2-digit", month: "short", year: "numeric" },
-                            )
+                            "en-GB",
+                            { day: "2-digit", month: "short", year: "numeric" },
+                          )
                           : "N/A"}
                       </span>
                     )}
@@ -544,6 +544,111 @@ const ShellStatusIcon = ({ status, size = 20 }) => {
     </svg>
   );
 };
+const OWNER_NAMES = {
+  AMNS: "AMNS Shipping & Logistics Private Limited",
+  GCL: "Global Chartering Limited",
+  USP: "Umang Shipping Private LTD"
+};
+
+const PremiumOwnerDropdown = ({ selectedOwner, setSelectedOwner, ownersList, height = "36px" }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={dropdownRef} style={{ position: "relative", minWidth: "250px", zIndex: 100 }}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "0 14px",
+          height: height,
+          backgroundColor: "#ffffff",
+          border: "1px solid #cbd5e1",
+          borderRadius: "8px",
+          cursor: "pointer",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+          transition: "all 0.2s ease",
+          fontSize: "0.85rem",
+          fontWeight: "600",
+          color: "#334155"
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.borderColor = "#94a3b8"}
+        onMouseLeave={(e) => e.currentTarget.style.borderColor = "#cbd5e1"}
+      >
+        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {selectedOwner === "ALL" ? "All Owners" : OWNER_NAMES[selectedOwner] || selectedOwner}
+        </span>
+        <ChevronDown size={16} style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s", flexShrink: 0, marginLeft: "8px" }} />
+      </div>
+
+      {isOpen && (
+        <div style={{
+          position: "absolute",
+          top: "100%",
+          left: 0,
+          right: 0,
+          marginTop: "6px",
+          backgroundColor: "#ffffff",
+          borderRadius: "8px",
+          border: "1px solid #e2e8f0",
+          boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)",
+          overflow: "hidden",
+          zIndex: 101
+        }}>
+          <div 
+            onClick={() => { setSelectedOwner("ALL"); setIsOpen(false); }}
+            style={{
+              padding: "10px 16px",
+              cursor: "pointer",
+              fontSize: "0.85rem",
+              fontWeight: selectedOwner === "ALL" ? "700" : "500",
+              color: selectedOwner === "ALL" ? "#2563eb" : "#475569",
+              backgroundColor: selectedOwner === "ALL" ? "#eff6ff" : "transparent",
+              borderBottom: "1px solid #f1f5f9",
+              transition: "background-color 0.15s"
+            }}
+            onMouseEnter={(e) => { if (selectedOwner !== "ALL") e.currentTarget.style.backgroundColor = "#f8fafc" }}
+            onMouseLeave={(e) => { if (selectedOwner !== "ALL") e.currentTarget.style.backgroundColor = "transparent" }}
+          >
+            All Owners
+          </div>
+          {ownersList.map(owner => (
+            <div 
+              key={owner}
+              onClick={() => { setSelectedOwner(owner); setIsOpen(false); }}
+              style={{
+                padding: "10px 16px",
+                cursor: "pointer",
+                fontSize: "0.85rem",
+                fontWeight: selectedOwner === owner ? "700" : "500",
+                color: selectedOwner === owner ? "#2563eb" : "#475569",
+                backgroundColor: selectedOwner === owner ? "#eff6ff" : "transparent",
+                transition: "background-color 0.15s"
+              }}
+              onMouseEnter={(e) => { if (selectedOwner !== owner) e.currentTarget.style.backgroundColor = "#f8fafc" }}
+              onMouseLeave={(e) => { if (selectedOwner !== owner) e.currentTarget.style.backgroundColor = "transparent" }}
+            >
+              {OWNER_NAMES[owner] || owner}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const LuboilAnalysis = () => {
   const { user } = useAuth();
   const userData = user?.user || user;
@@ -699,6 +804,39 @@ const LuboilAnalysis = () => {
   const [selectedVesselsFilter, setSelectedVesselsFilter] = useState([]);
   const [isVesselDropdownOpen, setIsVesselDropdownOpen] = useState(false);
   const vesselDropdownRef = useRef(null);
+
+  // NEW: Owner filtering state
+  const [selectedOwner, setSelectedOwner] = useState("ALL");
+  
+  const getOwner = (name) => {
+    if (!name) return "";
+    const upperName = name.toUpperCase();
+    
+    // AMNS Owner (AMNS, AMNSI)
+    if (upperName.startsWith("AMNS")) return "AMNS";
+    
+    // Umang Owner (AM Kirti, AM Tarang, AM Umang)
+    if (upperName.includes("KIRTI") || upperName.includes("TARANG") || upperName.includes("UMANG")) return "USP";
+    
+    // GCL Owner (GCL)
+    if (upperName.startsWith("GCL")) return "GCL";
+    
+    // Fallback: just return the first word if it doesn't match known ones
+    return name.split(" ")[0].toUpperCase();
+  };
+
+  
+  const dashboardOwners = useMemo(() => {
+    if (!matrixData || !matrixData.data) return [];
+    const owners = new Set(Object.keys(matrixData.data).map(name => getOwner(name)));
+    return Array.from(owners).sort();
+  }, [matrixData]);
+
+  const feedOwners = useMemo(() => {
+    if (!feedData || !Array.isArray(feedData)) return [];
+    const owners = new Set(feedData.map(item => getOwner(item.vessel_name)));
+    return Array.from(owners).sort();
+  }, [feedData]);
 
   const rawJobTitle = (user?.job_title || user?.user?.job_title || "")
     .toLowerCase()
@@ -985,7 +1123,10 @@ const LuboilAnalysis = () => {
     });
   }, [matrixData]);
 
-  const sourceFilteredVessels = availableVessels;
+  const sourceFilteredVessels = useMemo(() => {
+    if (selectedOwner === "ALL") return availableVessels;
+    return availableVessels.filter(v => getOwner(v.vessel_name) === selectedOwner);
+  }, [availableVessels, selectedOwner]);
 
   // Always keep selectedVesselsFilter in sync with sourceFilteredVessels.
   // Fires on: initial load, source pill change, new PDF upload (data refresh).
@@ -1023,14 +1164,12 @@ const LuboilAnalysis = () => {
     }
   }, [matrixData, listModal.isOpen]);
   const uniqueFeedVessels = useMemo(() => {
-    // We pull names from availableVessels (which contains every ship in your system)
-    // instead of only ships currently appearing in the feed.
-    const allNames = availableVessels.map((v) => v.vessel_name);
+    // We pull names from sourceFilteredVessels so it perfectly syncs with the chosen Owner
+    const allNames = sourceFilteredVessels.map((v) => v.vessel_name);
 
     // Prepend "ALL" for the default filter option.
-    // No need to sort or use 'Set' here because availableVessels is already unique and sorted.
     return ["ALL", ...allNames];
-  }, [availableVessels]);
+  }, [sourceFilteredVessels]);
 
   const handleShoreApproval = async (action) => {
     // action will be 'ACCEPT' or 'DECLINE'
@@ -1107,6 +1246,9 @@ const LuboilAnalysis = () => {
   const groupedFeed = useMemo(() => {
     // 1. Apply your existing filters + Updated Tab Filtering
     const filtered = (feedData || []).filter((item) => {
+      // --- NEW: OWNER FILTERING ---
+      if (selectedOwner !== "ALL" && getOwner(item.vessel_name) !== selectedOwner) return false;
+
       // --- NEW: TAB MODE FILTERING (RECIPIENT_ID BASED) ---
       // MY_FEED: Show items where recipient_id is NOT null (these are mentions/private)
       // FLEET: Show items where recipient_id IS null (these are general fleet actions)
@@ -1203,6 +1345,7 @@ const LuboilAnalysis = () => {
     feedFromDate,
     feedToDate,
     feedMode,
+    selectedOwner,
   ]);
   const handleResolutionSubmit = async () => {
     // 1. Basic Validation
@@ -1713,7 +1856,7 @@ const LuboilAnalysis = () => {
       }
 
       let defaultSource = null;
-      
+
       if (!defaultSource) {
         if (uniqueSources.includes("ALL")) defaultSource = "ALL";
         else if (uniqueSources.includes("SHELL")) defaultSource = "SHELL";
@@ -2367,6 +2510,10 @@ const LuboilAnalysis = () => {
     return selectedVesselsFilter.length > 0 ? selectedVesselsFilter : allNames;
   }, [availableVessels, selectedVesselsFilter]);
 
+  const ownerFilteredVessels = useMemo(() => {
+    return selectedVesselsFilter.filter(vName => selectedOwner === "ALL" || getOwner(vName) === selectedOwner);
+  }, [selectedVesselsFilter, selectedOwner]);
+
   // 3. Selection Handlers
   const handleVesselToggle = (vesselName) => {
     setSelectedVesselsFilter((prev) => {
@@ -2511,7 +2658,8 @@ const LuboilAnalysis = () => {
     let ovOver30Count = 0;
     let pendingUnresolvedCount = 0; // Tracks vessels needing attention (Action/Approval/Resample)
 
-    Object.values(data.data).forEach((vessel) => {
+    Object.entries(data.data).forEach(([vesselName, vessel]) => {
+      if (selectedOwner !== "ALL" && getOwner(vesselName) !== selectedOwner) return;
       let vesselHasReport = false;
       let vesselWorstStatus = "Normal";
       let vesselIsOverdueUnder30 = false;
@@ -2844,6 +2992,7 @@ const LuboilAnalysis = () => {
     const matchingVessels = [];
 
     Object.entries(matrixData.data).forEach(([vesselName, vesselData]) => {
+      if (selectedOwner !== "ALL" && getOwner(vesselName) !== selectedOwner) return;
       // Get the machineries (unified view)
       const sourceFilteredMachineries = Object.values(vesselData.machineries || {});
 
@@ -3052,7 +3201,7 @@ const LuboilAnalysis = () => {
     if (matrixData) {
       calculateMachineryStats(matrixData);
     }
-  }, [matrixData]);
+  }, [matrixData, selectedOwner]);
 
   const handleFileUpload = async (e) => {
     // 1. Convert FileList to an Array
@@ -3836,7 +3985,16 @@ const LuboilAnalysis = () => {
 
             {/* 3. UPLOAD BUTTON AREA — only for shore/admin, not vessel users */}
             {amIShore && (
-              <div style={{ position: "relative" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {/* --- PREMIUM OWNER DROPDOWN --- */}
+                <PremiumOwnerDropdown 
+                  selectedOwner={selectedOwner}
+                  setSelectedOwner={setSelectedOwner}
+                  ownersList={dashboardOwners}
+                  height="36px"
+                />
+
+                <div style={{ position: "relative" }}>
                 <input
                   type="file"
                   accept=".pdf"
@@ -3867,6 +4025,7 @@ const LuboilAnalysis = () => {
                       ? "Processing..."
                       : "Upload Report (PDF)"}
                 </Button>
+              </div>
               </div>
             )}
           </div>
@@ -4324,8 +4483,8 @@ const LuboilAnalysis = () => {
                       className="vessel-table-enhanced"
                       style={{
                         width:
-                          selectedVesselsFilter.length > 5
-                            ? `calc(220px + (${selectedVesselsFilter.length} * ((100% - 220px) / 5)))`
+                          ownerFilteredVessels.length > 5
+                            ? `calc(220px + (${ownerFilteredVessels.length} * ((100% - 220px) / 5)))`
                             : "100%",
                         borderCollapse: "separate", // Necessary for sticky headers to not flicker
                         borderSpacing: 0,
@@ -4352,7 +4511,7 @@ const LuboilAnalysis = () => {
                           </th>
 
                           {/* TOP STICKY VESSEL HEADERS (Restored Click Logic) */}
-                          {selectedVesselsFilter.map((vesselName) => {
+                          {ownerFilteredVessels.map((vesselName) => {
                             const vesselImo =
                               matrixData?.data?.[vesselName]?.imo;
 
@@ -4384,7 +4543,7 @@ const LuboilAnalysis = () => {
                                   top: 0,
                                   zIndex: 50,
                                   width: "calc((100% - 220px) / 5)",
-                                  minWidth: "calc((100% - 220px) / 5)",
+                                  minWidth: "150px", // Strict minimum width to prevent squishing on < 700px screens
                                   fontSize: "0.8rem",
                                   textAlign: "center",
                                   padding: "10px 4px", // Adjusted padding for better vertical fit
@@ -4394,24 +4553,40 @@ const LuboilAnalysis = () => {
                                   // cursor: "pointer",
                                   color: "#1e293b",
                                   transition: "background 0.2s",
+                                  overflow: "hidden", // Prevent contents from spilling out
                                 }}
-                              // onMouseEnter={(e) =>
-                              //   (e.currentTarget.style.backgroundColor =
-                              //     "#eff6ff")
-                              // }
-                              // onMouseLeave={(e) =>
-                              //   (e.currentTarget.style.backgroundColor =
-                              //     "#f8fafc")
-                              // }
                               >
-                                <div className="vessel-header-container">
+                                <div 
+                                  className="vessel-header-container"
+                                  style={{ display: "flex", flexDirection: "column", overflow: "hidden", width: "100%" }}
+                                >
                                   {/* Vessel Name */}
-                                  <span className="vessel-name-txt">
+                                  <span 
+                                    className="vessel-name-txt"
+                                    onMouseEnter={(e) => {
+                                      if (e.target.scrollWidth > e.target.clientWidth) {
+                                        e.target.title = vesselName;
+                                      } else {
+                                        e.target.removeAttribute('title');
+                                      }
+                                    }}
+                                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%", display: "block" }}
+                                  >
                                     {vesselName}
                                   </span>
 
                                   {/* Lab Source Name */}
-                                  <span className="vessel-lab-txt">
+                                  <span 
+                                    className="vessel-lab-txt"
+                                    onMouseEnter={(e) => {
+                                      if (e.target.scrollWidth > e.target.clientWidth) {
+                                        e.target.title = labNameDisplay;
+                                      } else {
+                                        e.target.removeAttribute('title');
+                                      }
+                                    }}
+                                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%", display: "block" }}
+                                  >
                                     {labNameDisplay}
                                   </span>
                                 </div>
@@ -4428,7 +4603,7 @@ const LuboilAnalysis = () => {
                             (colCode) => {
                               // Return true if ANY of the selected vessels has a report for this equipment
                               // AND (if source is filtered) that cell's source matches
-                              return selectedVesselsFilter.some(
+                              return ownerFilteredVessels.some(
                                 (vesselName) => {
                                   const cell =
                                     normalizedTable.rows[vesselName]?.[colCode];
@@ -4442,7 +4617,7 @@ const LuboilAnalysis = () => {
                           // 2. MAP ONLY THE VISIBLE ROWS (Hiding universal Missing/NA rows)
                           return visibleColumns.map((colCode, rowIndex) => {
                             // ðŸ”¥ NEW: Find the full description for this machinery code to show on hover
-                            const vesselWithInfo = selectedVesselsFilter.find(
+                            const vesselWithInfo = ownerFilteredVessels.find(
                               (vName) =>
                                 normalizedTable.rows[vName]?.[colCode]
                                   ?.description,
@@ -4478,7 +4653,7 @@ const LuboilAnalysis = () => {
                                 </td>
 
                                 {/* DATA CELLS */}
-                                {selectedVesselsFilter.map((vesselName) => {
+                                {ownerFilteredVessels.map((vesselName) => {
                                   const rawCell =
                                     normalizedTable.rows[vesselName]?.[colCode];
 
@@ -4658,7 +4833,7 @@ const LuboilAnalysis = () => {
                             PDF Reports
                           </td>
 
-                          {selectedVesselsFilter.map((vesselName) => {
+                          {ownerFilteredVessels.map((vesselName) => {
                             const vesselImo =
                               matrixData?.data?.[vesselName]?.imo;
                             const isOpen = footerReportVessel === vesselName;
@@ -4720,55 +4895,55 @@ const LuboilAnalysis = () => {
                                           footerReports
                                             // unified view includes all reports
                                             .map((report, idx) => (
-                                            <label
-                                              key={idx}
-                                              className="lub-footer-popover-item"
-                                            >
-                                              <input
-                                                type="checkbox"
-                                                className="popover-checkbox"
-                                                checked={selectedFooterReports.includes(
-                                                  report.report_id,
-                                                )}
-                                                onChange={() => {
-                                                  setSelectedFooterReports(
-                                                    (prev) =>
-                                                      prev.includes(
-                                                        report.report_id,
-                                                      )
-                                                        ? prev.filter(
-                                                          (id) =>
-                                                            id !==
-                                                            report.report_id,
-                                                        )
-                                                        : [
-                                                          ...prev,
+                                              <label
+                                                key={idx}
+                                                className="lub-footer-popover-item"
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  className="popover-checkbox"
+                                                  checked={selectedFooterReports.includes(
+                                                    report.report_id,
+                                                  )}
+                                                  onChange={() => {
+                                                    setSelectedFooterReports(
+                                                      (prev) =>
+                                                        prev.includes(
                                                           report.report_id,
-                                                        ],
-                                                  );
-                                                }}
-                                                style={{
-                                                  width: "15px",
-                                                  height: "15px",
-                                                  cursor: "pointer",
-                                                }}
-                                              />
-                                              <span className="popover-item-date">
-                                                {report.report_date
-                                                  ? new Date(
-                                                    report.report_date,
-                                                  ).toLocaleDateString(
-                                                    "en-GB",
-                                                    {
-                                                      day: "2-digit",
-                                                      month: "short",
-                                                      year: "numeric",
-                                                    },
-                                                  )
-                                                  : "Unknown Date"}
-                                              </span>
-                                            </label>
-                                          ))
+                                                        )
+                                                          ? prev.filter(
+                                                            (id) =>
+                                                              id !==
+                                                              report.report_id,
+                                                          )
+                                                          : [
+                                                            ...prev,
+                                                            report.report_id,
+                                                          ],
+                                                    );
+                                                  }}
+                                                  style={{
+                                                    width: "15px",
+                                                    height: "15px",
+                                                    cursor: "pointer",
+                                                  }}
+                                                />
+                                                <span className="popover-item-date">
+                                                  {report.report_date
+                                                    ? new Date(
+                                                      report.report_date,
+                                                    ).toLocaleDateString(
+                                                      "en-GB",
+                                                      {
+                                                        day: "2-digit",
+                                                        month: "short",
+                                                        year: "numeric",
+                                                      },
+                                                    )
+                                                    : "Unknown Date"}
+                                                </span>
+                                              </label>
+                                            ))
                                         )}
                                       </div>
 
@@ -4906,6 +5081,14 @@ const LuboilAnalysis = () => {
                       gap: "8px",
                     }}
                   >
+                    {/* NEW: PREMIUM OWNER DROPDOWN FOR FEED */}
+                    <PremiumOwnerDropdown 
+                      selectedOwner={selectedOwner}
+                      setSelectedOwner={setSelectedOwner}
+                      ownersList={feedOwners}
+                      height="32px"
+                    />
+
                     {/* NEW: FLEET / MY FEED TOGGLE SWITCH */}
                     <div
                       className="lub-feed-toggle-group"
@@ -6869,8 +7052,8 @@ const LuboilAnalysis = () => {
                             <span className="type-label">Extracted Page</span>
                           </div>
                           <iframe
-                            src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
-                            // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                            // src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                            src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
                             style={{ width: "100%", flex: 1, border: "none" }}
                             title="Opened View"
                           />
@@ -6899,8 +7082,8 @@ const LuboilAnalysis = () => {
                                 </span>
                               </div>
                               <iframe
-                                src={`/lub/api/luboil/view-specific-page/${targetId}`}
-                                // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
+                                // src={`/lub/api/luboil/view-specific-page/${targetId}`}
+                                src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
                                 style={{
                                   width: "100%",
                                   flex: 1,
@@ -6914,8 +7097,8 @@ const LuboilAnalysis = () => {
                       </div>
                     ) : selectedCell.data.report_url ? (
                       <iframe
-                        src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
-                        // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                        // src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                        src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
                         style={{ width: "100%", flex: 1, border: "none" }}
                         title="Original Report"
                       />
@@ -6928,7 +7111,7 @@ const LuboilAnalysis = () => {
                       </div>
                     )}
                   </div>
-                  
+
                 )}
               </div>
 
