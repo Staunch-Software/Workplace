@@ -815,11 +815,11 @@ const LuboilAnalysis = () => {
     // AMNS Owner (AMNS, AMNSI)
     if (upperName.startsWith("AMNS")) return "AMNS";
     
-    // Umang Owner (AM Kirti, AM Tarang, AM Umang)
-    if (upperName.includes("KIRTI") || upperName.includes("TARANG") || upperName.includes("UMANG")) return "USP";
+    // Umang Owner (GCL Ganga, GCL Narmada, GCL Sabarmati, GCL Tapi, GCL Yamuna)
+    if (upperName.includes("GANGA") || upperName.includes("NARMADA") || upperName.includes("SABARMATI") || upperName.includes("TAPI") || upperName.includes("YAMUNA")) return "USP";
     
-    // GCL Owner (GCL)
-    if (upperName.startsWith("GCL")) return "GCL";
+    // GCL Owner (AM Kirti, AM Tarang, AM Umang, GCL Fos, GCL Saraswati)
+    if (upperName.includes("KIRTI") || upperName.includes("TARANG") || upperName.includes("UMANG") || upperName.includes("FOS") || upperName.includes("SARASWATI")) return "GCL";
     
     // Fallback: just return the first word if it doesn't match known ones
     return name.split(" ")[0].toUpperCase();
