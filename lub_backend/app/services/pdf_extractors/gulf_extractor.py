@@ -1,54 +1,64 @@
-"""
-Gulf Marine Lube Oil PDF Extractor
-====================================
-Handles reports from Gulf Marine Pte Ltd.
-
-PDF Format (observed):
-  - All 10 equipment blocks are stacked vertically in one long document.
-  - pdfplumber renders this as 12 repeated physical pages (all same content).
-  - The CORRECT approach: extract the full text ONCE from page 1, then split
-    on "Equipment Information" boundary markers to find each machine block.
-
-Each block looks like:
-  Equipment Information
-  ...
-  Machinery Unit   MAIN ENGINE
-  Sample Location  CRANKCASE
-  Sample No        26047483
-  Sampled Date     04-Jun-26
-  Total Machine Hours  96542
-  Lubricant Hours      96542
-  Lubricant Condition  Normal
-  Results
-  Analysis
-  KV@40°C [mm²/s]   107.8
-  KV@100°C [mm²/s]  11.98
-  BN [mgKOH/g]      8.0
-  Iron (Fe)          5
-  ...
-  Recommendations :
-  The oil is fit for further use...
-"""
 import re
+import io
 import logging
+from typing import Optional, Dict, Any, List
 from datetime import datetime
-from typing import Any, Dict, Optional, List
 
 logger = logging.getLogger(__name__)
 
+# ─── Helper Functions ────────────────────────────────────────────────────────
 
-# ─── Helpers ────────────────────────────────────────────────────────────────
-
-def _parse_date(raw: str) -> Optional[str]:
-    if not raw:
+def _parse_date(date_str: str) -> Optional[str]:
+    """
+    Gulf dates can be like '19-Jan-25' (2-digit year) or '24-Apr-2026' (4-digit year).
+    We try both formats and convert to YYYY-MM-DD for the database.
+    """
+    if not date_str or not date_str.strip():
         return None
-    raw = raw.strip()
-    for fmt in ("%d-%b-%y", "%d-%b-%Y", "%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
+    date_str = date_str.strip()
+    for fmt in ("%d-%b-%y", "%d-%b-%Y"):
         try:
-            return datetime.strptime(raw, fmt).strftime("%Y-%m-%d")
+            dt = datetime.strptime(date_str, fmt)
+            return dt.strftime("%Y-%m-%d")
         except ValueError:
-            continue
+            pass
     return None
+
+
+def _get_latest_column_index(text: str) -> int:
+    """
+    Finds the 'Sampled Date' line, parses all dates, and returns the 0-based index
+    of the most recent date. If not found or error, defaults to -1 (last column).
+    """
+    for raw_line in text.splitlines():
+        line = _strip_limit_annotations(raw_line)
+        if re.search(r"Sampled? Date", line, re.IGNORECASE):
+            m = re.search(r"Sampled? Date", line, re.IGNORECASE)
+            after_label = line[m.end():].strip()
+            tokens = after_label.split()
+            if not tokens:
+                return -1
+            
+            max_date = datetime.min
+            max_idx = -1
+            
+            for i, token in enumerate(tokens):
+                token = token.strip()
+                parsed_dt = None
+                for fmt in ("%d-%b-%y", "%d-%b-%Y"):
+                    try:
+                        parsed_dt = datetime.strptime(token, fmt)
+                        break
+                    except ValueError:
+                        pass
+                
+                if parsed_dt and parsed_dt > max_date:
+                    max_date = parsed_dt
+                    max_idx = i
+            
+            if max_idx != -1:
+                return max_idx
+    return -1
 
 
 def _clean_number(val: str) -> Optional[float]:
@@ -61,9 +71,63 @@ def _clean_number(val: str) -> Optional[float]:
         return None
 
 
-def _regex_val(text: str, pattern: str) -> Optional[float]:
-    m = re.search(pattern, text, re.IGNORECASE)
-    return _clean_number(m.group(1)) if m else None
+def _strip_limit_annotations(text: str) -> str:
+    """
+    Gulf PDFs prepend limit/threshold markers like `>160*` or `>40*` on the
+    same line as the element label (e.g. '>160* Sodium (Na) 5 10 12').
+    pdfplumber extracts these on the same line, so we strip them out before
+    value extraction to avoid them being picked up as data values.
+    Anchored to the start of the line to prevent destroying '<1' data values.
+    """
+    return re.sub(r'^\s*[<>]?\d+\*?\s+', '', text)
+
+
+def _get_token_at_index(text: str, label_pattern: str, col_idx: int) -> Optional[str]:
+    """
+    Finds the label and returns the whitespace-separated token at `col_idx` ON THAT SAME LINE.
+    If `col_idx` is out of bounds, returns the last token (-1).
+    Operates line-by-line to prevent cross-line contamination.
+    Strips Gulf limit annotations (>40*, >160*) before searching.
+    """
+    for raw_line in text.splitlines():
+        line = _strip_limit_annotations(raw_line)
+        if re.search(label_pattern, line, re.IGNORECASE):
+            # Find position after the label
+            m = re.search(label_pattern, line, re.IGNORECASE)
+            after_label = line[m.end():].strip()
+            tokens = after_label.split()
+            if tokens:
+                try:
+                    return tokens[col_idx]
+                except IndexError:
+                    return tokens[-1]
+    return None
+
+
+def _regex_val(text: str, pattern: str, col_idx: int) -> Optional[float]:
+    """
+    Gulf PDF history columns go Left-to-Right (Oldest -> Newest).
+    Searches line-by-line for a line that contains the label AND a numeric value
+    on the SAME line, then returns the numeric token at `col_idx` (the Current sample).
+    If `col_idx` is out of bounds, returns the last numeric token.
+
+    This prevents cross-line matching: e.g. 'Sodium (Na)' at end of summary
+    header line cannot bleed into the next line containing 'KV@40C'.
+    """
+    for raw_line in text.splitlines():
+        line = _strip_limit_annotations(raw_line)
+        m = re.search(pattern, line, re.IGNORECASE)
+        if not m:
+            continue
+        # Extract the portion of the line after the match start (label + first value)
+        after_label = line[m.start(1):].strip() if m.lastindex else line[m.end():].strip()
+        tokens = re.findall(r'[<>]?\d*\.?\d+', after_label)
+        if tokens:
+            try:
+                return _clean_number(tokens[col_idx])
+            except IndexError:
+                return _clean_number(tokens[-1])
+    return None
 
 
 def _build_machine_name(machinery_unit: str, sample_location: str) -> str:
@@ -135,6 +199,9 @@ def extract(pdf) -> Optional[Dict[str, Any]]:
             continue
 
         equipment_count += 1  # 1-based: 1 = first equipment block in PDF
+        
+        # DETERMINE WHICH COLUMN HAS THE LATEST DATE
+        col_idx = _get_latest_column_index(block)
 
         machine: Dict[str, Any] = {
             "page_index":        equipment_count,  # Used to crop correct y-region from stacked PDF
@@ -166,31 +233,31 @@ def extract(pdf) -> Optional[Dict[str, Any]]:
         machine["name"] = _build_machine_name(machinery_unit, sample_location)
 
         # ── 2. Sample metadata ────────────────────────────────────────────
-        sno_m = re.search(r"Sample No\s+(\d+)", block, re.IGNORECASE)
-        if sno_m:
-            sample_no = sno_m.group(1)
+        sample_no_raw = _get_token_at_index(block, r"Sample No", col_idx)
+        if sample_no_raw:
+            sample_no = re.sub(r'[^\w]', '', sample_no_raw) # Strip stray characters if any
             machine["sample_info"]["number"] = sample_no
             # Skip duplicates (same sample appearing in repeated page renders)
             if sample_no in seen_samples:
                 continue
             seen_samples.add(sample_no)
 
-        sd_m = re.search(r"Sampled Date\s+(\S+)", block, re.IGNORECASE)
-        if sd_m:
-            machine["sample_info"]["date"] = _parse_date(sd_m.group(1))
+        sd_raw = _get_token_at_index(block, r"Sampled Date", col_idx)
+        if sd_raw:
+            machine["sample_info"]["date"] = _parse_date(sd_raw)
 
-        th_m = re.search(r"Total Machine Hours\s+([\d,]+)", block, re.IGNORECASE)
-        if th_m:
-            machine["sample_info"]["hours_equipment"] = _clean_number(th_m.group(1).replace(",", ""))
+        th_raw = _get_token_at_index(block, r"Total Machine Hours", col_idx)
+        if th_raw:
+            machine["sample_info"]["hours_equipment"] = _clean_number(th_raw)
 
-        lh_m = re.search(r"Lubricant Hours\s+([\d,]+)", block, re.IGNORECASE)
-        if lh_m:
-            machine["sample_info"]["hours_oil"] = _clean_number(lh_m.group(1).replace(",", ""))
+        lh_raw = _get_token_at_index(block, r"Lubricant Hours", col_idx)
+        if lh_raw:
+            machine["sample_info"]["hours_oil"] = _clean_number(lh_raw)
 
         # ── 3. Status ─────────────────────────────────────────────────────
-        cond_m = re.search(r"Lubricant Condition\s+(\w+)", block, re.IGNORECASE)
-        if cond_m:
-            raw_status = cond_m.group(1).strip().lower()
+        cond_raw = _get_token_at_index(block, r"Lubricant Condition", col_idx)
+        if cond_raw:
+            raw_status = cond_raw.strip().lower()
             if raw_status == "critical":
                 machine["status"] = "Critical"
             elif raw_status in ("caution", "warning"):
@@ -199,79 +266,70 @@ def extract(pdf) -> Optional[Dict[str, Any]]:
                 machine["status"] = "Normal"
 
         # ── 4. Diagnosis ──────────────────────────────────────────────────
-        rec_m = re.search(r"Recommendations\s*:\s*(.+?)(?:\n\n|\Z)", block, re.DOTALL | re.IGNORECASE)
+        # Capture from 'Recommendations :' until 'Lubricant Condition' (which is the footer) or end of block
+        rec_m = re.search(r"Recommendations\s*:\s*(.+?)(?:\n\s*Lubricant Condition|\Z)", block, re.DOTALL | re.IGNORECASE)
         if rec_m:
-            machine["diagnosis"] = rec_m.group(1).replace("\n", " ").strip()[:300]
+            raw_diag = rec_m.group(1).replace("\n", " ").strip()
+            # Strip PDF footer glossary and chart legends which falsely trigger alerts
+            machine["diagnosis"] = re.split(r'\bKV@40|\bWear Elemental Analysis|\bOil Properties|\bPollutants|\bParameters Explanation', raw_diag, flags=re.IGNORECASE)[0].strip()
 
-        if machine["status"] != "Normal" and machine["diagnosis"]:
-            machine["summary_error"] = machine["diagnosis"][:200]
-
-        # ── 5. Chemistry ──────────────────────────────────────────────────
-        phys = machine["chemistry"]["physical"]
+        # ── 5. Chemistry Values ───────────────────────────────────────────
         wear = machine["chemistry"]["wear"]
         cont = machine["chemistry"]["contamination"]
         adds = machine["chemistry"]["additives"]
+        phys = machine["chemistry"]["physical"]
 
-        # Physical
-        phys["viscosity_40c"]  = _regex_val(block, r"KV@40[°C\s\u00b0]+\[mm[²2]/s\]\s+([<>]?[\d.]+)")
-        phys["viscosity_100c"] = _regex_val(block, r"KV@100[°C\s\u00b0]+\[mm[²2]/s\]\s+([<>]?[\d.]+)")
-        phys["tbn"]            = _regex_val(block, r"(?:\bTBN\b|\bBN\b|\bBase Number\b)(?:\(.*?\)|\[.*?\]|[^\d\n])*([<>]?[0-9]*\.[0-9]+|[<>]?[0-9]+)")
-        phys["tan"]            = _regex_val(block, r"(?:\bTAN\b|\bAN\b|\bAcid Number\b)(?:\(.*?\)|\[.*?\]|[^\d\n])*([<>]?[0-9]*\.[0-9]+|[<>]?[0-9]+)")
-        fp_m = re.search(r"Flash Point\s*\[.C\]\s+([<>]?[\d.A-Za-z]+)", block, re.IGNORECASE)
-        if fp_m:
-            phys["flash_point"] = _clean_number(fp_m.group(1))
+        # WEAR
+        wear["iron"]      = _regex_val(block, r"Iron\s*\(Fe\)\s+([<>]?[\d.]+)", col_idx)
+        wear["copper"]    = _regex_val(block, r"Copper\s*\(Cu\)\s+([<>]?[\d.]+)", col_idx)
+        wear["lead"]      = _regex_val(block, r"Lead\s*\(Pb\)\s+([<>]?[\d.]+)", col_idx)
+        wear["tin"]       = _regex_val(block, r"Tin\s*\(Sn\)\s+([<>]?[\d.]+)", col_idx)
+        wear["chromium"]  = _regex_val(block, r"Chromium\s*\(Cr\)\s+([<>]?[\d.]+)", col_idx)
+        wear["aluminium"] = _regex_val(block, r"Aluminium\s*\(Al\)\s+([<>]?[\d.]+)", col_idx)
+        wear["nickel"]    = _regex_val(block, r"Nickel\s*\(Ni\)\s+([<>]?[\d.]+)", col_idx)
+        wear["wpi_index"]  = _regex_val(block, r"PQ\s*Index/2ml\s+([<>]?[\d.]+)", col_idx)
 
-        # Wear metals
-        wear["iron"]      = _regex_val(block, r"Iron\s*\(Fe\)\s+([<>]?[\d.]+)")
-        wear["copper"]    = _regex_val(block, r"Copper\s*\(Cu\)\s+([<>]?[\d.]+)")
-        wear["chromium"]  = _regex_val(block, r"Chromium\s*\(Cr\)\s+([<>]?[\d.]+)")
-        wear["aluminium"] = _regex_val(block, r"Aluminium\s*\(Al\)\s+([<>]?[\d.]+)")
-        wear["lead"]      = _regex_val(block, r"Lead\s*\(Pb\)\s+([<>]?[\d.]+)")
-        wear["tin"]       = _regex_val(block, r"Tin\s*\(Sn\)\s+([<>]?[\d.]+)")
-        wear["nickel"]    = _regex_val(block, r"Nickel\s*\(Ni\)\s+([<>]?[\d.]+)")
-        wear["vanadium"]  = _regex_val(block, r"Vanadium\s*\(V\)\s+([<>]?[\d.]+)")
-        wear["antimony"]  = _regex_val(block, r"Antimony\s*\(Sb\)\s+([<>]?[\d.]+)")
-        pq_m = re.search(r"PQ Index.*?\s+([<>]?[\d.]+)", block, re.IGNORECASE)
-        if pq_m:
-            wear["wpi_index"] = _clean_number(pq_m.group(1))
+        # CONTAMINATION
+        cont["water_pct"] = _regex_val(block, r"Water\s*\[%wt\]\s+([<>]?[\d.]+)", col_idx)
+        cont["soot_pct"]  = _regex_val(block, r"Soot/Insoluble\s*\[%wt\]\s+([<>]?[\d.]+)", col_idx)
+        cont["sodium"]    = _regex_val(block, r"Sodium\s*\(Na\)\s+([<>]?[\d.]+)", col_idx)
+        cont["silicon"]   = _regex_val(block, r"Silicon\s*\(Si\)\s+([<>]?[\d.]+)", col_idx)
 
-
-        # Contamination
-        cont["water_pct"] = _regex_val(block, r"Water\s*\[%wt\]\s+([<>]?[\d.]+)")
-        cont["soot_pct"]  = _regex_val(block, r"Soot/Insoluble\s*\[%wt\]\s+([<>]?[\d.]+)")
-        cont["sodium"]    = _regex_val(block, r"Sodium\s*\(Na\)\s+([<>]?[\d.]+)")
-        cont["silicon"]   = _regex_val(block, r"Silicon\s*\(Si\)\s+([<>]?[\d.]+)")
-
-        # Additives
-        adds["molybdenum"] = _regex_val(block, r"Molybdenum\s*\(Mo\)\s+([<>]?[\d.]+)")
-        adds["barium"]     = _regex_val(block, r"Barium\s*\(Ba\)\s+([<>]?[\d.]+)")
-        adds["calcium"]    = _regex_val(block, r"Calcium\s*\(Ca\)\s+([<>]?[\d.]+)")
+        # ADDITIVES (Converted from ppm to %)
+        adds["calcium"]    = _regex_val(block, r"Calcium\s*\(Ca\)\s+([<>]?[\d.]+)", col_idx)
         if adds["calcium"] is not None: adds["calcium"] = round(adds["calcium"] / 10000.0, 3)
-        adds["zinc"]       = _regex_val(block, r"Zinc\s*\(Zn\)\s+([<>]?[\d.]+)")
+        
+        adds["zinc"]       = _regex_val(block, r"Zinc\s*\(Zn\)\s+([<>]?[\d.]+)", col_idx)
         if adds["zinc"] is not None: adds["zinc"] = round(adds["zinc"] / 10000.0, 3)
-        adds["phosphorus"] = _regex_val(block, r"Phosphorus\s*\(P\)\s+([<>]?[\d.]+)")
+        
+        adds["phosphorus"] = _regex_val(block, r"Phosphorus\s*\(P\)\s+([<>]?[\d.]+)", col_idx)
         if adds["phosphorus"] is not None: adds["phosphorus"] = round(adds["phosphorus"] / 10000.0, 3)
-        adds["boron"]      = _regex_val(block, r"Boron\s*\(B\)\s+([<>]?[\d.]+)")
-        adds["magnesium"]  = _regex_val(block, r"Magnesium\s*\(Mg\)\s+([<>]?[\d.]+)")
+        
+        adds["boron"]      = _regex_val(block, r"Boron\s*\(B\)\s+([<>]?[\d.]+)", col_idx)
+        adds["magnesium"]  = _regex_val(block, r"Magnesium\s*\(Mg\)\s+([<>]?[\d.]+)", col_idx)
 
+        # PHYSICAL
+        phys["viscosity_40c"]  = _regex_val(block, r"KV@40\S+C\s*\[mm\S/s\]\s+([<>]?[\d.]+)", col_idx)
+        phys["viscosity_100c"] = _regex_val(block, r"KV@100\S+C\s*\[mm\S/s\]\s+([<>]?[\d.]+)", col_idx)
+        phys["tbn"]            = _regex_val(block, r"BN\s*\[mgKOH/g\]\s+([<>]?[\d.]+)", col_idx)
+        phys["tan"]            = _regex_val(block, r"(?:TAN|AN|Acid Number)\s*\[mgKOH/g\]\s+([<>]?[\d.]+)", col_idx)
 
-        # ── 6. Alerts (Smart Scan) ────────────────────────────────────────
+        # Some fields don't map cleanly to numeric _regex_val, e.g. Flash Point 'Pass'/'Fail'
+        # Can leave as None or extend extraction if needed.
+
+        # Filter out empty dicts
+        machine["chemistry"] = {k: v for k, v in machine["chemistry"].items() if v}
+
         _generate_alerts(machine)
-
-        # ── 7. Store ──────────────────────────────────────────────────────
-        if machine["name"]:
-            machineries.append(machine)
-            logger.info(
-                f"  Gulf extracted: '{machine['name']}' | "
-                f"Sample {machine['sample_info']['number']} | "
-                f"Iron: {wear.get('iron')} | Visc40: {phys.get('viscosity_40c')}"
-            )
+        machineries.append(machine)
 
     if not machineries:
-        logger.warning("Gulf extractor: no equipment blocks found in full text.")
         return None
 
-    return {"metadata": metadata, "machineries": machineries}
+    return {
+        "metadata": metadata,
+        "machineries": machineries
+    }
 
 
 def _generate_alerts(machine: Dict[str, Any]):
@@ -294,12 +352,12 @@ def _generate_alerts(machine: Dict[str, Any]):
         (r"\bNickel(?:\s*\(Ni\))?",              "Nickel (Ni) ppm", "wear", "nickel"),
         (r"\bVanadium(?:\s*\(V\))?",             "Vanadium (V) ppm", "wear", "vanadium"),
         (r"\bWater\b",                           "Water Content %", "contamination", "water_pct"),
-        (r"\bViscosity\b",                       "Viscosity 40°C cSt", "physical", "viscosity_40c"),
-        (r"\bViscosity\b",                       "Viscosity 100°C cSt", "physical", "viscosity_100c"),
+        (r"\bViscosity\b|KV@40",                 "Viscosity 40°C cSt", "physical", "viscosity_40c"),
+        (r"\bViscosity\b|KV@100",                "Viscosity 100°C cSt", "physical", "viscosity_100c"),
         (r"\bFlash\s*Point\b",                   "Flash Point °C", "physical", "flash_point"),
         (r"\bSilicon(?:\s*\(Si\))?",             "Silicon (Si) ppm", "contamination", "silicon"),
         (r"\bSodium(?:\s*\(Na\))?",              "Sodium (Na) ppm", "contamination", "sodium"),
-        (r"\bInsolubles\b|\bsoot\b",             "Insolubles %", "contamination", "soot_pct"),
+        (r"\bInsolubles\b|\bincreased soot\b|\bhigh soot\b|\bsoot level\b", "Insolubles %", "contamination", "soot_pct"),
         (r"\bAntimony(?:\s*\(Sb\))?",            "Antimony (Sb) ppm", "wear", "antimony"),
     ]
     

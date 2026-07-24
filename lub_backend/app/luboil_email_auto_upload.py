@@ -203,7 +203,7 @@ async def fetch_recent_luboil_emails(graph_token: str, folder_id: str = None) ->
     url = (
         f"{base}"
         f"?$filter=hasAttachments eq true and receivedDateTime ge {time_filter_str}"
-        f"&$select=id,subject,from,receivedDateTime,hasAttachments"
+        f"&$select=id,subject,from,receivedDateTime,hasAttachments,isRead"
         f"&$top=999"
     )
 
@@ -422,30 +422,34 @@ async def upload_pdf_to_fastapi(bearer_token: str, pdf_bytes: bytes, filename: s
 # ============================================================
 #  STEP 6 — MARK EMAIL AS READ
 # ============================================================
-# async def mark_email_as_read(graph_token: str, message_id: str) -> bool:
-#     
-#     headers = {
-#         "Authorization": f"Bearer {graph_token}",
-#         "Content-Type":  "application/json"
-#     }
-# 
-#     url = (
-#         f"https://graph.microsoft.com/v1.0/users/{MAILBOX_EMAIL}"
-#         f"/messages/{message_id}"
-#     )
-# 
-#     payload = {"isRead": True}
-# 
-#     try:
-#         async with httpx.AsyncClient() as client:
-#             response = await client.patch(url, headers=headers, json=payload, timeout=30.0)
-#             response.raise_for_status()
-#             logger.info(f"✅ Email marked as READ. (ID: ...{message_id[-12:]})")
-#             return True
-# 
-#     except httpx.RequestError as e:
-#         logger.error(f"❌ Failed to mark email as read: {e}")
-#         return False
+# FIX: Re-enabled mark_email_as_read.
+# Previously this function was fully commented out, so every processed email
+# remained Unread in the mailbox. The scheduler would then re-fetch and
+# re-upload the same PDF on its next run, causing duplicate feed entries.
+async def mark_email_as_read(graph_token: str, message_id: str) -> bool:
+
+    headers = {
+        "Authorization": f"Bearer {graph_token}",
+        "Content-Type":  "application/json"
+    }
+
+    url = (
+        f"https://graph.microsoft.com/v1.0/users/{MAILBOX_EMAIL}"
+        f"/messages/{message_id}"
+    )
+
+    payload = {"isRead": True}
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.patch(url, headers=headers, json=payload, timeout=30.0)
+            response.raise_for_status()
+            logger.info(f"✅ Email marked as READ. (ID: ...{message_id[-12:]})")
+            return True
+
+    except httpx.RequestError as e:
+        logger.error(f"❌ Failed to mark email as read: {e}")
+        return False
 
 
 # ============================================================
@@ -478,8 +482,10 @@ async def run_luboil_email_upload_job():
             logger.warning("⚠️  'Shell Lubeoil' folder not found — falling back to full mailbox search")
             folder_id = None
 
+        # FIX: Removed the duplicate fetch_recent_luboil_emails(graph_token) call.
+        # The second call had no folder_id argument, so it overwrote the folder-filtered
+        # results with a full mailbox scan, ignoring the 'Shell Lubeoil' folder lookup above.
         matched_emails = await fetch_recent_luboil_emails(graph_token, folder_id)
-        matched_emails = await fetch_recent_luboil_emails(graph_token)
         emails_found = len(matched_emails)
 
         if not matched_emails:
@@ -545,6 +551,11 @@ async def run_luboil_email_upload_job():
                 except Exception as upload_err:
                     uploads_failed += 1
                     logger.error(f"❌ UPLOAD FAILED for '{filename}': {upload_err}")
+
+            # FIX: Mark email as read after ALL its attachments have been processed.
+            # This prevents the scheduler from re-fetching and re-uploading this email
+            # on its next run (combined with the 'isRead eq false' filter above).
+            await mark_email_as_read(graph_token, email_id)
 
     except Exception as fatal_err:
         logger.error(f"💥 FATAL ERROR in job: {fatal_err}", exc_info=True)

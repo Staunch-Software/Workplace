@@ -31,6 +31,8 @@ def standardize_name(text: str) -> str:
         ("after fine filter",  "out"),
         ("before fine",        "in"),
         ("after fine",         "out"),
+        ("before servo oil",   "in"),
+        ("after servo oil",    "out"),
     ]
     for old, new in directional:
         s = s.replace(old, new)
@@ -46,6 +48,7 @@ def standardize_name(text: str) -> str:
         ("main engine",              "me"),
         ("hydraulic power system",   "hyd"),
         ("hydraulic system",         "hyd"),
+        ("hydraulic control",        "hyd"),
         ("steering gear",            "str"),
         ("hose handling crane",      "hose crane"),
         ("deck crane",               "dk crane"),
@@ -128,9 +131,9 @@ def find_smart_match(target_name: str, candidates: Dict[str, str]) -> Optional[s
 
     target_lower = target_name.lower()
     if "before fine" in target_lower and "hydraulic" in target_lower:
-        return "ME.HYD.IN"
+        return "ME.HYD.IN", 1.0
     if "after fine" in target_lower and "hydraulic" in target_lower:
-        return "ME.HYD.OUT"
+        return "ME.HYD.OUT", 1.0
         
     best_code = None
     highest_score = 0.0
@@ -163,10 +166,17 @@ def find_smart_match(target_name: str, candidates: Dict[str, str]) -> Optional[s
             if not is_implicit_one:
                 continue 
 
-        # 4. Subset Match Logic (Preserved exactly from source)
-        # If all words in the short PDF name exist in the long Excel name
-        is_subset = target_tokens.issubset(candidate_tokens) or candidate_tokens.issubset(target_tokens)
-        subset_score = 0.95 if (is_subset and len(target_tokens) > 0) else 0.0
+        # 4. Subset Match Logic
+        # Only give the high subset score when the CANDIDATE fully covers the TARGET
+        # (i.e., all target tokens exist in the candidate). This prevents a short
+        # generic label like "Main Engine" (2 tokens) from scoring 0.95 against a
+        # long specific name like "Main Engine Hydraulic Filter Before" (5 tokens).
+        # Extra guard: candidate must not be drastically shorter than the target
+        # (coverage ratio >= 0.6) to prevent trivial single-word matches.
+        candidate_covers_target = target_tokens.issubset(candidate_tokens)
+        coverage_ratio = len(candidate_tokens) / len(target_tokens) if target_tokens else 0
+        is_subset = candidate_covers_target and coverage_ratio >= 0.6
+        subset_score = 0.95 if is_subset else 0.0
 
         # 5. Structural Similarity (Preserved exactly from source)
         seq_score = difflib.SequenceMatcher(None, target_clean, candidate_clean).ratio()
@@ -273,199 +283,101 @@ async def save_luboil_report(
     machineries = extracted_data.get('machineries', [])
     report_date_parsed = date_type.fromisoformat(report_date_str)
 
-    # 4. DUPLICATE DETECTION — sample numbers + same date + same status
+    # ─────────────────────────────────────────────────────────────────────────
+    # 4. DUPLICATE DETECTION — New Rules (User-approved)
+    #
+    # TRUE DUPLICATE:
+    #   Same vessel + same oil_source + same sample numbers → Skip. Do NOT
+    #   overwrite anything. It is the exact same lab report uploaded twice.
+    #
+    # DIFFERENT REPORT, SAME FILENAME:
+    #   Different source OR different sample numbers, but filename collides →
+    #   This is a genuinely different report (e.g., Gulf & Shell both named
+    #   "Stallion.pdf"). Auto-rename the incoming file with a _v2/_v3 suffix
+    #   so both reports are stored independently without destroying each other.
+    #
+    # DIFFERENT REPORT, DIFFERENT FILENAME → Save normally as a new report.
+    # ─────────────────────────────────────────────────────────────────────────
+
     pdf_sample_numbers = [
         str(m.get('sample_info', {}).get('number'))
         for m in machineries if m.get('sample_info', {}).get('number')
     ]
-
-    # NEW: Content fingerprint set for full comparison
-    incoming_sample_numbers = {
-        str(m.get('sample_info', {}).get('number'))
-        for m in machineries
-        if m.get('sample_info', {}).get('number')
-    }
+    incoming_sample_numbers = set(pdf_sample_numbers)
 
     is_duplicate = False
     report = None
     existing_map = {}  # always initialize so sample loop never breaks
 
-    if pdf_sample_numbers:
+    # ── Step 1: Check for TRUE DUPLICATE (source + sample numbers match) ──
+    if incoming_sample_numbers:
         existing_samples_result = await session.execute(
             select(LuboilSample)
             .join(LuboilReport, LuboilSample.report_id == LuboilReport.report_id)
             .where(LuboilReport.imo_number == vessel_imo)
+            .where(LuboilReport.oil_source == oil_source_extracted)
             .where(LuboilSample.sample_number.in_(pdf_sample_numbers))
         )
         existing_samples = existing_samples_result.scalars().all()
-        existing_map = {s.sample_number: s for s in existing_samples}
 
-        def normalize_status(status: str) -> str:
-            if not status:
-                return 'Unknown'
-            s = status.strip().lower()
-            if s in ('action', 'critical'):
-                return 'Critical'
-            if s in ('attention', 'warning', 'caution'):
-                return 'Warning'
-            if s == 'normal':
-                return 'Normal'
-            return status.strip()
-
-        def get_pdf_status(sample_number):
-            for m in machineries:
-                if str(m.get('sample_info', {}).get('number')) == sample_number:
-                    return normalize_status(m.get('status', 'Unknown'))
-            return None
-
-        all_match = (
-            len(pdf_sample_numbers) > 0 and
-            any(
-                sn in existing_map and
-                str(existing_map[sn].sample_date) == report_date_str
-                for sn in pdf_sample_numbers
-            )
-        )
-
-        if all_match:
-            # NEW: Full content comparison — all sample numbers must match exactly
+        if existing_samples:
             existing_sample_numbers = {s.sample_number for s in existing_samples}
 
             if existing_sample_numbers == incoming_sample_numbers:
-                # EXACT DUPLICATE — same vessel + same date + same sample numbers
-                # Works regardless of file name (same or different)
+                # TRUE DUPLICATE — same vessel + same source + same sample numbers
+                # Do NOT touch anything. Just reuse the existing report for sample lookup.
                 is_duplicate = True
-                existing_report_result = await session.execute(
+                existing_report_res = await session.execute(
                     select(LuboilReport).where(
                         LuboilReport.report_id == existing_samples[0].report_id
                     )
                 )
-                report = existing_report_result.scalars().first()
-                # Only update file_name if this filename is not already owned by a different report
-                if report.file_name != filename:
-                    conflict_check = await session.execute(
-                        select(LuboilReport).where(
-                            LuboilReport.imo_number == vessel_imo,
-                            LuboilReport.file_name == filename,
-                            LuboilReport.report_id != report.report_id
-                        )
-                    )
-                    if not conflict_check.scalars().first():
-                        report.file_name = filename
-                report.full_json_data = extracted_data
-                report.oil_source = oil_source_extracted
+                report = existing_report_res.scalars().first()
                 existing_map = {s.sample_number: s for s in existing_samples}
-                logger.info(f"DUPLICATE: same content detected, reusing report_id={report.report_id}")
-            else:
-                # Same date but sample numbers changed → treat as new report
-                logger.info(f"Content changed → treating as new report")
+                logger.info(
+                    f"✅ TRUE DUPLICATE detected (source={oil_source_extracted}, "
+                    f"samples={incoming_sample_numbers}). Skipping insert. "
+                    f"Reusing report_id={report.report_id}"
+                )
 
+    # ── Step 2: Not a duplicate — handle filename collision ──
     if not is_duplicate:
-        # Extra safety: if same vessel + same date report already exists
-        existing_report_check = await session.execute(
-            select(LuboilReport).where(
-                LuboilReport.imo_number == vessel_imo,
-                LuboilReport.report_date == report_date_parsed
-            )
-        )
-        existing_report = existing_report_check.scalars().first()
-
-        if existing_report:
-            # NEW: Compare content before treating as duplicate
-            existing_samples_re = await session.execute(
-                select(LuboilSample).where(
-                    LuboilSample.report_id == existing_report.report_id
-                )
-            )
-            existing_samples_list = existing_samples_re.scalars().all()
-            existing_sample_numbers = {s.sample_number for s in existing_samples_list}
-
-            if existing_sample_numbers == incoming_sample_numbers:
-                # EXACT DUPLICATE — same vessel + same date + same content
-                is_duplicate = True
-                report = existing_report
-                # Only update file_name if this filename is not already owned by a different report
-                if report.file_name != filename:
-                    conflict_check2 = await session.execute(
-                        select(LuboilReport).where(
-                            LuboilReport.imo_number == vessel_imo,
-                            LuboilReport.file_name == filename,
-                            LuboilReport.report_id != report.report_id
-                        )
-                    )
-                    if not conflict_check2.scalars().first():
-                        report.file_name = filename
-                report.full_json_data = extracted_data
-                report.oil_source = oil_source_extracted
-                existing_map = {s.sample_number: s for s in existing_samples_list}
-                logger.info(f"SAFETY CATCH DUPLICATE: reusing report_id={existing_report.report_id}")
-            else:
-                # Same vessel + same date BUT content changed.
-                # CHECK: does the same filename already exist? If so, UPDATE in place
-                # to avoid violating the uq_luboil_file_per_vessel unique constraint.
-                filename_check = await session.execute(
-                    select(LuboilReport).where(
-                        LuboilReport.imo_number == vessel_imo,
-                        LuboilReport.file_name == filename
-                    )
-                )
-                existing_by_filename = filename_check.scalars().first()
-
-                if existing_by_filename:
-                    # Same file re-uploaded with improved extraction → update existing record
-                    is_duplicate = True
-                    report = existing_by_filename
-                    report.full_json_data = extracted_data
-                    report.oil_source = oil_source_extracted
-                    report.report_date = report_date_parsed
-                    report.lab_name = meta.get('lab_name', report.lab_name)
-                    existing_samples_re2 = await session.execute(
-                        select(LuboilSample).where(
-                            LuboilSample.report_id == existing_by_filename.report_id
-                        )
-                    )
-                    existing_map = {s.sample_number: s for s in existing_samples_re2.scalars().all()}
-                    logger.info(f"FILENAME MATCH: same file re-uploaded with new content, updating report_id={report.report_id}")
-                else:
-                    # Truly new report: different content AND different filename
-                    logger.info(f"SAFETY CATCH: content changed → creating new row")
-
-        if not is_duplicate:
-            # Final guard: check if this exact filename already exists (catches edge cases)
-            filename_guard = await session.execute(
+        # Resolve a safe filename that doesn't collide with an existing record
+        safe_filename = filename
+        counter = 2
+        while True:
+            collision_check = await session.execute(
                 select(LuboilReport).where(
                     LuboilReport.imo_number == vessel_imo,
-                    LuboilReport.file_name == filename
+                    LuboilReport.file_name == safe_filename
                 )
             )
-            existing_by_filename_guard = filename_guard.scalars().first()
+            collision = collision_check.scalars().first()
+            if not collision:
+                break  # filename is free — use it
+            # Collision found — this is a DIFFERENT report with the same filename
+            # Auto-rename: append _v2, _v3, etc. to keep both reports separate
+            name_part, _, ext = filename.rpartition('.')
+            if not name_part:
+                name_part = filename
+                ext = ''
+            safe_filename = f"{name_part}_v{counter}.{ext}" if ext else f"{name_part}_v{counter}"
+            counter += 1
+            logger.info(
+                f"⚠️ Filename collision: '{filename}' already exists for this vessel. "
+                f"Renaming incoming report to '{safe_filename}'"
+            )
 
-            if existing_by_filename_guard:
-                # Filename already exists — update instead of insert to avoid UniqueViolationError
-                is_duplicate = True
-                report = existing_by_filename_guard
-                report.full_json_data = extracted_data
-                report.oil_source = oil_source_extracted
-                report.report_date = report_date_parsed
-                report.lab_name = meta.get('lab_name', report.lab_name)
-                existing_samples_re3 = await session.execute(
-                    select(LuboilSample).where(
-                        LuboilSample.report_id == existing_by_filename_guard.report_id
-                    )
-                )
-                existing_map = {s.sample_number: s for s in existing_samples_re3.scalars().all()}
-                logger.info(f"FILENAME GUARD: filename already exists, updating report_id={report.report_id}")
-            else:
-                report = LuboilReport(
-                    imo_number=vessel_imo,
-                    file_name=filename,
-                    lab_name=meta.get('lab_name', 'Shell LubeAnalyst'),
-                    report_date=report_date_parsed,
-                    full_json_data=extracted_data,
-                    oil_source=oil_source_extracted
-                )
-                session.add(report)
-                logger.info(f"NEW report created for {vessel_display_name} date={report_date_str}")
+        report = LuboilReport(
+            imo_number=vessel_imo,
+            file_name=safe_filename,
+            lab_name=meta.get('lab_name', 'Shell LubeAnalyst'),
+            report_date=report_date_parsed,
+            full_json_data=extracted_data,
+            oil_source=oil_source_extracted
+        )
+        session.add(report)
+        logger.info(f"✅ NEW report created for {vessel_display_name} date={report_date_str} file='{safe_filename}'")
 
 
     await session.flush()
@@ -478,9 +390,10 @@ async def save_luboil_report(
         # Resolve Equipment Code
         equipment_code = None
         lube_analyst_code = machine.get("lube_analyst_code")
+        is_shell_source = (oil_source_extracted or "").upper() == "SHELL"
 
         # ── PRIORITY 1: Match by Lube Analyst Code via VesselConfig ──
-        # PRIORITY 1: VesselConfig lookup by lube analyst code
+        # Direct code lookup — fastest and most accurate path (Shell only)
         if lube_analyst_code and config_imo:
             result = await session.execute(
                 select(LuboilVesselConfig).filter(
@@ -491,12 +404,109 @@ async def save_luboil_report(
             config_match = result.scalars().first()
             if config_match:
                 equipment_code = config_match.equipment_code
-                logger.info(f"✅ VesselConfig Match: '{lube_analyst_code}' → '{equipment_code}'")
-            else:
-                logger.warning(f"⚠️ Lube Analyst Code '{lube_analyst_code}' not found in config, falling back.")
+                logger.info(f"✅ P1 VesselConfig Code Match: '{lube_analyst_code}' → '{equipment_code}'")
 
-        # PRIORITY 2: Name mapping cache
-        if not equipment_code:
+        # ── PRIORITY 2 (Shell): Text match against uncoded + completely unconfigured equipment ──
+        # If this is a Shell report with an unregistered LubeAnalyst code, we MUST NOT
+        # run the generic text match against all equipment — that causes wrong mappings.
+        # Search order:
+        #   2a. VesselConfig rows for this vessel where lab_analyst_code IS NULL (uncoded slots)
+        #   2b. Equipment types with NO VesselConfig row at all for this vessel (unconfigured)
+        # When matched from either pool → auto-register the code and create config if needed.
+        if not equipment_code and is_shell_source and lube_analyst_code and config_imo:
+
+            # --- 2a: Uncoded VesselConfig slots ---
+            uncoded_cfg_result = await session.execute(
+                select(LuboilVesselConfig).filter(
+                    LuboilVesselConfig.imo_number == config_imo,
+                    LuboilVesselConfig.lab_analyst_code == None  # noqa: E711
+                )
+            )
+            uncoded_configs = uncoded_cfg_result.scalars().all()
+            uncoded_eq_codes = {cfg.equipment_code for cfg in uncoded_configs}
+
+            # Also get all configured equipment codes (coded + uncoded) to find what's missing
+            all_cfg_result = await session.execute(
+                select(LuboilVesselConfig).filter(
+                    LuboilVesselConfig.imo_number == config_imo
+                )
+            )
+            all_vessel_configs = all_cfg_result.scalars().all()
+            all_configured_codes = {cfg.equipment_code for cfg in all_vessel_configs}
+
+            # --- 2b: Completely unconfigured equipment types for this vessel ---
+            # Any equipment type in the global list that has no VesselConfig row at all
+            fully_unconfigured_codes = {
+                code for code in equipment_candidates.values()
+                if code not in all_configured_codes
+            }
+
+            # Build combined candidate pool: uncoded slots + fully unconfigured types
+            available_candidates = {
+                label: code
+                for label, code in equipment_candidates.items()
+                if code in uncoded_eq_codes or code in fully_unconfigured_codes
+            }
+
+            if available_candidates:
+                shell_code_match, shell_score = find_smart_match(clean_name, available_candidates)
+                if shell_code_match:
+                    equipment_code = shell_code_match
+                    is_new_config = shell_code_match in fully_unconfigured_codes
+
+                    logger.info(
+                        f"✅ P2 Shell match: '{clean_name}' → '{equipment_code}' "
+                        f"(score: {shell_score:.2f}, lube_code: {lube_analyst_code}, "
+                        f"{'NEW config' if is_new_config else 'existing uncoded slot'})"
+                    )
+
+                    if is_new_config:
+                        # Auto-create a brand new VesselConfig row for this vessel + equipment
+                        try:
+                            new_cfg = LuboilVesselConfig(
+                                imo_number=config_imo,
+                                equipment_code=equipment_code,
+                                lab_analyst_code=lube_analyst_code,
+                                is_active=True,
+                            )
+                            session.add(new_cfg)
+                            await session.flush()
+                            logger.info(
+                                f"✅ Auto-created VesselConfig[{config_imo}/{equipment_code}] "
+                                f"with LubeAnalyst code '{lube_analyst_code}'"
+                            )
+                        except Exception as e:
+                            await session.rollback()
+                            logger.warning(f"⚠️ Could not auto-create VesselConfig: {e}")
+                    else:
+                        # Update the existing uncoded VesselConfig row with the code
+                        matched_cfg = next(
+                            (c for c in uncoded_configs if c.equipment_code == equipment_code), None
+                        )
+                        if matched_cfg:
+                            matched_cfg.lab_analyst_code = lube_analyst_code
+                            if not matched_cfg.is_active:
+                                matched_cfg.is_active = True
+                                logger.info(f"✅ Auto-activated previously disabled equipment '{equipment_code}'")
+
+                            logger.info(
+                                f"✅ Auto-registered LubeAnalyst code '{lube_analyst_code}' "
+                                f"→ VesselConfig[{config_imo}/{equipment_code}]"
+                            )
+                else:
+                    logger.warning(
+                        f"⚠️ Shell P2: no match found for '{clean_name}' "
+                        f"(lube_code={lube_analyst_code}) — saving with null equipment_code"
+                    )
+            else:
+                logger.warning(
+                    f"⚠️ Shell P2: no available equipment slots for IMO {config_imo} "
+                    f"— saving '{clean_name}' with null equipment_code"
+                )
+
+        # ── PRIORITY 3 (Gulf / Tribocare): Name mapping cache ──
+        # Only runs for non-Shell sources OR Shell machines without a LubeAnalyst code
+        if not equipment_code and not (is_shell_source and lube_analyst_code):
             result = await session.execute(
                 select(LuboilNameMapping).filter(
                     LuboilNameMapping.lab_raw_string == clean_name
@@ -505,10 +515,11 @@ async def save_luboil_report(
             mapping = result.scalars().first()
             if mapping:
                 equipment_code = mapping.equipment_code
-                logger.info(f"✅ Name Mapping cache: '{clean_name}' → '{equipment_code}'")
+                logger.info(f"✅ P3 Name Mapping cache: '{clean_name}' → '{equipment_code}'")
 
-        # PRIORITY 3: Smart name matching
-        if not equipment_code:
+        # ── PRIORITY 4 (Gulf / Tribocare): Smart name matching ──
+        # Only runs for non-Shell sources OR Shell machines without a LubeAnalyst code
+        if not equipment_code and not (is_shell_source and lube_analyst_code):
             equipment_code, match_score = find_smart_match(clean_name, equipment_candidates)
             if equipment_code:
                 if match_score >= 0.92:
@@ -521,9 +532,9 @@ async def save_luboil_report(
                         await session.flush()
                     except Exception:
                         await session.rollback()
-                logger.info(f"✅ Smart match: '{clean_name}' → '{equipment_code}' (score: {match_score:.2f})")
+                logger.info(f"✅ P4 Smart match: '{clean_name}' → '{equipment_code}' (score: {match_score:.2f})")
             else:
-                logger.warning(f"⚠️ No match found for: '{clean_name}' — saving with null equipment_code")
+                logger.warning(f"⚠️ P4 No match found for: '{clean_name}' — saving with null equipment_code")
 
         
 
@@ -535,11 +546,49 @@ async def save_luboil_report(
         cont = chem.get('contamination', {})
         adds = chem.get('additives', {})
 
+        # ── FUTURE-DATE GUARD (Shell only) ──────────────────────────────────
+        # Shell PDFs can be combined reports containing machines sampled on
+        # different dates. If a machine's sample date is AFTER the report date,
+        # it does not belong to this report — it will appear in a future PDF.
+        # Gulf and Tribocare always have sample dates before the report date
+        # (collection date vs issue date), so we only apply this to Shell.
+        if is_shell_source and m_sample_info.get('date'):
+            try:
+                m_sample_date = date_type.fromisoformat(m_sample_info.get('date'))
+                if m_sample_date > report_date_parsed:
+                    logger.warning(
+                        f"⏭️ Skipping Shell sample '{clean_name}' "
+                        f"(sample_date={m_sample_date} > report_date={report_date_parsed}) "
+                        f"— belongs to a future report."
+                    )
+                    continue
+            except (ValueError, TypeError):
+                pass  # If date parse fails, allow it through
+
+
+
+        # ── STATUS NORMALIZATION ────────────────────────────────────────────
+        def normalize_status(raw_status: str) -> str:
+            if not raw_status:
+                return 'Warning'  # Safe default if entirely missing
+            s = str(raw_status).strip().lower()
+            if s in ('action', 'critical'):
+                return 'Critical'
+            if s in ('attention', 'warning', 'caution', 'alert'):
+                return 'Warning'
+            if s == 'normal':
+                return 'Normal'
+            # If it's something entirely weird, default to Warning rather than crashing
+            return 'Warning'
+
+        raw_status = machine.get('status', 'Warning')
+        normalized_status = normalize_status(raw_status)
+
         tech_data = {
             "machinery_name": clean_name,
             "sample_number": m_sample_info.get('number'),
             "sample_date": date_type.fromisoformat(m_sample_info.get('date')) if m_sample_info.get('date') else report_date_parsed,
-            "status": machine.get('status', 'Unknown'),
+            "status": normalized_status,
             "equipment_hours": m_sample_info.get('hours_equipment'),
             "summary_error": machine.get('summary_error'),
             "pdf_page_index": machine.get('page_index'),
@@ -615,26 +664,31 @@ async def save_luboil_report(
             session.add(new_sample)
             logger.info(f"➕ New report: inserted fresh sample for {clean_name}")
 
-            # ── AUTO-CREATE VesselConfig if not already present ──────────
-            # This ensures Gulf/Tribocare equipment shows in the UI matrix
-            # without requiring manual configuration after first upload.
+            # ── AUTO-CREATE or AUTO-ACTIVATE VesselConfig ──────────
+            # This ensures equipment shows in the UI matrix without requiring
+            # manual configuration after an upload, regardless of the source.
             if equipment_code:
                 try:
-                    existing_cfg = await session.execute(
+                    existing_cfg_res = await session.execute(
                         select(LuboilVesselConfig).where(
                             LuboilVesselConfig.imo_number == vessel_imo,
                             LuboilVesselConfig.equipment_code == equipment_code
                         )
                     )
-                    if not existing_cfg.scalars().first():
+                    existing_cfg = existing_cfg_res.scalars().first()
+                    
+                    if not existing_cfg:
                         session.add(LuboilVesselConfig(
                             imo_number=vessel_imo,
                             equipment_code=equipment_code,
                             is_active=True
                         ))
                         logger.info(f"🔧 Auto-created VesselConfig: IMO={vessel_imo} → {equipment_code}")
+                    elif not existing_cfg.is_active:
+                        existing_cfg.is_active = True
+                        logger.info(f"🔧 Auto-activated previously disabled VesselConfig: IMO={vessel_imo} → {equipment_code}")
                 except Exception as cfg_err:
-                    logger.warning(f"⚠️ Could not auto-create VesselConfig for {equipment_code}: {cfg_err}")
+                    logger.warning(f"⚠️ Could not auto-create/activate VesselConfig for {equipment_code}: {cfg_err}")
 
 
     await session.commit()
@@ -648,6 +702,7 @@ async def save_luboil_report(
 
     return {
         "report_id": report.report_id,
+        "file_name": report.file_name,
         "vessel": vessel_display_name,
         "sample_count": len(machineries),
         "report_date": report_date_str,
