@@ -6,9 +6,10 @@ It automatically detects the lab that produced the PDF and
 delegates to the correct specialist extractor.
 
 Priority routing order:
-  1. Gulf Marine   → gulf_extractor.py
-  2. Tribocare     → tribocare_extractor.py
-  3. Shell / Default → existing luboil_pdf_extractor.py (unchanged)
+  1. Viswa Lab     → viswa_extractor.py
+  2. Gulf Marine   → gulf_extractor.py
+  3. Tribocare     → tribocare_extractor.py
+  4. Shell / Default → existing luboil_pdf_extractor.py (unchanged)
 
 Usage (from luboil_report_processor.py):
     from app.services.pdf_extractors.factory import extract_lube_oil_report_data
@@ -19,6 +20,7 @@ from typing import Any, Dict, Optional, BinaryIO
 
 from app.services.pdf_extractors import gulf_extractor
 from app.services.pdf_extractors import tribocare_extractor
+from app.services.pdf_extractors import viswa_extractor
 # Shell extractor is the original file — imported directly
 from app.luboil_pdf_extractor import extract_lube_oil_report_data as _shell_extract
 
@@ -28,6 +30,7 @@ logger = logging.getLogger(__name__)
 # Tribocare puts its logo mid-page (~char 2600), so we scan the full page 1 text.
 _DETECTION_LIMIT = 6000
 
+_VISWA_KEYWORDS     = ["viswa lab", "theviswagroup"]
 _GULF_KEYWORDS     = ["gulf marine"]
 _TRIBOCARE_KEYWORDS = ["tribocare", "tribocare fzc"]
 
@@ -35,14 +38,26 @@ _TRIBOCARE_KEYWORDS = ["tribocare", "tribocare fzc"]
 def _detect_lab(first_page_text: str, filename: str = "") -> str:
     """
     Identifies the laboratory from the first page of text.
-    Returns one of: 'GULF', 'TRIBOCARE', 'SHELL'
+    Returns one of: 'VISWA', 'GULF', 'TRIBOCARE', 'SHELL'
 
     Detection strategy:
       1. Scan full page 1 text (Tribocare puts its name ~char 2600)
       2. Fallback: check filename for known lab prefixes
+
+    NOTE: Viswa is checked FIRST because a Viswa report's "Brand & Grade"
+    field can itself contain the words "Gulf Marine" (it's naming the oil
+    brand, not the lab) — e.g. "GULF MARINE-GulfSea Hydraulic HVI Plus 32".
+    Checking Viswa's own distinctive markers before the Gulf keyword check
+    prevents that brand text from ever being misrouted to gulf_extractor.
     """
     snippet = first_page_text[:_DETECTION_LIMIT].lower()
     fname   = filename.lower()
+
+    # Viswa Lab: distinctive report title + lab domain, never appears in
+    # Gulf/Tribocare/Shell reports, so safe to check ahead of the rest.
+    for kw in _VISWA_KEYWORDS:
+        if kw in snippet:
+            return "VISWA"
 
     # Gulf Marine always puts its name in the Equipment Information block
     for kw in _GULF_KEYWORDS:
@@ -93,7 +108,20 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
     # ── Route to correct extractor ────────────────────────────────────────
     pdf_file_stream.seek(0)  # Reset stream before each extractor opens it
 
-    if lab == "GULF":
+    if lab == "VISWA":
+        try:
+            with pdfplumber.open(pdf_file_stream) as pdf:
+                result = viswa_extractor.extract(pdf)
+            if result:
+                logger.info(f"[Factory] Viswa extraction succeeded: {len(result.get('machineries', []))} machines.")
+                return result
+            else:
+                logger.warning("[Factory] Viswa extractor returned None — falling back to Shell.")
+        except Exception as e:
+            logger.error(f"[Factory] Viswa extractor error: {e}", exc_info=True)
+            logger.warning("[Factory] Falling back to Shell extractor.")
+
+    elif lab == "GULF":
         try:
             with pdfplumber.open(pdf_file_stream) as pdf:
                 result = gulf_extractor.extract(pdf)
