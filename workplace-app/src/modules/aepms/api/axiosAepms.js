@@ -324,7 +324,7 @@ class ApiService {
 
   async getFleet() {
     console.log("🚢 Get Fleet");
-    return this.request("/api/fleet/");
+    return this.request("/fleet/");
   }
 
   // ==================== DASHBOARD ENDPOINTS ====================
