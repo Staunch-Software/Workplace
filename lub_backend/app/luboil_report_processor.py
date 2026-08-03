@@ -56,14 +56,13 @@ def standardize_name(text: str) -> str:
         ("provision crane",          "prov crane"),
         ("valve remote control",     "rc valve"),
         ("remote control valve",     "rc valve"),
-        ("cylinders",                "cyl"),
         ("emergency diesel generator engine", "ge"),
         ("emergency diesel engine",  "ge"),
         ("emergency diesel",         "ge"),
         ("emergency generator",      "ge"),
         ("deck machinery fwd",       "winch fwd"),
         ("deck machinery aft",       "winch aft"),
-        ("deck machinery",           "dk machinery"),
+        ("deck machinery",           "deck"),
     ]
     for old, new in synonyms:
         s = s.replace(old, new)
