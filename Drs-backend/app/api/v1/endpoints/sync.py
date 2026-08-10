@@ -351,10 +351,10 @@ async def get_changes(
         since = since.astimezone(timezone.utc)
     
     # Strip tzinfo so SQLAlchemy compares naive UTC to naive UTC in the DB
-    # since = since.replace(tzinfo=None)
+    since = since.replace(tzinfo=None)
 
     # Record that the vessel pulled from shore — only if IMO provided
-    since = since - timedelta(minutes=30)
+    
     if vessel_imo:
         await record_vessel_sync_time(control_db, vessel_imo, is_vessel_pushing=False,db=db)
 
