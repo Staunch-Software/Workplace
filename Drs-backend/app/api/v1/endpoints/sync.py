@@ -354,7 +354,7 @@ async def get_changes(
     # since = since.replace(tzinfo=None)
 
     # Record that the vessel pulled from shore — only if IMO provided
-    
+    since = since - timedelta(minutes=30)
     if vessel_imo:
         await record_vessel_sync_time(control_db, vessel_imo, is_vessel_pushing=False,db=db)
 
