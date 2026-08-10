@@ -254,7 +254,7 @@ class SyncService:
 
                         # Track who deleted and when, if the model supports it
                         if hasattr(existing_entity, 'updated_at'):
-                            existing_entity.updated_at = datetime.utcnow()
+                            existing_entity.updated_at = datetime.now(timezone.utc)
 
                         await db.flush()
                         await db.commit()
@@ -436,7 +436,7 @@ class SyncService:
                     # This forces the vessel to pull the new permanent number on next sync
                     instance.defect_number = final_number
                     instance.version = incoming_version + 1
-                    instance.updated_at = datetime.utcnow()
+                    instance.updated_at = datetime.now(timezone.utc)
                     
                     logger.info(f"🔢 Master Number Assigned: {incoming_dn} -> {final_number} (v{instance.version})")
             
