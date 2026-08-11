@@ -1119,7 +1119,11 @@ async def get_luboil_fleet_overview(
                 LuboilSample.machinery_name,
                 LuboilSample.status,
                 LuboilSample.sample_date,
-                LuboilReport.report_date,
+                # Prefer this machine's OWN report_date (a single PDF's Report
+                # Date can genuinely differ per machine — see gulf_extractor.py's
+                # _extract_own_report_date); fall back to the report-level date
+                # for rows created before this column existed.
+                func.coalesce(LuboilSample.report_date, LuboilReport.report_date).label("report_date"),
                 LuboilSample.sample_id,
                 LuboilSample.officer_remarks,
                 LuboilSample.office_remarks,
@@ -1243,18 +1247,30 @@ async def get_luboil_fleet_overview(
                     src_raw = (h.oil_source or "").strip()
                     if not src_raw:
                         continue
-                    # Normalize to lowercase key e.g. "shell", "tribocare", "gulf"
-                    if "shell" in src_raw.lower():
-                        src_key = "shell"
-                    elif "tribocare" in src_raw.lower():
-                        src_key = "tribocare"
-                    elif "gulf" in src_raw.lower():
-                        src_key = "gulf"
-                    else:
-                        src_key = src_raw.lower()
-                    # Only keep the first (latest) sample per source
-                    if src_key not in by_source_map:
-                        by_source_map[src_key] = h
+                    # A single report can mix labs (e.g. one machine sampled
+                    # by Tribocare inside an otherwise Gulf report) — in that
+                    # case oil_source is stored as a comma-joined value like
+                    # "GULF, TRIBOCARE" (see factory.py). Register this
+                    # sample under EVERY lab it contains, not just whichever
+                    # substring an if/elif chain happened to match first —
+                    # otherwise a mixed report would silently disappear from
+                    # every source bucket except one.
+                    parts = [p.strip() for p in src_raw.split(",") if p.strip()] or [src_raw]
+                    src_keys = set()
+                    for part in parts:
+                        part_lower = part.lower()
+                        if "shell" in part_lower:
+                            src_keys.add("shell")
+                        elif "tribocare" in part_lower:
+                            src_keys.add("tribocare")
+                        elif "gulf" in part_lower:
+                            src_keys.add("gulf")
+                        else:
+                            src_keys.add(part_lower)
+                    for src_key in src_keys:
+                        # Only keep the first (latest) sample per source
+                        if src_key not in by_source_map:
+                            by_source_map[src_key] = h
 
                 cell_data = {
                     "code": code,

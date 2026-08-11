@@ -165,6 +165,7 @@ def extract(pdf) -> Optional[Dict[str, Any]]:
             "diagnosis":         None,
             "sample_info": {
                 "date":            None,
+                "report_date":     None,
                 "number":          None,
                 "hours_equipment": None,
                 "hours_oil":       None,
@@ -180,6 +181,13 @@ def extract(pdf) -> Optional[Dict[str, Any]]:
         # ── Machine name ("Equipment ... OIL CONDITION") ──────────────────
         eq_m = re.search(r"Equipment\s+(.+?)\s+OIL CONDITION", text, re.IGNORECASE)
         machine["name"] = eq_m.group(1).strip() if eq_m else f"Unknown Equipment (p{page_idx + 1})"
+
+        # This page's own Report Date, where present — each Viswa page is a
+        # self-contained report, so its own date (if printed) takes priority
+        # over the document-level one; falls back to it below if missing.
+        page_rd_raw = _line_text_value(text, r"Report Date")
+        if page_rd_raw:
+            machine["sample_info"]["report_date"] = _parse_date(page_rd_raw)
 
         # ── Sample identity ────────────────────────────────────────────────
         report_id = _line_text_value(text, r"Report ID")
@@ -259,6 +267,13 @@ def extract(pdf) -> Optional[Dict[str, Any]]:
 
     if not machineries:
         return None
+
+    # Fallback: only if a machine's OWN page had no Report Date line, use
+    # the document-level date — never overwrite a machine that successfully
+    # read its own.
+    for machine in machineries:
+        if not machine["sample_info"].get("report_date"):
+            machine["sample_info"]["report_date"] = metadata.get("report_date")
 
     return {
         "metadata": metadata,

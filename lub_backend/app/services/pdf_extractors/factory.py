@@ -2,21 +2,32 @@
 Lube Oil Extractor Factory
 ============================
 This is the single entry point for ALL PDF extractions.
-It automatically detects the lab that produced the PDF and
-delegates to the correct specialist extractor.
 
-Priority routing order:
-  1. Viswa Lab     → viswa_extractor.py
-  2. Gulf Marine   → gulf_extractor.py
-  3. Tribocare     → tribocare_extractor.py
-  4. Shell / Default → existing luboil_pdf_extractor.py (unchanged)
+A single PDF can mix results from more than one lab across its pages (e.g.
+one machine sampled by Tribocare inside an otherwise all-Gulf-Marine report)
+— confirmed on a real "AMNSI Maximus" report where 10 machines were Gulf
+Marine format and 1 (on page 8) was Tribocare format. Because of that, this
+factory no longer picks exactly one extractor for the whole file. Instead:
+
+  1. viswa_extractor, gulf_extractor and tribocare_extractor are each run
+     against the SAME pdf. Every one of them now scans every physical page
+     itself and only claims the pages that match its own lab's structure —
+     see each module's extract() docstring — so calling all three is safe
+     even for a single-lab file (the other two simply find nothing).
+  2. Their machineries lists are merged into one report.
+  3. Report-level metadata (vessel/report_date/lab_name/oil_source) comes
+     from whichever extractor found the most machines (the "primary" lab);
+     any vessel_name/report_date it didn't find are backfilled from the
+     other extractors' results.
+  4. If none of the three found anything, the original Shell/default
+     extractor (luboil_pdf_extractor.py) runs unchanged, exactly as before.
 
 Usage (from luboil_report_processor.py):
     from app.services.pdf_extractors.factory import extract_lube_oil_report_data
 """
 import logging
 import pdfplumber
-from typing import Any, Dict, Optional, BinaryIO
+from typing import Any, Dict, List, Optional, BinaryIO
 
 from app.services.pdf_extractors import gulf_extractor
 from app.services.pdf_extractors import tribocare_extractor
@@ -37,7 +48,14 @@ _TRIBOCARE_KEYWORDS = ["tribocare", "tribocare fzc"]
 
 def _detect_lab(first_page_text: str, filename: str = "") -> str:
     """
-    Identifies the laboratory from the first page of text.
+    Identifies the SINGLE most likely lab from page-1 text alone.
+
+    This is no longer used to route extraction (a file can legitimately mix
+    labs across pages — see the module docstring) — it's kept only as a
+    quick diagnostic logged alongside the real per-page multi-lab result,
+    so a log line always shows what the old page-1-only heuristic would
+    have guessed, for comparison.
+
     Returns one of: 'VISWA', 'GULF', 'TRIBOCARE', 'SHELL'
 
     Detection strategy:
@@ -64,6 +82,15 @@ def _detect_lab(first_page_text: str, filename: str = "") -> str:
         if kw in snippet:
             return "GULF"
 
+    # Structural fallback: some Shell/Gulfsea-branded reports (e.g. "AMNSI MAXIMUS")
+    # use the exact same Equipment Information / Machinery Unit / Sample Location
+    # table layout as Gulf Marine reports, but never say "gulf marine" on page 1 —
+    # they only mention the product brand ("GULFSEA ..."). "Machinery Unit" +
+    # "Sample Location" together are unique to this table layout (Viswa and
+    # Tribocare reports never contain either), so this is safe to check here.
+    if "machinery unit" in snippet and "sample location" in snippet:
+        return "GULF"
+
     # Tribocare signature: appears in the first detail page header ~mid-page
     for kw in _TRIBOCARE_KEYWORDS:
         if kw in snippet:
@@ -79,6 +106,13 @@ def _detect_lab(first_page_text: str, filename: str = "") -> str:
     return "SHELL"
 
 
+_SPECIALIST_EXTRACTORS = (
+    ("VISWA",     viswa_extractor),
+    ("GULF",      gulf_extractor),
+    ("TRIBOCARE", tribocare_extractor),
+)
+
+
 def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str, Any]]:
     """
     Drop-in replacement for the original extract_lube_oil_report_data().
@@ -87,67 +121,87 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
     The caller (luboil_report_processor.py) does NOT need to change — it still
     calls this one function, exactly as before.
     """
-    # Read the stream position so we can reset it for whichever extractor runs
     pdf_file_stream.seek(0)
 
-    # ── Detect lab from page 1 text ───────────────────────────────────────
     import os
     filename = getattr(pdf_file_stream, 'name', '') or ''
     filename = os.path.basename(filename)
 
+    # ── Run every specialist extractor against the same parsed PDF ─────────
+    # Each one now self-filters to only the pages matching its own lab's
+    # structure, so running all three is safe for single-lab files too.
+    results = []  # list of (lab_name, result_dict), most-machines first later
     try:
         with pdfplumber.open(pdf_file_stream) as pdf:
-            p0_text = pdf.pages[0].extract_text() if pdf.pages else ""
-            lab = _detect_lab(p0_text or "", filename)
+            # Diagnostic-only: log what the old page-1-only heuristic would
+            # have guessed, for comparison against the real per-page result below.
+            try:
+                p0_text = pdf.pages[0].extract_text() if pdf.pages else ""
+                logger.info(f"[Factory] Page-1-only heuristic would have guessed: {_detect_lab(p0_text or '', filename)}")
+            except Exception:
+                pass
 
-        logger.info(f"[Factory] Lab detected: {lab}")
+            for lab_name, extractor_module in _SPECIALIST_EXTRACTORS:
+                try:
+                    result = extractor_module.extract(pdf)
+                except Exception as e:
+                    logger.error(f"[Factory] {lab_name} extractor error: {e}", exc_info=True)
+                    continue
+                if result and result.get("machineries"):
+                    logger.info(f"[Factory] {lab_name} extraction found {len(result['machineries'])} machine(s).")
+                    results.append((lab_name, result))
     except Exception as e:
-        logger.error(f"[Factory] Could not read PDF for detection: {e}")
+        logger.error(f"[Factory] Could not read PDF: {e}")
         return None
 
-    # ── Route to correct extractor ────────────────────────────────────────
-    pdf_file_stream.seek(0)  # Reset stream before each extractor opens it
+    if results:
+        # Primary lab = whichever extractor found the most machines; its
+        # metadata (vessel/report_date/lab_name/oil_source) represents the
+        # report as a whole. Every machine's own fields are correct
+        # regardless of which lab produced them.
+        results.sort(key=lambda pair: len(pair[1]["machineries"]), reverse=True)
+        primary_lab, primary_result = results[0]
 
-    if lab == "VISWA":
-        try:
-            with pdfplumber.open(pdf_file_stream) as pdf:
-                result = viswa_extractor.extract(pdf)
-            if result:
-                logger.info(f"[Factory] Viswa extraction succeeded: {len(result.get('machineries', []))} machines.")
-                return result
-            else:
-                logger.warning("[Factory] Viswa extractor returned None — falling back to Shell.")
-        except Exception as e:
-            logger.error(f"[Factory] Viswa extractor error: {e}", exc_info=True)
-            logger.warning("[Factory] Falling back to Shell extractor.")
+        metadata = dict(primary_result["metadata"])
+        merged_machineries: List[Dict[str, Any]] = list(primary_result["machineries"])
 
-    elif lab == "GULF":
-        try:
-            with pdfplumber.open(pdf_file_stream) as pdf:
-                result = gulf_extractor.extract(pdf)
-            if result:
-                logger.info(f"[Factory] Gulf extraction succeeded: {len(result.get('machineries', []))} machines.")
-                return result
-            else:
-                logger.warning("[Factory] Gulf extractor returned None — falling back to Shell.")
-        except Exception as e:
-            logger.error(f"[Factory] Gulf extractor error: {e}", exc_info=True)
-            logger.warning("[Factory] Falling back to Shell extractor.")
+        for lab_name, result in results[1:]:
+            merged_machineries.extend(result["machineries"])
+            # Backfill vessel_name/report_date if the primary extractor
+            # didn't find them (e.g. a lone Tribocare page has no
+            # "Summary Report for..." title to read them from).
+            if not metadata.get("vessel_name") and result["metadata"].get("vessel_name"):
+                metadata["vessel_name"] = result["metadata"]["vessel_name"]
+            if not metadata.get("report_date") and result["metadata"].get("report_date"):
+                metadata["report_date"] = result["metadata"]["report_date"]
 
-    elif lab == "TRIBOCARE":
-        try:
-            with pdfplumber.open(pdf_file_stream) as pdf:
-                result = tribocare_extractor.extract(pdf)
-            if result:
-                logger.info(f"[Factory] Tribocare extraction succeeded: {len(result.get('machineries', []))} machines.")
-                return result
-            else:
-                logger.warning("[Factory] Tribocare extractor returned None — falling back to Shell.")
-        except Exception as e:
-            logger.error(f"[Factory] Tribocare extractor error: {e}", exc_info=True)
-            logger.warning("[Factory] Falling back to Shell extractor.")
+        if len(results) > 1:
+            # Mixed-lab report: oil_source/lab_name are report-level columns
+            # (one LuboilReport row per upload — see luboil_model.py), shared
+            # by every LuboilSample under it via the report_id join. So a
+            # PDF that genuinely mixes labs can't tag each sample with its
+            # own source in this schema; instead we combine every lab found
+            # into one deterministic, alphabetically-sorted string (e.g.
+            # "GULF, TRIBOCARE") so the report is never silently filed under
+            # just the primary lab — anywhere the UI/API prints oil_source
+            # or lab_name as text, both labs show up automatically.
+            sorted_labs = sorted(results, key=lambda pair: pair[0])
+            metadata["oil_source"] = ", ".join(name for name, _ in sorted_labs)
+            metadata["lab_name"] = ", ".join(
+                r["metadata"].get("lab_name") or name for name, r in sorted_labs
+            )
 
-    # ── Shell (default) path ──────────────────────────────────────────────
+            other_labs = ", ".join(f"{name} ({len(r['machineries'])})" for name, r in results[1:])
+            logger.info(
+                f"[Factory] Mixed-lab report: primary={primary_lab} "
+                f"({len(primary_result['machineries'])} machines), also found {other_labs}. "
+                f"All {len(merged_machineries)} machines included; report filed under "
+                f"oil_source={metadata['oil_source']}."
+            )
+
+        return {"metadata": metadata, "machineries": merged_machineries}
+
+    # ── Shell (default) path — unchanged ────────────────────────────────────
     pdf_file_stream.seek(0)
-    logger.info("[Factory] Running Shell extractor.")
+    logger.info("[Factory] No specialist extractor matched — running Shell extractor.")
     return _shell_extract(pdf_file_stream)

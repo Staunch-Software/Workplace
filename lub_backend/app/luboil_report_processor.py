@@ -587,6 +587,11 @@ async def save_luboil_report(
             "machinery_name": clean_name,
             "sample_number": m_sample_info.get('number'),
             "sample_date": date_type.fromisoformat(m_sample_info.get('date')) if m_sample_info.get('date') else report_date_parsed,
+            # This machine's OWN printed Report Date, where the extractor found
+            # one (a single PDF's Report Date can genuinely differ per machine —
+            # see gulf_extractor.py's _extract_own_report_date). Falls back to
+            # the whole-report's date only when this machine's own was missing.
+            "report_date": date_type.fromisoformat(m_sample_info.get('report_date')) if m_sample_info.get('report_date') else report_date_parsed,
             "status": normalized_status,
             "equipment_hours": m_sample_info.get('hours_equipment'),
             "summary_error": machine.get('summary_error'),

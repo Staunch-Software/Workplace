@@ -102,6 +102,13 @@ class LuboilSample(Base):
     
     # Core Data for Backend Logic (Status + Date + Hours)
     sample_date = Column(DATE, nullable=False, comment="The anchor date for calculating next due date")
+    report_date = Column(DATE, nullable=True, comment="This machine's own printed Report Date. A single PDF's "
+                          "'Report Date' can genuinely differ per machinery block (e.g. a Gulf Marine report "
+                          "where most pages say one date but one machine's page says another), so this is "
+                          "captured per sample rather than relying solely on LuboilReport.report_date, which "
+                          "is one value shared by every sample in the upload. NULL for samples created before "
+                          "this column existed, or when a machine's own block had no parseable date — callers "
+                          "should fall back to the parent LuboilReport.report_date in that case.")
     status = Column(String(50), nullable=False, comment="Condition: 'Normal', 'Warning', 'Action', 'Critical'")
     
     # Operational Data
