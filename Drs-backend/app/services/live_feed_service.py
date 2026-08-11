@@ -3,7 +3,7 @@
 from __future__ import annotations
 import uuid
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -76,7 +76,7 @@ async def _write(
             "triggered_by_role": triggered_by_role,
             **(extra_meta or {}),
         },
-        updated_at=datetime.utcnow(),
+        updated_at=datetime.now(timezone.utc),
     )
     db.add(entry)
     await db.flush()

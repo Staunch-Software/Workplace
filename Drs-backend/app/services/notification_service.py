@@ -48,7 +48,7 @@ async def notify_vessel_users(
             title=title,
             message=final_message,
             link=target_link,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
         )
         db.add(new_notif)
 
@@ -113,6 +113,6 @@ async def create_task_for_mentions(
                 "thread_id": str(thread_id),
                 "is_internal": is_internal
             },
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
         )
         db.add(notif)

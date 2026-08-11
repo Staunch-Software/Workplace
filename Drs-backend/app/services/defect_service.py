@@ -34,7 +34,7 @@
 
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -158,7 +158,7 @@ class DefectService:
             is_dd=defect_in.is_dd or False,           # ✅ Added
             defect_number=defect_number,
             origin="VESSEL" if _should_sync() else "SHORE",
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
         )
         db.add(new_defect)
 
@@ -379,7 +379,7 @@ class DefectService:
 
         # --- Version bump (guard against None) ---
         defect.version = (defect.version or 0) + 1
-        defect.updated_at = datetime.utcnow()
+        defect.updated_at = datetime.now(timezone.utc)
 
         # --- SyncQueue: VESSEL ONLY ---
         if _should_sync():
@@ -458,14 +458,14 @@ class DefectService:
 
         defect.is_deleted = True
         defect.version = (defect.version or 0) + 1
-        defect.updated_at = datetime.utcnow()
+        defect.updated_at = datetime.now(timezone.utc)
 
         if _should_sync():
             db.add(SyncQueue(
                 entity_id=defect.id,               # UUID object (not str)
                 entity_type="DEFECT",
                 operation="DELETE",                 # renamed from action
-                payload={"id": str(defect.id), "is_deleted": True, "updated_at": datetime.utcnow().isoformat()},
+                payload={"id": str(defect.id), "is_deleted": True, "updated_at": datetime.now(timezone.utc).isoformat()},
                 version=defect.version,
                 origin="VESSEL",
                 status="PENDING",
@@ -649,7 +649,7 @@ class DefectService:
             content_type=attachment_in.content_type,
             origin="VESSEL" if _should_sync() else "SHORE",        # ← ADD THIS
             version=1,            
-            updated_at=datetime.utcnow(),  # ← ADD THIS
+            updated_at=datetime.now(timezone.utc),  # ← ADD THIS
         )
         db.add(new_attachment)
 
@@ -687,7 +687,7 @@ class DefectService:
             blob_path=image_in.blob_path,
             origin="VESSEL" if _should_sync() else "SHORE",       # ← ADD THIS
             version=1,            # ← ADD THIS
-            updated_at=datetime.utcnow(),  # ← ADD THIS
+            updated_at=datetime.now(timezone.utc),  # ← ADD THIS
         )
         db.add(new_image)
 
@@ -765,7 +765,7 @@ class DefectService:
             created_by_id=user.id,
             origin="VESSEL" if _should_sync() else "SHORE",
             version=1,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
             mariapps_pr_status=cached.status if cached else None,
         )
         db.add(new_pr_entry)
@@ -826,7 +826,7 @@ class DefectService:
             update_payload["pr_description"] = pr_update.pr_description
 
         pr_entry.version += 1
-        pr_entry.updated_at = datetime.utcnow()
+        pr_entry.updated_at = datetime.now(timezone.utc)
 
         if _should_sync():
             db.add(SyncQueue(
@@ -859,14 +859,14 @@ class DefectService:
 
         pr_entry.is_deleted = True
         pr_entry.version = (pr_entry.version or 0) + 1 
-        pr_entry.updated_at = datetime.utcnow()
+        pr_entry.updated_at = datetime.now(timezone.utc)
 
         if _should_sync():
             db.add(SyncQueue(
                 entity_id=pr_entry_id,             # UUID object (not str)
                 entity_type="PR_ENTRY",
                 operation="DELETE",                 # renamed from action
-                payload={"id": str(pr_entry_id), "is_deleted": True, "updated_at": datetime.utcnow().isoformat()},
+                payload={"id": str(pr_entry_id), "is_deleted": True, "updated_at": datetime.now(timezone.utc).isoformat()},
                 version=pr_entry.version,
                 origin="VESSEL",
                 status="PENDING",
