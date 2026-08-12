@@ -78,7 +78,11 @@ class Base(DeclarativeBase):
 async def get_db() -> AsyncSession:
     """FastAPI dependency — yields an async DB session."""
     async with AsyncSessionLocal() as session:
-        yield session
+        try:
+            yield session
+        except Exception:           # ← ADD: catch any exception from the endpoint
+            await session.rollback() # ← ADD: roll back any open transaction before returning connection to pool
+            raise                    # ← ADD: re-raise so FastAPI still returns the correct error response
 
 # Keep old name as alias for any code still using get_db_session
 get_db_session = get_db

@@ -9,6 +9,10 @@ CONTROL_DATABASE_URL = config("CONTROL_DATABASE_URL")
 engine_control = create_async_engine(
     CONTROL_DATABASE_URL,
     echo=False,
+    pool_size=3,
+    max_overflow=2,
+    pool_timeout=10,
+    pool_recycle=1800,
     pool_pre_ping=True,
 )
 
@@ -31,5 +35,12 @@ async def get_control_db():
 
 # ── Sync engine (used by api.py inline SessionControl() calls) ──
 _sync_url = CONTROL_DATABASE_URL.replace("postgresql+asyncpg", "postgresql+psycopg2")
-_sync_engine = create_engine(_sync_url, pool_pre_ping=True)
+_sync_engine = create_engine(
+    _sync_url,
+    pool_size=3,
+    max_overflow=2,
+    pool_timeout=10,
+    pool_recycle=1800,
+    pool_pre_ping=True,
+)
 SessionControl = sessionmaker(bind=_sync_engine, autocommit=False, autoflush=False)

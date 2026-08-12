@@ -10,6 +10,10 @@ CONTROL_DATABASE_URL = config("CONTROL_DATABASE_URL")
 engine_control = create_async_engine(
     CONTROL_DATABASE_URL,
     echo=False,
+    pool_size=3,        # ← ADD: max 3 permanent connections in the pool
+    max_overflow=2,     # ← ADD: allow 2 extra temporary connections under burst load (total max = 5)
+    pool_timeout=10,    # ← ADD: if all 5 slots are busy, wait max 10s then raise error (not hang forever)
+    pool_recycle=1800,  # ← ADD: replace connections older than 30 min to avoid stale/dead connections
     pool_pre_ping=True,
 )
 

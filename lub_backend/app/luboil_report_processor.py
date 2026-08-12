@@ -227,8 +227,7 @@ async def save_luboil_report(
         raise ValueError("Missing Vessel Name or Date in report.")
 
     # 2. FIND VESSEL
-    control_db = SessionControl()
-    try:
+    with SessionControl() as control_db:
         vessel = control_db.query(ControlVessel).filter(
             ControlVessel.name.ilike(f"%{vessel_name_extracted}%"),
             ControlVessel.is_active == True
@@ -259,8 +258,7 @@ async def save_luboil_report(
                 ControlVessel.name.ilike(f"%{clean_name}%"),
                 ControlVessel.is_active == True
             ).first()
-    finally:
-        control_db.close()
+
 
     if not vessel:
         raise ValueError(f"Vessel '{vessel_name_extracted}' not registered in database.")

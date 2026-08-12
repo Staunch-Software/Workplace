@@ -87,6 +87,12 @@ from app.blob_storage import upload_file_to_azure, generate_sas_url
 from app.blob_storage import generate_sas_url
 from sqlalchemy import case, literal
 from app.load_excel_data import load_excel_to_database
+
+# Add these imports near the top of api.py
+from contextlib import asynccontextmanager
+from app.database import engine
+from app.core.database_control import engine_control
+
 VESSEL_ORDER_CONFIG = {
     9832925: 1,  # AM KIRTI
     9792058: 2,  # MV AM UMANG
@@ -117,10 +123,34 @@ def format_vessel_name(name: str) -> str:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ─── STARTUP LOGIC (Runs before the server accepts requests) ───
+    logger.info("Application startup: Initializing database...")
+    try:
+        await create_all_tables()
+        await run_startup_migrations()
+        await sync_vessel_display_order()
+    except Exception as e:
+        logger.error(f"Failed to initialize database on startup: {e}", exc_info=True)
+
+    # The 'yield' keyword tells FastAPI to pause here and run the application
+    yield
+
+    # ─── SHUTDOWN LOGIC (Runs when the server stops) ───
+    logger.info("Application shutdown: Disposing database engines...")
+    # This is the crucial part that prevents connection leaks!
+    await engine.dispose()          # Closes connections to workplace_engine
+    await engine_control.dispose()  # Closes connections to workplace_control
+    logger.info("Database engines disposed successfully.")
+    
 # Initialize FastAPI
+# Update the FastAPI initialization:
 app = FastAPI(
     title="Ship Performance Data API",
-    description="API for uploading and processing ship engine performance reports (PDFs)."
+    description="API for uploading and processing ship engine performance reports (PDFs).",
+    lifespan=lifespan  # ← ADD THIS LINE
 )
 
 app.add_middleware(
@@ -142,16 +172,6 @@ app.include_router(aux_router)
 # CHANGE TO
 app.include_router(engine_sync_router, tags=["Engine Sync"])
 
-# Database Initialization
-@app.on_event("startup")
-async def startup_event():
-    logger.info("Application startup: Initializing database...")
-    try:
-        await create_all_tables()
-        await run_startup_migrations()
-        await sync_vessel_display_order()
-    except Exception as e:
-        logger.error(f"Failed to initialize database on startup: {e}", exc_info=True)
 
 # ============================================
 # MAIN ENGINE PERFORMANCE GRAPH GENERATOR

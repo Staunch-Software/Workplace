@@ -10,6 +10,8 @@ engine = create_async_engine(
     future=True,
     pool_size=5,
     max_overflow=5,
+    pool_timeout=10,    # ← ADD
+    pool_recycle=1800,  # ← ADD
 )
 
 # 2. Create the Session Factory

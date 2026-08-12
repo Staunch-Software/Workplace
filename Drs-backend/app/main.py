@@ -8,6 +8,9 @@ import asyncio
 from app.services.sync_worker import start_background_sync
 from app.core.config import settings
 from app.scraper.pr_scheduler import start_pr_scheduler, stop_pr_scheduler
+# ADD this below your other app.core imports
+from app.core.database import engine
+from app.core.database_control import engine_control
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -18,8 +21,15 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(start_background_sync())
         print("Sync Worker started in background.")
     start_pr_scheduler()
-    yield
+    
+    yield  # ← App runs here
+    
+    # ── SHUTDOWN (NEW) ──
+    print("Shutting down Maritime DRS Backend...")
     stop_pr_scheduler()
+    await engine.dispose()          # ← Frees primary DB connections
+    await engine_control.dispose()  # ← Frees control DB connections
+    print("Engines disposed.")
     
 app = FastAPI(title="Maritime DRS API", lifespan=lifespan)
 

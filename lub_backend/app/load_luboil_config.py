@@ -17,11 +17,19 @@ from app.luboil_model import LuboilVessel, LuboilEquipmentType, LuboilVesselConf
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+from app.config import settings as _settings
+_LUBOIL_SYNC_URL = _settings.LUBOIL_DATABASE_URL.replace("postgresql+asyncpg", "postgresql+psycopg2")
+_luboil_sync_engine = create_engine(
+    _LUBOIL_SYNC_URL,
+    pool_size=2,
+    max_overflow=1,
+    pool_timeout=30,
+    pool_recycle=1800,
+    pool_pre_ping=True,
+)
+_LuboilSessionFactory = sessionmaker(bind=_luboil_sync_engine, autocommit=False, autoflush=False)
 def _get_sync_session():
-    from app.config import settings
-    _url = settings.LUBOIL_DATABASE_URL.replace("postgresql+asyncpg", "postgresql+psycopg2")
-    _engine = create_engine(_url, pool_pre_ping=True)
-    return sessionmaker(bind=_engine, autocommit=False, autoflush=False)()
+    return _LuboilSessionFactory()
 
 def normalize_string(name):
     """

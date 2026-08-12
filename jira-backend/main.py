@@ -35,8 +35,13 @@ async def lifespan(app: FastAPI):
         from services.sync_worker import start_background_sync
         asyncio.create_task(start_background_sync())
         print(f"[VESSEL MODE] Sync worker started. Shore={settings.SHORE_URL}")
-
-    yield
+    yield  # ← App runs here
+    # ── SHUTDOWN (NEW) ──
+    print("Shutting down Jira Backend...")
+    from db.database import engine, engine_control
+    await engine.dispose()
+    await engine_control.dispose()
+    print("Engines disposed.")
 
 
 app = FastAPI(title="Ozellar MA Ticketing Portal API", version="1.0.0", lifespan=lifespan)

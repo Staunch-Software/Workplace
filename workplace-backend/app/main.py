@@ -10,7 +10,22 @@ import app.models.control.vessel
 import app.models.control.associations
 import app.models
 
-app = FastAPI(title=settings.PROJECT_NAME)
+# Add this under your other imports (around line 6)
+from contextlib import asynccontextmanager
+from app.core.database_control import engine_control
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── STARTUP ──
+    await init_control_db()
+    
+    yield  # ← App runs here
+    
+    # ── SHUTDOWN (NEW) ──
+    print("Shutting down Workplace Control Backend...")
+    await engine_control.dispose()
+    print("Engines disposed.")
+app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,9 +39,7 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api/v1")
 
 
-@app.on_event("startup")
-async def startup():
-    await init_control_db()
+
 
 
 @app.get("/health")

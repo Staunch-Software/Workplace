@@ -59,6 +59,10 @@ from app.blob_storage import generate_sas_url
 from app.luboil_report_processor import save_luboil_report
 from app.luboil_model import LuboilEquipmentType, LuboilVesselConfig, LuboilNameMapping
 from sqlalchemy import case, literal
+
+from contextlib import asynccontextmanager
+from app.core.database_control import engine_control, _sync_engine
+
 VESSEL_ORDER_CONFIG = {
     9832925: 1,  # AM KIRTI
     9792058: 2,  # MV AM UMANG
@@ -84,8 +88,7 @@ def get_allowed_vessel_imos(db, current_user):
 
     logger.info(f"🔍 Resolved Identity - Role: '{role}', ID: {user_id_raw}")
 
-    control_db = SessionControl()
-    try:
+    with SessionControl() as control_db:
         # ✅ Standardized Shore Check
         if role in ("ADMIN", "SUPERUSER", "SHORE", "SUPERINTENDENT"):
             all_vessels = control_db.query(ControlVessel.imo).all()
@@ -110,8 +113,7 @@ def get_allowed_vessel_imos(db, current_user):
         # ✅ Relationship Logic (Many-to-Many)
         imos = [v.imo for v in db_user.vessels]
         return imos, role
-    finally:
-        control_db.close()
+
 
 def inject_attachments_to_chat(attachment_string, sample_date, target_list, status_log=None):
     if not attachment_string:
@@ -171,9 +173,33 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── STARTUP ──────────────────────────────────────────────────
+    logger.info("Application startup: Initializing database...")
+    import os, asyncio
+    if os.getenv("IS_VESSEL_INSTANCE", "false").lower() == "true":
+        from app.services.sync_worker import start_background_sync
+        asyncio.create_task(start_background_sync())
+        logger.info("Sync worker started (vessel instance).")
+
+    from app.luboil_email_auto_upload import start_async_email_scheduler
+    asyncio.create_task(start_async_email_scheduler())
+    logger.info("Email Auto-Upload Scheduler started in background.")
+
+    yield  # ← App runs here
+
+    # ── SHUTDOWN ─────────────────────────────────────────────────
+    logger.info("Shutdown: Disposing database engines...")
+    await engine_control.dispose()  # async engine — needs await
+    _sync_engine.dispose()          # sync engine  — NO await
+    logger.info("Engines disposed.")
+
+# Initialize FastAPI
 app = FastAPI(
     title="Luboil Analysis API",
-    description="Luboil module API part of Workplace platform."
+    description="Luboil module API part of Workplace platform.",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -194,36 +220,6 @@ app.include_router(sync_router, prefix="/api/sync", tags=["Sync"])
 from app.routes.vessels import router as vessels_router
 app.include_router(vessels_router, prefix="/api/vessels", tags=["Vessels"])
 
-# Database Initialization
-@app.on_event("startup")
-async def startup_event():
-    """Event handler that runs when the FastAPI application starts up."""
-    logger.info("Application startup: Initializing database...")
-    import os, asyncio
-    if os.getenv("IS_VESSEL_INSTANCE", "false").lower() == "true":
-        from app.services.sync_worker import start_background_sync
-        asyncio.create_task(start_background_sync())
-        logger.info("Sync worker started (vessel instance).")
-
-    from app.luboil_email_auto_upload import start_async_email_scheduler
-    asyncio.create_task(start_async_email_scheduler())
-    logger.info("Email Auto-Upload Scheduler started in background.")
-
-    # try:
-    #     create_all_tables()
-    #     logger.info("Database tables checked/created successfully.")
-    #     run_startup_migrations()
-    #     from app.database import SessionLocal
-    #     from app.core.database_control import SessionControl
-    #     db = SessionLocal()
-    #     try:
-    #         from app.database import create_superuser_if_not_exists
-    #         # from app.core.database_control import SessionControl
-    #         create_superuser_if_not_exists(db)
-    #     finally:
-    #         db.close()
-    # except Exception as e:
-    #     logger.error(f"Failed to initialize database on startup: {e}", exc_info=True)
 
 
 @app.post("/api/admin/trigger-email-sync", tags=["Admin", "Lube Oil"])
@@ -595,13 +591,11 @@ async def update_luboil_remarks(
     try:
         # 1. Find Vessel using control DB
         from app.models.control.vessel import Vessel as ControlVessel
-        control_db = SessionControl()
-        try:
+        with SessionControl() as control_db:
             vessel = control_db.query(ControlVessel).filter(
                 ControlVessel.name.ilike(f"%{request.vessel_name}%")
             ).first()
-        finally:
-            control_db.close()
+        
 
         if not vessel:
             logger.error(f"❌ Vessel matching '{request.vessel_name}' not found in DB.")
@@ -833,8 +827,7 @@ async def update_luboil_remarks(
         
         if not sender_name or sender_name == 'User':
             try:
-                _name_ctrl = SessionControl()
-                try:
+                with SessionControl() as _name_ctrl:
                     from app.models.control.user import User as ControlUser
                     # import uuid
                     _u = _name_ctrl.query(ControlUser).filter(
@@ -850,8 +843,7 @@ async def update_luboil_remarks(
                         logger.info(f"Resolved sender_name from DB: {sender_name}")
                     else:
                         logger.warning(f"No user found in control DB for id: {sender_id}")
-                finally:
-                    _name_ctrl.close()
+
             except Exception as name_err:
                 logger.error(f"Could not fetch sender name: {name_err}", exc_info=True)
 
@@ -875,10 +867,9 @@ async def update_luboil_remarks(
                     words = part.split()
                     if not words: continue
                     matched_user = None
-                    for length in range(min(len(words), 4), 0, -1):
-                        potential_full_name = " ".join(words[:length]).rstrip('.,!?;:')
-                        _ctrl = SessionControl()
-                        try:
+                    with SessionControl() as _ctrl:
+                        for length in range(min(len(words), 4), 0, -1):
+                            potential_full_name = " ".join(words[:length]).rstrip('.,!?;:')
                             base_filter = [User.full_name == potential_full_name]
                             if sender_uuid:
                                 base_filter.append(User.id != sender_uuid)
@@ -892,10 +883,10 @@ async def update_luboil_remarks(
                                 if not user_match: user_match = user_query.first()
                             if user_match:
                                 matched_user = user_match
-                        finally:
-                            _ctrl.close()
-                        if matched_user:
-                            break
+                        
+                            if matched_user:
+                                break
+                            
                     matched_uid = matched_user.id if matched_user else None
                     if matched_user and matched_uid != sender_uuid and matched_uid not in processed_uids:
                         db.add(Notification(recipient_id=matched_user.id, sender_name=sender_name, message=f"{sender_name} mentioned you in {request.machinery_name} ({vessel.name})", notification_type="mention", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
@@ -913,46 +904,45 @@ async def update_luboil_remarks(
 
         # WORKFLOW NOTIFICATIONS (Approval/Decisions)
         # WORKFLOW NOTIFICATIONS (Approval/Decisions)
-        _notif_ctrl = SessionControl()
-        try:
-            if approval_notif_msg:
-                if not is_shore_user:
-                    assigned_shore = _notif_ctrl.query(User).filter(
-                        User.role == "SHORE",
-                        User.vessels.any(Vessel.imo == str(vessel.imo))
-                    ).all()
-                    for staff in assigned_shore:
-                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=approval_notif_msg, notification_type="status_change", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
-                else:
-                    assigned_vessel = _notif_ctrl.query(User).filter(
+        with SessionControl() as _notif_ctrl:
+            try:
+                if approval_notif_msg:
+                    if not is_shore_user:
+                        assigned_shore = _notif_ctrl.query(User).filter(
+                            User.role == "SHORE",
+                            User.vessels.any(Vessel.imo == str(vessel.imo))
+                        ).all()
+                        for staff in assigned_shore:
+                            db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=approval_notif_msg, notification_type="status_change", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
+                    else:
+                        assigned_vessel = _notif_ctrl.query(User).filter(
+                            User.role == "VESSEL",
+                            User.vessels.any(Vessel.imo == str(vessel.imo))
+                        ).all()
+                        for staff in assigned_vessel:
+                            db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=approval_notif_msg, notification_type="status_change", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
+
+                if request.is_image_required is True:
+                    vessel_staff = _notif_ctrl.query(User).filter(
                         User.role == "VESSEL",
                         User.vessels.any(Vessel.imo == str(vessel.imo))
                     ).all()
-                    for staff in assigned_vessel:
-                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=approval_notif_msg, notification_type="status_change", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
+                    for staff in vessel_staff:
+                        if str(staff.id) != str(sender_id):
+                            db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=f"Mandatory Image requested: {request.machinery_name} ({vessel.name})", notification_type="mandatory", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
 
-            if request.is_image_required is True:
-                vessel_staff = _notif_ctrl.query(User).filter(
-                    User.role == "VESSEL",
-                    User.vessels.any(Vessel.imo == str(vessel.imo))
-                ).all()
-                for staff in vessel_staff:
-                    if str(staff.id) != str(sender_id):
-                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=f"Mandatory Image requested: {request.machinery_name} ({vessel.name})", notification_type="mandatory", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
-
-            if request.is_resampling_required is True:
-                vessel_staff = _notif_ctrl.query(User).filter(
-                    User.role == "VESSEL",
-                    User.vessels.any(Vessel.imo == str(vessel.imo))
-                ).all()
-                for staff in vessel_staff:
-                    if str(staff.id) != str(sender_id):
-                        db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=f"Mandatory Resample requested: {request.machinery_name} ({vessel.name})", notification_type="mandatory", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
-        except Exception as notif_err:
-            logger.error(f"Notification dispatch failed (non-fatal): {notif_err}", exc_info=True)
-        finally:
-            _notif_ctrl.close()
-
+                if request.is_resampling_required is True:
+                    vessel_staff = _notif_ctrl.query(User).filter(
+                        User.role == "VESSEL",
+                        User.vessels.any(Vessel.imo == str(vessel.imo))
+                    ).all()
+                    for staff in vessel_staff:
+                        if str(staff.id) != str(sender_id):
+                            db.add(Notification(recipient_id=staff.id, sender_name=sender_name, message=f"Mandatory Resample requested: {request.machinery_name} ({vessel.name})", notification_type="mandatory", imo=str(vessel.imo), equipment_code=request.machinery_name, is_read=False, created_at=datetime.utcnow()))
+            except Exception as notif_err:
+                logger.error(f"Notification dispatch failed (non-fatal): {notif_err}", exc_info=True)
+                
+            # (The finally block is deleted entirely)
         # Live Feed Commitment
         if feed_msg:
             try:
@@ -1057,12 +1047,10 @@ async def get_luboil_fleet_overview(
 
         from app.core.database_control import SessionControl, engine_control
         logger.info(f"DEBUG control DB URL: {engine_control.url}")
-        control_db = SessionControl()
-        try:
+        with SessionControl() as control_db:
             test = control_db.execute(text("SELECT current_database()")).scalar()
             logger.info(f"DEBUG control DB name: {test}")
-        finally:
-            control_db.close()
+
         if not allowed_imos:
             return {
                 "columns": [],
@@ -1072,13 +1060,11 @@ async def get_luboil_fleet_overview(
         # 1. Fetch Master Data & Vessels (RESTRICTED)
         from app.core.database_control import SessionControl
         from app.models.control.vessel import Vessel as ControlVessel
-        control_db = SessionControl()
-        try:
+        with SessionControl() as control_db:
             vessels = control_db.query(ControlVessel).filter(
                 ControlVessel.imo.in_(allowed_imos)
             ).order_by(ControlVessel.name).all()
-        finally:
-            control_db.close()
+
 
         res = await db.execute(sa_select(LuboilEquipmentType).order_by(LuboilEquipmentType.sort_order))
         all_master_equipment = res.scalars().all()
@@ -1959,8 +1945,7 @@ async def get_vessel_mentions(
 
         # 2. Query control DB for users assigned to this vessel
     from app.models.control.associations import user_vessel_link
-    control_db = SessionControl()
-    try:
+    with SessionControl() as control_db:
         query = control_db.query(User).join(
             user_vessel_link, User.id == user_vessel_link.c.user_id
         ).filter(user_vessel_link.c.vessel_imo == str(imo))
@@ -1976,8 +1961,7 @@ async def get_vessel_mentions(
 
 
         users = query.all()
-    finally:
-        control_db.close()
+
 
     # 5. Return formatted list
     return [
@@ -2199,8 +2183,7 @@ async def upload_vessel_config_report(
         await db.commit()
 
     # Save to Control DB vessels table
-    control_db = SessionControl()
-    try:
+    with SessionControl() as control_db:
         from app.models.control.vessel import Vessel as ControlVessel
         control_vessel = control_db.query(ControlVessel).filter(
             ControlVessel.imo == str(imo)
@@ -2208,8 +2191,7 @@ async def upload_vessel_config_report(
         if control_vessel:
             control_vessel.vessel_report_url = blob_url
             control_db.commit()
-    finally:
-        control_db.close()
+
     
     return {"url": blob_url}
 
@@ -2245,12 +2227,9 @@ async def vessel_overdue_workflow(
         submitter_id = getattr(current_user, 'id', None)
 
     # 2. Get Vessel Name for Notifications
-    control_db = SessionControl()
-    try:
+    with SessionControl() as control_db:
         vessel = control_db.query(ControlVessel).filter(ControlVessel.imo == str(request.imo)).first()
         vessel_name = vessel.name if vessel else f"IMO {request.imo}"
-    finally:
-        control_db.close()
 
     # 3. Find the Active Reports tied to this Vessel
     stmt = (
@@ -2293,8 +2272,7 @@ async def vessel_overdue_workflow(
             r.version = (r.version or 1) + 1
 
     # 5. 🔥 UPDATED: Trigger FLEET FEED + MY FEED with proper routing
-    control_db = SessionControl()
-    try:
+    with SessionControl() as control_db:
         # 🔥 NEW: Helper to normalize job_title for fuzzy matching
         def normalize(s):
             return (s or "").lower().replace(" ", "")
@@ -2416,8 +2394,6 @@ async def vessel_overdue_workflow(
                     created_at=datetime.utcnow()
                 ))
 
-    finally:
-        control_db.close()
 
     await db.commit()
     return {"message": "Vessel overdue workflow updated successfully."}
@@ -2490,11 +2466,9 @@ async def list_config_vessels(
     configured_imos = {row[0] for row in res.all()}  # set of strings
  
     from app.models.control.vessel import Vessel as ControlVessel
-    control_db = SessionControl()
-    try:
+    with SessionControl() as control_db:
         vessels = control_db.query(ControlVessel).order_by(ControlVessel.name).all()
-    finally:
-        control_db.close()
+
  
     return [
         {
@@ -2521,11 +2495,8 @@ async def list_unconfigured_vessels(
     configured_imos = {row[0] for row in res.all()}
  
     from app.models.control.vessel import Vessel as ControlVessel
-    control_db = SessionControl()
-    try:
+    with SessionControl() as control_db:
         vessels = control_db.query(ControlVessel).order_by(ControlVessel.name).all()
-    finally:
-        control_db.close()
  
     return [
         {

@@ -308,50 +308,46 @@ Examples:
     
     try:
         # Create database session
-        db = SessionLocal()
+        with SessionLocal() as db:
         
         # Determine report_id
-        if args.report_id:
-            report_id = args.report_id
-        else:
-            print(f"Looking for report: IMO {args.imo_number}, Month {args.report_month}")
-            report_id = find_report_by_imo_and_month(db, args.imo_number, args.report_month)
-            if not report_id:
-                print(f"ERROR: No report found for IMO {args.imo_number} in month {args.report_month}")
-                sys.exit(1)
-            print(f"Found report ID: {report_id}")
-        
-        # Generate graph data
-        generator = PerformanceGraphGenerator(db)
-        graph_data = generator.generate_graph_json(report_id)
-        
-        # Determine output file
-        if args.output:
-            output_file = args.output
-        else:
-            output_file = f"performance_graph_{report_id}.json"
-        
-        # Save JSON file
-        with open(output_file, 'w') as f:
-            if args.pretty:
-                json.dump(graph_data, f, indent=2, ensure_ascii=False)
+            if args.report_id:
+                report_id = args.report_id
             else:
-                json.dump(graph_data, f, ensure_ascii=False)
-        
-        print(f"\nSUCCESS: Graph data generated!")
-        print(f"Output file: {output_file}")
-        print(f"Vessel: {graph_data['vessel_info']['vessel_name']}")
-        print(f"Baseline points: {len(graph_data['shop_trial_baseline'])}")
-        print(f"Monthly load: {graph_data['monthly_performance']['load_percentage']}%")
-        print(f"Available metrics: {len(graph_data['available_metrics'])}")
+                print(f"Looking for report: IMO {args.imo_number}, Month {args.report_month}")
+                report_id = find_report_by_imo_and_month(db, args.imo_number, args.report_month)
+                if not report_id:
+                    print(f"ERROR: No report found for IMO {args.imo_number} in month {args.report_month}")
+                    sys.exit(1)
+                print(f"Found report ID: {report_id}")
+            
+            # Generate graph data
+            generator = PerformanceGraphGenerator(db)
+            graph_data = generator.generate_graph_json(report_id)
+            
+            # Determine output file
+            if args.output:
+                output_file = args.output
+            else:
+                output_file = f"performance_graph_{report_id}.json"
+            
+            # Save JSON file
+            with open(output_file, 'w') as f:
+                if args.pretty:
+                    json.dump(graph_data, f, indent=2, ensure_ascii=False)
+                else:
+                    json.dump(graph_data, f, ensure_ascii=False)
+            
+            print(f"\nSUCCESS: Graph data generated!")
+            print(f"Output file: {output_file}")
+            print(f"Vessel: {graph_data['vessel_info']['vessel_name']}")
+            print(f"Baseline points: {len(graph_data['shop_trial_baseline'])}")
+            print(f"Monthly load: {graph_data['monthly_performance']['load_percentage']}%")
+            print(f"Available metrics: {len(graph_data['available_metrics'])}")
         
     except Exception as e:
         print(f"ERROR: {e}")
         sys.exit(1)
-    
-    finally:
-        if 'db' in locals():
-            db.close()
 
 if __name__ == "__main__":
     main()
