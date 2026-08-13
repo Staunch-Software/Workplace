@@ -2,8 +2,8 @@ import axios from 'axios';
 import { handleExpiredSession } from '../../../utils/authGuard';
 
 const axiosLub = axios.create({
-  baseURL: 'http://localhost:8002',
-  // baseURL: "/lub",
+  // baseURL: 'http://localhost:8002',
+  baseURL: "/lub",
   headers: { 'Content-Type': 'application/json' },
 });
 
