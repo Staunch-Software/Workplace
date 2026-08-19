@@ -160,7 +160,11 @@ export default function ActivityFeedPage() {
   const openReport = (id) => {
     if (!id) return;
     const url = isVessel ? `/reports/vessel?open=${id}` : `/reports/shore?open=${id}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    // Same-origin internal link -- deliberately no 'noopener'/'noreferrer'
+    // here, since severing the opener also stops the browser from carrying
+    // sessionStorage (where the auth token lives) into the new tab, which
+    // made the new tab look logged out.
+    window.open(url, '_blank');
   };
 
   return (

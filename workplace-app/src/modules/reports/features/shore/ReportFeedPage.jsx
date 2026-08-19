@@ -86,7 +86,10 @@ export default function ReportFeedPage() {
   const handleView = (item) => {
     // If there's a report_id, open the report in a new tab
     if (item.report_id) {
-       window.open(`/reports/shore?open=${item.report_id}`, '_blank', 'noopener,noreferrer');
+       // No 'noopener'/'noreferrer' -- same-origin link, and severing the
+       // opener stops the new tab from inheriting sessionStorage (the auth
+       // token), which made it look logged out.
+       window.open(`/reports/shore?open=${item.report_id}`, '_blank');
     }
   };
 

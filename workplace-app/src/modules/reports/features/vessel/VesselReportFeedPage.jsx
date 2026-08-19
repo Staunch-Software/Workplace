@@ -86,7 +86,10 @@ export default function VesselReportFeedPage() {
   const handleView = (item) => {
     // If there's a report_id, open the report (Vessel view) in a new tab
     if (item.report_id) {
-       window.open(`/reports/vessel?open=${item.report_id}`, '_blank', 'noopener,noreferrer');
+       // No 'noopener'/'noreferrer' -- same-origin link, and severing the
+       // opener stops the new tab from inheriting sessionStorage (the auth
+       // token), which made it look logged out.
+       window.open(`/reports/vessel?open=${item.report_id}`, '_blank');
     }
   };
 
