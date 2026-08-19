@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 @router.get("/users", response_model=list[UserDetail])
 async def list_users(
     db: AsyncSession = Depends(get_control_db),
-    admin: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
         select(User).options(selectinload(User.vessels))
