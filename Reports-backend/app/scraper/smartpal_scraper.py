@@ -919,6 +919,18 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
 
             pdf_bytes = await response.body()
 
+            # A 200 OK response doesn't guarantee we actually got the file --
+            # SmartPAL can return an HTML error/session-timeout page with a
+            # 200 status instead of the real PDF (e.g. mid-download session
+            # hiccup). That garbage would otherwise get uploaded and labeled
+            # application/pdf purely from the filename extension, passing
+            # every existence check while being unreadable by any PDF viewer.
+            # Real PDFs always start with the "%PDF-" magic header.
+            if pdf_filename.lower().endswith(".pdf") and not pdf_bytes.startswith(b"%PDF-"):
+                logger.error(f"Downloaded '{pdf_filename}' does not look like a real PDF (missing %PDF- header) -- likely an error page. Marking as missing.")
+                attachments.append({"file_name": pdf_filename, "blob_path": f"MISSING:{pdf_filename}"})
+                continue
+
             # Try to get the real filename from Content-Disposition header
             import re
             content_disp = response.headers.get("content-disposition", "")

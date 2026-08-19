@@ -50,6 +50,10 @@ function isCsvFile(path) {
   return !!path && path.toLowerCase().endsWith('.csv');
 }
 
+function isPdfFile(path) {
+  return !!path && path.toLowerCase().endsWith('.pdf');
+}
+
 function isBrowserRenderable(path) {
   if (!path) return false;
   const lower = path.toLowerCase();
@@ -69,6 +73,7 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
   const [error, setError] = useState(null);
   const [sheetTables, setSheetTables] = useState(null); // [{ name, html }] for spreadsheet preview
   const [activeSheetIdx, setActiveSheetIdx] = useState(0);
+  const [pdfChecking, setPdfChecking] = useState(false); // true while verifying a PDF's magic header before rendering it
 
 
   // Load SAS URL whenever reportId or activeIdx changes
@@ -79,6 +84,10 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
     setSasUrl(null);
     setSheetTables(null);
     setActiveSheetIdx(0);
+    // Block the iframe from rendering until the PDF magic-header check below
+    // finishes, so a corrupted file never flashes the native "Failed to load
+    // PDF document" dialog before our own error state swaps in.
+    setPdfChecking(isPdfFile(attachments[activeIdx]?.file_name));
 
     const path = attachments[activeIdx]?.blob_path || null;
     if (path && path.startsWith('MISSING:')) {
@@ -131,6 +140,43 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [sasUrl, activeIdx]); // eslint-disable-line
+
+  // Once we have a SAS URL for a PDF, verify it's actually a real PDF before
+  // handing it to the iframe. A 200-OK download during scraping doesn't
+  // guarantee the bytes are a real PDF (e.g. SmartPAL can serve an HTML
+  // error/session-timeout page mid-download) -- Azure still serves those
+  // bytes with a "application/pdf" content-type (set from the filename, not
+  // the content), so the browser's native PDF viewer only discovers the
+  // problem after loading, showing a jarring generic "Failed to load PDF
+  // document" dialog. A cheap ranged request checking for the "%PDF-" magic
+  // header lets us show our own clean error state instead.
+  useEffect(() => {
+    const fileName = attachments[activeIdx]?.file_name;
+    if (!sasUrl || !isPdfFile(fileName)) return;
+
+    let cancelled = false;
+    fetch(sasUrl, { headers: { Range: 'bytes=0-4' } })
+      .then(r => {
+        if (!r.ok && r.status !== 206) throw new Error(`HTTP ${r.status}`);
+        return r.arrayBuffer();
+      })
+      .then(buf => {
+        if (cancelled) return;
+        const header = new TextDecoder().decode(buf);
+        if (header !== '%PDF-') {
+          setError('This document could not be opened -- it may have failed to download correctly. Try re-scraping, or use Download to inspect the raw file.');
+        }
+      })
+      .catch(() => {
+        // If the check itself fails (network hiccup, blocked Range support),
+        // don't block the preview -- fall through to the normal iframe.
+      })
+      .finally(() => {
+        if (!cancelled) setPdfChecking(false);
       });
 
     return () => { cancelled = true; };
@@ -211,19 +257,19 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
 
             {/* PDF Viewer */}
             <div className="rt-attach-viewer">
-              {loading && (
+              {(loading || pdfChecking) && (
                 <div className="rt-attach-loading">
                   <span className="rt-spinner" />
                   <span>Loading document...</span>
                 </div>
               )}
-              {error && (
+              {error && !pdfChecking && (
                 <div className="rt-attach-error">
                   <AlertCircle size={20} color="#dc2626" />
                   <span>{error}</span>
                 </div>
               )}
-              {!loading && !error && sasUrl && (
+              {!loading && !error && !pdfChecking && sasUrl && (
                 <>
                   {!isBrowserRenderable(attachments[activeIdx]?.file_name) ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', gap: '16px', background: '#f8fafc', padding: '24px', textAlign: 'center' }}>
