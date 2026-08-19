@@ -8,7 +8,7 @@ import ReportViewerModal from '../../components/ReportViewerModal';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import {
-  Ship, Filter, Search, ChevronDown, ChevronRight, X, CheckCircle2, Clock, AlertCircle, Paperclip, AlertTriangle, CalendarClock
+  Ship, Filter, Search, ChevronDown, ChevronRight, X, CheckCircle2, Clock, AlertCircle, Paperclip, AlertTriangle, CalendarClock, MessageSquare
 } from 'lucide-react';
 import '../../styles/Reports.css';
 
@@ -472,20 +472,23 @@ export default function ShoreReportsPage() {
                       <td>{r.job_category || '—'}</td>
                       <td style={{color:'#334155'}}>{r.approved_by || '—'}</td>
                       <td style={{ textAlign: 'center' }}>
-                        {r.attachments?.some(a => !a.blob_path?.startsWith('MISSING:')) && (
-                          <button 
-                            className="rt-btn-icon-only"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedRow(r);
-                              setModalFocusPane(undefined);
-                              setModalOpen(true);
-                            }}
-                            title="View Attachment"
-                          >
-                            <Paperclip size={16} />
-                          </button>
-                        )}
+                        {(() => {
+                          const hasAttachment = r.attachments?.some(a => !a.blob_path?.startsWith('MISSING:'));
+                          return (
+                            <button
+                              className="rt-btn-icon-only"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedRow(r);
+                                setModalFocusPane(undefined);
+                                setModalOpen(true);
+                              }}
+                              title={hasAttachment ? 'View Attachment' : 'View / Open Thread'}
+                            >
+                              {hasAttachment ? <Paperclip size={16} /> : <MessageSquare size={16} />}
+                            </button>
+                          );
+                        })()}
                       </td>
                     </tr>
                   )})}

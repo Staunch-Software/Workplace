@@ -168,7 +168,7 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
         if (cancelled) return;
         const header = new TextDecoder().decode(buf);
         if (header !== '%PDF-') {
-          setError('This document could not be opened -- it may have failed to download correctly. Try re-scraping, or use Download to inspect the raw file.');
+          setError('This file is not available in SmartPAL / MariApp.');
         }
       })
       .catch(() => {
@@ -207,7 +207,7 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
         {!attachments || attachments.length === 0 ? (
           <div className="rt-attach-empty">
             <Paperclip size={36} strokeWidth={1.2} color="#cbd5e1" />
-            <p>No attachments have been scraped yet.</p>
+            <p>No attachment found.</p>
           </div>
         ) : (
           <div style={{ 

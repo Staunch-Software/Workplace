@@ -367,20 +367,23 @@ export default function VesselReportsPage() {
                           <td>{r.job_category || '—'}</td>
                           <td style={{color:'#334155'}}>{r.approved_by || '—'}</td>
                           <td style={{ textAlign: 'center' }}>
-                            {r.attachments?.some(a => !a.blob_path?.startsWith('MISSING:')) && (
-                              <button 
-                                className="rt-btn-icon-only"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedRow(r);
-                                  setModalFocusPane(undefined);
-                                  setModalOpen(true);
-                                }}
-                                title="View Attachment"
-                              >
-                                <Paperclip size={16} />
-                              </button>
-                            )}
+                            {(() => {
+                              const hasAttachment = r.attachments?.some(a => !a.blob_path?.startsWith('MISSING:'));
+                              return (
+                                <button
+                                  className="rt-btn-icon-only"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedRow(r);
+                                    setModalFocusPane(undefined);
+                                    setModalOpen(true);
+                                  }}
+                                  title={hasAttachment ? 'View Attachment' : 'View / Open Thread'}
+                                >
+                                  {hasAttachment ? <Paperclip size={16} /> : <MessageSquare size={16} />}
+                                </button>
+                              );
+                            })()}
                           </td>
                         </tr>
                       )})
