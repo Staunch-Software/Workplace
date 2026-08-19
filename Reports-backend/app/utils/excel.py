@@ -1,8 +1,9 @@
 import os
 import openpyxl
 
-EXCEL_PATH = r"D:\Report Tracker\Report_Tracking_11Aug2026.xlsx"
+from app.core.config import settings
 
+EXCEL_PATH = settings.REPORT_EXCEL_PATH
 def _make_entry(sr, title, rtype, freq) -> dict:
     title = str(title).strip()
     rtype = str(rtype).strip().upper() if rtype else "TECHNICAL"
