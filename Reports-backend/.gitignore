@@ -1,0 +1,75 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment — NEVER push real credentials
+.env
+
+# Database files
+*.db
+*.sqlite3
+
+# Playwright browser binaries
+.playwright-browsers/
+
+# Runtime temp files
+.reports-runtime/
+
+# Debug/scratch files at root level
+attachments_debug.*
+scraper_apis*.json
+intercepted_apis.json
+scraper_apis_responses.json
+resp.json
+test_token.txt
+page1.txt
+
+# One-off root scripts (dev utilities)
+check.py
+check_attachments.py
+check_db.py
+clean_db.py
+clear_db.py
+clear_kirti.py
+count_pdfs.py
+create_new_tables.py
+cron_dry_run.py
+inspect_db.py
+migrate_db.py
+mock_populate.py
+patch_scraper.py
+patch_sniffer_responses.py
+pure_api_scraper_scaffold.py
+recreate_db.py
+run_scraper.py
+run_sniffer.py
+scratch_check_db.py
+trigger_full.py
+trigger_umang.py
+add_freq.py
+api_discovery.py
+get_imos.py
+import_and_scrape.py
+search_db.py
+test_smart_scrape.py
+
+# Old/backup scraper versions
+app/scraper/smartpal_scraper_api.py
+app/scraper/smartpal_scraper_corrected.py
+app/scraper/smartpal_scraper_fixed.py
+app/scraper/smartpal_scraper_sniffer.py
+app/scraper/old_search_logic_backup.txt
+
+# Zip backups
+*.zip
+
+# Scratch folders
+scratch/
+
+# Data files
+data/*.xlsx
+data/*.csv

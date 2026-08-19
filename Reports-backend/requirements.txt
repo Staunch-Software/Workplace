@@ -1,0 +1,32 @@
+# SmartPAL Report Tracker Backend
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.6
+pydantic>=2.9.2
+pydantic-settings>=2.5.2
+
+# Database
+sqlalchemy>=2.0.35
+asyncpg>=0.30.0
+alembic>=1.13.3
+
+# Security
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Azure Blob Storage
+azure-storage-blob>=12.22.0
+
+# Playwright (for SmartPAL scraper)
+playwright>=1.62.0
+
+# Excel parsing (for vessel/report config)
+openpyxl>=3.1.5
+
+# Scheduler (cronjob)
+apscheduler>=3.10.4
+
+# HTTP client
+httpx>=0.27.2
+
+# Utilities
+python-multipart>=0.0.9
