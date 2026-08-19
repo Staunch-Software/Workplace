@@ -1,4 +1,4 @@
-﻿# app/core/database_control.py
+# app/core/database_control.py
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
@@ -11,6 +11,7 @@ engine_control = create_async_engine(
     max_overflow=3,
     pool_timeout=10,
     pool_recycle=1800,
+    pool_pre_ping=True,
 )
 
 ControlSession = sessionmaker(
