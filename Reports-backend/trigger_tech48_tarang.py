@@ -6,12 +6,18 @@
 # the next scheduled cron run or re-scraping every other config too.
 
 import asyncio
+import logging
 import os
 import sys
 
 sys.path.append(os.path.abspath("."))
 from app.core.database import SessionLocal
 from app.scraper.smartpal_scraper import run_scraper
+
+# Without this, every logger.info(...) call in the scraper (login status,
+# search attempts, save results) is silently swallowed -- the script still
+# runs, you just can't see what it's doing.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-8s %(message)s")
 
 
 async def main():
