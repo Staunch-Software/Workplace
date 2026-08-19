@@ -32,10 +32,28 @@ function isSpreadsheetFile(path) {
   return lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.xlsm') || lower.endsWith('.csv');
 }
 
+// Excel/Word/PowerPoint files render via Microsoft's Office Online Viewer
+// (pixel-accurate to the real app -- colors, merges, logos, layout, slides,
+// everything) instead of a plain fallback. Office Online doesn't support raw
+// .csv, so that keeps using the SheetJS table.
+function isOfficeViewerFile(path) {
+  if (!path) return false;
+  const lower = path.toLowerCase();
+  return (
+    lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.xlsm') ||
+    lower.endsWith('.docx') || lower.endsWith('.doc') ||
+    lower.endsWith('.pptx') || lower.endsWith('.ppt')
+  );
+}
+
+function isCsvFile(path) {
+  return !!path && path.toLowerCase().endsWith('.csv');
+}
+
 function isBrowserRenderable(path) {
   if (!path) return false;
   const lower = path.toLowerCase();
-  return lower.endsWith('.pdf') || lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.gif') || lower.endsWith('.txt') || isSpreadsheetFile(path);
+  return lower.endsWith('.pdf') || lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.gif') || lower.endsWith('.txt') || isSpreadsheetFile(path) || isOfficeViewerFile(path);
 }
 
 function isImageFile(path) {
@@ -76,10 +94,11 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
       .finally(() => setLoading(false));
   }, [reportId, activeIdx]); // eslint-disable-line
 
-  // Once we have a SAS URL for a spreadsheet attachment, fetch and parse it into HTML tables
+  // Once we have a SAS URL for a CSV attachment, fetch and parse it into an HTML table.
+  // (.xlsx/.xls/.xlsm go through the Office Online Viewer iframe instead -- see render below.)
   useEffect(() => {
     const fileName = attachments[activeIdx]?.file_name;
-    if (!sasUrl || !isSpreadsheetFile(fileName)) return;
+    if (!sasUrl || !isCsvFile(fileName)) return;
 
     let cancelled = false;
     setLoading(true);
@@ -98,6 +117,14 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
           html: XLSX.utils.sheet_to_html(wb.Sheets[name], { id: undefined, editable: false }),
         }));
         setSheetTables(tables);
+        // Open on whichever tab was active when the file was last saved in
+        // Excel (stored in the workbook itself), so the preview matches what
+        // you'd see opening the downloaded file -- not always sheet 1, which
+        // is often just a summary/index tab.
+        const savedActiveTab = wb.Workbook?.WBView?.[0]?.activeTab;
+        setActiveSheetIdx(
+          Number.isInteger(savedActiveTab) && savedActiveTab < tables.length ? savedActiveTab : 0
+        );
       })
       .catch(() => {
         if (!cancelled) setError('Could not preview this spreadsheet.');
@@ -164,7 +191,22 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
             {/* Filename display */}
             <div className="rt-attach-filename">
               <FileText size={13} color="#3b82f6" />
-              <span>{attachments[activeIdx]?.file_name || 'Document'}</span>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {attachments[activeIdx]?.file_name || 'Document'}
+              </span>
+              {sasUrl && !error && (
+                <a
+                  href={sasUrl}
+                  download={attachments[activeIdx]?.file_name}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Download file"
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#3b82f6', textDecoration: 'none', fontWeight: 600, fontSize: '0.75rem', flexShrink: 0 }}
+                >
+                  <Download size={13} />
+                  Download
+                </a>
+              )}
             </div>
 
             {/* PDF Viewer */}
@@ -209,7 +251,14 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
                         style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '4px' }}
                       />
                     </div>
-                  ) : isSpreadsheetFile(attachments[activeIdx]?.file_name) ? (
+                  ) : isOfficeViewerFile(attachments[activeIdx]?.file_name) ? (
+                    <iframe
+                      key={sasUrl}
+                      src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(sasUrl)}`}
+                      title={attachments[activeIdx]?.file_name}
+                      className="rt-attach-iframe"
+                    />
+                  ) : isCsvFile(attachments[activeIdx]?.file_name) ? (
                     !sheetTables ? (
                       <div className="rt-attach-loading">
                         <span className="rt-spinner" />

@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { reportsApi, vesselReportsApi } from '../../api/reportsApi';
 import ReportsNavbar from '../../components/ReportsNavbar';
@@ -102,7 +101,6 @@ function TypePill({ type, active, count, onClick }) {
 
 /* ─── Main ───────────────────────────────────────────────────────── */
 export default function ActivityFeedPage() {
-  const navigate   = useNavigate();
   const { user }   = useAuth();
   const [filterVessel, setFilterVessel] = useState('All');
   const [filterType,   setFilterType]   = useState('All');
@@ -161,7 +159,8 @@ export default function ActivityFeedPage() {
 
   const openReport = (id) => {
     if (!id) return;
-    navigate(isVessel ? `/reports/vessel?open=${id}` : `/reports/shore?open=${id}`);
+    const url = isVessel ? `/reports/vessel?open=${id}` : `/reports/shore?open=${id}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   return (

@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { vesselReportsApi } from '../../api/reportsApi';
 import ReportsNavbar from '../../components/ReportsNavbar';
 import '../../../drs/components/shared/live-feed.css';
@@ -57,7 +56,6 @@ const formatDateTime = (dateStr) => {
 export default function VesselReportFeedPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const [filter, setFilter] = useState('UNREAD');
 
   const { data: notifications = [], isLoading, isFetching } = useQuery({
@@ -86,9 +84,9 @@ export default function VesselReportFeedPage() {
   };
 
   const handleView = (item) => {
-    // If there's a report_id, navigate to the report (Vessel view)
+    // If there's a report_id, open the report (Vessel view) in a new tab
     if (item.report_id) {
-       navigate(`/reports/vessel?open=${item.report_id}`);
+       window.open(`/reports/vessel?open=${item.report_id}`, '_blank', 'noopener,noreferrer');
     }
   };
 

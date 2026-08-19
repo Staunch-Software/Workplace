@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { ChevronDown, Settings, Home, ClipboardList, MessageSquare } from 'lucide-react';
+import { ChevronDown, Settings, Home, LayoutGrid, Rss } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import coreApi from '@/api/axios';
 import NotificationBell from '@/components/NotificationBell';
@@ -84,52 +84,20 @@ export default function ReportsNavbar({ totalUnread, reportsRemaining }) {
         </div>
       </div>
 
-      {/* ── Status chips ── */}
-      {totalUnread > 0 && (
-        <div className="rpt-chip rpt-chip--info">
-          <MessageSquare size={12} />
-          <span>{totalUnread} Unread</span>
-        </div>
-      )}
-
       {/* ── Navigation Links ── */}
-      <div className="rpt-nav-links" style={{ display: 'flex', gap: '8px', marginLeft: '32px' }}>
-        <button 
-          className="rpt-nav-link" 
+      <div className="rpt-nav-links" style={{ marginLeft: '24px' }}>
+        <button
+          className={`rpt-nav-link ${(location.pathname.endsWith('shore') || location.pathname.endsWith('vessel')) ? 'active' : ''}`}
           onClick={() => navigate(user?.role === 'VESSEL' ? '/reports/vessel' : '/reports/shore')}
-          style={{ 
-            background: location.pathname.endsWith('shore') || location.pathname.endsWith('vessel') ? '#e0e7ff' : 'transparent', 
-            border: 'none', 
-            color: location.pathname.endsWith('shore') || location.pathname.endsWith('vessel') ? '#4f46e5' : '#64748b', 
-            fontSize: '0.9rem', 
-            fontWeight: 600, 
-            cursor: 'pointer', 
-            padding: '6px 14px', 
-            borderRadius: '6px',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => { if (!location.pathname.endsWith('shore') && !location.pathname.endsWith('vessel')) e.target.style.color = '#0f172a' }}
-          onMouseLeave={(e) => { if (!location.pathname.endsWith('shore') && !location.pathname.endsWith('vessel')) e.target.style.color = '#64748b' }}
         >
+          <LayoutGrid size={14} />
           Dashboard
         </button>
-        <button 
-          className="rpt-nav-link" 
+        <button
+          className={`rpt-nav-link ${location.pathname.includes('feed') ? 'active' : ''}`}
           onClick={() => navigate(user?.role === 'VESSEL' ? '/reports/vessel-feed' : '/reports/feed')}
-          style={{ 
-            background: location.pathname.includes('feed') ? '#e0e7ff' : 'transparent', 
-            border: 'none', 
-            color: location.pathname.includes('feed') ? '#4f46e5' : '#64748b', 
-            fontSize: '0.9rem', 
-            fontWeight: 600, 
-            cursor: 'pointer', 
-            padding: '6px 14px', 
-            borderRadius: '6px',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => { if (!location.pathname.includes('feed')) e.target.style.color = '#0f172a' }}
-          onMouseLeave={(e) => { if (!location.pathname.includes('feed')) e.target.style.color = '#64748b' }}
         >
+          <Rss size={14} />
           Feed
         </button>
       </div>
