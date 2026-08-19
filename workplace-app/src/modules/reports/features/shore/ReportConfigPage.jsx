@@ -135,10 +135,24 @@ export default function ReportConfigPage() {
     // Attach scraped report status to each config
     Object.values(groups).forEach(g => {
       g.configs = g.configs.map(c => {
-        const scraped = reports.find(
+        // There can be multiple Report rows for the same report_code (one
+        // per job cycle) -- e.g. a still-open PENDING cycle alongside an
+        // earlier COMPLETED one. Picking just the first match arbitrarily
+        // (via .find()) tended to land on whichever was updated most
+        // recently, which is usually the PENDING one since the cron keeps
+        // re-touching it -- and a PENDING row never has next_due_date set
+        // (only a completed cycle knows when the next one is due), even
+        // though another row for the same report clearly has that info.
+        const matches = reports.filter(
           r => r.vessel_imo === c.vessel_imo && r.report_code === c.report_code
         );
-        return { ...c, scrapeStatus: scraped?.scrape_status || 'MISSING', lastScraped: scraped?.updated_at, nextDueDate: scraped?.next_due_date };
+        const latest = matches.reduce((best, r) =>
+          (!best || new Date(r.updated_at) > new Date(best.updated_at)) ? r : best, null);
+        const nextDue =
+          matches.find(r => r.next_due_date)?.next_due_date ??
+          matches.find(r => r.scrape_status === 'PENDING')?.due_date ??
+          null;
+        return { ...c, scrapeStatus: latest?.scrape_status || 'MISSING', lastScraped: latest?.updated_at, nextDueDate: nextDue };
       });
       // Sort configs by report code
       g.configs.sort((a, b) => a.report_code.localeCompare(b.report_code));
