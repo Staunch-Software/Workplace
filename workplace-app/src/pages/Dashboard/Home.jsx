@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { FileText, Trello, Ship, Droplet, Activity } from "lucide-react";
+import { FileText, Trello, Ship, Droplet, Activity, FileBarChart2 } from "lucide-react";
 import api from '../../api/axios';
 import './Home.css';
 
@@ -89,6 +89,14 @@ const Home = ({ searchQuery = '' }) => {
     if (appId === 'engine') {
       window.open('/aepms', '_blank');
     }
+
+    if (appId === 'reports') {
+      if (user?.role === 'VESSEL') {
+        window.open('/reports/vessel', '_blank');
+      } else {
+        window.open('/reports/shore', '_blank');
+      }
+    }
   };
 
   const allApps = [
@@ -97,6 +105,7 @@ const Home = ({ searchQuery = '' }) => {
     { id: 'voyage', permKey: 'voyage', name: 'Voyage Performance', desc: 'Analytics & Tracking', icon: <Ship size={32} />, class: 'hm-card-voyage', delay: '0.2s' },
     { id: 'lube', permKey: 'lubeoil', name: 'Lubeoil Analysis', desc: 'Shore Analysis Portal', icon: <Droplet size={32} />, class: 'hm-card-lube', delay: '0.3s' },
     { id: 'engine', permKey: 'engine_performance', name: 'Engine Performance', desc: 'Metrics & Health', icon: <Activity size={32} />, class: 'hm-card-engine', delay: '0.4s' },
+    { id: 'reports', permKey: 'report_tracker', name: 'Report Tracker', desc: 'Report Tracking & Threads', icon: <FileBarChart2 size={32} />, class: 'hm-card-reports', delay: '0.5s' },
   ];
 
   const apps = allApps

@@ -15,6 +15,7 @@ const DrsModule = lazy(() => import('./modules/drs/DrsModule'));
 const LubModule = lazy(() => import('./modules/lubeoil/Lubmodule'));
 const JiraModule = lazy(() => import('./modules/jira/JiraModule'));
 const AepmsModule = lazy(() => import('./modules/aepms/AepmsModule'));
+const ReportsModule = lazy(() => import('./modules/reports/ReportsModule'));
 const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
 // const VoyageModule = lazy(() => import('./modules/voyage/VoyageModule'));
 
@@ -120,6 +121,15 @@ function App() {
             <ProtectedRoute allowedRoles={['SHORE', 'ADMIN', 'VESSEL']}>
               <Suspense fallback={<ModuleLoader label="Loading AEPMS..." />}>
                 <AepmsModule />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+
+          {/* ── REPORTS MODULE (SmartPAL) ────────────────────── */}
+          <Route path="/reports/*" element={
+            <ProtectedRoute allowedRoles={['SHORE', 'ADMIN', 'VESSEL']}>
+              <Suspense fallback={<ModuleLoader label="Loading Reports..." />}>
+                <ReportsModule />
               </Suspense>
             </ProtectedRoute>
           } />

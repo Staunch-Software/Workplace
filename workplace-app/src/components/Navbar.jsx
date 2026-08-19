@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Building2, Search, Shield, LogOut, ChevronDown, Ship, X, Check, KeyRound, Activity, ChevronRight, Database, Clock, Wifi, WifiOff, FileText, Trello, Droplet, Zap, AlertCircle, Terminal, RefreshCw, ArrowUpRight, ArrowDownLeft, CheckCircle, Ship as ShipIcon, BookOpen, AlertTriangle } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import NotificationBell from './NotificationBell';
 import { getVesselStatus } from '../pages/admin/lib/adminApi';
 import './Navbar.css';
 import apiDrs from '../modules/drs/api/axiosDrs';
@@ -1106,6 +1107,8 @@ const Navbar = ({ setSearchQuery }) => {
                         </div>
 
                         <div className="divider"></div>
+
+                        <NotificationBell />
 
                         <div className="profile-wrapper" ref={dropdownRef}>
                             <button
