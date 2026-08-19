@@ -88,7 +88,7 @@ export default function VesselReportFeedPage() {
   const handleView = (item) => {
     // If there's a report_id, navigate to the report (Vessel view)
     if (item.report_id) {
-       navigate(`/reports/vessel?report=${item.report_id}`);
+       navigate(`/reports/vessel?open=${item.report_id}`);
     }
   };
 

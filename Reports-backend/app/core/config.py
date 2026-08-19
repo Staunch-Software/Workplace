@@ -36,8 +36,14 @@ class Settings(BaseSettings):
     SCRAPER_CRON_HOUR: int = 2
     SCRAPER_CRON_MINUTE: int = 0
 
-    # Path to Excel file containing vessel/report mapping
+    # Path to Excel file containing vessel/report mapping (used only to
+    # regenerate DEFAULT_REPORTS_JSON_PATH offline, not read on every request)
     REPORT_EXCEL_PATH: str = "./data/reports_config.xlsx"
+
+    # Path to the JSON snapshot of the 45 default report configs, used by the
+    # "Assign 45 Defaults" action. Reading a static file (rather than parsing
+    # the Excel workbook on every request) avoids re-parsing overhead/failures.
+    DEFAULT_REPORTS_JSON_PATH: str = "./data/default_reports_config.json"
 
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:

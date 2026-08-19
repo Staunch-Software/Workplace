@@ -7,7 +7,6 @@ from app.core.database import init_models, engine
 from app.core.database_control import engine_control
 from app.core.blob_storage import configure_blob
 from app.api.v1.api import api_router
-from app.scraper.scheduler import start_scheduler, stop_scheduler
 
 
 @asynccontextmanager
@@ -28,15 +27,18 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(_blob_init())
 
-    # 3. Start the daily cronjob (no UI trigger needed)
-    start_scheduler()
-    print("SmartPAL scraper scheduled. Backend ready.")
+    # NOTE: Scraping is triggered externally via an OS-level cron job running
+    # app/scraper/cron_smart_scrape.py (smart_cron=True), NOT by an in-process
+    # scheduler. Do not re-add an in-process scheduler here without removing
+    # the external cron job first -- running both risks two Playwright
+    # sessions logging into SmartPAL at the same time and invalidating each
+    # other's session.
+    print("Backend ready. Scraping is handled by the external cron job.")
 
     yield
 
     # ── SHUTDOWN ──
     print("Shutting down Report Tracker Backend...")
-    stop_scheduler()
     await engine.dispose()
     await engine_control.dispose()
     print("Engines disposed.")

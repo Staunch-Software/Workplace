@@ -6,6 +6,10 @@ from uuid import UUID
 from app.models.report import ScrapeStatus, VerifyStatus
 
 
+class VerifyRequest(BaseModel):
+    verified_by: str
+
+
 # ── Thread Schemas ─────────────────────────────────────────────────────────────
 
 class ThreadAttachmentCreate(BaseModel):

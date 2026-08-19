@@ -357,7 +357,24 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                 name_without_prefix = re.sub(r'^[\s-]+', '', name_without_prefix)
                 if len(name_without_prefix) > 3:
                     search_terms.append(name_without_prefix)
-            
+
+        # Some reports are labelled with a DIFFERENT numbering scheme on
+        # different vessels' SmartPAL trees (e.g. one vessel shows
+        # "OPT - BCR - 11 - TANK SOUNDING REPORT", another shows
+        # "MONTHLY - 10 - TANK SOUNDING REPORT" for the same report), so a
+        # literal full-name search only ever matches whichever vessel
+        # happens to use our config's exact wording. As a last-resort
+        # fallback term, strip everything up to and including the last
+        # "<code/word> - <number> - " segment, leaving just the descriptive
+        # title (e.g. "TANK SOUNDING REPORT"), which is shared across the
+        # differently-numbered variants and is specific enough to still
+        # uniquely identify the report in the portal's search.
+        desc_match = re.search(r'-\s*\d+[A-Z]?\s*-\s*(.+)$', clean_report_name)
+        if desc_match:
+            desc_term = desc_match.group(1).strip()
+            if len(desc_term) > 3:
+                search_terms.append(desc_term)
+
         search_terms = list(dict.fromkeys(t for t in search_terms if t))
 
         # --- Locate the search input ---
@@ -401,17 +418,24 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                     if (visible.length === 0) return false;
                     
                     let bestNode = visible[0];
-                    
+
+                    // Report codes are built from titles like "TECH - 57 - ..." where
+                    // spaces around the separator become underscores (e.g. "TECH_-_57"),
+                    // which broke plain substring checks like code.includes('TECH-57').
+                    // Collapse any run of space/underscore/hyphen into a single '-' so
+                    // matching is independent of the exact separator style.
+                    const codeNorm = code.replace(/[\s_-]+/g, '-');
+
                     // --- Custom overrides as requested by user ---
-                    if (code.includes('TECH-15') || code.includes('TECH-12') || code.includes('TECH-57') || code.includes('TECH_-16') || code.includes('TECH-16')) {
+                    if (codeNorm.includes('TECH-15') || codeNorm.includes('TECH-12') || codeNorm.includes('TECH-57') || codeNorm.includes('TECH-16')) {
                         for (const item of visible) {
                             const text = (item.innerText || "").toUpperCase();
-                            if (code.includes('AE-1') && text.includes('AE-1')) { bestNode = item; break; }
-                            if (code.includes('AE-2') && text.includes('AE-2')) { bestNode = item; break; }
-                            if (code.includes('AE-3') && text.includes('AE-3')) { bestNode = item; break; }
-                            if (code.includes('ME ') && text.includes('ME ')) { bestNode = item; break; }
-                            if (code.includes('TECH-57') && text.includes('57')) { bestNode = item; break; }
-                            if (code.includes('TECH_-16') && text.includes('16')) { bestNode = item; break; }
+                            if (codeNorm.includes('AE-1') && text.includes('AE-1')) { bestNode = item; break; }
+                            if (codeNorm.includes('AE-2') && text.includes('AE-2')) { bestNode = item; break; }
+                            if (codeNorm.includes('AE-3') && text.includes('AE-3')) { bestNode = item; break; }
+                            if (codeNorm.includes('ME-') && text.includes('ME ')) { bestNode = item; break; }
+                            if (codeNorm.includes('TECH-57') && text.includes('57')) { bestNode = item; break; }
+                            if (codeNorm.includes('TECH-16') && text.includes('16')) { bestNode = item; break; }
                         }
                     }
                     

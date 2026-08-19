@@ -88,7 +88,7 @@ export default function ReportFeedPage() {
   const handleView = (item) => {
     // If there's a report_id, navigate to the report
     if (item.report_id) {
-       navigate(`/reports/shore?report=${item.report_id}`);
+       navigate(`/reports/shore?open=${item.report_id}`);
     }
   };
 

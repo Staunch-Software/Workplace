@@ -10,7 +10,8 @@
 # VESSEL endpoints (verify) are in a separate file, not implemented here.
 
 from typing import List, Optional
-from uuid import UUID
+from uuid import UUID, uuid4
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -19,8 +20,8 @@ from sqlalchemy import desc, case
 
 from app.core.database import get_db
 from app.api.deps import require_shore, require_any
-from app.models.report import Report, ReportThread, ReportConfig
-from app.schemas.report import ReportOut, ReportListOut, SasUrlOut
+from app.models.report import Report, ReportThread, ReportConfig, ReportEvent, VerifyStatus
+from app.schemas.report import ReportOut, ReportListOut, SasUrlOut, VerifyRequest
 from app.core.blob_storage import generate_read_sas_url, verify_blob_exists
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
@@ -56,11 +57,20 @@ async def list_reports(
 
     # ── VESSEL ROLE: restrict to their assigned vessel(s) only ──
     if current_user.role == 'VESSEL':
-        assigned = getattr(current_user, 'assigned_vessels', [])
+        assigned = getattr(current_user, 'assigned_vessels', None)
+        if assigned is None:
+            # assigned_vessels lookup failed (see deps.get_current_user) --
+            # do NOT silently return [], that's indistinguishable from a
+            # vessel user who genuinely has 0 vessels and would show an
+            # empty inbox with no indication anything went wrong.
+            raise HTTPException(
+                status_code=503,
+                detail="Could not verify vessel assignment. Please retry.",
+            )
         if assigned:
             stmt = stmt.where(Report.vessel_imo.in_(assigned))
         else:
-            # No assigned vessels → return nothing for safety
+            # Genuinely no vessels assigned → return nothing for safety
             return []
 
     # ── FILTERS ──
@@ -114,12 +124,71 @@ async def get_report(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 
-    # Mark shore's unread count as 0 after they open the report
-    if report.unread_shore > 0:
+    # Clear whichever side's unread badge belongs to the viewer's own role.
+    # Shore/Admin opening it clears unread_shore; a vessel user opening their
+    # own report clears unread_vessel. Never clear the other side's count.
+    if current_user.role in ("SHORE", "ADMIN") and report.unread_shore > 0:
         report.unread_shore = 0
+        await db.commit()
+    elif current_user.role == "VESSEL" and report.unread_vessel > 0:
+        report.unread_vessel = 0
         await db.commit()
 
     return report
+
+
+@router.post("/{report_id}/verify", response_model=ReportOut)
+async def verify_report(
+    report_id: UUID,
+    payload: VerifyRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_any),
+):
+    """
+    Marks a report as verified. Called by vessel crew after reviewing a report.
+    """
+    stmt = (
+        select(Report)
+        .where(Report.id == report_id)
+        .options(selectinload(Report.threads))
+        .options(selectinload(Report.attachments))
+    )
+    result = await db.execute(stmt)
+    report = result.scalars().first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    report.verify_status = VerifyStatus.VERIFIED
+    report.verified_by = payload.verified_by
+    report.verified_at = datetime.utcnow()
+    report.updated_at = datetime.utcnow()
+
+    event = ReportEvent(
+        id=uuid4(),
+        vessel_imo=report.vessel_imo,
+        vessel_name=report.vessel_name,
+        report_id=report.id,
+        event_type="VERIFIED",
+        description=f"{report.report_name} was verified by {payload.verified_by}",
+        source="VESSEL",
+        author_name=payload.verified_by,
+        created_at=datetime.utcnow(),
+    )
+    db.add(event)
+
+    await db.commit()
+
+    # Re-query with the same eager-loading as the initial fetch — db.refresh()
+    # would expire the already-loaded threads/attachments relationships and
+    # risk a lazy-load (MissingGreenlet) when the response model serializes them.
+    stmt_reload = (
+        select(Report)
+        .where(Report.id == report_id)
+        .options(selectinload(Report.threads))
+        .options(selectinload(Report.attachments))
+    )
+    result_reload = await db.execute(stmt_reload)
+    return result_reload.scalars().first()
 
 
 @router.get("/{report_id}/pdf", response_model=SasUrlOut)
@@ -139,10 +208,7 @@ async def get_report_pdf_url(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     if not report.attachments:
-        return SasUrlOut(
-            sas_url="https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", 
-            blob_path="dummy.pdf"
-        )
+        raise HTTPException(status_code=404, detail="Attachment not available")
 
     if path:
         # If the frontend requested a specific path, use it (verify it belongs to this report first)
@@ -155,10 +221,12 @@ async def get_report_pdf_url(
         target_path = report.attachments[0].blob_path
 
     if not verify_blob_exists(target_path):
-        return SasUrlOut(
-            sas_url="https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", 
-            blob_path=target_path
-        )
+        # Don't fall back to an external placeholder URL -- if it ever fails
+        # to load (network policy, the third-party host being unreachable,
+        # etc.) the iframe shows a confusing native "Failed to load PDF
+        # document" error. Tell the frontend outright so AttachmentsPanel can
+        # show its own "attachment not available" state instead.
+        raise HTTPException(status_code=404, detail="Attachment not available")
 
     sas_url = generate_read_sas_url(target_path)
     return SasUrlOut(sas_url=sas_url, blob_path=target_path)

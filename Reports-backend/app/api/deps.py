@@ -67,16 +67,26 @@ async def get_current_user(
 
     # ── Inject assigned vessel IMOs from the user_vessel_link table ──
     # The JWT does NOT include assigned_vessels, so we query the DB directly.
-    # This is used by the feed endpoint to restrict VESSEL users to their own vessel.
+    # This is used by list_reports/feed to restrict VESSEL users to their own vessel.
     try:
         link_result = await control_db.execute(
             text("SELECT vessel_imo FROM user_vessel_link WHERE user_id = :uid"),
             {"uid": str(user.id)}
         )
         user.assigned_vessels = [row[0] for row in link_result.fetchall()]
-    except Exception:
-        # If the table doesn't exist or any error, fall back to empty list
-        user.assigned_vessels = []
+    except Exception as e:
+        # IMPORTANT: use None (not []) to mean "lookup failed", distinct from
+        # a VESSEL user who genuinely has zero vessels assigned ([]). Callers
+        # that restrict VESSEL users by assigned_vessels must check for this
+        # sentinel and fail loudly instead of silently returning an empty
+        # list, which used to make a transient error (e.g. control-DB pool
+        # exhaustion -- this pool is deliberately tiny, see database_control.py)
+        # indistinguishable from "you have no vessel assigned".
+        import logging
+        logging.getLogger("deps").error(
+            f"Failed to load assigned_vessels for user {user.id}: {e}"
+        )
+        user.assigned_vessels = None
 
     return user
 

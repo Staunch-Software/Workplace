@@ -161,7 +161,7 @@ export default function ActivityFeedPage() {
 
   const openReport = (id) => {
     if (!id) return;
-    navigate(isVessel ? `/reports/vessel?report=${id}` : `/reports/shore?report=${id}`);
+    navigate(isVessel ? `/reports/vessel?open=${id}` : `/reports/shore?open=${id}`);
   };
 
   return (

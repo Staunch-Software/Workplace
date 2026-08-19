@@ -5,8 +5,11 @@ import ThreadPanel from './ThreadPanel';
 import VesselThreadPanel from './VesselThreadPanel';
 import '../styles/Reports.css';
 
-export default function ReportViewerModal({ report, role, onClose }) {
-  const [isPdfCollapsed, setIsPdfCollapsed] = useState(false);
+export default function ReportViewerModal({ report, role, onClose, focusPane }) {
+  // When opened from a mention notification (focusPane="thread"), collapse
+  // the document pane so the conversation is immediately visible full-width
+  // instead of landing on the default document view.
+  const [isPdfCollapsed, setIsPdfCollapsed] = useState(focusPane === 'thread');
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
 
   if (!report) return null;

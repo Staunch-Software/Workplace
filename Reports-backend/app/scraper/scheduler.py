@@ -28,7 +28,11 @@ async def _scraper_job():
     logger.info("[CRON] SmartPAL scraper job triggered.")
     async with SessionLocal() as db:
         try:
-            await run_scraper(db)
+            # smart_cron=True: only scrapes configs that are actually due
+            # (new / pending / next_due_date reached) instead of all configs
+            # every night, and is required for ReportEvent rows to be created
+            # -- the Activity/Live Feed reads only events written this way.
+            await run_scraper(db, smart_cron=True)
             logger.info("[CRON] Scraper job completed successfully.")
         except Exception as e:
             logger.error(f"[CRON] Scraper job failed: {e}")

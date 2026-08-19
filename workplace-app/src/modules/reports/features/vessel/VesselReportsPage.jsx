@@ -44,9 +44,10 @@ export default function VesselReportsPage() {
   
   const [selectedRow, setSelectedRow] = useState(null); // The report opened in the Modal
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalFocusPane, setModalFocusPane] = useState(undefined); // 'thread' when opened from a mention notification
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["vessel-reports-list"],
     queryFn: () => vesselReportsApi.listReports(),
     refetchInterval: 15000,
@@ -66,6 +67,7 @@ export default function VesselReportsPage() {
         setExpandedFreqs(prev => prev.includes(f) ? prev : [...prev, f]);
         setSelectedReportName(target.report_name);
         setSelectedRow(target);
+        setModalFocusPane(searchParams.get('thread') === 'true' ? 'thread' : undefined);
         setModalOpen(true);
         setSearchParams({}, { replace: true });
       }
@@ -289,6 +291,16 @@ export default function VesselReportsPage() {
 
             {isLoading ? (
               <div className="rt-loading"><span className="rt-spinner"/></div>
+            ) : isError ? (
+              <div className="rt-loading" style={{ flexDirection: 'column', gap: '10px', color: '#dc2626' }}>
+                <span>Couldn't load your reports ({error?.response?.status === 503 ? 'vessel assignment check failed' : 'server error'}). Please retry.</span>
+                <button
+                  onClick={() => refetch()}
+                  style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Retry
+                </button>
+              </div>
             ) : (
               <div className="rt-table-scroll">
                 <table className="rt-data-table">
@@ -361,6 +373,7 @@ export default function VesselReportsPage() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setSelectedRow(r);
+                                  setModalFocusPane(undefined);
                                   setModalOpen(true);
                                 }}
                                 title="View Attachment"
@@ -380,9 +393,10 @@ export default function VesselReportsPage() {
 
           {/* ── Collapsible Modal Viewer ── */}
           {modalOpen && selectedRow && (
-            <ReportViewerModal 
+            <ReportViewerModal
               report={selectedRow}
               role="VESSEL"
+              focusPane={modalFocusPane}
               onClose={() => setModalOpen(false)}
             />
           )}

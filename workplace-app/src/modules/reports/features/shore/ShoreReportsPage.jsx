@@ -55,6 +55,7 @@ export default function ShoreReportsPage() {
   const [sidebarSearch, setSidebarSearch] = useState('');
   const [selectedRow, setSelectedRow] = useState(null); // The report opened in the Modal
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalFocusPane, setModalFocusPane] = useState(undefined); // 'thread' when opened from a mention notification
   const [isVesselDropdownOpen, setIsVesselDropdownOpen] = useState(false);
   const [tooltipData, setTooltipData] = useState({ visible: false, text: '', x: 0, y: 0 });
   const [searchParams, setSearchParams] = useSearchParams();
@@ -100,6 +101,7 @@ export default function ShoreReportsPage() {
         
         setSelectedReportName(target.report_name);
         setSelectedRow(target);
+        setModalFocusPane(searchParams.get('thread') === 'true' ? 'thread' : undefined);
         setModalOpen(true);
         setSearchParams({}, { replace: true });
       }
@@ -476,6 +478,7 @@ export default function ShoreReportsPage() {
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedRow(r);
+                              setModalFocusPane(undefined);
                               setModalOpen(true);
                             }}
                             title="View Attachment"
@@ -493,9 +496,10 @@ export default function ShoreReportsPage() {
 
           {/* ── Collapsible Modal Viewer ── */}
           {modalOpen && selectedRow && (
-            <ReportViewerModal 
+            <ReportViewerModal
               report={selectedRow}
               role="SHORE"
+              focusPane={modalFocusPane}
               onClose={() => setModalOpen(false)}
             />
           )}

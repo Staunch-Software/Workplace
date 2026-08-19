@@ -45,13 +45,13 @@ async def list_notifications(
     current_user=Depends(require_any),
 ):
     """
-    Returns the 50 most recent notifications for the current user.
-    Unread first, then sorted by created_at desc.
+    Returns the 50 most recent notifications for the current user,
+    newest first regardless of read/unread status.
     """
     stmt = (
         select(Notification)
         .where(Notification.user_id == str(current_user.id))
-        .order_by(Notification.is_read.asc(), Notification.created_at.desc())
+        .order_by(Notification.created_at.desc())
         .limit(50)
     )
     result = await db.execute(stmt)

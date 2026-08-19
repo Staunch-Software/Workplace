@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.core.database import get_db
+from app.api.deps import require_shore
 from app.models.report import ReportConfig
 from app.schemas.report import ReportConfigOut, ReportConfigCreate, BulkAssignRequest
 from app.utils.excel import get_default_configs
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/reports/config", tags=["config"])
 
 
 @router.get("", response_model=List[ReportConfigOut])
-async def list_configs(db: AsyncSession = Depends(get_db)):
+async def list_configs(db: AsyncSession = Depends(get_db), current_user=Depends(require_shore)):
     """
     List all report configs for the scraper.
     """
@@ -24,10 +25,21 @@ async def list_configs(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("", response_model=ReportConfigOut)
-async def create_config(config: ReportConfigCreate, db: AsyncSession = Depends(get_db)):
+async def create_config(config: ReportConfigCreate, db: AsyncSession = Depends(get_db), current_user=Depends(require_shore)):
     """
     Create a new report scraper configuration.
     """
+    stmt = select(ReportConfig).where(
+        ReportConfig.vessel_imo == config.vessel_imo,
+        ReportConfig.report_code == config.report_code,
+    )
+    result = await db.execute(stmt)
+    if result.scalars().first():
+        raise HTTPException(
+            status_code=409,
+            detail="A config with this report_code already exists for this vessel.",
+        )
+
     new_config = ReportConfig(
         id=uuid.uuid4(),
         vessel_imo=config.vessel_imo,
@@ -44,14 +56,14 @@ async def create_config(config: ReportConfigCreate, db: AsyncSession = Depends(g
 
 
 @router.post("/bulk-assign")
-async def bulk_assign_configs(req: BulkAssignRequest, db: AsyncSession = Depends(get_db)):
+async def bulk_assign_configs(req: BulkAssignRequest, db: AsyncSession = Depends(get_db), current_user=Depends(require_shore)):
     """
     Bulk assign the 45 default master reports to a specific vessel.
     """
     default_reports = get_default_configs()
     if not default_reports:
-        raise HTTPException(status_code=400, detail="Default reports excel not found or could not be parsed")
-    
+        raise HTTPException(status_code=400, detail="Default reports config not found or could not be parsed")
+
     # Fetch existing configs for this vessel to avoid duplicates
     stmt = select(ReportConfig.report_code).where(ReportConfig.vessel_imo == req.vessel_imo)
     result = await db.execute(stmt)
@@ -79,7 +91,7 @@ async def bulk_assign_configs(req: BulkAssignRequest, db: AsyncSession = Depends
 
 
 @router.delete("/{config_id}", status_code=204)
-async def delete_config(config_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def delete_config(config_id: uuid.UUID, db: AsyncSession = Depends(get_db), current_user=Depends(require_shore)):
     """
     Delete a report config.
     """

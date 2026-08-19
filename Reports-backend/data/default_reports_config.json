@@ -1,0 +1,317 @@
+[
+  {
+    "report_code": "WK-01-WEEKLY_REPORT_REVIEW_REPORT",
+    "report_name": "WEEKLY REPORT REVIEW REPORT",
+    "department": "ENGINE",
+    "frequency": "Weekly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "WK-02-WEEKLY_-_01_-_DECK_WEEKLY_WORK",
+    "report_name": "WEEKLY - 01 - DECK WEEKLY WORKDONE REPORT",
+    "department": "DECK",
+    "frequency": "Weekly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "WK-03-WEEKLY_-_02_-_ENG_WEEKLY_WORKD",
+    "report_name": "WEEKLY - 02 - ENG WEEKLY WORKDONE REPORT",
+    "department": "ENGINE",
+    "frequency": "Weekly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "WK-04-WEEKLY_-_03_-_ELECTRICAL__WEEK",
+    "report_name": "WEEKLY - 03 - ELECTRICAL  WEEKLY WORKDONE REPORT",
+    "department": "ELECTRICAL",
+    "frequency": "Weekly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "WK-05-WEEKLY_-_04__-_DECK_CORROSION",
+    "report_name": "WEEKLY - 04  - DECK CORROSION MAINTENANCE PLAN",
+    "department": "DECK",
+    "frequency": "Weekly",
+    "type": "CORROSION"
+  },
+  {
+    "report_code": "WK-06-WEEKLY_-_05_-_WEEKLY_BUNKER_RE",
+    "report_name": "WEEKLY - 05 - WEEKLY BUNKER REPORT",
+    "department": "ENGINE",
+    "frequency": "Weekly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "WK-07-WEEKLY_-_06_-_BOILER_AND_COOLE",
+    "report_name": "WEEKLY - 06 - BOILER AND COOLER WATER REPORT",
+    "department": "ENGINE",
+    "frequency": "Weekly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "WK-08-TECH_-_57_-_ONBOARD_LO_WEEKLY",
+    "report_name": "TECH - 57 - ONBOARD LO WEEKLY ANALYSIS REPORT",
+    "department": "ENGINE",
+    "frequency": "Weekly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "WK-09-TECH_-_02_-_WEEKLY_PMS_(ONLY_F",
+    "report_name": "TECH - 02 - WEEKLY PMS (ONLY FOR TUFMAX)",
+    "department": "ENGINE",
+    "frequency": "Weekly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "WK-01-MONTHLY_REVIEW_OF_TECHNICAL_RE",
+    "report_name": "MONTHLY REVIEW OF TECHNICAL REPORT",
+    "department": "ENGINE",
+    "frequency": "Weekly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-02-TECH-07_ME_PERFORMANCE_SHEET",
+    "report_name": "TECH-07 ME PERFORMANCE SHEET",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-03-TECH-06_ENGINE_PERFORMANCE_TRE",
+    "report_name": "TECH-06 ENGINE PERFORMANCE TREND",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-04-TECH-08A_SCAVENGE_PORT_INSPECT",
+    "report_name": "TECH-08A SCAVENGE PORT INSPECTION TEMPLATE",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-05-TECH-55_SCRAPE_DOWN_ANALYSIS_T",
+    "report_name": "TECH-55 SCRAPE DOWN ANALYSIS TEST",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-06-TECH-12_AE-1_PERFORMANCE_SHEET",
+    "report_name": "TECH-12 AE-1 PERFORMANCE SHEET",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-07-TECH-12_AE-2_PERFORMANCE_SHEET",
+    "report_name": "TECH-12 AE-2 PERFORMANCE SHEET",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-08-TECH-12_AE-3_PERFORMANCE_SHEET",
+    "report_name": "TECH-12 AE-3 PERFORMANCE SHEET",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-09-TECH-13_AUXILIARY_ENGINE_PERFO",
+    "report_name": "TECH-13 AUXILIARY ENGINE PERFORMANCE TREND",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-10-TECH-56_MONTHLY_LO_CONSUMPTION",
+    "report_name": "TECH-56 MONTHLY LO CONSUMPTION REPORT",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-11-TECH-11_CHEMICAL_CONSUMPTION_R",
+    "report_name": "TECH-11 CHEMICAL CONSUMPTION RECORD",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-12-WATERPROOF_REPORT_-_BOILER_AND",
+    "report_name": "WATERPROOF REPORT - BOILER AND COOLING WATER TEST",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-13-MONTHLY_-_05-_LIST_OF_PRECISIO",
+    "report_name": "MONTHLY - 05- LIST OF PRECISION TOOLS AND EQUIPMENT",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-14-TECH-10_VIBRATION_ANALYSIS_REP",
+    "report_name": "TECH-10 VIBRATION ANALYSIS REPORT",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-15-MONTHLY_-_04_-_MONTHLY_PARAMET",
+    "report_name": "MONTHLY - 04 - MONTHLY PARAMETERS",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-16-MONTHLY_-_03__-_ENGINE_MONTH_E",
+    "report_name": "MONTHLY - 03  - ENGINE MONTH END REPORT REVIEW",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "MO-17-OPR-06_MONTHLY_PAINT_CONSUMPTI",
+    "report_name": "OPR-06 MONTHLY PAINT CONSUMPTION REPORT",
+    "department": "DECK",
+    "frequency": "Monthly",
+    "type": "CORROSION"
+  },
+  {
+    "report_code": "MO-18-TECH-01_CORROSION_MAINTENANCE",
+    "report_name": "TECH-01 CORROSION MAINTENANCE TOOL",
+    "department": "DECK",
+    "frequency": "Monthly",
+    "type": "CORROSION"
+  },
+  {
+    "report_code": "MO-19-TECH-48_ICCP_LOG",
+    "report_name": "TECH-48 ICCP LOG",
+    "department": "ELECTRICAL",
+    "frequency": "Monthly",
+    "type": "ELECTRICAL"
+  },
+  {
+    "report_code": "MO-20-TECH-49_MGPS_LOG",
+    "report_name": "TECH-49 MGPS LOG",
+    "department": "ELECTRICAL",
+    "frequency": "Monthly",
+    "type": "ELECTRICAL"
+  },
+  {
+    "report_code": "MO-21-MONTHLY_-_06_-_BATTERY_LOG",
+    "report_name": "MONTHLY - 06 - BATTERY LOG",
+    "department": "ELECTRICAL",
+    "frequency": "Monthly",
+    "type": "ELECTRICAL"
+  },
+  {
+    "report_code": "MO-22-OPT_-_BCR_-_11_-_TANK_SOUNDING",
+    "report_name": "OPT - BCR - 11 - TANK SOUNDING REPORT",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "MARPOL"
+  },
+  {
+    "report_code": "MO-23-MONTHLY_-_11_-_OIL_RECORD_BOOK",
+    "report_name": "MONTHLY - 11 - OIL RECORD BOOK",
+    "department": "MARPOL",
+    "frequency": "Monthly",
+    "type": "MARPOL"
+  },
+  {
+    "report_code": "MO-24-TECH-04_MONTHLY_MARPOL_REPORT",
+    "report_name": "TECH-04 MONTHLY MARPOL REPORT",
+    "department": "MARPOL",
+    "frequency": "Monthly",
+    "type": "MARPOL"
+  },
+  {
+    "report_code": "MO-25-SAF_24_-_GARBAGE_RECORD_BOOK",
+    "report_name": "SAF 24 - GARBAGE RECORD BOOK",
+    "department": "MARPOL",
+    "frequency": "Monthly",
+    "type": "MARPOL"
+  },
+  {
+    "report_code": "MO-26-OPR_26_-_BALLAST_RECORD_BOOK",
+    "report_name": "OPR 26 - BALLAST RECORD BOOK",
+    "department": "MARPOL",
+    "frequency": "Monthly",
+    "type": "MARPOL"
+  },
+  {
+    "report_code": "MO-27-MONTHLY_-_09_-_BWTS_OPERATIONA",
+    "report_name": "MONTHLY - 09 - BWTS OPERATIONAL DATA DUMP RECORD",
+    "department": "MARPOL",
+    "frequency": "Monthly",
+    "type": "MARPOL"
+  },
+  {
+    "report_code": "MO-28-TECH-38A_SEAL_INVENTORY_FORM",
+    "report_name": "TECH-38A SEAL INVENTORY FORM",
+    "department": "ENGINE",
+    "frequency": "Monthly",
+    "type": "MARPOL"
+  },
+  {
+    "report_code": "WK-01-QUARTERLY_REVIEW_OF_TECHNICAL",
+    "report_name": "QUARTERLY REVIEW OF TECHNICAL REPORT",
+    "department": "ENGINE",
+    "frequency": "Weekly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "QT-02-QUARTER_-_01_-_VESSEL_CONDITIO",
+    "report_name": "QUARTER - 01 - VESSEL CONDITION REPORT-DECK",
+    "department": "DECK",
+    "frequency": "Quarterly",
+    "type": "CORROSION"
+  },
+  {
+    "report_code": "QT-03-QUARTER_-_02_-_VESSEL_CONDITIO",
+    "report_name": "QUARTER - 02 - VESSEL CONDITION REPORT-ENGINE",
+    "department": "DECK",
+    "frequency": "Quarterly",
+    "type": "CORROSION"
+  },
+  {
+    "report_code": "QT-04-TECH-15_AE-1_CRANKWEB_DEFLECTI",
+    "report_name": "TECH-15 AE-1 CRANKWEB DEFLECTION REPORT",
+    "department": "ENGINE",
+    "frequency": "Quarterly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "QT-05-TECH-15_AE-2_CRANKWEB_DEFLECTI",
+    "report_name": "TECH-15 AE-2 CRANKWEB DEFLECTION REPORT",
+    "department": "ENGINE",
+    "frequency": "Quarterly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "QT-06-TECH-15_AE-3_CRANKWEB_DEFLECTI",
+    "report_name": "TECH-15 AE-3 CRANKWEB DEFLECTION REPORT",
+    "department": "ENGINE",
+    "frequency": "Quarterly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "QT-07-TECH_-16_MAIN_ENGINE_BEARING_C",
+    "report_name": "TECH -16 MAIN ENGINE BEARING CLEARANCES",
+    "department": "ENGINE",
+    "frequency": "Quarterly",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "QT-08-TECH-15_ME_CRANKWEB_DEFLECTION",
+    "report_name": "TECH-15 ME CRANKWEB DEFLECTION REPORT",
+    "department": "ENGINE",
+    "frequency": "Quarterly",
+    "type": "TECHNICAL"
+  }
+]

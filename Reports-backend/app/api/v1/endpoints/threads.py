@@ -14,12 +14,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-import re
 
 from app.core.database import get_db
 from app.core.database_control import ControlSession
 from app.api.deps import require_shore, require_any
 from app.models.report import Report, ReportThread, ReportThreadAttachment, ReportEvent
+from app.models.notification import Notification
 from app.schemas.report import ThreadCreate, ThreadOut, SasUrlOut
 from app.core.blob_storage import generate_read_sas_url, generate_write_sas_url
 
@@ -93,49 +93,75 @@ async def post_thread(
             )
             db.add(db_att)
 
-    # Increment the vessel's unread count
-    report.unread_vessel += 1
+    # Bump the OTHER side's unread count: shore replies notify the vessel,
+    # vessel replies notify shore. This endpoint is shared by both clients.
+    if current_user.role == "VESSEL":
+        report.unread_shore += 1
+    else:
+        report.unread_vessel += 1
     report.updated_at = datetime.utcnow()
 
     await db.commit()
     await db.refresh(thread)
 
     # ── Mention Activity Events ──────────────────────────────────────────────────
-    if '@' in payload.body:
+    # The frontend's @mention picker already resolves real user ids into
+    # payload.tagged_user_ids (see ThreadPanel.jsx selectMention()), so we use
+    # those directly instead of re-parsing the free-text body: a body-regex
+    # can't reliably tell where a "@Full Name" mention ends and the rest of
+    # the sentence begins (e.g. "@Super Admin can you check this" has no
+    # delimiter after the name), so it silently failed to match real users.
+    if payload.tagged_user_ids:
         try:
             from app.core.database_control import ControlSession
             from sqlalchemy import text as sql_text
 
-            # Extract unique @mentions from the message body
-            # e.g. "@Super Admin" → ["Super Admin"]
-            mentions = set(re.findall(r'@([\w ]+?)(?=[^a-zA-Z ]|$)', payload.body))
+            async with ControlSession() as ctrl_db:
+                users_res = await ctrl_db.execute(sql_text("SELECT id, full_name FROM users WHERE is_active = true"))
+                users_list = users_res.fetchall()
 
-            if mentions:
-                async with ControlSession() as ctrl_db:
-                    users_res = await ctrl_db.execute(sql_text("SELECT id, full_name FROM users WHERE is_active = true"))
-                    users_list = users_res.fetchall()
+            # Build id→name map for quick lookup
+            id_to_name = {str(row[0]): row[1] for row in users_list}
 
-                # Build name→id map for quick lookup
-                name_to_id = {row[1]: str(row[0]) for row in users_list if row[1]}
+            seen_uids = set()
+            for tagged_id in payload.tagged_user_ids:
+                uid = str(tagged_id)
+                if uid == str(current_user.id) or uid in seen_uids:
+                    continue
+                full_name = id_to_name.get(uid)
+                if not full_name:
+                    continue
+                seen_uids.add(uid)
+                event = ReportEvent(
+                    id=uuid4(),
+                    vessel_imo=report.vessel_imo,
+                    vessel_name=report.vessel_name,
+                    report_id=report.id,
+                    event_type="MENTION",
+                    description=f"{current_user.full_name} mentioned @{full_name} in {report.report_name}",
+                    source="SYSTEM",
+                    author_name=current_user.full_name,
+                    created_at=datetime.utcnow()
+                )
+                db.add(event)
 
-                seen_uids = set()
-                for mention in mentions:
-                    mention = mention.strip()
-                    uid = name_to_id.get(mention)
-                    if uid and uid != str(current_user.id) and uid not in seen_uids:
-                        seen_uids.add(uid)
-                        event = ReportEvent(
-                            id=uuid4(),
-                            vessel_imo=report.vessel_imo,
-                            vessel_name=report.vessel_name,
-                            report_id=report.id,
-                            event_type="MENTION",
-                            description=f"{current_user.full_name} mentioned @{mention} in {report.report_name}",
-                            source="SYSTEM",
-                            author_name=current_user.full_name,
-                            created_at=datetime.utcnow()
-                        )
-                        db.add(event)
+                # Per-recipient notification for the bell/Notifications Feed
+                # (Notification is a separate table from ReportEvent -- the
+                # feed above shows this to everyone watching the vessel, this
+                # is what actually pings the specific mentioned user).
+                notification = Notification(
+                    id=uuid4(),
+                    user_id=uid,
+                    type="mention",
+                    title=f"{current_user.full_name} mentioned you — {report.vessel_name}",
+                    body=payload.body[:300],
+                    report_id=report.id,
+                    thread_id=thread.id,
+                    is_read=False,
+                    created_at=datetime.utcnow(),
+                )
+                db.add(notification)
+            if seen_uids:
                 await db.commit()
         except Exception as e:
             import logging

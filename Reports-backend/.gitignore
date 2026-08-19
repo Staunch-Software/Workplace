@@ -13,6 +13,9 @@ __pycache__/
 *.db
 *.sqlite3
 
+# Cron lock file (app/scraper/cron_smart_scrape.py)
+cron_smart_scrape.lock
+
 # Playwright browser binaries
 .playwright-browsers/
 

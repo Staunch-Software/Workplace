@@ -1,9 +1,11 @@
+import json
 import os
 import openpyxl
 
 from app.core.config import settings
 
 EXCEL_PATH = settings.REPORT_EXCEL_PATH
+DEFAULT_REPORTS_JSON_PATH = settings.DEFAULT_REPORTS_JSON_PATH
 def _make_entry(sr, title, rtype, freq) -> dict:
     title = str(title).strip()
     rtype = str(rtype).strip().upper() if rtype else "TECHNICAL"
@@ -44,7 +46,27 @@ def _make_entry(sr, title, rtype, freq) -> dict:
 
 def get_default_configs() -> list[dict]:
     """
+    Return the 45 master report configs used by "Assign 45 Defaults".
+
+    Reads from a static JSON snapshot (DEFAULT_REPORTS_JSON_PATH) instead of
+    parsing the Excel workbook on every request. The snapshot was generated
+    once from the Reports sheet via generate_default_configs_from_excel()
+    below, so report_code values are unchanged and existing configs/reports
+    keyed on them keep matching.
+    """
+    if not os.path.exists(DEFAULT_REPORTS_JSON_PATH):
+        return []
+
+    with open(DEFAULT_REPORTS_JSON_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def generate_default_configs_from_excel() -> list[dict]:
+    """
     Parse the Reports sheet and return the 45 master reports.
+
+    Offline utility only — used to (re)generate DEFAULT_REPORTS_JSON_PATH
+    when the source Excel changes. Not called on the request path.
     """
     if not os.path.exists(EXCEL_PATH):
         return []

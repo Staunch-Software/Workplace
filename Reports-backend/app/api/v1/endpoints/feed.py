@@ -47,9 +47,22 @@ async def get_feed(
         stmt = stmt.where(ReportEvent.vessel_imo == vessel_imo)
     # If the user is a VESSEL role, they can only see their own vessel's feed
     elif current_user.role == 'VESSEL':
-        assigned = getattr(current_user, 'assigned_vessels', [])
+        assigned = getattr(current_user, 'assigned_vessels', None)
+        if assigned is None:
+            # assigned_vessels lookup failed (see deps.get_current_user).
+            # Do NOT fall through to "no filter" -- that would leak every
+            # vessel's feed to this vessel user on a transient DB error.
+            raise HTTPException(
+                status_code=503,
+                detail="Could not verify vessel assignment. Please retry.",
+            )
         if assigned:
             stmt = stmt.where(ReportEvent.vessel_imo.in_(assigned))
+        else:
+            # Genuinely zero vessels assigned -> show nothing (previously
+            # this fell through to no filter at all, leaking every vessel's
+            # feed to a vessel user with no assignment).
+            stmt = stmt.where(ReportEvent.vessel_imo.in_([]))
 
     if event_type:
         stmt = stmt.where(ReportEvent.event_type == event_type)

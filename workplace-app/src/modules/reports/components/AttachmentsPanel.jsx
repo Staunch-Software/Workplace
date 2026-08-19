@@ -4,6 +4,7 @@
 // Supports multiple attachments from comma-separated blob_path.
 import React, { useState, useEffect } from 'react';
 import { FileText, Paperclip, AlertCircle, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { reportsApi } from '../api/reportsApi';
 
 function getFilename(path) {
@@ -25,10 +26,16 @@ function getFilename(path) {
   return cleanName.replace(/_/g, ' ').trim();
 }
 
+function isSpreadsheetFile(path) {
+  if (!path) return false;
+  const lower = path.toLowerCase();
+  return lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.xlsm') || lower.endsWith('.csv');
+}
+
 function isBrowserRenderable(path) {
   if (!path) return false;
   const lower = path.toLowerCase();
-  return lower.endsWith('.pdf') || lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.gif') || lower.endsWith('.txt');
+  return lower.endsWith('.pdf') || lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.gif') || lower.endsWith('.txt') || isSpreadsheetFile(path);
 }
 
 function isImageFile(path) {
@@ -42,6 +49,8 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
   const [sasUrl, setSasUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [sheetTables, setSheetTables] = useState(null); // [{ name, html }] for spreadsheet preview
+  const [activeSheetIdx, setActiveSheetIdx] = useState(0);
 
 
   // Load SAS URL whenever reportId or activeIdx changes
@@ -50,6 +59,8 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
     setLoading(true);
     setError(null);
     setSasUrl(null);
+    setSheetTables(null);
+    setActiveSheetIdx(0);
 
     const path = attachments[activeIdx]?.blob_path || null;
     if (path && path.startsWith('MISSING:')) {
@@ -64,6 +75,39 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
       .catch(e => setError(e.response?.data?.detail || 'Could not load PDF.'))
       .finally(() => setLoading(false));
   }, [reportId, activeIdx]); // eslint-disable-line
+
+  // Once we have a SAS URL for a spreadsheet attachment, fetch and parse it into HTML tables
+  useEffect(() => {
+    const fileName = attachments[activeIdx]?.file_name;
+    if (!sasUrl || !isSpreadsheetFile(fileName)) return;
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    fetch(sasUrl)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.arrayBuffer();
+      })
+      .then(buf => {
+        if (cancelled) return;
+        const wb = XLSX.read(buf, { type: 'array' });
+        const tables = wb.SheetNames.map(name => ({
+          name,
+          html: XLSX.utils.sheet_to_html(wb.Sheets[name], { id: undefined, editable: false }),
+        }));
+        setSheetTables(tables);
+      })
+      .catch(() => {
+        if (!cancelled) setError('Could not preview this spreadsheet.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [sasUrl, activeIdx]); // eslint-disable-line
 
   if (isCollapsed) {
     return (
@@ -86,7 +130,7 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
         <ChevronUp size={16} className="rt-panel-chevron" />
       </div>
 
-      <div style={{ flex: 1, overflow: 'hidden', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ flex: 1, overflow: 'hidden', padding: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {!attachments || attachments.length === 0 ? (
           <div className="rt-attach-empty">
             <Paperclip size={36} strokeWidth={1.2} color="#cbd5e1" />
@@ -159,12 +203,41 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
                     </div>
                   ) : isImageFile(attachments[activeIdx]?.file_name) ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', overflow: 'hidden', padding: '16px' }}>
-                      <img 
-                        src={sasUrl} 
+                      <img
+                        src={sasUrl}
                         alt={attachments[activeIdx]?.file_name}
                         style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '4px' }}
                       />
                     </div>
+                  ) : isSpreadsheetFile(attachments[activeIdx]?.file_name) ? (
+                    !sheetTables ? (
+                      <div className="rt-attach-loading">
+                        <span className="rt-spinner" />
+                        <span>Loading spreadsheet...</span>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                        {sheetTables.length > 1 && (
+                          <div className="rt-attach-tabs" style={{ flexShrink: 0 }}>
+                            {sheetTables.map((s, idx) => (
+                              <button
+                                key={s.name}
+                                className={`rt-attach-tab ${activeSheetIdx === idx ? 'active' : ''}`}
+                                onClick={() => setActiveSheetIdx(idx)}
+                                title={s.name}
+                              >
+                                <span>{s.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <div
+                          className="rt-attach-sheet-table"
+                          style={{ flex: 1, overflow: 'auto', background: '#fff', padding: '8px' }}
+                          dangerouslySetInnerHTML={{ __html: sheetTables[activeSheetIdx]?.html || '' }}
+                        />
+                      </div>
+                    )
                   ) : (
                     <iframe
                       key={sasUrl}
