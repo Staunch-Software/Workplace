@@ -1089,6 +1089,46 @@ async def _save_report(db: AsyncSession, data: dict):
                     )
                     db.add(event)
                     logger.info(f"Created {event_type} feed event for vessel {data['vessel_imo']}")
+
+                    # A MISSING_REPORT event also pings the bell/Notifications
+                    # Feed for whoever is actually responsible for this vessel's
+                    # reports, not just the passive Activity Feed. SHORE/Admin
+                    # already see missing reports surfaced at the top of their
+                    # main inbox (sorted by scrape_status=FAILED), so this is
+                    # scoped to the vessel's own crew.
+                    if event_type == "MISSING_REPORT":
+                        try:
+                            from app.core.database_control import ControlSession
+                            from app.models.notification import Notification
+                            from sqlalchemy import text as sql_text
+
+                            async with ControlSession() as ctrl_db:
+                                users_res = await ctrl_db.execute(
+                                    sql_text(
+                                        "SELECT u.id FROM users u "
+                                        "JOIN user_vessel_link uvl ON uvl.user_id = u.id "
+                                        "WHERE uvl.vessel_imo = :imo AND u.is_active = true"
+                                    ),
+                                    {"imo": data["vessel_imo"]}
+                                )
+                                recipient_ids = [row[0] for row in users_res.fetchall()]
+
+                            for uid in recipient_ids:
+                                db.add(Notification(
+                                    id=uuid4(),
+                                    user_id=str(uid),
+                                    type="missing_report",
+                                    title=f"Missing report — {data.get('vessel_name', data['vessel_imo'])}",
+                                    body=desc,
+                                    report_id=new_report.id,
+                                    thread_id=None,
+                                    is_read=False,
+                                    created_at=datetime.utcnow(),
+                                ))
+                            if recipient_ids:
+                                logger.info(f"Created {len(recipient_ids)} missing-report notification(s) for vessel {data['vessel_imo']}")
+                        except Exception as e:
+                            logger.warning(f"Failed to create missing-report notifications: {e}")
                 except Exception as e:
                     logger.warning(f"Failed to create feed event: {e}")
 
