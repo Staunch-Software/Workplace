@@ -13,8 +13,8 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 // ── API helpers ──────────────────────────────────────────────────────────────
-const BASE_URL = 'http://localhost:8006/api/v1'; // local dev
-// const BASE_URL = '/reports/api/v1';                 // production (Nginx proxy)
+// const BASE_URL = 'http://localhost:8006/api/v1'; // local dev
+const BASE_URL = '/reports/api/v1';                 // production (Nginx proxy)
 
 function getToken() {
   return (
