@@ -11,7 +11,8 @@
 
 from typing import List, Optional
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, date
+import enum
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -19,12 +20,41 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import desc, case
 
 from app.core.database import get_db
+from app.core.config import settings
+from app.models.sync import SyncQueue
 from app.api.deps import require_shore, require_any
 from app.models.report import Report, ReportThread, ReportConfig, ReportEvent, VerifyStatus
 from app.schemas.report import ReportOut, ReportListOut, SasUrlOut, VerifyRequest
 from app.core.blob_storage import generate_read_sas_url, verify_blob_exists
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
+
+
+def _should_sync() -> bool:
+    """True only on a vessel instance (STORAGE_MODE=offline). No-op on shore."""
+    return settings.is_offline_vessel
+
+
+def _json_safe(value):
+    """Coerces ORM column values (datetime, UUID, Enum) into JSONB-storable types."""
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, enum.Enum):
+        return value.value
+    return value
+
+
+def _enqueue_sync(db: AsyncSession, entity_type: str, entity_id, operation: str, payload: dict):
+    db.add(SyncQueue(
+        entity_type=entity_type,
+        entity_id=entity_id,
+        operation=operation,
+        payload={k: _json_safe(v) for k, v in payload.items()},
+        origin="VESSEL",
+        status="PENDING",
+    ))
 
 
 @router.get("", response_model=List[ReportListOut])
@@ -175,6 +205,14 @@ async def verify_report(
         created_at=datetime.utcnow(),
     )
     db.add(event)
+
+    if _should_sync():
+        _enqueue_sync(db, "report", report.id, "UPDATE", {
+            c.name: getattr(report, c.name) for c in report.__table__.columns
+        })
+        _enqueue_sync(db, "report_event", event.id, "CREATE", {
+            c.name: getattr(event, c.name) for c in event.__table__.columns
+        })
 
     await db.commit()
 

@@ -15,6 +15,7 @@ passlib[bcrypt]>=1.7.4
 
 # Azure Blob Storage
 azure-storage-blob>=12.22.0
+azure-identity>=1.17.1
 
 # Playwright (for SmartPAL scraper)
 playwright>=1.62.0

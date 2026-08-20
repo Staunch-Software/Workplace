@@ -9,7 +9,8 @@
 #   POST /reports/{id}/threads        -> SHORE, ADMIN (post a message)
 
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, date
+import enum
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -17,6 +18,8 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.database_control import ControlSession
+from app.core.config import settings
+from app.models.sync import SyncQueue
 from app.api.deps import require_shore, require_any
 from app.models.report import Report, ReportThread, ReportThreadAttachment, ReportEvent
 from app.models.notification import Notification
@@ -25,6 +28,33 @@ from app.core.blob_storage import generate_read_sas_url, generate_write_sas_url
 
 
 router = APIRouter(prefix="/reports", tags=["Threads"])
+
+
+def _should_sync() -> bool:
+    """True only on a vessel instance (STORAGE_MODE=offline). No-op on shore."""
+    return settings.is_offline_vessel
+
+
+def _json_safe(value):
+    from uuid import UUID as _UUID
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, _UUID):
+        return str(value)
+    if isinstance(value, enum.Enum):
+        return value.value
+    return value
+
+
+def _enqueue_sync(db: AsyncSession, entity_type: str, entity_id, operation: str, payload: dict):
+    db.add(SyncQueue(
+        entity_type=entity_type,
+        entity_id=entity_id,
+        operation=operation,
+        payload={k: _json_safe(v) for k, v in payload.items()},
+        origin="VESSEL",
+        status="PENDING",
+    ))
 
 
 @router.get("/{report_id}/threads", response_model=list[ThreadOut])
@@ -78,8 +108,9 @@ async def post_thread(
         created_at=datetime.utcnow(),
     )
     db.add(thread)
-    
+
     # Process attachments
+    thread_attachments = []
     if hasattr(payload, 'attachments') and payload.attachments:
         for att in payload.attachments:
             db_att = ReportThreadAttachment(
@@ -92,6 +123,7 @@ async def post_thread(
                 created_at=datetime.utcnow()
             )
             db.add(db_att)
+            thread_attachments.append(db_att)
 
     # Bump the OTHER side's unread count: shore replies notify the vessel,
     # vessel replies notify shore. This endpoint is shared by both clients.
@@ -100,6 +132,18 @@ async def post_thread(
     else:
         report.unread_vessel += 1
     report.updated_at = datetime.utcnow()
+
+    if _should_sync():
+        _enqueue_sync(db, "report_thread", thread.id, "CREATE", {
+            c.name: getattr(thread, c.name) for c in thread.__table__.columns
+        })
+        for db_att in thread_attachments:
+            _enqueue_sync(db, "report_thread_attachment", db_att.id, "CREATE", {
+                c.name: getattr(db_att, c.name) for c in db_att.__table__.columns
+            })
+        _enqueue_sync(db, "report", report.id, "UPDATE", {
+            c.name: getattr(report, c.name) for c in report.__table__.columns
+        })
 
     await db.commit()
     await db.refresh(thread)
