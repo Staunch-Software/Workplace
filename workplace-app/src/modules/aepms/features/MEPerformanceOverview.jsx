@@ -31,6 +31,28 @@ import PerformanceNav from "./PerformanceNav";
 import AEPerformanceOverview from "./AEPerformanceOverview";
 import Performance from "./UnifiedPerformance.jsx";
 
+// Runs `fn` over `items` with at most `limit` calls in flight at once.
+// Used to avoid firing one DB request per vessel simultaneously, which can
+// exhaust the backend's connection pool on fleets with many vessels.
+async function mapWithConcurrencyLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex++;
+      results[currentIndex] = await fn(items[currentIndex], currentIndex);
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(limit, items.length) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+  return results;
+}
+
 // --- CONSTANTS ---
 const COLORS = {
   critical: "#ef4444",
@@ -1274,7 +1296,7 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
   const fetchAlertHistory = async (vessels) => {
     const historyMap = {};
     const monthBuckets = getLast12Months();
-    const promises = vessels.map(async (v) => {
+    await mapWithConcurrencyLimit(vessels, 4, async (v) => {
       try {
         const imo = v.imo_number || v.imo;
         const response = await axiosAepms.getMEAlertHistory(imo, 60);
@@ -1376,7 +1398,6 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
         };
       }
     });
-    await Promise.all(promises);
     setAlertHistory(historyMap);
   };
 
