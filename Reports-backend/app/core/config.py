@@ -2,11 +2,22 @@
 import os
 from pydantic_settings import BaseSettings
 from urllib.parse import quote_plus
+from enum import Enum
+
+
+class StorageMode(str, Enum):
+    OFFLINE = "offline"  # Vessel deployment
+    ONLINE = "online"    # Shore/cloud deployment
 
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "SmartPAL Report Tracker"
     API_V1_STR: str = "/api/v1"
+
+    # Defaults to ONLINE (shore) so existing deployments are unaffected
+    # unless STORAGE_MODE=offline is explicitly set in .env for a vessel
+    # instance.
+    STORAGE_MODE: StorageMode = StorageMode.ONLINE
 
     # Shared JWT secret with workplace-backend
     SECRET_KEY: str
@@ -45,10 +56,34 @@ class Settings(BaseSettings):
     # the Excel workbook on every request) avoids re-parsing overhead/failures.
     DEFAULT_REPORTS_JSON_PATH: str = "./data/default_reports_config.json"
 
+    # --- NETWORK / SYNC (vessel <-> shore, same pattern as Drs-backend) ---
+    # URL of the shore Reports-backend to check connectivity from a vessel instance
+    CLOUD_HEALTH_URL: str = "https://workplace.ozellar.com/reports/health"
+    NETWORK_TIMEOUT_SECONDS: float = 3.0
+    SYNC_RETRY_INTERVAL: int = 10
+
+    CLOUD_BASE_URL: str = "https://workplace.ozellar.com/reports/api/v1"
+    MAX_SYNC_RETRIES: int = 5
+    SYNC_BATCH_SIZE: int = 50
+    SYNC_API_KEY: str = "change-me-in-production"
+    VESSEL_IMO: str = ""
+
+    # Cloud blob account used for local (Azurite) -> cloud blob promotion
+    # during sync, mirroring Drs-backend's _handle_blob_upload.
+    CLOUD_STORAGE_ACCOUNT_NAME: str = "deploymentvmstorage"
+    CLOUD_AZURE_CONTAINER_NAME: str = "smartpal-reports"
+    AZURE_TENANT_ID: str = ""
+    AZURE_CLIENT_ID: str = ""
+    AZURE_CLIENT_SECRET: str = ""
+
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
         encoded_password = quote_plus(self.DB_PASSWORD)
         return f"postgresql+asyncpg://{self.DB_USER}:{encoded_password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+
+    @property
+    def is_offline_vessel(self) -> bool:
+        return self.STORAGE_MODE == StorageMode.OFFLINE
 
     class Config:
         env_file = os.environ.get("ENV_FILE", ".env")
@@ -57,4 +92,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-print("--- REPORT TRACKER BACKEND STARTING (SHORE MODE) ---")
+print(f"--- REPORT TRACKER BACKEND STARTING ({settings.STORAGE_MODE.upper()} MODE) ---")

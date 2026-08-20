@@ -7,6 +7,8 @@ from app.core.database import init_models, engine
 from app.core.database_control import engine_control
 from app.core.blob_storage import configure_blob
 from app.api.v1.api import api_router
+from app.core.config import settings
+from app.services.sync_worker import start_background_sync
 
 
 @asynccontextmanager
@@ -26,6 +28,13 @@ async def lifespan(app: FastAPI):
             print(f"[WARN] Blob config failed (non-fatal): {e}")
 
     asyncio.create_task(_blob_init())
+
+    # 3. Vessel-only background sync worker (pushes queued local changes to
+    # shore, pulls shore changes down). No-op on shore, where STORAGE_MODE
+    # defaults to "online".
+    if settings.is_offline_vessel:
+        asyncio.create_task(start_background_sync())
+        print("Report Tracker Sync Worker started in background (vessel mode).")
 
     # NOTE: Scraping is triggered externally via an OS-level cron job running
     # app/scraper/cron_smart_scrape.py (smart_cron=True), NOT by an in-process

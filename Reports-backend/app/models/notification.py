@@ -26,3 +26,4 @@ class Notification(Base):
     thread_id  = Column(UUID(as_uuid=True), nullable=True)         # linked thread (optional)
     is_read    = Column(Boolean,     nullable=False, default=False)
     created_at = Column(DateTime,    default=datetime.utcnow)
+    updated_at = Column(DateTime,    default=datetime.utcnow, onupdate=datetime.utcnow)

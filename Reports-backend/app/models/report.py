@@ -80,6 +80,7 @@ class ReportThread(Base):
     author_role = Column(String(20),  nullable=False)   # SHORE / VESSEL / ADMIN
     body        = Column(Text, nullable=False)
     created_at  = Column(DateTime, default=datetime.utcnow)
+    updated_at  = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     report = relationship("Report", back_populates="threads")
     attachments = relationship(
@@ -98,6 +99,7 @@ class ReportThreadAttachment(Base):
     content_type = Column(String(100), nullable=True)
     blob_path    = Column(String(1000), nullable=False)
     created_at   = Column(DateTime, default=datetime.utcnow)
+    updated_at   = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     thread = relationship("ReportThread", back_populates="attachments")
 
@@ -125,6 +127,7 @@ class ReportAttachment(Base):
     file_name   = Column(String(500), nullable=False)
     blob_path   = Column(String(1000), nullable=False)
     created_at  = Column(DateTime, default=datetime.utcnow)
+    updated_at  = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     report = relationship("Report", back_populates="attachments")
 
@@ -140,5 +143,6 @@ class ReportEvent(Base):
     source        = Column(String(50), nullable=True)    # SYSTEM, VESSEL, SHORE
     author_name   = Column(String(150), nullable=True)   # Name of person or 'System'
     created_at    = Column(DateTime, default=datetime.utcnow)
+    updated_at    = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     report = relationship("Report", backref="events")
