@@ -70,10 +70,11 @@ async def get_changes(
     db: AsyncSession = Depends(get_db),
 ):
     """Return all report tracker records changed since the given timestamp."""
-    if since.tzinfo is None:
-        since = since.replace(tzinfo=timezone.utc)
-    else:
-        since = since.astimezone(timezone.utc)
+    # Report Tracker's DateTime columns are naive (no timezone=True), unlike
+    # Drs-backend's -- normalize to a naive UTC datetime before querying, or
+    # asyncpg raises a type mismatch comparing aware vs. naive timestamps.
+    if since.tzinfo is not None:
+        since = since.astimezone(timezone.utc).replace(tzinfo=None)
 
     models = {
         "reports": Report,

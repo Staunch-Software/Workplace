@@ -1,4 +1,5 @@
 # app/main.py
+import logging
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +10,16 @@ from app.core.blob_storage import configure_blob
 from app.api.v1.api import api_router
 from app.core.config import settings
 from app.services.sync_worker import start_background_sync
+
+# Without this, the logger.info/warning/error calls in network_service.py,
+# sync_service.py, sync_processor.py and sync_worker.py are silently
+# swallowed -- nothing attaches a handler by default, so sync failures
+# (auth errors, missing columns, etc.) never show up in the console or in
+# the NSSM-redirected log file. This makes them visible.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 
 @asynccontextmanager
