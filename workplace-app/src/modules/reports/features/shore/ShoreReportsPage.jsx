@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { reportsApi } from '../../api/reportsApi';
 import ReportsNavbar from '../../components/ReportsNavbar';
@@ -56,6 +56,8 @@ export default function ShoreReportsPage() {
   const [selectedRow, setSelectedRow] = useState(null); // The report opened in the Modal
   const [modalOpen, setModalOpen] = useState(false);
   const [modalFocusPane, setModalFocusPane] = useState(undefined); // 'thread' when opened from a mention notification
+  const [highlightRowId, setHighlightRowId] = useState(null); // Row to flash/scroll to when opened from a notification
+  const skipAutoSelectRef = useRef(false); // set while a notification is choosing the vessel/report, to stop auto-select from overriding it
   const [isVesselDropdownOpen, setIsVesselDropdownOpen] = useState(false);
   const [tooltipData, setTooltipData] = useState({ visible: false, text: '', x: 0, y: 0 });
   const [searchParams, setSearchParams] = useSearchParams();
@@ -87,26 +89,41 @@ export default function ShoreReportsPage() {
   });
   const reports = Array.isArray(rawReports) ? rawReports : [];
 
-  // Handle ?open= param
+  // Handle ?open= param — a notification click should land on the correct
+  // report row in the table, not pop the viewer modal (mentions still need
+  // the modal since that's where the thread panel lives).
   useEffect(() => {
     const openId = searchParams.get('open');
     if (openId && reports.length > 0) {
       const target = reports.find(r => r.id === openId);
       if (target) {
+        skipAutoSelectRef.current = true;
         setSelectedImo(target.vessel_imo);
-        
+
         // Find correct frequency for this report to ensure the sidebar expands
         const f = normalizeFreq(target.frequency);
         setExpandedFreqs(prev => prev.includes(f) ? prev : [...prev, f]);
-        
+
         setSelectedReportName(target.report_name);
         setSelectedRow(target);
-        setModalFocusPane(searchParams.get('thread') === 'true' ? 'thread' : undefined);
-        setModalOpen(true);
+
+        if (searchParams.get('thread') === 'true') {
+          setModalFocusPane('thread');
+          setModalOpen(true);
+        } else {
+          setHighlightRowId(target.id);
+        }
         setSearchParams({}, { replace: true });
       }
     }
   }, [searchParams, reports, setSearchParams]);
+
+  // Clear the highlight a few seconds after landing on the row
+  useEffect(() => {
+    if (!highlightRowId) return;
+    const t = setTimeout(() => setHighlightRowId(null), 4000);
+    return () => clearTimeout(t);
+  }, [highlightRowId]);
 
   const { data: rawConfigs } = useQuery({
     queryKey: ['report-configs'],
@@ -187,6 +204,10 @@ export default function ShoreReportsPage() {
 
   // Auto-select first report on vessel change
   useEffect(() => {
+    if (skipAutoSelectRef.current) {
+      skipAutoSelectRef.current = false;
+      return;
+    }
     setSelectedRow(null);
     for (const f of displayFreqs) {
       const names = getSortedNames(f);
@@ -442,10 +463,14 @@ export default function ShoreReportsPage() {
                         isOverdue = due < now;
                     }
 
+                    const isHighlighted = r.id === highlightRowId;
+
                     return (
                     <tr
                       key={r.id}
+                      ref={isHighlighted ? (el) => el?.scrollIntoView({ behavior: 'smooth', block: 'center' }) : undefined}
                       className={`rt-data-row ${isPending ? (isOverdue ? 'rt-row-overdue' : 'rt-row-today-planned') : ''}`}
+                      style={isHighlighted ? { outline: '2px solid #6366f1', outlineOffset: '-2px', background: 'rgba(99,102,241,0.08)', transition: 'background 1.5s ease' } : undefined}
                     >
                       <td className="rt-col-job">
                          {isPending && (
