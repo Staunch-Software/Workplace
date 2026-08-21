@@ -91,11 +91,7 @@ const Home = ({ searchQuery = '' }) => {
     }
 
     if (appId === 'reports') {
-      if (user?.role === 'VESSEL') {
-        window.open('/reports/vessel', '_blank');
-      } else {
-        window.open('/reports/shore', '_blank');
-      }
+      window.open('/reports/overview', '_blank');
     }
   };
 
