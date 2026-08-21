@@ -92,8 +92,15 @@ async def get_changes(
 
         # Scope reports/events to the requesting vessel when known, so a
         # vessel instance doesn't pull every other vessel's data.
-        if vessel_imo and hasattr(model, "vessel_imo"):
-            stmt = stmt.where(model.vessel_imo == vessel_imo)
+        if vessel_imo:
+            if hasattr(model, "vessel_imo"):
+                stmt = stmt.where(model.vessel_imo == vessel_imo)
+            elif model == ReportThread:
+                stmt = stmt.join(Report, model.report_id == Report.id).where(Report.vessel_imo == vessel_imo)
+            elif model == ReportAttachment:
+                stmt = stmt.join(Report, model.report_id == Report.id).where(Report.vessel_imo == vessel_imo)
+            elif model == ReportThreadAttachment:
+                stmt = stmt.join(ReportThread, model.thread_id == ReportThread.id).join(Report, ReportThread.report_id == Report.id).where(Report.vessel_imo == vessel_imo)
 
         items = (await db.execute(stmt)).scalars().all()
         results[key] = [
