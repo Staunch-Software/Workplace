@@ -5,45 +5,29 @@
 // Notification types:
 //   "mention"    – @mention in a thread
 //   "new_report" – new scrape cycle for an assigned vessel
+//   "new_thread" – shore sent a new message (vessel side only)
+//
+// FIX BUG 1 & 7 (2026-08-21):
+//   The original component used hard-coded fetch() calls pointing to
+//   '/reports/api/v1' (shore Nginx proxy). On a vessel (local intranet),
+//   this URL doesn't resolve — the vessel backend runs on a different host.
+//   Fixed by routing through the existing role-aware API clients:
+//     - VESSEL role  → vesselReportsApi (localhost:8006 / vessel server)
+//     - SHORE/ADMIN  → reportsApi       (Nginx proxy / shore cloud)
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bell, MessageSquare, FileText, Check, CheckCheck, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { reportsApi, vesselReportsApi } from '../modules/reports/api/reportsApi';
 
-// ── API helpers ──────────────────────────────────────────────────────────────
-// const BASE_URL = 'http://localhost:8006/api/v1'; // local dev
-const BASE_URL = '/reports/api/v1';                 // production (Nginx proxy)
-
-function getToken() {
-  return (
-    localStorage.getItem('platform_token') ||
-    sessionStorage.getItem('platform_token') ||
-    ''
-  );
-}
-
-async function fetchNotifications() {
-  const res = await fetch(`${BASE_URL}/notifications`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-  if (!res.ok) throw new Error('Failed to fetch notifications');
-  return res.json();
-}
-
-async function markOneRead(id) {
-  await fetch(`${BASE_URL}/notifications/${id}/read`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-}
-
-async function markAllRead() {
-  await fetch(`${BASE_URL}/notifications/read-all`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
+// ── Role-aware API dispatcher ─────────────────────────────────────────────────
+// Returns the correct notifications API set based on the user's role so
+// vessel users hit their local backend and shore/admin users hit the cloud.
+function useNotificationsApi(role) {
+  if (role === 'VESSEL') return vesselReportsApi;
+  return reportsApi;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -63,9 +47,12 @@ export default function NotificationBell() {
   const qc = useQueryClient();
   const navigate = useNavigate();
 
+  // Pick the correct API client based on the logged-in user's role.
+  const api = useNotificationsApi(user?.role);
+
   const { data: notifications = [] } = useQuery({
-    queryKey: ['notifications'],
-    queryFn: fetchNotifications,
+    queryKey: ['notifications', user?.role],
+    queryFn: () => api.getNotifications(),
     enabled: !!user,
     refetchInterval: 15000,
     staleTime: 10000,
@@ -74,13 +61,13 @@ export default function NotificationBell() {
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const markOneMutation = useMutation({
-    mutationFn: markOneRead,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+    mutationFn: (id) => api.markNotificationRead(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications', user?.role] }),
   });
 
   const markAllMutation = useMutation({
-    mutationFn: markAllRead,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+    mutationFn: () => api.markAllNotificationsRead(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications', user?.role] }),
   });
 
   // Close panel when clicking outside
@@ -304,9 +291,12 @@ export default function NotificationBell() {
 
 // ── Notification item ─────────────────────────────────────────────────────────
 function NotificationItem({ notification: n, userRole, onNavigate }) {
-  const isMention = n.type === 'mention';
+  const isMention   = n.type === 'mention';
+  const isNewThread = n.type === 'new_thread';
   const base = userRole === 'VESSEL' ? '/reports/vessel' : '/reports/shore';
-  const url = isMention 
+
+  // For mentions → open the thread panel directly. For new messages/reports → open report.
+  const url = (isMention || isNewThread)
     ? `${base}?open=${n.report_id}&thread=true`
     : `${base}?open=${n.report_id}`;
 
@@ -357,17 +347,21 @@ function NotificationItem({ notification: n, userRole, onNavigate }) {
           borderRadius: '10px',
           background: isMention
             ? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
+            : isNewThread
+            ? 'linear-gradient(135deg, #f59e0b, #ef4444)'
             : 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           boxShadow: isMention
             ? '0 2px 8px rgba(99,102,241,0.35)'
+            : isNewThread
+            ? '0 2px 8px rgba(245,158,11,0.35)'
             : '0 2px 8px rgba(14,165,233,0.35)',
           opacity: n.is_read ? 0.55 : 1,
         }}
       >
-        {isMention ? (
+        {(isMention || isNewThread) ? (
           <MessageSquare size={16} color="#fff" />
         ) : (
           <FileText size={16} color="#fff" />

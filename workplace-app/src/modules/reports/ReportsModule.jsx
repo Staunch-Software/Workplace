@@ -8,12 +8,9 @@ import VesselReportsPage from './features/vessel/VesselReportsPage';
 import ActivityFeedPage from './features/shared/ActivityFeedPage';
 import ReportConfigPage from './features/shore/ReportConfigPage';
 import OverviewPage from './features/shore/OverviewPage';
-import { useAuth } from '@/context/AuthContext';
 
 function DefaultRedirect() {
-  const { user } = useAuth();
-  if (user?.role === 'VESSEL') return <Navigate to="vessel" replace />;
-  return <Navigate to="shore" replace />;
+  return <Navigate to="overview" replace />;
 }
 
 export default function ReportsModule() {

@@ -1,14 +1,15 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { reportsApi } from '../../api/reportsApi';
 import ReportsNavbar from '../../components/ReportsNavbar';
 import AttachmentsPanel from '../../components/AttachmentsPanel';
 import ThreadPanel from '../../components/ThreadPanel';
 import ReportViewerModal from '../../components/ReportViewerModal';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import BulkDownloadModal from '../../components/BulkDownloadModal';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import {
-  Ship, Filter, Search, ChevronDown, ChevronRight, X, CheckCircle2, Clock, AlertCircle, Paperclip, AlertTriangle, CalendarClock, MessageSquare
+  Ship, Filter, Search, ChevronDown, ChevronRight, X, CheckCircle2, Clock, AlertCircle, Paperclip, AlertTriangle, CalendarClock, MessageSquare, Download
 } from 'lucide-react';
 import '../../styles/Reports.css';
 
@@ -45,8 +46,7 @@ function StatusBadge({ scrape_status }) {
 }
 
 export default function ShoreReportsPage() {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
+  useAuth();
 
   const [selectedImo, setSelectedImo] = useState('');
   const [expandedFreqs, setExpandedFreqs] = useState(['WEEKLY', 'MONTHLY']);
@@ -60,6 +60,7 @@ export default function ShoreReportsPage() {
   const skipAutoSelectRef = useRef(false); // set while a notification is choosing the vessel/report, to stop auto-select from overriding it
   const [isVesselDropdownOpen, setIsVesselDropdownOpen] = useState(false);
   const [tooltipData, setTooltipData] = useState({ visible: false, text: '', x: 0, y: 0 });
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const handleTooltipEnter = useCallback((e, text) => {
@@ -78,7 +79,7 @@ export default function ShoreReportsPage() {
   // Fetch vessels
   const { data: coreVessels = [] } = useQuery({
     queryKey: ['core-vessels'],
-    queryFn: () => import('@/api/axios').then(m => m.default.get('/vessels').then(r => r.data)),
+    queryFn: () => reportsApi.getVessels(),
   });
 
   // Fetch all reports
@@ -87,7 +88,7 @@ export default function ShoreReportsPage() {
     queryFn: () => reportsApi.listReports(),
     refetchInterval: 30000,
   });
-  const reports = Array.isArray(rawReports) ? rawReports : [];
+  const reports = useMemo(() => (Array.isArray(rawReports) ? rawReports : []), [rawReports]);
 
   // Handle ?open= param — a notification click should land on the correct
   // report row in the table, not pop the viewer modal (mentions still need
@@ -129,7 +130,7 @@ export default function ShoreReportsPage() {
     queryKey: ['report-configs'],
     queryFn: () => reportsApi.listConfigs(),
   });
-  const configs = Array.isArray(rawConfigs) ? rawConfigs : [];
+  const configs = useMemo(() => (Array.isArray(rawConfigs) ? rawConfigs : []), [rawConfigs]);
 
   // Build vessel list
   const vessels = useMemo(() => {
@@ -184,7 +185,7 @@ export default function ShoreReportsPage() {
     });
 
     return map;
-  }, [vesselReports, configs, activeVesselImo]);
+  }, [vesselReports]);
 
   const displayFreqs = FREQ_ORDER;
 
@@ -329,6 +330,11 @@ export default function ShoreReportsPage() {
         </div>
 
         <div className="rt-control-right">
+          <button className="bdl-trigger-btn" onClick={() => setDownloadModalOpen(true)}>
+            <Download size={14} />
+            Download Reports
+          </button>
+
           <div className="rt-search-box">
             <Search size={13} color="#94a3b8" />
             <input
@@ -346,19 +352,28 @@ export default function ShoreReportsPage() {
       <div className="rt-main-content">
 
         {/* Card Accordion Sidebar */}
-        <div className="rt-freq-sidebar">
+        <div className="rt-freq-sidebar" style={{ paddingTop: 0 }}>
           
           {/* Sidebar Search */}
-          <div style={{ marginBottom: '16px', position: 'relative' }}>
-            <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              type="text"
-              placeholder="Filter reports..."
-              value={sidebarSearch}
-              onChange={e => setSidebarSearch(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px 10px 34px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#1e293b', outline: 'none', background: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}
-            />
-            {sidebarSearch && <X size={13} color="#94a3b8" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer' }} onClick={() => setSidebarSearch('')} />}
+          <div style={{ 
+            position: 'sticky', 
+            top: 0, 
+            zIndex: 10, 
+            background: '#f1f5f9', 
+            padding: '20px 16px 16px 16px', 
+            margin: '0 -16px'
+          }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                type="text"
+                placeholder="Filter reports..."
+                value={sidebarSearch}
+                onChange={e => setSidebarSearch(e.target.value)}
+                style={{ width: '100%', padding: '10px 12px 10px 34px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#1e293b', outline: 'none', background: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}
+              />
+              {sidebarSearch && <X size={13} color="#94a3b8" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer' }} onClick={() => setSidebarSearch('')} />}
+            </div>
           </div>
 
           {displayFreqs.map(freqId => {
@@ -451,7 +466,7 @@ export default function ShoreReportsPage() {
                         {selectedReportName ? 'No records found.' : 'Select a report from the left.'}
                       </td>
                     </tr>
-                  ) : tableData.map((r, idx) => {
+                  ) : tableData.map((r) => {
                     const isPending = r.job_status === 'PENDING';
                     
                     let isOverdue = false;
@@ -533,6 +548,14 @@ export default function ShoreReportsPage() {
           )}
         </div>
       </div>
+
+      {downloadModalOpen && (
+        <BulkDownloadModal
+          vessels={vessels}
+          reports={reports}
+          onClose={() => setDownloadModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

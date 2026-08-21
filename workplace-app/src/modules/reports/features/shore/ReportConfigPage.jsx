@@ -10,7 +10,6 @@ import {
   Ship, AlertCircle, CheckCircle2,
   Clock, RefreshCcw, Settings, Zap, ChevronDown
 } from 'lucide-react';
-import { getVessels } from '../../../../pages/admin/lib/adminApi';
 import '../../styles/ReportConfigPage.css';
 
 const EMPTY_FORM = { vessel_name: '', vessel_imo: '', report_name: '', department: 'DECK', frequency: 'MONTHLY' };
@@ -76,10 +75,7 @@ export default function ReportConfigPage() {
 
   const { data: coreVessels = [], isLoading: coreVesselsLoading } = useQuery({
     queryKey: ['core-vessels'],
-    queryFn: async () => {
-      const res = await getVessels();
-      return res.data || [];
-    },
+    queryFn: () => reportsApi.getVessels(),
   });
 
   // ── Mutations ──
@@ -261,7 +257,7 @@ export default function ReportConfigPage() {
                     onClick={() => registerMutation.mutate({ vessel_imo: activeVessel.imo, vessel_name: activeVessel.name })}
                     disabled={registerMutation.isPending}
                   >
-                    <Zap size={14} /> {registerMutation.isPending ? 'Assigning...' : 'Assign 45 Defaults'}
+                    <Zap size={14} /> {registerMutation.isPending ? 'Assigning...' : 'Assign 40 Defaults'}
                   </button>
                   <button className="rcfg-btn rcfg-btn--ghost" onClick={() => setShowAddForm(!showAddForm)}>
                     <Plus size={14} /> Add Custom Target

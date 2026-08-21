@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ChevronDown, Settings, Home, LayoutGrid, Rss, LayoutDashboard } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import coreApi from '@/api/axios';
+import { reportsApi, vesselReportsApi } from '../api/reportsApi';
 import NotificationBell from '@/components/NotificationBell';
 
 export default function ReportsNavbar({ totalUnread, reportsRemaining }) {
@@ -27,7 +27,7 @@ export default function ReportsNavbar({ totalUnread, reportsRemaining }) {
 
   const { data: coreVessels = [] } = useQuery({
     queryKey: ['core-vessels'],
-    queryFn: () => coreApi.get('/vessels').then(r => r.data),
+    queryFn: () => (user?.role === 'VESSEL' ? vesselReportsApi : reportsApi).getVessels(),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 

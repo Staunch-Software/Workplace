@@ -37,6 +37,7 @@ class NotificationOut(BaseModel):
         from_attributes = True
 
 
+
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
 @router.get("", response_model=List[NotificationOut])
