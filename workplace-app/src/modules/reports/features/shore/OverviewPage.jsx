@@ -1,6 +1,6 @@
 // src/modules/reports/features/shore/OverviewPage.jsx
 // All-vessel Overview matrix: report name (rows) x vessel (columns).
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { reportsApi } from '../../api/reportsApi';
 import { useAuth } from '@/context/AuthContext';
@@ -25,6 +25,12 @@ const MONTH_NAMES = [
   'January','February','March','April','May','June',
   'July','August','September','October','November','December',
 ];
+
+// Base/floor widths — must match the CSS defaults (--ovw-col-report-w,
+// --ovw-cell-week-w, --ovw-cell-std-w) in OverviewPage.css.
+const REPORT_COL_W = 260;
+const BASE_WEEK_COL_W = 88;
+const BASE_STD_COL_W = 150;
 
 const QUARTERS = [
   { id: 0, label: 'Q1', sub: 'Jan – Mar' },
@@ -375,6 +381,36 @@ export default function OverviewPage() {
 
   const isWeekly = frequency === 'WEEKLY';
 
+  // When the data columns' natural width leaves spare room in the scroll
+  // container (few vessels/reports on a wide screen), spread that leftover
+  // space evenly across the data columns only — the Report Name column
+  // always stays fixed at REPORT_COL_W, so it never balloons into a phantom
+  // gap. Columns never shrink below their normal design width either; once
+  // there are enough vessels to fill the space naturally, this just falls
+  // back to the CSS defaults and the table scrolls horizontally as usual.
+  const scrollRef = useRef(null);
+  const [dataColWidth, setDataColWidth] = useState(null);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const totalDataCols = isWeekly ? vessels.length * buckets.length : vessels.length;
+    const baseWidth = isWeekly ? BASE_WEEK_COL_W : BASE_STD_COL_W;
+
+    const recompute = () => {
+      if (totalDataCols === 0) { setDataColWidth(null); return; }
+      const available = el.clientWidth - REPORT_COL_W;
+      const ideal = Math.floor(available / totalDataCols);
+      setDataColWidth(ideal > baseWidth ? ideal : null);
+    };
+
+    recompute();
+    const ro = new ResizeObserver(recompute);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [vessels.length, buckets.length, isWeekly]);
+
   return (
     <div className="rt-root ovw-root">
       <ReportsNavbar />
@@ -514,7 +550,14 @@ export default function OverviewPage() {
             <p className="ovw-state-sub">Try adjusting the period or clearing the search filter</p>
           </div>
         ) : (
-          <div className="ovw-table-scroll">
+          <div
+            className="ovw-table-scroll"
+            ref={scrollRef}
+            style={dataColWidth ? {
+              '--ovw-cell-week-w': `${dataColWidth}px`,
+              '--ovw-cell-std-w': `${dataColWidth}px`,
+            } : undefined}
+          >
             <table className="ovw-table">
               <thead>
                 {/* ── Row 1: Report Name + Vessel Names ── */}
