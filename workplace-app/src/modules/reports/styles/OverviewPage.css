@@ -460,8 +460,14 @@
 .ovw-table {
   border-collapse: separate;
   border-spacing: 0;
+  /* No min-width: 100% here on purpose — with few vessel columns (e.g. a
+     single vessel-role user), stretching the table to fill the container
+     makes table-layout: fixed distribute the surplus width into every
+     column, including the sticky Report Name column, ballooning it far
+     past its intended width and leaving a huge blank strip that reads as
+     a phantom column. Sizing purely to content and leaving any leftover
+     space blank keeps every column's width exact regardless of vessel count. */
   width: max-content;
-  min-width: 100%;
   font-size: 13px;
   color: var(--ovw-text-primary);
   table-layout: fixed;
