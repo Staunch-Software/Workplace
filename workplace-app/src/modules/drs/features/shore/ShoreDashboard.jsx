@@ -83,7 +83,7 @@ export const OWNER_OPTIONS = [
 // ─── TOAST SYSTEM ───
 const ToastContext = React.createContext(null);
 
-const ToastProvider = ({ children }) => {
+export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
 
   const addToast = (message, type = 'success') => {
@@ -194,7 +194,7 @@ const useColumnResize = (setColumnWidths) => {
 
 // ✅ FIXED: ThreadSection with corrected internal mention filtering
 
-const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, closedById, initialChatMode = 'external' }) => {
+export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, closedById, initialChatMode = 'external', readOnly = false }) => {
   const { user } = useAuth();
   const toast = useToast();
   const [confirmModal, setConfirmModal] = useState(null);
@@ -684,7 +684,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
       )}
 
       {/* INPUT SECTION OR CLOSED STATE */}
-      {defectStatus !== 'CLOSED' ? (
+      {readOnly ? null : defectStatus !== 'CLOSED' ? (
         <div style={{
           padding: '12px',
           borderTop: '1px solid #e2e8f0',
@@ -870,7 +870,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, close
 };
 
 
-const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onToggleRequired }) => {
+export const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onToggleRequired, readOnly = false }) => {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [files, setFiles] = useState([]);
@@ -880,6 +880,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
   const [localPreviewIndex, setLocalPreviewIndex] = useState(null); // ✅ ADDED
 
   const isClosed = defectStatus === 'CLOSED';
+  const canEdit = !isClosed && !readOnly;
 
   const { data: existingImages = [] } = useQuery({
     queryKey: [`${type}-images`, defectId],
@@ -890,7 +891,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
   });
 
   const handleFileChange = (e) => {
-    if (isClosed) return;
+    if (!canEdit) return;
     const newFiles = Array.from(e.target.files);
     const MAX_SIZE = 1024 * 1024;
     const validFiles = [];
@@ -932,7 +933,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
   };
 
   const handleUpload = async () => {
-    if (previewImages.length === 0 || isClosed) return;  // ✅ Use previewImages
+    if (previewImages.length === 0 || !canEdit) return;  // ✅ Use previewImages
     setIsUploading(true);
     try {
       for (const item of previewImages) {  // ✅ Iterate previewImages
@@ -973,7 +974,9 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
         <h4 className='closed-defect-td' style={{ margin: 0, fontSize: '13px', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <ImageIcon size={14} />
-          {type === 'before' ? 'Before' : 'After'}
+          {readOnly
+            ? (type === 'before' ? 'Before Image' : 'After Image')
+            : (type === 'before' ? 'Before' : 'After')}
           {totalCount > 0 && (
             <span className='closed-thread' style={{ fontSize: '10px', background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: '10px', fontWeight: '600' }}>
               {totalCount} {totalCount === 1 ? 'Image' : 'Images'}
@@ -981,7 +984,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
           )}
         </h4>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-          {!isClosed && onToggleRequired && (
+          {canEdit && onToggleRequired && (
             <div
               onClick={(e) => { e.stopPropagation(); onToggleRequired(); }}
               className='closed-thread'
@@ -1011,7 +1014,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onT
         </div>
       </div>
 
-      {!isClosed && (
+      {canEdit && (
         <>
           {/* ✅ ADDED: Preview list with cancel buttons (same as VesselDashboard) */}
           {previewImages.length > 0 && (
@@ -2292,7 +2295,11 @@ const ShoreDashboard = () => {
     onError: (_, __, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(DEFECTS_QUERY_KEY, ctx.prev);
     },
-    onSettled: () => queryClient.invalidateQueries(DEFECTS_QUERY_KEY),
+    onSettled: (_data, _err, defectId) => {
+      queryClient.invalidateQueries(DEFECTS_QUERY_KEY);
+      queryClient.invalidateQueries(['live-feed']);
+      queryClient.invalidateQueries(['defect-detail', defectId]);
+    },
   });
   const scrollRowBelowHeader = (rowId) => {
     const anchor = document.getElementById(`row-${rowId}`);

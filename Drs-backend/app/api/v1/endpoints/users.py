@@ -6,7 +6,8 @@ from app.models.user import User
 from app.models.vessel import Vessel
 from app.schemas.user import UserCreate, UserResponse, UserPreferencesUpdate
 from app.core.security import get_password_hash
-from app.models.tasks import LiveFeedRead, Task, Notification,LiveFeed  
+from app.models.tasks import LiveFeedRead, Task, Notification,LiveFeed
+from app.models.defect import UserDefectFlag
 from sqlalchemy import update, desc
 from app.api.deps import get_current_user # <--- ADDED THIS IMPORT
 from uuid import UUID
@@ -270,6 +271,18 @@ async def get_live_feed(
     )
     read_feed_ids = {str(row[0]) for row in read_result.all()}
 
+    # 4b. Fetch per-user flag state for the defects behind these feed items
+    defect_ids = [feed.defect_id for feed in feeds if feed.defect_id]
+    flagged_ids = set()
+    if defect_ids:
+        flag_result = await db.execute(
+            select(UserDefectFlag.defect_id).where(
+                UserDefectFlag.user_id == current_user.id,
+                UserDefectFlag.defect_id.in_(defect_ids),
+            )
+        )
+        flagged_ids = {row[0] for row in flag_result.all()}
+
     # 5. Build Response
     return [
         {
@@ -291,6 +304,7 @@ async def get_live_feed(
                 "equipment_name": feed.defect.equipment_name if feed.defect else None,
                 "closure_remark": feed.defect.closure_remarks if feed.defect else None,
                 "defect_source": feed.defect.defect_source.value if feed.defect and hasattr(feed.defect.defect_source, "value") else (feed.defect.defect_source if feed.defect else None),
+                "is_flagged": feed.defect_id in flagged_ids,
             } if feed.defect else None,
         }
         for feed in feeds
@@ -330,3 +344,94 @@ async def mark_feed_read(
 
     await db.commit()
     return {"success": True, "id": str(feed_id), "is_read": True, "is_seen": True}
+
+
+@router.patch("/live-feed/{feed_id}/unread")
+async def mark_feed_unread(
+    feed_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Check feed exists
+    entry = await db.get(LiveFeed, feed_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    # Upsert per-user read state back to unread
+    existing = await db.execute(
+        select(LiveFeedRead).where(
+            LiveFeedRead.feed_id == feed_id,
+            LiveFeedRead.user_id == current_user.id,
+        )
+    )
+    record = existing.scalar_one_or_none()
+
+    if record:
+        record.is_read = False
+        record.read_at = None
+    else:
+        db.add(LiveFeedRead(
+            feed_id=feed_id,
+            user_id=current_user.id,
+            is_read=False,
+        ))
+
+    await db.commit()
+    return {"success": True, "id": str(feed_id), "is_read": False, "is_seen": False}
+
+
+@router.patch("/live-feed/read-all")
+async def mark_all_feed_read(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # 1. Determine which feed items this user can see (same rules as get_live_feed)
+    query = select(LiveFeed.id)
+    vessel_imos = [v.imo for v in current_user.vessels]
+
+    mention_filter = (LiveFeed.event_type == "MENTION") & (
+        LiveFeed.meta["mentioned_user_ids"].contains([str(current_user.id)])
+    )
+
+    if current_user.role in ("VESSEL", "SHORE"):
+        query = query.where(
+            mention_filter | (LiveFeed.vessel_imo.in_(vessel_imos))
+        )
+    # ADMIN sees everything, no filter applied
+
+    result = await db.execute(query)
+    visible_feed_ids = [row[0] for row in result.all()]
+
+    if not visible_feed_ids:
+        return {"success": True, "marked_count": 0}
+
+    # 2. Find which ones already have a read record for this user
+    existing_result = await db.execute(
+        select(LiveFeedRead).where(
+            LiveFeedRead.user_id == current_user.id,
+            LiveFeedRead.feed_id.in_(visible_feed_ids),
+        )
+    )
+    existing_records = existing_result.scalars().all()
+    existing_feed_ids = {record.feed_id for record in existing_records}
+
+    now = datetime.now()
+
+    # 3. Update existing unread records
+    for record in existing_records:
+        if not record.is_read:
+            record.is_read = True
+            record.read_at = now
+
+    # 4. Insert new read records for feed items with no record yet
+    for feed_id in visible_feed_ids:
+        if feed_id not in existing_feed_ids:
+            db.add(LiveFeedRead(
+                feed_id=feed_id,
+                user_id=current_user.id,
+                is_read=True,
+                read_at=now,
+            ))
+
+    await db.commit()
+    return {"success": True, "marked_count": len(visible_feed_ids)}
