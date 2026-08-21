@@ -35,17 +35,29 @@ function makeClient(baseURL) {
   return client;
 }
 
-// ── Shore client (SHORE + ADMIN) ──
-// const shoreClient = makeClient('http://localhost:8006/api/v1');    // local dev
-// const shoreClient = makeClient('http://52.172.91.85:8006/api/v1'); // direct VM
-const shoreClient  = makeClient('/reports/api/v1');                   // production (Nginx proxy)
+// ─────────────────────────────────────────────────────────────────────────────
+// !! DEPLOYMENT SWITCH — change ONLY the active (uncommented) line per env !!
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ── Vessel client (VESSEL role - local vessel backend) ──
-// const vesselClient = makeClient('http://localhost:8006/api/v1');   // local dev
-const vesselClient = makeClient('/reports/api/v1');                   // production (same server for now)
+// ── Shore client (SHORE + ADMIN) ──
+// PRODUCTION (Nginx proxy):  const shoreClient = makeClient('/reports/api/v1');
+// DEV (local):
+const shoreClient = makeClient('http://localhost:8006/api/v1');
+// DIRECT VM (staging):       const shoreClient = makeClient('http://52.172.91.85:8006/api/v1');
+
+// ── Vessel client (VESSEL role — hits the vessel's LOCAL backend) ──
+// PRODUCTION (vessel intranet): const vesselClient = makeClient('/reports/api/v1');
+// DEV (local):
+const vesselClient = makeClient('http://localhost:8006/api/v1');
+
+// ── Core client (workplace-backend control plane — owns users & vessels) ──
+// PRODUCTION (Nginx proxy):  const coreClient = makeClient('/api/v1');
+// DEV (local):
+const coreClient = makeClient('http://localhost:8000/api/v1');
 
 // --- Shore API (SHORE + ADMIN) ---
 export const reportsApi = {
+  getVessels: () => coreClient.get("/vessels").then((r) => r.data),
   listReports: (params = {}) =>
     shoreClient.get("/reports", { params }).then((r) => r.data),
   getReport: (reportId) =>
@@ -89,6 +101,7 @@ export const reportsApi = {
 
 // --- Vessel API (VESSEL + ADMIN) - offline-first local backend ---
 export const vesselReportsApi = {
+  getVessels: () => coreClient.get("/vessels").then((r) => r.data),
   listReports: (params = {}) =>
     vesselClient.get("/reports", { params }).then((r) => r.data),
   getReport: (reportId) =>

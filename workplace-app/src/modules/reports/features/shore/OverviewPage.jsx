@@ -6,9 +6,10 @@ import { reportsApi } from '../../api/reportsApi';
 import ReportsNavbar from '../../components/ReportsNavbar';
 import AttachmentsPanel from '../../components/AttachmentsPanel';
 import ThreadPanel from '../../components/ThreadPanel';
+import BulkDownloadModal from '../../components/BulkDownloadModal';
 import {
   ChevronDown, X, Paperclip, FileWarning, CalendarDays, Layers, Search,
-  BarChart3, MessageSquare,
+  BarChart3, MessageSquare, Download, AlertCircle, Clock,
 } from 'lucide-react';
 import '../../styles/Reports.css';
 import '../../styles/OverviewPage.css';
@@ -105,6 +106,39 @@ function findBestMatch(instances, start, end) {
   return pool.sort((a, b) => (reportDate(b) || 0) - (reportDate(a) || 0))[0];
 }
 
+/* Earliest date among instances that actually have a valid attachment —
+   marks the point tracking "starts" for a given report/vessel pair. */
+function earliestAttachmentDate(instances) {
+  let earliest = null;
+  instances.forEach(r => {
+    if (!hasValidAttachment(r.attachments)) return;
+    const d = reportDate(r);
+    if (d && (!earliest || d < earliest)) earliest = d;
+  });
+  return earliest;
+}
+
+/* Resolves what a cell should show: an existing attachment, a missing
+   (overdue, no submission) state, a pending (not yet due) state, or blank.
+   Missing/Pending only apply to a period that actually has a report record
+   in the dashboard (a `match`) — periods with no report instance at all are
+   left blank rather than inventing a status for them. Also gated to after
+   the report/vessel's first-ever attachment — not tracked before that. */
+function cellStatus(instances, bucket, now) {
+  const match = findBestMatch(instances, bucket.start, bucket.end);
+  if (match && hasValidAttachment(match.attachments)) {
+    return { status: 'has', match, date: reportDate(match) };
+  }
+  if (!match) {
+    return { status: 'blank' };
+  }
+  const firstDate = earliestAttachmentDate(instances);
+  if (!firstDate || bucket.start < firstDate) {
+    return { status: 'blank' };
+  }
+  return { status: bucket.end < now ? 'missing' : 'pending', match, date: reportDate(match) };
+}
+
 /* ─── Sub-components ────────────────────────────────────────────────────── */
 
 function CompactSelect({ icon, value, options, onChange }) {
@@ -180,6 +214,54 @@ function AttachmentPreviewModal({ report, onClose }) {
   );
 }
 
+function AttachmentCell({ instances, bucket, now, onOpen }) {
+  const { status, match, date } = cellStatus(instances, bucket, now);
+
+  if (status === 'blank') {
+    return <div className="ovw-chip-empty" />;
+  }
+  if (status === 'missing') {
+    return (
+      <div className="ovw-chip ovw-chip-missing" title={`${bucket.label}: ${fmtShort(date)} — Missing attachment`}>
+        <span className="ovw-chip-missing-icon">
+          <AlertCircle size={13} />
+        </span>
+        <span>Missing</span>
+        <span className="ovw-chip-sub-date">{fmtShort(date)}</span>
+      </div>
+    );
+  }
+  if (status === 'pending') {
+    return (
+      <div className="ovw-chip ovw-chip-pending" title={`${bucket.label}: ${fmtShort(date)} — Not yet due`}>
+        <span className="ovw-chip-pending-icon">
+          <Clock size={13} />
+        </span>
+        <span>Pending</span>
+        <span className="ovw-chip-sub-date">{fmtShort(date)}</span>
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      className="ovw-chip ovw-chip-has"
+      title={`${bucket.label}: ${fmtShort(date)} — View attachment`}
+      onClick={() => onOpen(match)}
+    >
+      <span className="ovw-chip-has-icon">
+        <Paperclip size={13} />
+        {match.unread_shore > 0 && (
+          <span className="ovw-chip-msg-badge" title="New message">
+            <MessageSquare size={8} />
+          </span>
+        )}
+      </span>
+      <span>{fmtShort(date)}</span>
+    </button>
+  );
+}
+
 /* ─── Main Page ─────────────────────────────────────────────────────────── */
 
 export default function OverviewPage() {
@@ -190,10 +272,11 @@ export default function OverviewPage() {
   const [quarterIdx, setQuarterIdx] = useState(Math.floor(now.getMonth() / 3));
   const [search, setSearch] = useState('');
   const [previewReport, setPreviewReport] = useState(null);
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
 
   const { data: coreVessels = [] } = useQuery({
     queryKey: ['core-vessels'],
-    queryFn: () => import('@/api/axios').then(m => m.default.get('/vessels').then(r => r.data)),
+    queryFn: () => reportsApi.getVessels(),
   });
 
   const { data: rawReports, isLoading } = useQuery({
@@ -249,16 +332,11 @@ export default function OverviewPage() {
   const reportNames = useMemo(() => {
     const set = new Set(reportsForFreq.map(r => r.report_name || 'Unknown'));
     let names = [...set].filter(name =>
-      vessels.some(v =>
-        buckets.some(b => {
-          const match = findBestMatch(instanceIndex[name]?.[v.imo] || [], b.start, b.end);
-          return match && hasValidAttachment(match.attachments);
-        })
-      )
+      vessels.some(v => (instanceIndex[name]?.[v.imo] || []).some(r => hasValidAttachment(r.attachments)))
     );
     if (search) names = names.filter(n => n.toLowerCase().includes(search.toLowerCase()));
     return names.sort((a, b) => a.localeCompare(b));
-  }, [reportsForFreq, search, vessels, instanceIndex, buckets]);
+  }, [reportsForFreq, search, vessels, instanceIndex]);
 
   const handleMonthChange = useCallback((v) => setMonthIdx(v), []);
   const handleQuarterChange = useCallback((v) => setQuarterIdx(v), []);
@@ -303,17 +381,25 @@ export default function OverviewPage() {
           </div>
         </div>
 
-        {/* ── Frequency Pill Tabs ── */}
-        <div className="ovw-freq-tabs">
-          {FREQUENCIES.map(f => (
-            <button
-              key={f.id}
-              className={`ovw-freq-tab ${frequency === f.id ? 'active' : ''}`}
-              onClick={() => setFrequency(f.id)}
-            >
-              {f.label}
-            </button>
-          ))}
+        <div className="ovw-header-right-actions">
+          {/* ── Download Button ── */}
+          <button className="bdl-trigger-btn" onClick={() => setDownloadModalOpen(true)}>
+            <Download size={14} />
+            Download Reports
+          </button>
+
+          {/* ── Frequency Pill Tabs ── */}
+          <div className="ovw-freq-tabs">
+            {FREQUENCIES.map(f => (
+              <button
+                key={f.id}
+                className={`ovw-freq-tab ${frequency === f.id ? 'active' : ''}`}
+                onClick={() => setFrequency(f.id)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -366,6 +452,14 @@ export default function OverviewPage() {
           <div className="ovw-legend-pill">
             <span className="ovw-legend-swatch has" />
             <span>Attachment available</span>
+          </div>
+          <div className="ovw-legend-pill">
+            <span className="ovw-legend-swatch pending" />
+            <span>Pending</span>
+          </div>
+          <div className="ovw-legend-pill">
+            <span className="ovw-legend-swatch missing" />
+            <span>Missing</span>
           </div>
 
           {/* Search */}
@@ -468,73 +562,20 @@ export default function OverviewPage() {
                       const instances = instanceIndex[name]?.[v.imo] || [];
 
                       if (isWeekly) {
-                        return buckets.map(b => {
-                          const match = findBestMatch(instances, b.start, b.end);
-                          const date = match ? reportDate(match) : null;
-                          const hasAtt = match && hasValidAttachment(match.attachments);
-
-                          if (!hasAtt) {
-                            return (
-                              <td key={`${v.imo}-${b.key}`} className="ovw-td-cell ovw-td-week">
-                                <div className="ovw-chip-empty" />
-                              </td>
-                            );
-                          }
-                          return (
-                            <td key={`${v.imo}-${b.key}`} className="ovw-td-cell ovw-td-week">
-                              <button
-                                type="button"
-                                className="ovw-chip ovw-chip-has"
-                                title={`${b.label}: ${fmtShort(date)} — View attachment`}
-                                onClick={() => setPreviewReport(match)}
-                              >
-                                <span className="ovw-chip-has-icon">
-                                  <Paperclip size={13} />
-                                  {match.unread_shore > 0 && (
-                                    <span className="ovw-chip-msg-badge" title="New message">
-                                      <MessageSquare size={8} />
-                                    </span>
-                                  )}
-                                </span>
-                                <span>{fmtShort(date)}</span>
-                              </button>
-                            </td>
-                          );
-                        });
+                        return buckets.map(b => (
+                          <td key={`${v.imo}-${b.key}`} className="ovw-td-cell ovw-td-week">
+                            <AttachmentCell instances={instances} bucket={b} now={now} onOpen={setPreviewReport} />
+                          </td>
+                        ));
                       }
 
                       /* Monthly / Quarterly: single merged cell per vessel */
                       return (
                         <td key={v.imo} className="ovw-td-cell">
                           <div className="ovw-icon-group">
-                            {buckets.map(b => {
-                              const match = findBestMatch(instances, b.start, b.end);
-                              const date = match ? reportDate(match) : null;
-                              const hasAtt = match && hasValidAttachment(match.attachments);
-
-                              if (!hasAtt) {
-                                return <div key={b.key} className="ovw-chip-empty" />;
-                              }
-                              return (
-                                <button
-                                  key={b.key}
-                                  type="button"
-                                  className="ovw-chip ovw-chip-has"
-                                  title={`${b.label}: ${fmtShort(date)} — View attachment`}
-                                  onClick={() => setPreviewReport(match)}
-                                >
-                                  <span className="ovw-chip-has-icon">
-                                    <Paperclip size={13} />
-                                    {match.unread_shore > 0 && (
-                                      <span className="ovw-chip-msg-badge" title="New message">
-                                        <MessageSquare size={8} />
-                                      </span>
-                                    )}
-                                  </span>
-                                  <span>{fmtShort(date)}</span>
-                                </button>
-                              );
-                            })}
+                            {buckets.map(b => (
+                              <AttachmentCell key={b.key} instances={instances} bucket={b} now={now} onOpen={setPreviewReport} />
+                            ))}
                           </div>
                         </td>
                       );
@@ -551,6 +592,14 @@ export default function OverviewPage() {
 
       {previewReport && (
         <AttachmentPreviewModal report={previewReport} onClose={() => setPreviewReport(null)} />
+      )}
+
+      {downloadModalOpen && (
+        <BulkDownloadModal
+          vessels={vessels}
+          reports={reports}
+          onClose={() => setDownloadModalOpen(false)}
+        />
       )}
     </div>
   );

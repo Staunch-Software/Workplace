@@ -28,13 +28,14 @@ class NotificationOut(BaseModel):
     type: str
     title: str
     body: Optional[str]
-    report_id: Optional[UUID]
-    thread_id: Optional[UUID]
+    report_id: Optional[str]   # UUID column in model — Pydantic stringifies it for JSON
+    thread_id: Optional[str]   # UUID column in model — Pydantic stringifies it for JSON
     is_read: bool
     created_at: datetime
 
     class Config:
         from_attributes = True
+
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────

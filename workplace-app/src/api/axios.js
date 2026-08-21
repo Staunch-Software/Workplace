@@ -1,11 +1,16 @@
 import axios from 'axios';
 import { handleExpiredSession } from '../utils/authGuard';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// !! DEPLOYMENT SWITCH — change ONLY the active (uncommented) line per env !!
+// ─────────────────────────────────────────────────────────────────────────────
 const api = axios.create({
-  // baseURL: 'http://localhost:8003/api/v1',
-  // baseURL: 'http://localhost:8000/api/v1',
+  // PRODUCTION (Nginx proxy):
+  // baseURL: '/api/v1',
+  // DEV (local):
+  baseURL: 'http://localhost:8000/api/v1',
+  // DIRECT VM (staging):
   // baseURL: 'http://52.172.91.85:8003/api/v1',
-  baseURL: "/api/v1",
   headers: { 'Content-Type': 'application/json' },
 });
 

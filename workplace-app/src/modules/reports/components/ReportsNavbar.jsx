@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ChevronDown, Settings, Home, LayoutGrid, Rss, LayoutDashboard } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import coreApi from '@/api/axios';
+import { reportsApi, vesselReportsApi } from '../api/reportsApi';
 import NotificationBell from '@/components/NotificationBell';
 
 export default function ReportsNavbar({ totalUnread, reportsRemaining }) {
@@ -27,7 +27,7 @@ export default function ReportsNavbar({ totalUnread, reportsRemaining }) {
 
   const { data: coreVessels = [] } = useQuery({
     queryKey: ['core-vessels'],
-    queryFn: () => coreApi.get('/vessels').then(r => r.data),
+    queryFn: () => (user?.role === 'VESSEL' ? vesselReportsApi : reportsApi).getVessels(),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
@@ -86,15 +86,13 @@ export default function ReportsNavbar({ totalUnread, reportsRemaining }) {
 
       {/* ── Navigation Links ── */}
       <div className="rpt-nav-links" style={{ marginLeft: '24px' }}>
-        {user?.role !== 'VESSEL' && (
-          <button
-            className={`rpt-nav-link ${location.pathname.includes('overview') ? 'active' : ''}`}
-            onClick={() => navigate('/reports/overview')}
-          >
-            <LayoutDashboard size={14} />
-            Overview
-          </button>
-        )}
+        <button
+          className={`rpt-nav-link ${location.pathname.includes('overview') ? 'active' : ''}`}
+          onClick={() => navigate('/reports/overview')}
+        >
+          <LayoutDashboard size={14} />
+          Overview
+        </button>
         <button
           className={`rpt-nav-link ${(location.pathname.endsWith('shore') || location.pathname.endsWith('vessel')) ? 'active' : ''}`}
           onClick={() => navigate(user?.role === 'VESSEL' ? '/reports/vessel' : '/reports/shore')}

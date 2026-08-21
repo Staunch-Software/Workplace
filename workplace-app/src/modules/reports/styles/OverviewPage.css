@@ -121,6 +121,15 @@
   font-weight: 400;
 }
 
+/* ─── Header right-side actions group ──────────────────────────────────── */
+
+.ovw-header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 /* ─── Frequency Pill Tabs ───────────────────────────────────────────────── */
 
 .ovw-freq-tabs {
@@ -360,6 +369,14 @@
     #f1f5f9 2px, #f1f5f9 6px
   );
   border: 1.5px solid #cbd5e1;
+}
+.ovw-legend-swatch.missing {
+  background: var(--ovw-red-bg);
+  border: 1.5px solid var(--ovw-red);
+}
+.ovw-legend-swatch.pending {
+  background: var(--ovw-amber-bg);
+  border: 1.5px solid var(--ovw-amber);
 }
 
 /* ─── Search Box ────────────────────────────────────────────────────────── */
@@ -745,6 +762,71 @@ thead {
 }
 
 .ovw-chip-has:active { transform: translateY(0); }
+
+/* Missing attachment — deadline passed, no submission */
+.ovw-chip-missing-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1.5px solid #fca5a5;
+  background: var(--ovw-red-bg);
+  color: var(--ovw-red);
+  flex-shrink: 0;
+}
+
+.ovw-chip-missing span {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ovw-red);
+  line-height: 1;
+}
+
+/* Pending attachment — not yet due */
+.ovw-chip-pending-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1.5px solid #fde68a;
+  background: var(--ovw-amber-bg);
+  color: var(--ovw-amber);
+  flex-shrink: 0;
+}
+
+.ovw-chip-pending span {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ovw-amber);
+  line-height: 1;
+}
+
+/* Missing/Pending chips carry a status label + a date line, so they grow
+   taller than the single-line "has" chip */
+.ovw-chip-missing,
+.ovw-chip-pending {
+  height: auto;
+  min-height: 44px;
+  gap: 3px;
+  padding: 4px 2px;
+}
+
+.ovw-chip-sub-date {
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.ovw-chip-missing .ovw-chip-sub-date,
+.ovw-chip-pending .ovw-chip-sub-date {
+  color: var(--ovw-text-muted);
+}
 
 /* ─── Loading State ─────────────────────────────────────────────────────── */
 

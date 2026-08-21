@@ -36,9 +36,9 @@ async def get_db():
 
 async def init_models():
     async with engine.begin() as conn:
-        from app.models.report import Report, ReportThread, ReportThreadAttachment, ReportAttachment, ReportConfig
-        from app.models.notification import Notification  # ensures table is created
-        from app.models.sync import SyncQueue, SyncState, SyncConflict  # ensures sync tables are created
+        from app.models.report import Report, ReportThread, ReportThreadAttachment, ReportAttachment, ReportConfig, ReportEvent  # noqa: F401
+        from app.models.notification import Notification  # ensures table is created  # noqa: F401
+        from app.models.sync import SyncQueue, SyncState, SyncConflict  # ensures sync tables are created  # noqa: F401
         await conn.run_sync(Base.metadata.create_all)
         print("Report Tracker DB tables created.")
 

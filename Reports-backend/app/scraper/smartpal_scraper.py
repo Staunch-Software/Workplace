@@ -676,13 +676,13 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                 if "COMPLETED" in status_text.upper() and not found_completed:
                     # Strict validation: If we are tracking a specific cycle via smart_cron
                     if target_job_order_no and target_due_date:
-                        is_same_job = (row_job_no == target_job_order_no)
+                        # SmartPAL reuses the same job_order_no across a due-date cycle's
+                        # PENDING -> COMPLETED lifecycle (it doesn't mint a new number on
+                        # completion), so row_job_no == target_job_order_no is exactly the
+                        # completion we're watching for, not "nothing new". Only the due
+                        # date tells us whether this row belongs to the cycle we're tracking.
                         is_target_cycle = (row_due_date and row_due_date.date() == target_due_date.date())
-                        
-                        if is_same_job:
-                            # It's still the old job, no new submission found.
-                            continue # Keep looking or just skip it
-                        
+
                         if not is_target_cycle:
                             # It is a different job, but its due date doesn't match our expected next cycle.
                             # We can just ignore it or assume it's out of order. For strictness, we skip.

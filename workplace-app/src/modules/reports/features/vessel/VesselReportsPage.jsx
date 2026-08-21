@@ -229,10 +229,18 @@ export default function VesselReportsPage() {
 
         <div className="rt-main-content">
           {/* Card Accordion Sidebar */}
-          <div className="rt-freq-sidebar">
-            
-            {/* Sidebar Search */}
-            <div style={{ marginBottom: '16px', position: 'relative' }}>
+          <div className="rt-freq-sidebar" style={{ paddingTop: 0 }}>
+          
+          {/* Sidebar Search */}
+          <div style={{ 
+            position: 'sticky', 
+            top: 0, 
+            zIndex: 10, 
+            background: '#f1f5f9', 
+            padding: '20px 16px 16px 16px', 
+            margin: '0 -16px'
+          }}>
+            <div style={{ position: 'relative' }}>
               <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="text"
@@ -243,6 +251,7 @@ export default function VesselReportsPage() {
               />
               {sidebarSearch && <X size={13} color="#94a3b8" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer' }} onClick={() => setSidebarSearch('')} />}
             </div>
+          </div>
 
             {displayFreqs.map(freq => {
               const reportNames = getSortedNames(freq.id);
