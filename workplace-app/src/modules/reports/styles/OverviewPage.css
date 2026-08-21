@@ -450,6 +450,11 @@
   table-layout: fixed;
 }
 
+.ovw-table th,
+.ovw-table td {
+  box-sizing: border-box;
+}
+
 /* ─── Sticky Column (Report Name) ───────────────────────────────────────── */
 
 .ovw-sticky-col {

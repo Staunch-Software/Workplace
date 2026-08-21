@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { reportsApi } from '../../api/reportsApi';
+import { useAuth } from '@/context/AuthContext';
 import ReportsNavbar from '../../components/ReportsNavbar';
 import AttachmentsPanel from '../../components/AttachmentsPanel';
 import ThreadPanel from '../../components/ThreadPanel';
@@ -183,6 +184,7 @@ function AttachmentPreviewModal({ report, onClose }) {
 /* ─── Main Page ─────────────────────────────────────────────────────────── */
 
 export default function OverviewPage() {
+  const { user } = useAuth();
   const now = new Date();
   const [frequency, setFrequency] = useState('WEEKLY');
   const [year] = useState(now.getFullYear());
@@ -214,12 +216,24 @@ export default function OverviewPage() {
     [reports, frequency]
   );
 
+  const assignedImos = useMemo(() => {
+    if (user?.role !== 'VESSEL') return null;
+    const list = Array.isArray(user?.assigned_vessels) ? user.assigned_vessels : [];
+    return new Set(list.map(v => (typeof v === 'string' ? v : v?.imo)).filter(Boolean));
+  }, [user]);
+
   const vessels = useMemo(() => {
-    if (coreVessels.length > 0) return [...coreVessels].sort((a, b) => a.name.localeCompare(b.name));
-    const map = {};
-    reports.forEach(r => { if (!map[r.vessel_imo]) map[r.vessel_imo] = { imo: r.vessel_imo, name: r.vessel_name }; });
-    return Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
-  }, [coreVessels, reports]);
+    let list;
+    if (coreVessels.length > 0) {
+      list = [...coreVessels];
+    } else {
+      const map = {};
+      reports.forEach(r => { if (!map[r.vessel_imo]) map[r.vessel_imo] = { imo: r.vessel_imo, name: r.vessel_name }; });
+      list = Object.values(map);
+    }
+    if (assignedImos) list = list.filter(v => assignedImos.has(v.imo));
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+  }, [coreVessels, reports, assignedImos]);
 
   const configuredPairs = useMemo(() => {
     if (configs.length === 0) return null;
@@ -296,9 +310,11 @@ export default function OverviewPage() {
             <BarChart3 size={22} />
           </div>
           <div className="ovw-header-text">
-            <h1 className="ovw-page-title">Fleet Report Overview</h1>
+            <h1 className="ovw-page-title">{assignedImos ? 'Vessel Report Overview' : 'Fleet Report Overview'}</h1>
             <p className="ovw-page-subtitle">
-              Track submission status across all vessels and report types
+              {assignedImos
+                ? 'Track submission status for your vessel and report types'
+                : 'Track submission status across all vessels and report types'}
             </p>
           </div>
         </div>

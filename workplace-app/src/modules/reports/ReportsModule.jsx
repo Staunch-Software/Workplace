@@ -41,11 +41,11 @@ export default function ReportsModule() {
         }
       />
 
-      {/* All-vessel Overview matrix */}
+      {/* Overview matrix — shows all vessels for SHORE/ADMIN, only the assigned vessel for VESSEL */}
       <Route
         path="overview"
         element={
-          <ProtectedRoute allowedRoles={['SHORE', 'ADMIN']}>
+          <ProtectedRoute allowedRoles={['SHORE', 'ADMIN', 'VESSEL']}>
             <OverviewPage />
           </ProtectedRoute>
         }

@@ -86,15 +86,13 @@ export default function ReportsNavbar({ totalUnread, reportsRemaining }) {
 
       {/* ── Navigation Links ── */}
       <div className="rpt-nav-links" style={{ marginLeft: '24px' }}>
-        {user?.role !== 'VESSEL' && (
-          <button
-            className={`rpt-nav-link ${location.pathname.includes('overview') ? 'active' : ''}`}
-            onClick={() => navigate('/reports/overview')}
-          >
-            <LayoutDashboard size={14} />
-            Overview
-          </button>
-        )}
+        <button
+          className={`rpt-nav-link ${location.pathname.includes('overview') ? 'active' : ''}`}
+          onClick={() => navigate('/reports/overview')}
+        >
+          <LayoutDashboard size={14} />
+          Overview
+        </button>
         <button
           className={`rpt-nav-link ${(location.pathname.endsWith('shore') || location.pathname.endsWith('vessel')) ? 'active' : ''}`}
           onClick={() => navigate(user?.role === 'VESSEL' ? '/reports/vessel' : '/reports/shore')}

@@ -704,6 +704,23 @@
   border-width: 3px;
 }
 
+/* Informational notice — file not yet available from MariApp/SmartPAL.
+   Deliberately amber/neutral, not red, so it doesn't read as a system crash. */
+.rt-attach-error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.84rem;
+  font-weight: 500;
+  text-align: center;
+  padding: 24px;
+}
+
 /* Zoom toolbar above Office / iframe viewers */
 .rt-attach-zoom-bar {
   display: flex;

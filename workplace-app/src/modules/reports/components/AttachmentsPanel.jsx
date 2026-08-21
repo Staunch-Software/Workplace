@@ -3,7 +3,7 @@
 // Shows attachment tabs at top, inline PDF viewer below.
 // Supports multiple attachments from comma-separated blob_path.
 import React, { useState, useEffect } from 'react';
-import { FileText, Paperclip, AlertCircle, ChevronDown, ChevronUp, Download, ZoomIn, ZoomOut, RotateCcw, RefreshCw } from 'lucide-react';
+import { FileText, Paperclip, AlertCircle, ChevronDown, ChevronUp, Download, ZoomIn, ZoomOut, RotateCcw, RefreshCw, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { reportsApi } from '../api/reportsApi';
 
@@ -60,6 +60,25 @@ function isBrowserRenderable(path) {
   return lower.endsWith('.pdf') || lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.gif') || lower.endsWith('.txt') || isSpreadsheetFile(path) || isOfficeViewerFile(path);
 }
 
+// Downloads a (possibly cross-origin) file without navigating or opening a
+// new tab. A plain `<a download target="_blank">` makes the browser flash
+// open/close a blank tab for cross-origin URLs, which reflows the whole page
+// ("shake"). Fetching the bytes ourselves and saving via a blob: URL avoids
+// any navigation entirely.
+async function triggerDownload(url, filename) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = filename || 'download';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(blobUrl);
+}
+
 function isImageFile(path) {
   if (!path) return false;
   const lower = path.toLowerCase();
@@ -77,6 +96,19 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
   const [officeLoading, setOfficeLoading] = useState(false); // true until the Office Online iframe reports loaded
   const [sheetZoom, setSheetZoom] = useState(100); // % zoom for the local spreadsheet table preview
   const [officeZoom, setOfficeZoom] = useState(100); // % zoom for Office Online iframe
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadClick = async () => {
+    const fileName = attachments[activeIdx]?.file_name || 'Document';
+    setDownloading(true);
+    try {
+      await triggerDownload(sasUrl, fileName);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
 
   // Load SAS URL whenever reportId or activeIdx changes
@@ -97,7 +129,7 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
 
     const path = attachments[activeIdx]?.blob_path || null;
     if (path && path.startsWith('MISSING:')) {
-      setError('Unable to preview (File missing in SmartPAL)');
+      setError('This report has not been updated in MariApp yet.');
       setSasUrl(null);
       setLoading(false);
       return;
@@ -165,6 +197,9 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
     if (!sasUrl || !isPdfFile(fileName)) return;
 
     let cancelled = false;
+    const isRealPdf = (buf) => new TextDecoder().decode(buf.slice(0, 5)) === '%PDF-';
+    const notReady = () => { if (!cancelled) setError('This report has not been updated in MariApp yet.'); };
+
     fetch(sasUrl, { headers: { Range: 'bytes=0-4' } })
       .then(r => {
         if (!r.ok && r.status !== 206) throw new Error(`HTTP ${r.status}`);
@@ -172,15 +207,22 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
       })
       .then(buf => {
         if (cancelled) return;
-        const header = new TextDecoder().decode(buf);
-        if (header !== '%PDF-') {
-          setError('This file is not available in SmartPAL / MariApp.');
-        }
+        if (!isRealPdf(buf)) notReady();
       })
-      .catch(() => {
-        // If the check itself fails (network hiccup, blocked Range support),
-        // don't block the preview -- fall through to the normal iframe.
-      })
+      .catch(() =>
+        // Range requests aren't always supported by the storage backend --
+        // retry with a plain GET before concluding the file is unavailable,
+        // so a healthy PDF is never misreported as missing.
+        fetch(sasUrl)
+          .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.arrayBuffer();
+          })
+          .then(buf => {
+            if (!cancelled && !isRealPdf(buf)) notReady();
+          })
+          .catch(notReady)
+      )
       .finally(() => {
         if (!cancelled) setPdfChecking(false);
       });
@@ -247,17 +289,16 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
                 {attachments[activeIdx]?.file_name || 'Document'}
               </span>
               {sasUrl && !error && (
-                <a
-                  href={sasUrl}
-                  download={attachments[activeIdx]?.file_name}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={handleDownloadClick}
+                  disabled={downloading}
                   title="Download file"
-                  style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#3b82f6', textDecoration: 'none', fontWeight: 600, fontSize: '0.75rem', flexShrink: 0 }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#3b82f6', background: 'none', border: 'none', padding: 0, cursor: downloading ? 'default' : 'pointer', textDecoration: 'none', fontWeight: 600, fontSize: '0.75rem', flexShrink: 0, opacity: downloading ? 0.6 : 1, fontFamily: 'inherit' }}
                 >
-                  <Download size={13} />
-                  Download
-                </a>
+                  {downloading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                  {downloading ? 'Downloading…' : 'Download'}
+                </button>
               )}
             </div>
 
@@ -271,7 +312,7 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
               )}
               {error && !pdfChecking && (
                 <div className="rt-attach-error">
-                  <AlertCircle size={20} color="#dc2626" />
+                  <AlertCircle size={22} color="#d97706" />
                   <span>{error}</span>
                 </div>
               )}
@@ -284,16 +325,15 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
                         <h3 style={{ margin: '0 0 8px 0', color: '#0f172a' }}>File Download Required</h3>
                         <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>This document type ({(attachments[activeIdx]?.file_name || '').split('.').pop().toUpperCase()}) cannot be previewed natively in the browser.</p>
                       </div>
-                      <a 
-                        href={sasUrl} 
-                        download={attachments[activeIdx]?.file_name}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#3b82f6', color: '#fff', padding: '10px 20px', borderRadius: '6px', textDecoration: 'none', fontWeight: 600, marginTop: '8px' }}
+                      <button
+                        type="button"
+                        onClick={handleDownloadClick}
+                        disabled={downloading}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#3b82f6', color: '#fff', padding: '10px 20px', borderRadius: '6px', border: 'none', textDecoration: 'none', fontWeight: 600, marginTop: '8px', cursor: downloading ? 'default' : 'pointer', opacity: downloading ? 0.75 : 1, fontFamily: 'inherit' }}
                       >
-                        <Download size={18} />
-                        Download File
-                      </a>
+                        {downloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                        {downloading ? 'Downloading…' : 'Download File'}
+                      </button>
                     </div>
                   ) : isImageFile(attachments[activeIdx]?.file_name) ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', overflow: 'hidden', padding: '16px' }}>
