@@ -6,13 +6,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { defectApi } from '@drs/services/defectApi';
 import { DEFECT_SOURCE_OPTIONS } from '../../components/shared/constants';
+import FeedDefectModal from '../../components/modals/FeedDefectModal';
 import "../../components/shared/live-feed.css"
 
 import {
   AlertCircle, AlertTriangle, Info, Zap,
   Eye, CheckCircle, Search, Filter,
   Anchor, Wrench, Image, GitPullRequest,
-  Lock, Unlock, ChevronDown, X, RefreshCw, AtSign
+  Lock, Unlock, ChevronDown, X, RefreshCw, AtSign, CheckCheck, Flag
 } from 'lucide-react';
 
 // ── Event type config ──────────────────────────────────────────────────────
@@ -228,7 +229,7 @@ const LiveFeed = () => {
   // FIX 1: Extract to plain variable — user?.id is not valid in deps array
   const userId = user?.id;
 
-  const [activeTab, setActiveTab] = useState('live');
+  const [activeTab, setActiveTab] = useState('mine');
   const [vesselFilter, setVesselFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
@@ -259,6 +260,11 @@ const LiveFeed = () => {
     onSuccess: () => queryClient.invalidateQueries(['live-feed']),
   });
 
+  const markAllReadMutation = useMutation({
+    mutationFn: defectApi.markAllFeedRead,
+    onSuccess: () => queryClient.invalidateQueries(['live-feed']),
+  });
+
   const sourceOptions = DEFECT_SOURCE_OPTIONS.map(s => ({ value: s, label: s }));
 
   const priorityOptions = [
@@ -268,7 +274,7 @@ const LiveFeed = () => {
     { value: 'LOW', label: 'Low' },
   ];
 
-  const handleView = (defectId, isInternal = false) => {
+  const goToDefectPage = (defectId, isInternal = false) => {
     const url = isInternal
       ? `/drs/shore/dashboard?highlightDefectId=${defectId}&isInternal=true`
       : `/drs/shore/dashboard?highlightDefectId=${defectId}`;
@@ -276,8 +282,19 @@ const LiveFeed = () => {
     window.open(url, '_blank');
   };
 
-  const handleMarkDone = (id) => {
-    markReadMutation.mutate(id);
+  const [modalIndex, setModalIndex] = useState(null);
+
+  const handleOpenFeedItem = (item) => {
+    if (!item.is_read) markReadMutation.mutate(item.id);
+    if (!item.defect_id) return;
+    const idx = displayItems.findIndex(i => i.id === item.id);
+    setModalIndex(idx === -1 ? 0 : idx);
+  };
+
+  const closeFeedModal = () => setModalIndex(null);
+
+  const handleMarkAllRead = () => {
+    markAllReadMutation.mutate();
   };
 
   const clearFilters = () => {
@@ -367,12 +384,6 @@ const LiveFeed = () => {
             {/* FIX 4: clearFilters() on every tab switch */}
             <div className="tab-container">
               <button
-                onClick={() => { setActiveTab('live'); setViewMode('all'); clearFilters(); }}
-                className={`tab-btn ${activeTab === 'live' ? 'active' : ''}`}
-              >
-                Live Feed
-              </button>
-              <button
                 onClick={() => { setActiveTab('mine'); setViewMode('all'); clearFilters(); }}
                 className={`tab-btn ${activeTab === 'mine' ? 'active' : ''}`}
               >
@@ -383,6 +394,12 @@ const LiveFeed = () => {
                     {myMentionUnreadCount}
                   </span>
                 )}
+              </button>
+              <button
+                onClick={() => { setActiveTab('live'); setViewMode('all'); clearFilters(); }}
+                className={`tab-btn ${activeTab === 'live' ? 'active' : ''}`}
+              >
+                Live Feed
               </button>
             </div>
 
@@ -413,6 +430,14 @@ const LiveFeed = () => {
                 </button>
               ))}
             </div>
+            <button
+              onClick={handleMarkAllRead}
+              disabled={markAllReadMutation.isPending || unreadCount === 0}
+              className="mark-all-read-btn"
+            >
+              <CheckCheck size={14} />
+              {markAllReadMutation.isPending ? 'Marking…' : 'Mark all as read'}
+            </button>
             <button onClick={() => refetch()} className="refresh-btn">
               <RefreshCw size={14} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
               Refresh
@@ -477,8 +502,8 @@ const LiveFeed = () => {
                 <SectionDivider label="Today" color="#ef4444" />
                 {grouped.todayUnread.map(item => (
                   activeTab === 'live'
-                    ? <FeedRow key={item.id} item={item} onView={handleView} onMarkDone={handleMarkDone} isPending={markReadMutation.isPending} />
-                    : <MentionRow key={item.id} item={item} onView={handleView} onMarkDone={handleMarkDone} isPending={markReadMutation.isPending} />
+                    ? <FeedRow key={item.id} item={item} onOpen={handleOpenFeedItem} />
+                    : <MentionRow key={item.id} item={item} onOpen={handleOpenFeedItem} />
                 ))}
               </>
             )}
@@ -487,8 +512,8 @@ const LiveFeed = () => {
                 <SectionDivider label="Earlier" color="#f59e0b" />
                 {grouped.olderUnread.map(item => (
                   activeTab === 'live'
-                    ? <FeedRow key={item.id} item={item} onView={handleView} onMarkDone={handleMarkDone} isPending={markReadMutation.isPending} />
-                    : <MentionRow key={item.id} item={item} onView={handleView} onMarkDone={handleMarkDone} isPending={markReadMutation.isPending} />
+                    ? <FeedRow key={item.id} item={item} onOpen={handleOpenFeedItem} />
+                    : <MentionRow key={item.id} item={item} onOpen={handleOpenFeedItem} />
                 ))}
               </>
             )}
@@ -497,8 +522,8 @@ const LiveFeed = () => {
                 <SectionDivider label="Read" color="#94a3b8" />
                 {grouped.read.map(item => (
                   activeTab === 'live'
-                    ? <FeedRow key={item.id} item={item} onView={handleView} onMarkDone={handleMarkDone} isPending={markReadMutation.isPending} />
-                    : <MentionRow key={item.id} item={item} onView={handleView} onMarkDone={handleMarkDone} isPending={markReadMutation.isPending} />
+                    ? <FeedRow key={item.id} item={item} onOpen={handleOpenFeedItem} />
+                    : <MentionRow key={item.id} item={item} onOpen={handleOpenFeedItem} />
                 ))}
               </>
             )}
@@ -513,6 +538,16 @@ const LiveFeed = () => {
         ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
       `}</style>
+
+      {modalIndex !== null && (
+        <FeedDefectModal
+          items={displayItems}
+          index={modalIndex}
+          onIndexChange={setModalIndex}
+          onClose={closeFeedModal}
+          onGoToDefect={goToDefectPage}
+        />
+      )}
     </div>
   );
 };
@@ -528,7 +563,7 @@ const SectionDivider = ({ label, color }) => (
   </div>
 );
 // ── Feed row ───────────────────────────────────────────────────────────────
-const FeedRow = ({ item, onView, onMarkDone, isPending }) => {
+const FeedRow = ({ item, onOpen }) => {
   const cfg = EVENT_CONFIG[item.event_type] || EVENT_CONFIG.DEFECT_OPENED;
   const priority = item.defect?.priority || item.meta?.new_priority;
   const pIconCfg = PRIORITY_ICON_CONFIG[priority] || null;
@@ -542,7 +577,9 @@ const FeedRow = ({ item, onView, onMarkDone, isPending }) => {
 
   return (
     <div className={`feed-row ${item.is_read ? 'is-read' : 'is-unread'}`}
+      onClick={() => onOpen(item)}
       style={{
+        cursor: item.defect_id ? 'pointer' : 'default',
         "--row-accent": accentColor,
         "--row-bg": accentBg,
         "--row-border": accentBorder
@@ -610,17 +647,15 @@ const FeedRow = ({ item, onView, onMarkDone, isPending }) => {
       <div className="feed-row-actions">
         <span className="timestamp">{formatDateTime(item.created_at)}</span>
         <div className="btn-group">
-          {item.defect_id && (
-            <Tooltip text="View Defect">
-              <button onClick={() => onView(item.defect_id)} className="action-btn view-btn">
-                <Eye size={14} />
-              </button>
+          {item.defect?.is_flagged && (
+            <Tooltip text="Flagged defect">
+              <Flag size={14} color="#e8290b" fill="#e8290b" style={{ marginRight: '2px' }} />
             </Tooltip>
           )}
-          {!item.is_read && (
-            <Tooltip text="Mark as Done">
-              <button onClick={() => onMarkDone(item.id)} disabled={isPending} className="action-btn done-btn">
-                <CheckCircle size={14} />
+          {item.defect_id && (
+            <Tooltip text="View Defect">
+              <button onClick={(e) => { e.stopPropagation(); onOpen(item); }} className="action-btn view-btn">
+                <Eye size={14} />
               </button>
             </Tooltip>
           )}
@@ -631,7 +666,7 @@ const FeedRow = ({ item, onView, onMarkDone, isPending }) => {
 };
 
 // ── Mention row (Mapping to your DB structure & matching FeedRow layout) ──
-const MentionRow = ({ item, onView, onMarkDone, isPending }) => {
+const MentionRow = ({ item, onOpen }) => {
   // Use Priority from joined defect or default to Blue for Mentions
   const priority = item.defect?.priority;
   const pIconCfg = PRIORITY_ICON_CONFIG[priority] || { color: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe' };
@@ -653,7 +688,9 @@ const MentionRow = ({ item, onView, onMarkDone, isPending }) => {
 
   return (
     <div className={`feed-row mention-row ${item.is_read ? 'is-read' : 'is-unread'}`}
+      onClick={() => onOpen(item)}
       style={{
+        cursor: item.defect_id ? 'pointer' : 'default',
         "--row-accent": accentColor,
         "--row-bg": accentBg,
         "--row-border": accentBorder
@@ -710,17 +747,15 @@ const MentionRow = ({ item, onView, onMarkDone, isPending }) => {
           {formatDateTime(item.created_at)}
         </span>
         <div className="btn-group">
-          {item.defect_id && (
-            <Tooltip text="View Defect">
-              <button onClick={() => onView(item.defect_id, item.meta?.is_internal)} className="action-btn view-btn">
-                <Eye size={14} />
-              </button>
+          {item.defect?.is_flagged && (
+            <Tooltip text="Flagged defect">
+              <Flag size={14} color="#e8290b" fill="#e8290b" style={{ marginRight: '2px' }} />
             </Tooltip>
           )}
-          {!item.is_read && (
-            <Tooltip text="Mark as Done">
-              <button onClick={() => onMarkDone(item.id)} disabled={isPending} className="action-btn done-btn">
-                <CheckCircle size={14} />
+          {item.defect_id && (
+            <Tooltip text="View Defect">
+              <button onClick={(e) => { e.stopPropagation(); onOpen(item); }} className="action-btn view-btn">
+                <Eye size={14} />
               </button>
             </Tooltip>
           )}

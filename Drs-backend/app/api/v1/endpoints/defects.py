@@ -2230,7 +2230,12 @@ async def create_defect(
 # GET SINGLE DEFECT
 # =============================================================================
 @router.get("/{defect_id}", response_model=DefectResponse)
-async def get_defect(defect_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_defect(
+    defect_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    control_db: AsyncSession = Depends(get_control_db),
+    current_user: User = Depends(get_current_user),
+):
     """Get a specific defect by ID."""
     try:
         defect = await db.get(Defect, defect_id)
@@ -2240,6 +2245,21 @@ async def get_defect(defect_id: UUID, db: AsyncSession = Depends(get_db)):
         # Use __dict__ to avoid mutating the ORM collection (prevents SQLAlchemy
         # from nullifying defect_id on removed items at session flush)
         defect.__dict__['pr_entries'] = [pr for pr in defect.pr_entries if not pr.is_deleted]
+
+        vessel_result = await control_db.execute(
+            select(Vessel).where(Vessel.imo == defect.vessel_imo)
+        )
+        vessel = vessel_result.scalar_one_or_none()
+        defect.vessel_name = vessel.name if vessel else defect.vessel_imo
+
+        flag_result = await db.execute(
+            select(UserDefectFlag).where(
+                UserDefectFlag.user_id == current_user.id,
+                UserDefectFlag.defect_id == defect_id,
+            )
+        )
+        defect.__dict__['is_flagged'] = flag_result.scalar_one_or_none() is not None
+
         return defect
     except HTTPException:
         raise

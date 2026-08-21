@@ -237,7 +237,7 @@ const ShoreLayout = () => {
             </button>
             <button className={`nav-pill ${isActive('/drs/shore/tasks') ? 'active' : ''}`} onClick={() => navigate('/drs/shore/tasks')}>
               {/* <ListTodo size={16} /> */}
-              <span className="pill-label">My Feed</span>
+              <span className="pill-label">Feed</span>
             </button>
             {/* ✅ NEW: Reports Tab */}
             <button className={`nav-pill ${isActive('/drs/shore/reports') ? 'active' : ''}`} onClick={() => navigate('/drs/shore/reports')}>
@@ -560,7 +560,7 @@ const ShoreLayout = () => {
 
           <button className={`side-nav-item ${isActive('/drs/shore/tasks') ? 'active' : ''}`}
             onClick={() => { navigate('/drs/shore/tasks'); setIsSidebarOpen(false); }}>
-            <MessageSquare size={18} /> My Feed
+            <MessageSquare size={18} /> Feed
           </button>
 
           <button className={`side-nav-item ${isActive('/drs/shore/reports') ? 'active' : ''}`}

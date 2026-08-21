@@ -441,6 +441,12 @@ export const defectApi = {
 
   markFeedRead: (id) =>
     api.patch(`/users/live-feed/${id}/read`).then((r) => r.data),
+
+  markFeedUnread: (id) =>
+    api.patch(`/users/live-feed/${id}/unread`).then((r) => r.data),
+
+  markAllFeedRead: () =>
+    api.patch(`/users/live-feed/read-all`).then((r) => r.data),
   // ============================================
   // VESSEL USERS
   // ============================================
