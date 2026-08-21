@@ -7,6 +7,7 @@ import ShoreReportsPage from './features/shore/ShoreReportsPage';
 import VesselReportsPage from './features/vessel/VesselReportsPage';
 import ActivityFeedPage from './features/shared/ActivityFeedPage';
 import ReportConfigPage from './features/shore/ReportConfigPage';
+import OverviewPage from './features/shore/OverviewPage';
 import { useAuth } from '@/context/AuthContext';
 
 function DefaultRedirect() {
@@ -36,6 +37,16 @@ export default function ReportsModule() {
         element={
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <ReportConfigPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* All-vessel Overview matrix */}
+      <Route
+        path="overview"
+        element={
+          <ProtectedRoute allowedRoles={['SHORE', 'ADMIN']}>
+            <OverviewPage />
           </ProtectedRoute>
         }
       />

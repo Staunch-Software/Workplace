@@ -3,7 +3,7 @@
 // Shows attachment tabs at top, inline PDF viewer below.
 // Supports multiple attachments from comma-separated blob_path.
 import React, { useState, useEffect } from 'react';
-import { FileText, Paperclip, AlertCircle, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { FileText, Paperclip, AlertCircle, ChevronDown, ChevronUp, Download, ZoomIn, ZoomOut, RotateCcw, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { reportsApi } from '../api/reportsApi';
 
@@ -74,6 +74,9 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
   const [sheetTables, setSheetTables] = useState(null); // [{ name, html }] for spreadsheet preview
   const [activeSheetIdx, setActiveSheetIdx] = useState(0);
   const [pdfChecking, setPdfChecking] = useState(false); // true while verifying a PDF's magic header before rendering it
+  const [officeLoading, setOfficeLoading] = useState(false); // true until the Office Online iframe reports loaded
+  const [sheetZoom, setSheetZoom] = useState(100); // % zoom for the local spreadsheet table preview
+  const [officeZoom, setOfficeZoom] = useState(100); // % zoom for Office Online iframe
 
 
   // Load SAS URL whenever reportId or activeIdx changes
@@ -84,6 +87,9 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
     setSasUrl(null);
     setSheetTables(null);
     setActiveSheetIdx(0);
+    setSheetZoom(100);
+    setOfficeLoading(isOfficeViewerFile(attachments[activeIdx]?.file_name));
+    setOfficeZoom(100);
     // Block the iframe from rendering until the PDF magic-header check below
     // finishes, so a corrupted file never flashes the native "Failed to load
     // PDF document" dialog before our own error state swaps in.
@@ -298,12 +304,40 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
                       />
                     </div>
                   ) : isOfficeViewerFile(attachments[activeIdx]?.file_name) ? (
-                    <iframe
-                      key={sasUrl}
-                      src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(sasUrl)}`}
-                      title={attachments[activeIdx]?.file_name}
-                      className="rt-attach-iframe"
-                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden' }}>
+                      {/* Zoom toolbar */}
+                      {!officeLoading && (
+                        <div className="rt-attach-zoom-bar">
+                          <button type="button" className="rt-zoom-btn" title="Zoom out" onClick={() => setOfficeZoom(z => Math.max(50, z - 10))}><ZoomOut size={13} /></button>
+                          <span className="rt-zoom-label">{officeZoom}%</span>
+                          <button type="button" className="rt-zoom-btn" title="Zoom in" onClick={() => setOfficeZoom(z => Math.min(200, z + 10))}><ZoomIn size={13} /></button>
+                          <button type="button" className="rt-zoom-btn" title="Reset zoom" onClick={() => setOfficeZoom(100)}><RotateCcw size={12} /></button>
+                        </div>
+                      )}
+                      {/* Iframe with loading overlay */}
+                      <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
+                        {officeLoading && (
+                          <div className="rt-attach-loading" style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
+                            <span className="rt-spinner" />
+                            <span>Loading document…</span>
+                          </div>
+                        )}
+                        <iframe
+                          key={sasUrl}
+                          src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(sasUrl)}`}
+                          title={attachments[activeIdx]?.file_name}
+                          className="rt-attach-iframe"
+                          onLoad={() => setOfficeLoading(false)}
+                          style={{
+                            opacity: officeLoading ? 0 : 1,
+                            width: `${(100 / officeZoom) * 100}%`,
+                            height: `${(100 / officeZoom) * 100}%`,
+                            transform: `scale(${officeZoom / 100})`,
+                            transformOrigin: 'top left',
+                          }}
+                        />
+                      </div>
+                    </div>
                   ) : isCsvFile(attachments[activeIdx]?.file_name) ? (
                     !sheetTables ? (
                       <div className="rt-attach-loading">
@@ -312,23 +346,52 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-                        {sheetTables.length > 1 && (
-                          <div className="rt-attach-tabs" style={{ flexShrink: 0 }}>
-                            {sheetTables.map((s, idx) => (
-                              <button
-                                key={s.name}
-                                className={`rt-attach-tab ${activeSheetIdx === idx ? 'active' : ''}`}
-                                onClick={() => setActiveSheetIdx(idx)}
-                                title={s.name}
-                              >
-                                <span>{s.name}</span>
-                              </button>
-                            ))}
+                        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                          {sheetTables.length > 1 && (
+                            <div className="rt-attach-tabs" style={{ flex: 1, minWidth: 0 }}>
+                              {sheetTables.map((s, idx) => (
+                                <button
+                                  key={s.name}
+                                  className={`rt-attach-tab ${activeSheetIdx === idx ? 'active' : ''}`}
+                                  onClick={() => setActiveSheetIdx(idx)}
+                                  title={s.name}
+                                >
+                                  <span>{s.name}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0 8px', marginLeft: 'auto', flexShrink: 0 }}>
+                            <button
+                              type="button"
+                              onClick={() => setSheetZoom(z => Math.max(50, z - 10))}
+                              title="Zoom out"
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', border: '1px solid #e2e8f0', borderRadius: '5px', background: '#fff', cursor: 'pointer', color: '#475569' }}
+                            >
+                              <ZoomOut size={13} />
+                            </button>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', minWidth: '34px', textAlign: 'center' }}>{sheetZoom}%</span>
+                            <button
+                              type="button"
+                              onClick={() => setSheetZoom(z => Math.min(200, z + 10))}
+                              title="Zoom in"
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', border: '1px solid #e2e8f0', borderRadius: '5px', background: '#fff', cursor: 'pointer', color: '#475569' }}
+                            >
+                              <ZoomIn size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSheetZoom(100)}
+                              title="Reset zoom"
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', border: '1px solid #e2e8f0', borderRadius: '5px', background: '#fff', cursor: 'pointer', color: '#475569' }}
+                            >
+                              <RotateCcw size={12} />
+                            </button>
                           </div>
-                        )}
+                        </div>
                         <div
                           className="rt-attach-sheet-table"
-                          style={{ flex: 1, overflow: 'auto', background: '#fff', padding: '8px' }}
+                          style={{ flex: 1, overflow: 'auto', background: '#fff', padding: '8px', zoom: sheetZoom / 100 }}
                           dangerouslySetInnerHTML={{ __html: sheetTables[activeSheetIdx]?.html || '' }}
                         />
                       </div>
