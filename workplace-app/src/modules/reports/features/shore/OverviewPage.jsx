@@ -1,7 +1,7 @@
 // src/modules/reports/features/shore/OverviewPage.jsx
 // All-vessel Overview matrix: report name (rows) x vessel (columns).
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { reportsApi } from '../../api/reportsApi';
 import { useAuth } from '@/context/AuthContext';
 import ReportsNavbar from '../../components/ReportsNavbar';
@@ -71,16 +71,47 @@ function hasValidAttachment(attachments) {
   return Array.isArray(attachments) && attachments.some(a => a.blob_path && !a.blob_path.startsWith('MISSING:'));
 }
 
+/* Monday on/before Jan 1 of `year` — start of ISO week 1. */
+function isoWeekOneStart(year) {
+  const jan1 = new Date(year, 0, 1);
+  const day = jan1.getDay(); // 0 = Sun ... 6 = Sat
+  const diff = (day === 0 ? -6 : 1) - day;
+  const monday = new Date(year, 0, 1 + diff);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
+
+/* All real calendar weeks of `year`: week 1 = the Mon–Sun spanning Jan 1
+   (may start in the prior December), continuing until the year ends. */
+function buildYearWeeks(year) {
+  const weeks = [];
+  const cursor = isoWeekOneStart(year);
+  const yearEnd = new Date(year, 11, 31, 23, 59, 59);
+  let n = 1;
+  while (cursor <= yearEnd) {
+    const start = new Date(cursor);
+    const end = new Date(cursor);
+    end.setDate(end.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    weeks.push({
+      key: `w${n}`,
+      number: n,
+      label: `W${n}`,
+      sub: `${fmtShort(start)} – ${fmtShort(end)}`,
+      start,
+      end,
+    });
+    cursor.setDate(cursor.getDate() + 7);
+    n++;
+  }
+  return weeks;
+}
+
 function buildBuckets(frequency, year, monthIdx, quarterIdx) {
   if (frequency === 'WEEKLY') {
-    const lastDay = new Date(year, monthIdx + 1, 0).getDate();
-    const bounds = [1, 8, 15, 22, lastDay + 1];
-    return [0, 1, 2, 3].map(i => ({
-      key: `w${i + 1}`,
-      label: `W${i + 1}`,
-      start: new Date(year, monthIdx, bounds[i]),
-      end: new Date(year, monthIdx, Math.min(bounds[i + 1] - 1, lastDay), 23, 59, 59),
-    }));
+    const monthStart = new Date(year, monthIdx, 1);
+    const monthEnd = new Date(year, monthIdx + 1, 0, 23, 59, 59);
+    return buildYearWeeks(year).filter(w => w.start <= monthEnd && w.end >= monthStart);
   }
   if (frequency === 'MONTHLY') {
     const lastDay = new Date(year, monthIdx + 1, 0).getDate();
@@ -221,7 +252,7 @@ function AttachmentPreviewModal({ report, onClose }) {
   );
 }
 
-function AttachmentCell({ instances, bucket, now, onOpen }) {
+function AttachmentCell({ instances, bucket, now, onOpen, viewerRole }) {
   const { status, match, date } = cellStatus(instances, bucket, now);
 
   if (status === 'blank') {
@@ -258,7 +289,7 @@ function AttachmentCell({ instances, bucket, now, onOpen }) {
     >
       <span className="ovw-chip-has-icon">
         <Paperclip size={13} />
-        {match.unread_shore > 0 && (
+        {(viewerRole === 'VESSEL' ? match.unread_vessel : match.unread_shore) > 0 && (
           <span className="ovw-chip-msg-badge" title="New message">
             <MessageSquare size={8} />
           </span>
@@ -273,6 +304,7 @@ function AttachmentCell({ instances, bucket, now, onOpen }) {
 
 export default function OverviewPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const now = new Date();
   const [frequency, setFrequency] = useState('WEEKLY');
   const [year] = useState(now.getFullYear());
@@ -357,6 +389,24 @@ export default function OverviewPage() {
     if (search) names = names.filter(n => n.toLowerCase().includes(search.toLowerCase()));
     return names.sort((a, b) => a.localeCompare(b));
   }, [reportsForFreq, search, vessels, instanceIndex]);
+
+  /* Opening a report from the matrix should clear its unread badge, same as
+     opening it from the inbox does — otherwise the badge never goes away.
+     Clear it optimistically in the cache too, so the badge disappears the
+     instant the report is opened rather than waiting on the round trip. */
+  const handleOpenReport = useCallback((report) => {
+    setPreviewReport(report);
+    const field = user?.role === 'VESSEL' ? 'unread_vessel' : 'unread_shore';
+    if (!(report[field] > 0)) return;
+
+    queryClient.setQueryData(['reports-list'], (old) =>
+      Array.isArray(old) ? old.map(r => (r.id === report.id ? { ...r, [field]: 0 } : r)) : old
+    );
+
+    reportsApi.getReport(report.id)
+      .then(() => queryClient.invalidateQueries({ queryKey: ['reports-list'] }))
+      .catch(() => {});
+  }, [user, queryClient]);
 
   const handleMonthChange = useCallback((v) => setMonthIdx(v), []);
   const handleQuarterChange = useCallback((v) => setQuarterIdx(v), []);
@@ -587,7 +637,7 @@ export default function OverviewPage() {
                   <tr className="ovw-thead-row2">
                     {vessels.map(v =>
                       buckets.map(b => (
-                        <th key={`${v.imo}-${b.key}`} className="ovw-th-week">
+                        <th key={`${v.imo}-${b.key}`} className="ovw-th-week" title={`Week ${b.number} · ${b.sub}`}>
                           {b.label}
                         </th>
                       ))
@@ -623,7 +673,7 @@ export default function OverviewPage() {
                       if (isWeekly) {
                         return buckets.map(b => (
                           <td key={`${v.imo}-${b.key}`} className="ovw-td-cell ovw-td-week">
-                            <AttachmentCell instances={instances} bucket={b} now={now} onOpen={setPreviewReport} />
+                            <AttachmentCell instances={instances} bucket={b} now={now} onOpen={handleOpenReport} viewerRole={user?.role} />
                           </td>
                         ));
                       }
@@ -633,7 +683,7 @@ export default function OverviewPage() {
                         <td key={v.imo} className="ovw-td-cell">
                           <div className="ovw-icon-group">
                             {buckets.map(b => (
-                              <AttachmentCell key={b.key} instances={instances} bucket={b} now={now} onOpen={setPreviewReport} />
+                              <AttachmentCell key={b.key} instances={instances} bucket={b} now={now} onOpen={handleOpenReport} viewerRole={user?.role} />
                             ))}
                           </div>
                         </td>
