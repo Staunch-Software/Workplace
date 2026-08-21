@@ -40,20 +40,20 @@ function makeClient(baseURL) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Shore client (SHORE + ADMIN) ──
-// PRODUCTION (Nginx proxy):  const shoreClient = makeClient('/reports/api/v1');
-// DEV (local):
-const shoreClient = makeClient('http://localhost:8006/api/v1');
+// PRODUCTION (Nginx proxy):
+const shoreClient = makeClient('/reports/api/v1');
+// DEV (local):              const shoreClient = makeClient('http://localhost:8006/api/v1');
 // DIRECT VM (staging):       const shoreClient = makeClient('http://52.172.91.85:8006/api/v1');
 
 // ── Vessel client (VESSEL role — hits the vessel's LOCAL backend) ──
-// PRODUCTION (vessel intranet): const vesselClient = makeClient('/reports/api/v1');
-// DEV (local):
-const vesselClient = makeClient('http://localhost:8006/api/v1');
+// PRODUCTION (vessel intranet):
+const vesselClient = makeClient('/reports/api/v1');
+// DEV (local):              const vesselClient = makeClient('http://localhost:8006/api/v1');
 
 // ── Core client (workplace-backend control plane — owns users & vessels) ──
-// PRODUCTION (Nginx proxy):  const coreClient = makeClient('/api/v1');
-// DEV (local):
-const coreClient = makeClient('http://localhost:8000/api/v1');
+// PRODUCTION (Nginx proxy):
+const coreClient = makeClient('/api/v1');
+// DEV (local):              const coreClient = makeClient('http://localhost:8000/api/v1');
 
 // --- Shore API (SHORE + ADMIN) ---
 export const reportsApi = {
