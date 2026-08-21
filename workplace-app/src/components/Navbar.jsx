@@ -575,7 +575,6 @@ const LiveModuleDetail = ({ imo, moduleKey, isInstalled, prefetchedData }) => {
 
 const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
     const [vessels, setVessels] = useState([]);
-    const [moduleErrors, setModuleErrors] = useState({});
     const [syncLogs, setSyncLogs] = useState({});  // { imo: { drs: {...}, lubeoil: {...}, jira: {...} } }
     const [filter, setFilter] = useState('all');
     const [search, setSearch] = useState('');
@@ -602,13 +601,6 @@ const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
                 promise
                     .then(res => {
                         const data = res.data || {};
-                        setModuleErrors(prev => {
-                            const next = { ...prev };
-                            Object.entries(data).forEach(([imo, d]) => {
-                                next[imo] = (next[imo] || 0) + (d.failed_items_count || 0);
-                            });
-                            return next;
-                        });
                         setSyncLogs(prev => {
                             const next = { ...prev };
                             Object.entries(data).forEach(([imo, d]) => {
@@ -636,6 +628,11 @@ const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
         { key: 'voyage', label: 'Voyage perf' },
         { key: 'engine_performance', label: 'Engine perf' },
     ];
+
+    function getTotalErrors(imo) {
+        const logs = syncLogs[String(imo)] || {};
+        return Object.values(logs).reduce((sum, d) => sum + (d?.failed_items_count || 0), 0);
+    }
 
     function ageClass(iso) {
         if (!iso) return 'never';
@@ -733,14 +730,16 @@ const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
     }
 
 
-    const filtered = vessels.filter(v => {
-        const totalErrors = moduleErrors[String(v.imo)] || 0;
-        const matchSearch = v.name.toLowerCase().includes(search.toLowerCase()) ||
-            String(v.imo).includes(search);
-        if (filter === 'live') return v.online && matchSearch;
-        if (filter === 'errors') return totalErrors > 0 && matchSearch;
-        return matchSearch;
-    });
+    const filtered = vessels
+        .filter(v => {
+            const totalErrors = getTotalErrors(v.imo);
+            const matchSearch = v.name.toLowerCase().includes(search.toLowerCase()) ||
+                String(v.imo).includes(search);
+            if (filter === 'live') return v.online && matchSearch;
+            if (filter === 'errors') return totalErrors > 0 && matchSearch;
+            return matchSearch;
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
 
     const pillBase = { flex: 1, padding: '6px 16px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: '1px solid', transition: '0.15s' };
     const pills = {
@@ -809,7 +808,7 @@ const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
                                             </td>
                                         </tr>
                                     ) : filtered.map(v => {
-                                        const totalErrors = moduleErrors[String(v.imo)] || 0;
+                                        const totalErrors = getTotalErrors(v.imo);
                                         return (
                                             <tr key={v.imo} style={tStyles.row}>
                                                 <td style={tStyles.td}>
