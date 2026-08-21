@@ -479,6 +479,7 @@
   left: 0;
   z-index: 4;
   background: var(--ovw-card-bg);
+  width: var(--ovw-col-report-w);
   min-width: var(--ovw-col-report-w);
   max-width: var(--ovw-col-report-w);
 }
