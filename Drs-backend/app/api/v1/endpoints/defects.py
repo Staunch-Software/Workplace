@@ -2217,6 +2217,20 @@ async def create_defect(
         await feed_defect_opened(
             db, control_db, defect=new_defect, actor_id=current_user.id
         )
+        # Priority HIGH/CRITICAL auto-enforces mandatory before/after images
+        # (see DefectService.create_defect) — surface that in the feed too.
+        if new_defect.before_image_required:
+            await feed_pic_mandatory_changed(
+                db, control_db, defect=new_defect,
+                image_field="before_image_required", is_now_required=True,
+                actor_id=current_user.id,
+            )
+        if new_defect.after_image_required:
+            await feed_pic_mandatory_changed(
+                db, control_db, defect=new_defect,
+                image_field="after_image_required", is_now_required=True,
+                actor_id=current_user.id,
+            )
         await db.commit()
     except Exception as e:
         logger.error(f"⚠️ Live feed error (non-fatal): {e}")
@@ -2299,7 +2313,6 @@ async def update_defect(
         old_status = old_defect.status
         old_before_req = old_defect.before_image_required
         old_after_req = old_defect.after_image_required
-        update_data = defect_update.model_dump(exclude_unset=True)
 
         # ── All DB writes, status machine, SyncQueue → service ───────────────
         updated_defect = await DefectService.update_defect(
@@ -2355,29 +2368,27 @@ async def update_defect(
                 remarks=updated_defect.closure_remarks,
             )
 
-        if (
-            "before_image_required" in update_data
-            and update_data["before_image_required"] != old_before_req
-        ):
+        # Compare against the final persisted values rather than the raw
+        # request payload — DefectService.update_defect can also flip these
+        # flags itself (e.g. priority escalated to HIGH/CRITICAL auto-enforces
+        # mandatory images), and that wouldn't show up in `update_data`.
+        if updated_defect.before_image_required != old_before_req:
             await feed_pic_mandatory_changed(
                 db,
                 control_db,
                 defect=updated_defect,
                 image_field="before_image_required",
-                is_now_required=update_data["before_image_required"],
+                is_now_required=updated_defect.before_image_required,
                 actor_id=current_user.id,
             )
 
-        if (
-            "after_image_required" in update_data
-            and update_data["after_image_required"] != old_after_req
-        ):
+        if updated_defect.after_image_required != old_after_req:
             await feed_pic_mandatory_changed(
                 db,
                 control_db,
                 defect=updated_defect,
                 image_field="after_image_required",
-                is_now_required=update_data["after_image_required"],
+                is_now_required=updated_defect.after_image_required,
                 actor_id=current_user.id,
             )
 
@@ -2732,14 +2743,25 @@ async def get_defect_threads(
         query = query.order_by(Thread.created_at.asc())
         result = await db.execute(query)
         threads = result.scalars().all()
+
+        # Batch-fetch all authors in a single round-trip instead of one
+        # query per thread (was the main source of "Loading conversation…"
+        # latency — N sequential control_db calls for N messages).
+        author_ids = {
+            t.user_id for t in threads if not t.is_system_message and t.user_id
+        }
+        users_by_id = {}
+        if author_ids:
+            users_result = await control_db.execute(
+                select(User).where(User.id.in_(author_ids))
+            )
+            users_by_id = {u.id: u for u in users_result.scalars().all()}
+
         for thread in threads:
             if thread.is_system_message:
                 thread.author_role = "SYSTEM"
             else:
-                user_result = await control_db.execute(
-                    select(User).where(User.id == thread.user_id)
-                )
-                user = user_result.scalars().first()
+                user = users_by_id.get(thread.user_id)
                 thread.author_role = (
                     user.full_name if user else (thread.author_role or "Unknown")
                 )

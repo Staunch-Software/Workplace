@@ -283,15 +283,34 @@ const LiveFeed = () => {
   };
 
   const [modalIndex, setModalIndex] = useState(null);
+  // Snapshot of item ids at the moment the modal opened. Browsing order/
+  // presence stays fixed while the modal is open — otherwise opening an
+  // unread item marks it read, which (on the Unread tab) immediately drops
+  // it out of displayItems and reflows every index after it, so the modal
+  // silently ends up pointing at a different item (e.g. "Mark as unread"
+  // would then act on the wrong one).
+  const [modalItemIds, setModalItemIds] = useState(null);
+
+  const modalItems = useMemo(() => {
+    if (!modalItemIds) return [];
+    return modalItemIds
+      .map(id => feedItems.find(i => i.id === id))
+      .filter(Boolean);
+  }, [modalItemIds, feedItems]);
 
   const handleOpenFeedItem = (item) => {
     if (!item.is_read) markReadMutation.mutate(item.id);
     if (!item.defect_id) return;
-    const idx = displayItems.findIndex(i => i.id === item.id);
+    const ids = displayItems.map(i => i.id);
+    const idx = ids.indexOf(item.id);
+    setModalItemIds(ids);
     setModalIndex(idx === -1 ? 0 : idx);
   };
 
-  const closeFeedModal = () => setModalIndex(null);
+  const closeFeedModal = () => {
+    setModalIndex(null);
+    setModalItemIds(null);
+  };
 
   const handleMarkAllRead = () => {
     markAllReadMutation.mutate();
@@ -541,7 +560,7 @@ const LiveFeed = () => {
 
       {modalIndex !== null && (
         <FeedDefectModal
-          items={displayItems}
+          items={modalItems}
           index={modalIndex}
           onIndexChange={setModalIndex}
           onClose={closeFeedModal}

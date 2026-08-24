@@ -1771,6 +1771,23 @@
   box-sizing: border-box;
 }
 
+/* Priority picker on the "new defect" create row — needs to read as an
+   obviously clickable control, not just a bare icon */
+.new-row-priority-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 6px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 14px;
+  background: white;
+  cursor: pointer;
+}
+
+.new-row-priority-pill:hover {
+  background: #f8fafc;
+}
+
 /* ============================================================
    CUSTOM THIN SCROLLBAR
    ============================================================ */
