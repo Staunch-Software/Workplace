@@ -47,6 +47,16 @@ class Settings(BaseSettings):
     SCRAPER_CRON_HOUR: int = 2
     SCRAPER_CRON_MINUTE: int = 0
 
+    # AEPMS (Engine Performance) push -- after a scrape, ME/AE monthly
+    # report PDFs are pushed here automatically instead of being manually
+    # re-uploaded. AEPMS derives the vessel from the PDF itself, so no
+    # vessel_id is sent -- only a service-account login to satisfy its
+    # auth.get_current_user dependency (VESSEL-role users are rejected by
+    # the upload endpoints, so this must be a SHORE/ADMIN service account).
+    AEPMS_BASE_URL: str = ""
+    AEPMS_SERVICE_EMAIL: str = ""
+    AEPMS_SERVICE_PASSWORD: str = ""
+
     # Path to Excel file containing vessel/report mapping (used only to
     # regenerate DEFAULT_REPORTS_JSON_PATH offline, not read on every request)
     REPORT_EXCEL_PATH: str = "./data/reports_config.xlsx"

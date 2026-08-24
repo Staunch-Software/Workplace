@@ -56,6 +56,12 @@ class Report(Base):
     unread_shore    = Column(Integer, default=0)
     unread_vessel   = Column(Integer, default=0)
 
+    # ── AEPMS (Engine Performance) auto-push tracking ──
+    # PENDING (default/null) -> PUSHED | PUSHED_UNVERIFIED | FAILED.
+    # Prevents re-uploading the same report to AEPMS on every re-scrape.
+    aepms_push_status = Column(String(30), nullable=True)
+    aepms_pushed_at    = Column(DateTime,   nullable=True)
+
     created_at      = Column(DateTime, default=datetime.utcnow)
     updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

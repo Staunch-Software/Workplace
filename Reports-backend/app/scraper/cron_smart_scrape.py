@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from app.core.database import SessionLocal           # FIX: was AsyncSessionLocal (does not exist)
 from app.scraper.smartpal_scraper import run_scraper
+from app.services.aepms_push import push_pending_reports
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-8s %(message)s")
 logger = logging.getLogger(__name__)
@@ -45,6 +46,17 @@ async def main():
         # run_scraper with smart_cron=True handles querying latest rows and filtering them.
         await run_scraper(db, smart_cron=True)
     logger.info("Smart Scrape Cron Job COMPLETE.")
+
+    logger.info("Starting AEPMS push for pending ME/AE reports...")
+    async with SessionLocal() as db:
+        try:
+            await push_pending_reports(db)
+        except Exception as e:
+            # Must never take down the cron job -- the scrape itself already
+            # succeeded and committed above; a push failure is independently
+            # retryable on the next run.
+            logger.error(f"AEPMS push step failed: {e}")
+    logger.info("AEPMS Push COMPLETE.")
 
 if __name__ == "__main__":
     # NOTE: Do NOT use WindowsSelectorEventLoopPolicy here --
