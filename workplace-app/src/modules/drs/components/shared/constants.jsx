@@ -1,3 +1,46 @@
+// Priority icon: 4 ascending signal bars. Pass `level` (1-4, LOW..CRITICAL)
+// to fill only that many bars against a light gray track; omit it (header/
+// generic use) to fill all 4 bars in the given contextual color.
+export const PrioritySignalBarsIcon = ({ size = 16, color = '#94a3b8', level, title }) => {
+  const barCount = level || 4;
+  const bars = [
+    { x: 1, y: 14, w: 5, h: 7 },
+    { x: 8, y: 9, w: 5, h: 12 },
+    { x: 15, y: 5, w: 5, h: 16 },
+    { x: 22, y: 1, w: 4, h: 20 },
+  ];
+  return (
+    <svg width={size} height={size * (22 / 26)} viewBox="0 0 26 22" style={{ flexShrink: 0 }}>
+      {title && <title>{title}</title>}
+      {bars.map((b, i) => (
+        <rect key={i} x={b.x} y={b.y} width={b.w} height={b.h} rx="1" fill={i < barCount ? color : '#e5e7eb'} />
+      ))}
+    </svg>
+  );
+};
+
+// Status icon: progress ring. OPEN = empty outline, PENDING_CLOSURE = half
+// filled, CLOSED = fully filled with a check. Omit `status` (header/generic
+// use) to render a plain outline ring in the given contextual color.
+export const StatusStageIcon = ({ size = 16, color = '#94a3b8', status, title }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+    {title && <title>{title}</title>}
+    {status === 'CLOSED' ? (
+      <>
+        <circle cx="12" cy="12" r="9" fill={color} />
+        <path d="M8 12.5l2.5 2.5 5-5.5" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </>
+    ) : status === 'PENDING_CLOSURE' ? (
+      <>
+        <circle cx="12" cy="12" r="9" fill="none" stroke={color} strokeWidth="3" />
+        <path d="M12 3 A9 9 0 0 1 12 21 Z" fill={color} />
+      </>
+    ) : (
+      <circle cx="12" cy="12" r="9" fill="none" stroke={color} strokeWidth="3" />
+    )}
+  </svg>
+);
+
 // ✅ ONLY SHOW THESE TWO IN DROPDOWNS (PENDING_CLOSURE is internal state only)
 export const STATUS_OPTIONS = ['OPEN', 'CLOSED'];
 export const PRIORITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];

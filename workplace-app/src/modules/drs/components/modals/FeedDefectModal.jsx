@@ -1,9 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, ChevronLeft, ChevronRight, ExternalLink, Flag, Lock, MailOpen, AlertTriangle } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, ExternalLink, Flag, Lock, MailOpen, Pencil, Check } from 'lucide-react';
 import { defectApi } from '@drs/services/defectApi';
-import { formatDate } from '../shared/constants';
-import { ToastProvider, ThreadSection, BeforeAfterImageUpload } from '../../features/shore/ShoreDashboard';
+import {
+  formatDate, getStatusColor, getDeadlineStatus, toLocalDateInput,
+  PRIORITY_OPTIONS, DEFECT_SOURCE_OPTIONS, COMPONENT_OPTIONS, PrioritySignalBarsIcon,
+} from '../shared/constants';
+import { ToastProvider, ThreadSection, BeforeAfterImageUpload, useToast } from '../../features/shore/ShoreDashboard';
 import './FeedDefectModal.css';
 
 const DEFECTS_QUERY_KEY = ['defects', 'global-list'];
@@ -15,8 +18,61 @@ const PRIORITY_COLORS = {
   LOW: '#16a34a',
 };
 
-const FeedDefectModal = ({ items, index, onIndexChange, onClose, onGoToDefect }) => {
+const TIMELINE_LABELS = {
+  OVERDUE: 'Overdue',
+  WARNING: 'Due Soon',
+  NORMAL: 'On Track',
+};
+
+// Custom dropdown: shows only ~4 options at a time, rest reachable via scroll.
+const VISIBLE_OPTION_COUNT = 4;
+const OPTION_ROW_HEIGHT = 34;
+
+const ScrollableSelect = ({ value, options, onChange, disabled }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const close = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        className="fm-edit-input fm-scrollselect-trigger"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen(o => !o)}
+      >
+        {value || '—'}
+      </button>
+      {open && !disabled && (
+        <div
+          className="fm-scrollselect-list"
+          style={{ maxHeight: `${VISIBLE_OPTION_COUNT * OPTION_ROW_HEIGHT}px` }}
+        >
+          {options.map(opt => (
+            <div
+              key={opt}
+              className={`fm-scrollselect-option ${opt === value ? 'is-selected' : ''}`}
+              onClick={() => { onChange(opt); setOpen(false); }}
+            >
+              {opt}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefect }) => {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const feedItem = items?.[index];
   const defectId = feedItem?.defect_id;
 
@@ -25,6 +81,47 @@ const FeedDefectModal = ({ items, index, onIndexChange, onClose, onGoToDefect })
     queryFn: () => defectApi.getDefectById(defectId),
     enabled: !!defectId,
   });
+
+  const updateFieldMutation = useMutation({
+    mutationFn: ({ id, field, value }) => defectApi.updateDefect(id, { [field]: value }),
+    onMutate: async ({ id, field, value }) => {
+      await queryClient.cancelQueries(['defect-detail', id]);
+      const prev = queryClient.getQueryData(['defect-detail', id]);
+      queryClient.setQueryData(['defect-detail', id], (old) =>
+        old ? { ...old, [field]: value } : old
+      );
+      return { prev };
+    },
+    onError: (err, { id }, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['defect-detail', id], ctx.prev);
+      toast?.(`Update failed: ${err.message}`, 'error');
+    },
+    onSettled: (_data, _err, { id }) => {
+      queryClient.invalidateQueries(['defect-detail', id]);
+      queryClient.invalidateQueries(DEFECTS_QUERY_KEY);
+      queryClient.invalidateQueries(['live-feed']);
+    },
+  });
+
+  const [isEditMode, setIsEditMode] = useState(false);
+  useEffect(() => { setIsEditMode(false); }, [defectId]);
+
+  const canEditFields = isEditMode && defect && defect.status !== 'CLOSED';
+
+  const updateField = (field, value) => {
+    if (!defect || defect[field] === value) return;
+
+    if (field === 'target_close_date') {
+      const reportDate = new Date((defect.date_identified || '').split('T')[0]);
+      const newDue = new Date(value);
+      if (newDue <= reportDate) {
+        toast?.('Due date must be after the report date', 'warning');
+        return;
+      }
+    }
+
+    updateFieldMutation.mutate({ id: defect.id, field, value });
+  };
 
   const toggleFlagMutation = useMutation({
     mutationFn: (id) => defectApi.toggleFlag(id),
@@ -51,18 +148,36 @@ const FeedDefectModal = ({ items, index, onIndexChange, onClose, onGoToDefect })
     onSuccess: () => queryClient.invalidateQueries(['live-feed']),
   });
 
-  const hasPrev = index > 0;
-  const hasNext = index < (items?.length || 0) - 1;
+  // Jump straight to the next/previous event for a *different* defect —
+  // consecutive events on the same defect (e.g. "Priority Changed" then
+  // "Before Image Made Mandatory" fired seconds apart) show identical
+  // defect details, so re-opening the same defect again is wasted clicks.
+  const findAdjacentDifferentIndex = (dir) => {
+    if (!items) return -1;
+    const currentDefectId = feedItem?.defect_id;
+    let i = index + dir;
+    while (i >= 0 && i < items.length) {
+      const candidateDefectId = items[i]?.defect_id;
+      if (!candidateDefectId || candidateDefectId !== currentDefectId) return i;
+      i += dir;
+    }
+    return -1;
+  };
+
+  const prevIndex = findAdjacentDifferentIndex(-1);
+  const nextIndex = findAdjacentDifferentIndex(1);
+  const hasPrev = prevIndex !== -1;
+  const hasNext = nextIndex !== -1;
 
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowLeft' && hasPrev) onIndexChange(index - 1);
-      if (e.key === 'ArrowRight' && hasNext) onIndexChange(index + 1);
+      if (e.key === 'ArrowLeft' && hasPrev) onIndexChange(prevIndex);
+      if (e.key === 'ArrowRight' && hasNext) onIndexChange(nextIndex);
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [index, hasPrev, hasNext, onClose, onIndexChange]);
+  }, [index, hasPrev, hasNext, prevIndex, nextIndex, onClose, onIndexChange]);
 
   useEffect(() => {
     const prevOverflow = document.body.style.overflow;
@@ -73,13 +188,12 @@ const FeedDefectModal = ({ items, index, onIndexChange, onClose, onGoToDefect })
   if (!feedItem) return null;
 
   return (
-    <ToastProvider>
       <div className="feed-modal-overlay" onClick={onClose}>
         <button
           className="feed-modal-swipe-btn feed-modal-swipe-left"
-          onClick={(e) => { e.stopPropagation(); if (hasPrev) onIndexChange(index - 1); }}
+          onClick={(e) => { e.stopPropagation(); if (hasPrev) onIndexChange(prevIndex); }}
           disabled={!hasPrev}
-          title="Previous feed item"
+          title="Previous defect"
         >
           <ChevronLeft size={26} />
         </button>
@@ -93,6 +207,14 @@ const FeedDefectModal = ({ items, index, onIndexChange, onClose, onGoToDefect })
                   onClick={() => onGoToDefect(defect.id, feedItem.meta?.is_internal || feedItem.event_type === 'MENTION')}
                 >
                   <ExternalLink size={14} /> Go to Defect
+                </button>
+              )}
+              {defect && defect.status !== 'CLOSED' && (
+                <button
+                  className={`fm-edit-toggle-btn ${isEditMode ? 'is-active' : ''}`}
+                  onClick={() => setIsEditMode(v => !v)}
+                >
+                  {isEditMode ? <><Check size={14} /> Exit Edit Mode</> : <><Pencil size={14} /> Enable Edit Mode</>}
                 </button>
               )}
             </div>
@@ -143,26 +265,91 @@ const FeedDefectModal = ({ items, index, onIndexChange, onClose, onGoToDefect })
                   </div>
                   <div className="fm-field">
                     <span className="fm-label">Due Date</span>
-                    <span className="fm-value">{formatDate(defect.target_close_date)}</span>
+                    {canEditFields ? (
+                      <input
+                        type="date"
+                        className="fm-edit-input"
+                        defaultValue={toLocalDateInput(defect.target_close_date)}
+                        onBlur={(e) => e.target.value && updateField('target_close_date', e.target.value)}
+                      />
+                    ) : (
+                      <span className="fm-value">{formatDate(defect.target_close_date)}</span>
+                    )}
                   </div>
                   <div className="fm-field">
                     <span className="fm-label">Source</span>
-                    <span className="fm-value">{defect.defect_source}</span>
+                    {canEditFields ? (
+                      <select
+                        className="fm-edit-input"
+                        value={defect.defect_source || ''}
+                        onChange={(e) => updateField('defect_source', e.target.value)}
+                      >
+                        {DEFECT_SOURCE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    ) : (
+                      <span className="fm-value">{defect.defect_source}</span>
+                    )}
                   </div>
                   <div className="fm-field">
                     <span className="fm-label">Priority</span>
+                    {canEditFields ? (
+                      <select
+                        className="fm-edit-input"
+                        value={defect.priority || ''}
+                        onChange={(e) => updateField('priority', e.target.value)}
+                        style={{ color: PRIORITY_COLORS[defect.priority] || '#0f172a', fontWeight: 700 }}
+                      >
+                        {PRIORITY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    ) : (
+                      <span className="fm-value fm-priority-value">
+                        <PrioritySignalBarsIcon
+                          size={13}
+                          color={PRIORITY_COLORS[defect.priority] || '#94a3b8'}
+                          level={{ LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 }[defect.priority]}
+                        />
+                        {defect.priority || '—'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="fm-field">
+                    <span className="fm-label">Status</span>
                     <span className="fm-value fm-priority-value">
-                      <AlertTriangle size={13} color={PRIORITY_COLORS[defect.priority] || '#94a3b8'} />
-                      {defect.priority || '—'}
+                      <span className="fm-status-dot" style={{ background: getStatusColor(defect.status) }} />
+                      {defect.status?.replace('_', ' ') || '—'}
+                    </span>
+                  </div>
+                  <div className="fm-field">
+                    <span className="fm-label">Timeline</span>
+                    <span className="fm-value fm-priority-value">
+                      {defect.status === 'CLOSED'
+                        ? 'Closed'
+                        : TIMELINE_LABELS[getDeadlineStatus(defect.target_close_date)]}
                     </span>
                   </div>
                   <div className="fm-field">
                     <span className="fm-label">Area of Concern</span>
-                    <span className="fm-value">{defect.equipment_name}</span>
+                    {canEditFields ? (
+                      <ScrollableSelect
+                        value={defect.equipment_name}
+                        options={COMPONENT_OPTIONS}
+                        onChange={(val) => updateField('equipment_name', val)}
+                      />
+                    ) : (
+                      <span className="fm-value">{defect.equipment_name}</span>
+                    )}
                   </div>
                   <div className="fm-field fm-field-grow">
                     <span className="fm-label">Description</span>
-                    <span className="fm-value fm-description-value">{defect.description}</span>
+                    {canEditFields ? (
+                      <textarea
+                        className="fm-edit-input fm-edit-textarea"
+                        defaultValue={defect.description}
+                        onBlur={(e) => updateField('description', e.target.value)}
+                      />
+                    ) : (
+                      <span className="fm-value fm-description-value">{defect.description}</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -180,7 +367,7 @@ const FeedDefectModal = ({ items, index, onIndexChange, onClose, onGoToDefect })
                   closureRemarks={defect.closure_remarks}
                   closedAt={defect.closed_at || defect.updated_at}
                   closedById={defect.closed_by_id}
-                  readOnly
+                  fixedHeight="480px"
                 />
                 <div className="fm-images">
                   <BeforeAfterImageUpload
@@ -188,14 +375,14 @@ const FeedDefectModal = ({ items, index, onIndexChange, onClose, onGoToDefect })
                     type="before"
                     isMandatory={defect.before_image_required}
                     defectStatus={defect.status}
-                    readOnly
+                    onToggleRequired={() => updateField('before_image_required', !defect.before_image_required)}
                   />
                   <BeforeAfterImageUpload
                     defectId={defect.id}
                     type="after"
                     isMandatory={defect.after_image_required}
                     defectStatus={defect.status}
-                    readOnly
+                    onToggleRequired={() => updateField('after_image_required', !defect.after_image_required)}
                   />
                 </div>
               </div>
@@ -205,15 +392,20 @@ const FeedDefectModal = ({ items, index, onIndexChange, onClose, onGoToDefect })
 
         <button
           className="feed-modal-swipe-btn feed-modal-swipe-right"
-          onClick={(e) => { e.stopPropagation(); if (hasNext) onIndexChange(index + 1); }}
+          onClick={(e) => { e.stopPropagation(); if (hasNext) onIndexChange(nextIndex); }}
           disabled={!hasNext}
-          title="Next feed item"
+          title="Next defect"
         >
           <ChevronRight size={26} />
         </button>
       </div>
-    </ToastProvider>
   );
 };
+
+const FeedDefectModal = (props) => (
+  <ToastProvider>
+    <FeedDefectModalInner {...props} />
+  </ToastProvider>
+);
 
 export default FeedDefectModal;

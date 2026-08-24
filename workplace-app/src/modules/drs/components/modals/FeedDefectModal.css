@@ -116,6 +116,83 @@
   text-transform: capitalize;
 }
 
+.fm-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.fm-edit-input {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 6px;
+  background: #f8fafc;
+  font-family: inherit;
+  max-width: 200px;
+}
+
+.fm-edit-input:hover {
+  border-color: #cbd5e1;
+}
+
+.fm-edit-input:focus {
+  outline: none;
+  border-color: #ea580c;
+  background: white;
+}
+
+.fm-edit-textarea {
+  max-width: 100%;
+  min-width: 240px;
+  min-height: 40px;
+  resize: vertical;
+  font-weight: 500;
+}
+
+.fm-scrollselect-trigger {
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+
+.fm-scrollselect-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1000;
+  min-width: 200px;
+  max-width: 240px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.fm-scrollselect-option {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fm-scrollselect-option:hover {
+  background: #f1f5f9;
+}
+
+.fm-scrollselect-option.is-selected {
+  font-weight: 700;
+  background: #fff7ed;
+  color: #ea580c;
+}
+
 .fm-description-value {
   font-weight: 500;
   white-space: normal;
@@ -170,6 +247,35 @@
   border-color: #cbd5e1;
 }
 
+.fm-edit-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: white;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  padding: 0 14px;
+  height: 34px;
+  box-sizing: border-box;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.fm-edit-toggle-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.fm-edit-toggle-btn.is-active {
+  background: #ea580c;
+  border-color: #ea580c;
+  color: white;
+}
+
 .fm-unread-btn {
   display: flex;
   align-items: center;
@@ -215,8 +321,7 @@
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 20px;
-  flex: 1;
-  min-height: 350px;
+  height: 480px;
 }
 
 .fm-images {
@@ -224,7 +329,7 @@
   flex-direction: column;
   gap: 15px;
   overflow-y: auto;
-  min-height: 0;
+  height: 100%;
 }
 
 .feed-modal-swipe-btn {
@@ -258,7 +363,7 @@
   }
   .fm-body {
     grid-template-columns: 1fr;
-    flex: none;
+    height: auto;
   }
   .feed-modal-swipe-btn {
     display: none;

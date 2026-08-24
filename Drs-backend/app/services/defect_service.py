@@ -134,6 +134,9 @@ class DefectService:
         except ValueError as e:
             raise ValueError(f"Invalid enum value: {str(e)}")
 
+        # --- Critical/High priority defects always require before/after images ---
+        auto_image_required = priority_enum in (DefectPriority.CRITICAL, DefectPriority.HIGH)
+
         # --- Build defect object (COMMON to both Shore and Vessel) ---
         new_defect = Defect(
             id=defect_in.id,
@@ -150,8 +153,8 @@ class DefectService:
             date_identified=date_identified,
             target_close_date=target_close_date,
             json_backup_path=defect_in.json_backup_path,
-            before_image_required=defect_in.before_image_required or False,
-            after_image_required=defect_in.after_image_required or False,
+            before_image_required=auto_image_required or (defect_in.before_image_required or False),
+            after_image_required=auto_image_required or (defect_in.after_image_required or False),
             before_image_path=defect_in.before_image_path,
             after_image_path=defect_in.after_image_path,
             is_owner=False,
@@ -175,6 +178,8 @@ class DefectService:
             sync_payload["target_close_date"] = target_close_date.isoformat() if target_close_date else None
             sync_payload["is_flagged"] = defect_in.is_flagged
             sync_payload["is_dd"] = defect_in.is_dd
+            sync_payload["before_image_required"] = new_defect.before_image_required
+            sync_payload["after_image_required"] = new_defect.after_image_required
 
             db.add(SyncQueue(
                 entity_id=new_defect.id,           
@@ -231,6 +236,7 @@ class DefectService:
 
         notification_task = None
         priority_changed = False
+        auto_image_required = False
         old_priority = defect.priority
         update_data = defect_update.model_dump(exclude_unset=True)
 
@@ -246,6 +252,11 @@ class DefectService:
                         priority_changed = True
                         old_priority = defect.priority   # capture BEFORE mutating
                         defect.priority = new_priority
+
+                    if new_priority in (DefectPriority.CRITICAL, DefectPriority.HIGH):
+                        defect.before_image_required = True
+                        defect.after_image_required = True
+                        auto_image_required = True
                 except ValueError:
                     pass
 
@@ -380,6 +391,10 @@ class DefectService:
         # --- Version bump (guard against None) ---
         defect.version = (defect.version or 0) + 1
         defect.updated_at = datetime.now(timezone.utc)
+
+        if auto_image_required:
+            update_data["before_image_required"] = True
+            update_data["after_image_required"] = True
 
         # --- SyncQueue: VESSEL ONLY ---
         if _should_sync():

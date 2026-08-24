@@ -9,7 +9,7 @@ import {
   ArrowRight, Flag,
   ArrowRightLeft, Move, Download, Loader2
 } from 'lucide-react';
-import { Flower2, Flower, RefreshCcw } from "lucide-react";
+import { Flower2, RefreshCcw } from "lucide-react";
 import { MessageCircle } from "lucide-react";
 import { Check, Plus, MoreHorizontal, Mail } from 'lucide-react';
 
@@ -38,8 +38,11 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import {
   STATUS_OPTIONS, FILTER_STATUS_OPTIONS, PRIORITY_OPTIONS, DEADLINE_STATUS_OPTIONS, PR_STATUS_OPTIONS, COMPONENT_OPTIONS, DEFECT_SOURCE_OPTIONS,
-  DEFECT_SOURCE_MAP, formatDate, toLocalDateInput, getDeadlineStatus, getDefectSourceLabel, paginate, COLUMN_DEFINITIONS, COLUMN_MIN_WIDTHS
+  DEFECT_SOURCE_MAP, formatDate, toLocalDateInput, getDeadlineStatus, getDefectSourceLabel, paginate, COLUMN_DEFINITIONS, COLUMN_MIN_WIDTHS,
+  PrioritySignalBarsIcon, StatusStageIcon
 } from '@drs/components/shared/constants';
+
+const PRIORITY_PILL_COLORS = { CRITICAL: '#dc2626', HIGH: '#f97316', MEDIUM: '#2563eb', LOW: '#16a34a' };
 
 import {
   FilterHeader,
@@ -2117,11 +2120,14 @@ const VesselDashboard = () => {
       MEDIUM: '#2563eb',     // blue
       LOW: '#16a34a'      // green
     };
+    const levelMap = { LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 };
 
     return (
-      <AlertTriangle
+      <PrioritySignalBarsIcon
         size={20}
         color={colorMap[priority] || '#94a3b8'}
+        level={levelMap[priority]}
+        title={priority}
       />
     );
   };
@@ -2129,12 +2135,12 @@ const VesselDashboard = () => {
 
   const getStatusIcon = (status) => {
     if (status === 'CLOSED') {
-      return <Flower size={20} color="#22c55e" title="Closed" />;
+      return <StatusStageIcon size={20} color="#22c55e" status="CLOSED" title="Closed" />;
     }
     if (status === 'PENDING_CLOSURE') {
-      return <Flower size={20} color="#f59e0b" title="Pending Closure" />;
+      return <StatusStageIcon size={20} color="#f59e0b" status="PENDING_CLOSURE" title="Pending Closure" />;
     }
-    return <Flower size={20} color="#3b82f6" title="Open" />;
+    return <StatusStageIcon size={20} color="#3b82f6" status="OPEN" title="Open" />;
   };
 
 
@@ -2663,10 +2669,10 @@ const VesselDashboard = () => {
             <div className="legend-item">
               <strong>Priority:</strong>
               <span className="legend-icons">
-                <AlertTriangle size={14} color="#16a34a" /> <label>Low</label>
-                <AlertTriangle size={14} color="#2563eb" /> <label>Medium</label>
-                <AlertTriangle size={14} color="#f97316" /> <label>High</label>
-                <AlertTriangle size={14} color="#dc2626" /> <label>Critical</label>
+                <PrioritySignalBarsIcon size={14} color="#16a34a" level={1} /> <label>Low</label>
+                <PrioritySignalBarsIcon size={14} color="#2563eb" level={2} /> <label>Medium</label>
+                <PrioritySignalBarsIcon size={14} color="#f97316" level={3} /> <label>High</label>
+                <PrioritySignalBarsIcon size={14} color="#dc2626" level={4} /> <label>Critical</label>
               </span>
             </div>
 
@@ -2674,9 +2680,9 @@ const VesselDashboard = () => {
             <div className="legend-item">
               <strong>Status:</strong>
               <span className="legend-icons">
-                <Flower size={14} color="#3b82f6" /><label>Open</label>
-                <Flower size={14} color="#f59e0b" /><label>Pending</label>
-                <Flower size={14} color="#22c55e" /><label>Closed</label>
+                <StatusStageIcon size={14} color="#3b82f6" status="OPEN" /><label>Open</label>
+                <StatusStageIcon size={14} color="#f59e0b" status="PENDING_CLOSURE" /><label>Pending</label>
+                <StatusStageIcon size={14} color="#22c55e" status="CLOSED" /><label>Closed</label>
               </span>
             </div>
             <div className="legend-item">
@@ -2863,7 +2869,7 @@ const VesselDashboard = () => {
                                   style={{ cursor: 'pointer', display: 'inline-flex' }}
                                   title="Sort by Priority"
                                 >
-                                  <AlertTriangle size={16} color={filters.text_sort.field === 'priority' ? '#ea580c' : '#64748b'} />
+                                  <PrioritySignalBarsIcon size={16} color={filters.text_sort.field === 'priority' ? '#ea580c' : '#64748b'} />
                                 </span>
                                 <FilterHeader
                                   label=""
@@ -2879,7 +2885,8 @@ const VesselDashboard = () => {
                                   ]}
                                   iconRenderer={(val) => {
                                     const colorMap = { CRITICAL: '#dc2626', HIGH: '#f97316', MEDIUM: '#2563eb', LOW: '#16a34a' };
-                                    return <AlertTriangle size={13} color={colorMap[val]} />;
+                                    const levelMap = { LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 };
+                                    return <PrioritySignalBarsIcon size={13} color={colorMap[val]} level={levelMap[val]} />;
                                   }}
                                 />
                               </div>
@@ -2895,7 +2902,7 @@ const VesselDashboard = () => {
                                   style={{ cursor: 'pointer', display: 'inline-flex' }}
                                   title="Sort by Status"
                                 >
-                                  <Flower size={16} color={filters.text_sort.field === 'status' ? '#ea580c' : '#64748b'} />
+                                  <StatusStageIcon size={16} color={filters.text_sort.field === 'status' ? '#ea580c' : '#64748b'} />
                                 </span>
                                 <FilterHeader
                                   label=""
@@ -2910,7 +2917,7 @@ const VesselDashboard = () => {
                                   ]}
                                   iconRenderer={(val) => {
                                     const colorMap = { OPEN: '#3b82f6', PENDING_CLOSURE: '#f59e0b', CLOSED: '#22c55e' };
-                                    return <Flower size={13} color={colorMap[val]} />;
+                                    return <StatusStageIcon size={13} color={colorMap[val]} status={val} />;
                                   }}
                                 />
                               </div>
@@ -3837,14 +3844,21 @@ const VesselDashboard = () => {
 
                         case 'priority':
                           return (
-                            <td key="priority" style={{ width: 20 }}>
-                              <FloatingSelectWithIcon
-                                icon={getPriorityIcon(newDefect.priority)}
-                                value={newDefect.priority}
-                                options={PRIORITY_OPTIONS}
-                                iconRenderer={getPriorityIcon}
-                                onChange={(val) => setNewDefect(prev => ({ ...prev, priority: val }))}
-                              />
+                            <td key="priority" style={{ width: 44, overflow: 'visible' }}>
+                              <div
+                                className="new-row-priority-pill"
+                                title="Click to set priority"
+                                style={{ borderColor: PRIORITY_PILL_COLORS[newDefect.priority] || '#cbd5e1' }}
+                              >
+                                <FloatingSelectWithIcon
+                                  icon={getPriorityIcon(newDefect.priority)}
+                                  value={newDefect.priority}
+                                  options={PRIORITY_OPTIONS}
+                                  iconRenderer={getPriorityIcon}
+                                  onChange={(val) => setNewDefect(prev => ({ ...prev, priority: val }))}
+                                />
+                                <ChevronDown size={12} color="#94a3b8" />
+                              </div>
                             </td>
                           );
 

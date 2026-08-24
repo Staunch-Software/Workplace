@@ -352,10 +352,27 @@
 }
 .ghost-select:hover { background: #f1f5f9; border-color: #e2e8f0; }
 .ghost-select:focus {
-  background: white; 
-  border-color: var(--accent-orange); 
+  background: white;
+  border-color: var(--accent-orange);
   outline: none;
   box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.1);
+}
+
+/* Priority picker on the "new defect" create row — needs to read as an
+   obviously clickable control, not just a bare icon */
+.new-row-priority-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 6px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 14px;
+  background: white;
+  cursor: pointer;
+}
+
+.new-row-priority-pill:hover {
+  background: #f8fafc;
 }
 
 /* --- ICONS & BADGES --- */

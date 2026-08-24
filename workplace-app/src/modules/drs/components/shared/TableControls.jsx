@@ -1274,21 +1274,53 @@ export const FloatingSelectWithIcon = ({
   disabled
 }) => {
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState(null);
   const ref = useRef(null);
+  const menuRef = useRef(null);
 
   useEffect(() => {
     const close = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (
+        ref.current && !ref.current.contains(e.target) &&
+        (!menuRef.current || !menuRef.current.contains(e.target))
+      ) setOpen(false);
     };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    const reposition = () => setOpen(false);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+    return () => {
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    };
+  }, [open]);
+
+  const toggleOpen = () => {
+    if (disabled) return;
+    if (!open && ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      const estimatedMenuHeight = options.length * 36 + 16;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUp = spaceBelow < estimatedMenuHeight && rect.top > estimatedMenuHeight;
+      setMenuPos({
+        left: rect.left + rect.width / 2,
+        top: openUp ? undefined : rect.bottom + 4,
+        bottom: openUp ? window.innerHeight - rect.top + 4 : undefined,
+      });
+    }
+    setOpen(o => !o);
+  };
+
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-flex' }}>
       {/* ICON ONLY (NORMAL + EDIT MODE) */}
       <span
-        onClick={() => !disabled && setOpen(!open)}
+        onClick={toggleOpen}
         style={{
           cursor: disabled ? 'not-allowed' : 'pointer',
           display: 'inline-flex',
@@ -1299,19 +1331,22 @@ export const FloatingSelectWithIcon = ({
         {icon}
       </span>
 
-      {/* FLOATING SELECT (ICON + NAME) */}
-      {open && !disabled && (
+      {/* FLOATING SELECT (ICON + NAME) — portaled to <body> so it can't be
+          clipped or covered by an ancestor's overflow/stacking context */}
+      {open && !disabled && menuPos && ReactDOM.createPortal(
         <div
+          ref={menuRef}
           style={{
-            position: 'absolute',
-            top: '120%',
-            left: '50%',
+            position: 'fixed',
+            top: menuPos.top,
+            bottom: menuPos.bottom,
+            left: menuPos.left,
             transform: 'translateX(-50%)',
             background: 'white',
             border: '1px solid #e2e8f0',
             borderRadius: '6px',
             boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-            zIndex: 1000,
+            zIndex: 10000,
             minWidth: '140px'
           }}
         >
@@ -1338,7 +1373,8 @@ export const FloatingSelectWithIcon = ({
               <span>{opt}</span>
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -1405,17 +1441,49 @@ export const FloatingSelectText = ({
   width = '100%'
 }) => {
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState(null);
   const ref = useRef(null);
+  const menuRef = useRef(null);
+  const MENU_MAX_HEIGHT = 260;
 
   useEffect(() => {
     const close = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
+      if (
+        ref.current && !ref.current.contains(e.target) &&
+        (!menuRef.current || !menuRef.current.contains(e.target))
+      ) {
         setOpen(false);
       }
     };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const reposition = () => setOpen(false);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+    return () => {
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    };
+  }, [open]);
+
+  const toggleOpen = () => {
+    if (disabled) return;
+    if (!open && ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUp = spaceBelow < MENU_MAX_HEIGHT && rect.top > spaceBelow;
+      setMenuPos({
+        left: rect.left,
+        top: openUp ? undefined : rect.bottom + 4,
+        bottom: openUp ? window.innerHeight - rect.top + 4 : undefined,
+      });
+    }
+    setOpen(o => !o);
+  };
 
   return (
     <div
@@ -1428,7 +1496,7 @@ export const FloatingSelectText = ({
     >
       {/* DISPLAY TEXT */}
       <span
-        onClick={() => !disabled && setOpen(!open)}
+        onClick={toggleOpen}
         title={value}
         style={{
           cursor: disabled ? 'default' : 'pointer',
@@ -1444,18 +1512,21 @@ export const FloatingSelectText = ({
         {getDefectSourceLabel(value) || '—'}
       </span>
 
-      {/* FLOATING DROPDOWN */}
-      {open && !disabled && (
+      {/* FLOATING DROPDOWN — portaled to <body> so it can't be clipped or
+          covered by an ancestor's overflow/stacking context */}
+      {open && !disabled && menuPos && ReactDOM.createPortal(
         <div
+          ref={menuRef}
           style={{
-            position: 'absolute',
-            top: '120%',
-            left: 0,
+            position: 'fixed',
+            top: menuPos.top,
+            bottom: menuPos.bottom,
+            left: menuPos.left,
             background: 'white',
             border: '1px solid #e2e8f0',
             borderRadius: '6px',
             boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-            zIndex: 1000,
+            zIndex: 10000,
             minWidth: '220px',
             maxHeight: '260px',
             overflowY: 'auto'
@@ -1480,7 +1551,8 @@ export const FloatingSelectText = ({
               {getDefectSourceLabel(opt)}
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -1497,20 +1569,52 @@ export const OwnerFloatingSelectWithIcon = ({
   disabled
 }) => {
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState(null);
   const ref = useRef(null);
+  const menuRef = useRef(null);
 
   useEffect(() => {
     const close = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (
+        ref.current && !ref.current.contains(e.target) &&
+        (!menuRef.current || !menuRef.current.contains(e.target))
+      ) setOpen(false);
     };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    const reposition = () => setOpen(false);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+    return () => {
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    };
+  }, [open]);
+
+  const toggleOpen = () => {
+    if (disabled) return;
+    if (!open && ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      const estimatedMenuHeight = options.length * 36 + 16;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUp = spaceBelow < estimatedMenuHeight && rect.top > estimatedMenuHeight;
+      setMenuPos({
+        left: rect.left + rect.width / 2,
+        top: openUp ? undefined : rect.bottom + 4,
+        bottom: openUp ? window.innerHeight - rect.top + 4 : undefined,
+      });
+    }
+    setOpen(o => !o);
+  };
+
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-flex' }}>
       <span
-        onClick={() => !disabled && setOpen(!open)}
+        onClick={toggleOpen}
         style={{
           cursor: disabled ? 'not-allowed' : 'pointer',
           display: 'inline-flex',
@@ -1522,18 +1626,20 @@ export const OwnerFloatingSelectWithIcon = ({
         {icon}
       </span>
 
-      {open && !disabled && (
+      {open && !disabled && menuPos && ReactDOM.createPortal(
         <div
+          ref={menuRef}
           style={{
-            position: 'absolute',
-            top: '120%',
-            left: '50%',
+            position: 'fixed',
+            top: menuPos.top,
+            bottom: menuPos.bottom,
+            left: menuPos.left,
             transform: 'translateX(-50%)',
             background: 'white',
             border: '1px solid #e2e8f0',
             borderRadius: '6px',
             boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-            zIndex: 1000,
+            zIndex: 10000,
             minWidth: '140px'
           }}
         >
@@ -1563,7 +1669,8 @@ export const OwnerFloatingSelectWithIcon = ({
               <span>{labelRenderer ? labelRenderer(opt) : opt}</span>
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

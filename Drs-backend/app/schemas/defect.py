@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
@@ -189,8 +189,14 @@ class ThreadResponse(BaseModel):
     user_id: UUID
     is_system_message: bool = False
     tagged_user_ids: List[str] = []
-    attachments: List['AttachmentResponse'] = [] 
+    attachments: List['AttachmentResponse'] = []
     is_internal: bool = False
+
+    @field_validator('tagged_user_ids', mode='before')
+    @classmethod
+    def _default_tagged_user_ids(cls, v):
+        # Older/system threads can have NULL here — treat as "no mentions".
+        return v if v is not None else []
 
     class Config:
         from_attributes = True
