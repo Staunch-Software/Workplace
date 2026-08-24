@@ -439,7 +439,7 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
                   ) : (
                     <iframe
                       key={sasUrl}
-                      src={`/reports/api/v1/reports/${reportId}/pdf/stream?path=${encodeURIComponent(attachments[activeIdx]?.blob_path || '')}`}
+                      src={reportsApi.getPdfStreamUrl(reportId, attachments[activeIdx]?.blob_path || '')}
                       title={attachments[activeIdx]?.file_name}
                       className="rt-attach-iframe"
                     />

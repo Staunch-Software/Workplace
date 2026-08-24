@@ -402,16 +402,17 @@ export default function OverviewPage() {
   const instanceIndex = useMemo(() => {
     const idx = {};
     reportsForFreq.forEach(r => {
-      const name = r.report_name || 'Unknown';
+      const name = (r.report_name || 'Unknown').trim();
       if (!idx[name]) idx[name] = {};
       if (!idx[name][r.vessel_imo]) idx[name][r.vessel_imo] = [];
-      idx[name][r.vessel_imo].push(r);
+      // Pass normalized name down just in case
+      idx[name][r.vessel_imo].push({ ...r, report_name: name });
     });
     return idx;
   }, [reportsForFreq]);
 
   const reportNames = useMemo(() => {
-    const set = new Set(reportsForFreq.map(r => r.report_name || 'Unknown'));
+    const set = new Set(reportsForFreq.map(r => (r.report_name || 'Unknown').trim()));
     let names = [...set].filter(name =>
       vessels.some(v => (instanceIndex[name]?.[v.imo] || []).some(r => hasValidAttachment(r.attachments)))
     );

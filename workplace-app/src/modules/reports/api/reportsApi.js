@@ -36,27 +36,21 @@ function makeClient(baseURL) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// !! DEPLOYMENT SWITCH — change ONLY the active (uncommented) line per env !!
+// DYNAMIC DEPLOYMENT SWITCH (Auto-detects Local vs Production)
 // ─────────────────────────────────────────────────────────────────────────────
+const isDev = import.meta.env.DEV;
 
 // ── Shore client (SHORE + ADMIN) ──
-// PRODUCTION (Nginx proxy):
-const shoreClient = makeClient('/reports/api/v1');
-// DEV (local):              
-// const shoreClient = makeClient('http://localhost:8006/api/v1');
-// DIRECT VM (staging):       const shoreClient = makeClient('http://52.172.91.85:8006/api/v1');
+const shoreBase = isDev ? 'http://localhost:8006/api/v1' : '/reports/api/v1';
+const shoreClient = makeClient(shoreBase);
 
 // ── Vessel client (VESSEL role — hits the vessel's LOCAL backend) ──
-// PRODUCTION (vessel intranet):
-const vesselClient = makeClient('/reports/api/v1');
-// DEV (local):              
-// const vesselClient = makeClient('http://localhost:8006/api/v1');
+const vesselBase = isDev ? 'http://localhost:8006/api/v1' : '/reports/api/v1';
+const vesselClient = makeClient(vesselBase);
 
 // ── Core client (workplace-backend control plane — owns users & vessels) ──
-// PRODUCTION (Nginx proxy):
-const coreClient = makeClient('/api/v1');
-// DEV (local):             
-// const coreClient = makeClient('http://localhost:8000/api/v1');
+const coreBase = isDev ? 'http://localhost:8000/api/v1' : '/api/v1';
+const coreClient = makeClient(coreBase);
 
 // --- Shore API (SHORE + ADMIN) ---
 export const reportsApi = {

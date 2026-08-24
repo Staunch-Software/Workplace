@@ -450,17 +450,17 @@
 
 /* Overdue / planned rows */
 .rt-data-table tbody tr.rt-row-overdue {
-  background: var(--rt-red-bg);
-  border-left: 3px solid var(--rt-red);
+  background: var(--rt-amber-bg);
+  border-left: 3px solid var(--rt-amber);
 }
-.rt-data-table tbody tr.rt-row-overdue:hover { background: #fde8e8; }
+.rt-data-table tbody tr.rt-row-overdue:hover { background: #fef3d6; }
 .rt-data-table tbody tr.rt-row-today-planned {
   background: var(--rt-amber-bg);
   border-left: 3px solid var(--rt-amber);
 }
 .rt-data-table tbody tr.rt-row-today-planned:hover { background: #fef3d6; }
 
-.rt-due-pin-icon { color: var(--rt-red); }
+.rt-due-pin-icon { color: var(--rt-amber); }
 .rt-row-today-planned .rt-due-pin-icon { color: var(--rt-amber); }
 
 .rt-due-status-label {
@@ -469,7 +469,7 @@
   font-size: 0.7rem; font-weight: 800; white-space: nowrap;
   text-transform: uppercase; letter-spacing: 0.04em;
 }
-.rt-due-status-label.overdue { background: var(--rt-red-bg); color: var(--rt-red); border: 1px solid var(--rt-red-border); }
+.rt-due-status-label.overdue { background: var(--rt-amber-bg); color: var(--rt-amber); border: 1px solid var(--rt-amber-border); }
 .rt-due-status-label.planned { background: var(--rt-amber-bg); color: var(--rt-amber); border: 1px solid var(--rt-amber-border); }
 
 /* Premium Action Button */
