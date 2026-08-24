@@ -550,8 +550,6 @@ thead {
   text-align: center;
   border-right: 1px solid var(--ovw-border);
   white-space: nowrap;
-  width: var(--ovw-cell-std-w);
-  min-width: var(--ovw-cell-std-w);
 }
 
 .ovw-th-vessel:last-child { border-right: none; }

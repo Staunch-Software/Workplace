@@ -19,6 +19,11 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.config import settings
 from app.services.sync_service import SyncService
+from typing import Dict, Any, Optional
+import json
+from sqlalchemy import update
+from app.core.database_control import get_control_db
+from app.model.control.vessel import Vessel
 
 # Engine Performance models
 from app.models import (
@@ -408,6 +413,83 @@ async def sync_shop_trial_performance(payload: SyncPayload, db: AsyncSession = D
         return {"status": "processed", "id": payload.entity_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+# ---------------------------------------------------------------------------
+# Helper: record sync timestamp in Vessel row
+# ---------------------------------------------------------------------------
+
+SYNC_SCOPE = "AEPMS"
+MODULE_KEY = "aepms"
+
+async def record_vessel_sync_time(
+    control_db: AsyncSession,
+    imo: str,
+    is_vessel_pushing: bool,
+    error_msg: str = None,
+    telemetry: dict = None,
+):
+    if not imo:
+        return
+    now = datetime.now(timezone.utc)
+
+    # Update Vessel row in control DB
+    try:
+        res = await control_db.execute(select(Vessel).where(Vessel.imo == imo))
+        vessel = res.scalar_one_or_none()
+        if not vessel:
+            return
+
+        vessel_update = {"updated_at": now}
+        vessel_update["last_push_at" if is_vessel_pushing else "last_pull_at"] = now
+
+        if telemetry is not None or error_msg:
+            reported_count = telemetry.get("failed_items_count", 0) if telemetry else 0
+            active_errors = telemetry.get("active_errors", []) if telemetry else []
+            if error_msg:
+                active_errors.insert(0, {"entity": "Shore-API", "msg": error_msg, "ts": now.isoformat()})
+
+            module_status = dict(vessel.module_status or {})
+            if not module_status.get(MODULE_KEY):
+                module_status[MODULE_KEY] = True
+            vessel_update["module_status"] = module_status
+
+            current_counts = dict(vessel.module_error_counts or {})
+            current_counts[MODULE_KEY] = reported_count
+            vessel_update["module_error_counts"] = current_counts
+            vessel_update["total_error_count"] = sum(current_counts.values())
+            vessel_update["last_sync_success"] = (sum(current_counts.values()) == 0)
+
+            if active_errors:
+                try:
+                    history = json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
+                    latest_msg = active_errors[0].get("msg", "")
+                    if not history or history[0].get("msg") != latest_msg:
+                        history.insert(0, {
+                            "module": MODULE_KEY.upper(),
+                            "type": "vessel_error",
+                            "msg": latest_msg,
+                            "ts": now.isoformat()
+                        })
+                        vessel_update["last_sync_error"] = json.dumps(history[:50])
+                except Exception:
+                    pass
+
+        await control_db.execute(update(Vessel).where(Vessel.imo == imo).values(vessel_update))
+        await control_db.commit()
+    except Exception as e:
+        print(f"record_vessel_sync_time: Vessel update failed: {e}")
+
+@router.post("/heartbeat", dependencies=[Depends(verify_sync_key)])
+async def receive_heartbeat(
+    payload: Dict[str, Any],
+    control_db: AsyncSession = Depends(get_control_db),
+):
+    imo = payload.get("vessel_imo")
+    if not imo:
+        raise HTTPException(status_code=400, detail="vessel_imo missing from payload")
+    telemetry = payload.get("vessel_telemetry") or payload
+    await record_vessel_sync_time(control_db, imo, is_vessel_pushing=False, error_msg=None, telemetry=telemetry)
+    return {"status": "ok"}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # CHANGES FEED  (vessel pulls from shore, or shore pulls from vessel)
 # GET /engine-sync/changes?since=<iso-datetime>
@@ -417,6 +499,7 @@ async def sync_shop_trial_performance(payload: SyncPayload, db: AsyncSession = D
 @router.get("/changes", dependencies=[Depends(verify_sync_key)])
 async def get_engine_changes(
     since: datetime = Query(...),
+    vessel_imo: str = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -464,6 +547,21 @@ async def get_engine_changes(
             results[key] = []
             continue
         stmt = select(model).where(model.updated_at > since)
+
+        if vessel_imo:
+            imo_int = int(vessel_imo)
+            if hasattr(model, "imo_number"):
+                stmt = stmt.where(model.imo_number == imo_int)
+            elif hasattr(model, "report_id"):
+                if key.startswith("ae_") or key.startswith("generator_"):
+                    stmt = stmt.join(GeneratorMonthlyReportHeader, model.report_id == GeneratorMonthlyReportHeader.report_id).where(GeneratorMonthlyReportHeader.imo_number == imo_int)
+                else:
+                    stmt = stmt.join(MonthlyReportHeader, model.report_id == MonthlyReportHeader.report_id).where(MonthlyReportHeader.imo_number == imo_int)
+            elif hasattr(model, "engine_no"):
+                stmt = stmt.join(VesselInfo, model.engine_no == VesselInfo.engine_no).where(VesselInfo.imo_number == imo_int)
+            elif hasattr(model, "generator_no"):
+                stmt = stmt.join(VesselGenerator, model.generator_no == VesselGenerator.generator_no).where(VesselGenerator.imo_number == imo_int)
+
         items = (await db.execute(stmt)).scalars().all()
         results[key] = [
             {c.name: getattr(i, c.name) for c in i.__table__.columns}
