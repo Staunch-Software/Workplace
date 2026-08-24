@@ -5,7 +5,8 @@ from typing import Optional, List, Any
 from app.core.database_control import get_control_db as get_db
 from app.model.control.user import User
 from datetime import datetime
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 import bcrypt
 import logging
 from app.utils.auth_utils import (
@@ -74,27 +75,28 @@ def require_admin(current_user: dict = Depends(get_current_user)):
 # ======================= ROUTES =======================
 
 @router.post("/sso/microsoft", response_model=TokenResponse)
-async def microsoft_sso_login(request: MicrosoftSSORequest, db: Session = Depends(get_db)):
+async def microsoft_sso_login(request: MicrosoftSSORequest, db: AsyncSession = Depends(get_db)):
     try:
         # Validate Microsoft token
         ms_user_info = validate_microsoft_token(request.id_token)
-        
+
         # Check if user exists in database
-        user = db.query(User).filter_by(email=ms_user_info["email"]).first()
-        
+        result = await db.execute(select(User).filter_by(email=ms_user_info["email"]))
+        user = result.scalar_one_or_none()
+
         if not user:
             # NEW USER - Create as INACTIVE
             email_domain = ms_user_info["email"].split("@")[1]
-            
+
             user = User(
                 full_name=ms_user_info["name"],
                 email=ms_user_info["email"],
                 role="VESSEL",
                 is_active=False,
             )
-            
+
             db.add(user)
-            db.commit()
+            await db.commit()
             
             raise HTTPException(
                 status_code=403, 
@@ -116,8 +118,8 @@ async def microsoft_sso_login(request: MicrosoftSSORequest, db: Session = Depend
             )
         
         user.last_login = datetime.utcnow()
-        db.commit()
-        
+        await db.commit()
+
         app_token = create_application_jwt({
             "id": str(user.id),
             "email": user.email,
@@ -125,9 +127,9 @@ async def microsoft_sso_login(request: MicrosoftSSORequest, db: Session = Depend
             "role": user.role,
             "permissions": user.permissions or {}
         })
-        
+
         from app.config import settings
-        
+
         return TokenResponse(
             access_token=app_token,
             token_type="bearer",
@@ -141,7 +143,7 @@ async def microsoft_sso_login(request: MicrosoftSSORequest, db: Session = Depend
                 access_type=user.access_type
             )
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -149,7 +151,7 @@ async def microsoft_sso_login(request: MicrosoftSSORequest, db: Session = Depend
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/local/login", response_model=TokenResponse)
-async def local_login(request: LocalLoginRequest, db: Session = Depends(get_db)):
+async def local_login(request: LocalLoginRequest, db: AsyncSession = Depends(get_db)):
     """Local authentication endpoint."""
     
     # --- ADMIN BYPASS FOR TESTING ---
@@ -175,22 +177,23 @@ async def local_login(request: LocalLoginRequest, db: Session = Depends(get_db))
         )
     # --------------------------------
 
-    user = db.query(User).filter_by(email=request.email).first()
-    
+    result = await db.execute(select(User).filter_by(email=request.email))
+    user = result.scalar_one_or_none()
+
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    
+
     if not user.password_hash:
         raise HTTPException(status_code=403, detail="Local login disabled. Use SSO.")
-    
+
     if not bcrypt.checkpw(request.password.encode('utf-8'), user.password_hash.encode('utf-8')):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    
+
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account not activated")
-    
+
     user.last_login = datetime.utcnow()
-    db.commit()
+    await db.commit()
     
     app_token = create_application_jwt({
         "id": str(user.id),
