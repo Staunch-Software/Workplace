@@ -4,7 +4,7 @@ import { X, ChevronLeft, ChevronRight, ExternalLink, Flag, Lock, MailOpen, Penci
 import { defectApi } from '@drs/services/defectApi';
 import {
   formatDate, getStatusColor, getDeadlineStatus, toLocalDateInput,
-  PRIORITY_OPTIONS, DEFECT_SOURCE_OPTIONS, COMPONENT_OPTIONS, PrioritySignalBarsIcon,
+  PRIORITY_OPTIONS, DEFECT_SOURCE_OPTIONS, COMPONENT_OPTIONS, PrioritySignalBarsIcon, StatusStageIcon,
 } from '../shared/constants';
 import { ToastProvider, ThreadSection, BeforeAfterImageUpload, useToast } from '../../features/shore/ShoreDashboard';
 import './FeedDefectModal.css';
@@ -315,7 +315,7 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                   <div className="fm-field">
                     <span className="fm-label">Status</span>
                     <span className="fm-value fm-priority-value">
-                      <span className="fm-status-dot" style={{ background: getStatusColor(defect.status) }} />
+                      <StatusStageIcon size={13} color={getStatusColor(defect.status)} status={defect.status} />
                       {defect.status?.replace('_', ' ') || '—'}
                     </span>
                   </div>
@@ -339,7 +339,7 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                       <span className="fm-value">{defect.equipment_name}</span>
                     )}
                   </div>
-                  <div className="fm-field fm-field-grow">
+                  <div className={`fm-field fm-field-grow ${canEditFields ? 'fm-field-grow-full' : ''}`}>
                     <span className="fm-label">Description</span>
                     {canEditFields ? (
                       <textarea

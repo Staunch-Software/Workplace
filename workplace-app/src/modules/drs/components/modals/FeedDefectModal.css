@@ -95,6 +95,10 @@
   min-width: 160px;
 }
 
+.fm-field-grow-full {
+  flex-basis: 100%;
+}
+
 .fm-label {
   font-size: 10px;
   font-weight: 700;
@@ -114,13 +118,6 @@
   align-items: center;
   gap: 5px;
   text-transform: capitalize;
-}
-
-.fm-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
 }
 
 .fm-edit-input {
@@ -146,11 +143,12 @@
 }
 
 .fm-edit-textarea {
+  width: 100%;
   max-width: 100%;
-  min-width: 240px;
-  min-height: 40px;
+  min-height: 60px;
   resize: vertical;
   font-weight: 500;
+  box-sizing: border-box;
 }
 
 .fm-scrollselect-trigger {
