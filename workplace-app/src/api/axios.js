@@ -6,9 +6,9 @@ import { handleExpiredSession } from '../utils/authGuard';
 // ─────────────────────────────────────────────────────────────────────────────
 const api = axios.create({
   // PRODUCTION (Nginx proxy):
-  // baseURL: '/api/v1',
+  baseURL: '/api/v1',
   // DEV (local):
-  baseURL: 'http://localhost:8000/api/v1',
+  // baseURL: 'http://localhost:8000/api/v1',
   // DIRECT VM (staging):
   // baseURL: 'http://52.172.91.85:8003/api/v1',
   headers: { 'Content-Type': 'application/json' },
