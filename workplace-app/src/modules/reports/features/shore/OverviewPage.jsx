@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import '../../styles/Reports.css';
 import '../../styles/OverviewPage.css';
+import { compareReportNames } from '../../reportOrder';
 
 const FREQUENCIES = [
   { id: 'WEEKLY',    label: 'Weekly' },
@@ -431,7 +432,7 @@ export default function OverviewPage() {
       vessels.some(v => (instanceIndex[name]?.[v.imo] || []).some(r => hasValidAttachment(r.attachments)))
     );
     if (search) names = names.filter(n => n.toLowerCase().includes(search.toLowerCase()));
-    return names.sort((a, b) => a.localeCompare(b));
+    return names.sort(compareReportNames);
   }, [reportsForFreq, search, vessels, instanceIndex]);
 
   /* Opening a report from the matrix should clear its unread badge, same as

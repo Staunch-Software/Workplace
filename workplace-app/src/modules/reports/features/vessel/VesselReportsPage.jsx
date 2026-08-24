@@ -8,6 +8,7 @@ import VesselThreadPanel from "../../components/VesselThreadPanel";
 import ReportViewerModal from "../../components/ReportViewerModal";
 import { FileText, MessageSquare, Search, X, WifiOff, ChevronRight, Paperclip, AlertTriangle, CalendarClock } from "lucide-react";
 import "../../styles/Reports.css";
+import { compareReportNames } from "../../reportOrder";
 
 const FREQUENCIES = [
   { id: 'WEEKLY', label: 'WEEKLY' },
@@ -112,13 +113,7 @@ export default function VesselReportsPage() {
     if (sidebarSearch) {
       names = names.filter(n => n.toLowerCase().includes(sidebarSearch.toLowerCase()));
     }
-    return names.sort((a, b) => {
-      const datesA = treeData[freq][a].map(r => new Date(r.due_date || r.job_date || r.created_at || 0).getTime());
-      const maxA = datesA.length ? Math.max(...datesA) : 0;
-      const datesB = treeData[freq][b].map(r => new Date(r.due_date || r.job_date || r.created_at || 0).getTime());
-      const maxB = datesB.length ? Math.max(...datesB) : 0;
-      return maxB - maxA;
-    });
+    return names.sort(compareReportNames);
   }, [treeData, sidebarSearch]);
 
   // Auto-select first report if none selected

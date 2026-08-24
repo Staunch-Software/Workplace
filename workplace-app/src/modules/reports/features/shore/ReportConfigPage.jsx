@@ -11,6 +11,7 @@ import {
   Clock, RefreshCcw, Settings, Zap, ChevronDown
 } from 'lucide-react';
 import '../../styles/ReportConfigPage.css';
+import { compareReportNames } from '../../reportOrder';
 
 const EMPTY_FORM = { vessel_name: '', vessel_imo: '', report_name: '', department: 'DECK', frequency: 'MONTHLY' };
 const FREQS = ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'YEARLY', 'OTHER'];
@@ -136,8 +137,8 @@ export default function ReportConfigPage() {
         );
         return { ...c, scrapeStatus: scraped?.scrape_status || 'MISSING', lastScraped: scraped?.updated_at, nextDueDate: scraped?.next_due_date };
       });
-      // Sort configs by report code
-      g.configs.sort((a, b) => a.report_code.localeCompare(b.report_code));
+      // Sort configs by the canonical report order
+      g.configs.sort((a, b) => compareReportNames(a.report_name, b.report_name));
     });
 
     const sortedGroups = Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
