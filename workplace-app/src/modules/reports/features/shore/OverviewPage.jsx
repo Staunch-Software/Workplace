@@ -156,13 +156,16 @@ function earliestAttachmentDate(instances) {
   return earliest;
 }
 
-/* Resolves what a cell should show: an existing attachment, a missing
-   (overdue, no submission) state, a pending (not yet due) state, or blank.
-   Missing/Pending only apply to a period that actually has a report record
-   in the dashboard (a `match`) — periods with no report instance at all are
-   left blank rather than inventing a status for them. Also gated to after
-   the report/vessel's first-ever attachment — not tracked before that. */
-function cellStatus(instances, bucket, now) {
+/* Resolves what a cell should show.
+   Rules (client requirement):
+   - 'has'       : attachment present
+   - 'pending'   : the ONE most-recent past bucket that has no attachment,
+                   and only after Tuesday of the FOLLOWING week.
+   - 'blank'     : no report record, before tracking started, current week,
+                   grace period before next Tuesday, or an older incomplete period.
+   Only the single latest incomplete bucket is surfaced so the matrix
+   stays clean and actionable. */
+function cellStatus(instances, bucket, now, isLatestIncompleteBucket) {
   const match = findBestMatch(instances, bucket.start, bucket.end);
   if (match && hasValidAttachment(match.attachments)) {
     return { status: 'has', match, date: reportDate(match) };
@@ -174,7 +177,41 @@ function cellStatus(instances, bucket, now) {
   if (!firstDate || bucket.start < firstDate) {
     return { status: 'blank' };
   }
-  return { status: bucket.end < now ? 'missing' : 'pending', match, date: reportDate(match) };
+
+  // For past buckets: only the MOST RECENT incomplete one shows as pending.
+  if (!isLatestIncompleteBucket) {
+    return { status: 'blank' };
+  }
+
+  // Only show Pending after Tuesday of the FOLLOWING week.
+  const followingTuesday = new Date(bucket.end);
+  followingTuesday.setDate(followingTuesday.getDate() + 2); // Sun → Tue
+  followingTuesday.setHours(0, 0, 0, 0);
+
+  if (now >= followingTuesday) {
+    return { status: 'pending', match, date: reportDate(match) };
+  }
+
+  // Before following Tuesday (including current week) — stay blank
+  return { status: 'blank', match, date: reportDate(match) };
+}
+
+/* Returns the key of the latest bucket (by bucket.end) that has no
+   valid attachment but does have a report record. Used so that only
+   the single most-actionable incomplete bucket is shown per cell column. */
+function latestIncompleteBucketKey(instances, buckets) {
+  const firstDate = earliestAttachmentDate(instances);
+  if (!firstDate) return null;
+  // Walk buckets newest-first, find first one without a valid attachment
+  for (let i = buckets.length - 1; i >= 0; i--) {
+    const b = buckets[i];
+    if (b.start < firstDate) break; // before tracking started
+    const match = findBestMatch(instances, b.start, b.end);
+    if (match && !hasValidAttachment(match.attachments)) {
+      return b.key;
+    }
+  }
+  return null;
 }
 
 /* ─── Sub-components ────────────────────────────────────────────────────── */
@@ -252,28 +289,20 @@ function AttachmentPreviewModal({ report, onClose }) {
   );
 }
 
-function AttachmentCell({ instances, bucket, now, onOpen, viewerRole }) {
-  const { status, match, date } = cellStatus(instances, bucket, now);
+function AttachmentCell({ instances, bucket, now, onOpen, viewerRole, buckets }) {
+  const latestKey = latestIncompleteBucketKey(instances, buckets);
+  const isCurrentBucket = bucket.start <= now && now <= bucket.end;
+  const isLatestIncomplete = isCurrentBucket || bucket.key === latestKey;
+  const { status, match, date } = cellStatus(instances, bucket, now, isLatestIncomplete);
 
   if (status === 'blank') {
     return <div className="ovw-chip-empty" />;
   }
-  if (status === 'missing') {
-    return (
-      <div className="ovw-chip ovw-chip-missing" title={`${bucket.label}: ${fmtShort(date)} — Missing attachment`}>
-        <span className="ovw-chip-missing-icon">
-          <AlertCircle size={13} />
-        </span>
-        <span>Missing</span>
-        <span className="ovw-chip-sub-date">{fmtShort(date)}</span>
-      </div>
-    );
-  }
   if (status === 'pending') {
     return (
-      <div className="ovw-chip ovw-chip-pending" title={`${bucket.label}: ${fmtShort(date)} — Not yet due`}>
+      <div className="ovw-chip ovw-chip-pending" title={`${bucket.label}: ${fmtShort(date)} — Pending submission`}>
         <span className="ovw-chip-pending-icon">
-          <Clock size={13} />
+          <AlertCircle size={13} />
         </span>
         <span>Pending</span>
         <span className="ovw-chip-sub-date">{fmtShort(date)}</span>
@@ -431,6 +460,13 @@ export default function OverviewPage() {
 
   const isWeekly = frequency === 'WEEKLY';
 
+  /* Key of the bucket that contains today — used to underline current-week header */
+  const currentWeekKey = useMemo(() => {
+    if (!isWeekly) return null;
+    const found = buckets.find(b => b.start <= now && now <= b.end);
+    return found ? found.key : null;
+  }, [buckets, isWeekly]); // eslint-disable-line
+
   // When the data columns' natural width leaves spare room in the scroll
   // container (few vessels/reports on a wide screen), spread that leftover
   // space evenly across the data columns only — the Report Name column
@@ -559,10 +595,6 @@ export default function OverviewPage() {
             <span className="ovw-legend-swatch pending" />
             <span>Pending</span>
           </div>
-          <div className="ovw-legend-pill">
-            <span className="ovw-legend-swatch missing" />
-            <span>Missing</span>
-          </div>
 
           {/* Search */}
           <div className="ovw-search-box">
@@ -637,8 +669,13 @@ export default function OverviewPage() {
                   <tr className="ovw-thead-row2">
                     {vessels.map(v =>
                       buckets.map(b => (
-                        <th key={`${v.imo}-${b.key}`} className="ovw-th-week" title={`Week ${b.number} · ${b.sub}`}>
+                        <th
+                          key={`${v.imo}-${b.key}`}
+                          className={`ovw-th-week${b.key === currentWeekKey ? ' ovw-th-week-current' : ''}`}
+                          title={`Week ${b.number} · ${b.sub}`}
+                        >
                           {b.label}
+                          {b.key === currentWeekKey && <span className="ovw-current-week-dot" />}
                         </th>
                       ))
                     )}
@@ -673,7 +710,7 @@ export default function OverviewPage() {
                       if (isWeekly) {
                         return buckets.map(b => (
                           <td key={`${v.imo}-${b.key}`} className="ovw-td-cell ovw-td-week">
-                            <AttachmentCell instances={instances} bucket={b} now={now} onOpen={handleOpenReport} viewerRole={user?.role} />
+                            <AttachmentCell instances={instances} bucket={b} now={now} onOpen={handleOpenReport} viewerRole={user?.role} buckets={buckets} />
                           </td>
                         ));
                       }
@@ -683,7 +720,7 @@ export default function OverviewPage() {
                         <td key={v.imo} className="ovw-td-cell">
                           <div className="ovw-icon-group">
                             {buckets.map(b => (
-                              <AttachmentCell key={b.key} instances={instances} bucket={b} now={now} onOpen={handleOpenReport} viewerRole={user?.role} />
+                              <AttachmentCell key={b.key} instances={instances} bucket={b} now={now} onOpen={handleOpenReport} viewerRole={user?.role} buckets={buckets} />
                             ))}
                           </div>
                         </td>

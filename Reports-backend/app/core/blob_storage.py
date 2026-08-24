@@ -177,3 +177,9 @@ def verify_blob_exists(blob_name: str) -> bool:
     except Exception as e:
         logger.error(f"Error checking blob '{blob_name}': {e}")
         return False
+
+
+def download_blob_bytes(blob_name: str) -> bytes:
+    """Reads blob bytes directly from Azure storage."""
+    container = get_container_client()
+    return container.get_blob_client(blob_name).download_blob().readall()

@@ -42,18 +42,21 @@ function makeClient(baseURL) {
 // ── Shore client (SHORE + ADMIN) ──
 // PRODUCTION (Nginx proxy):
 const shoreClient = makeClient('/reports/api/v1');
-// DEV (local):              const shoreClient = makeClient('http://localhost:8006/api/v1');
+// DEV (local):              
+// const shoreClient = makeClient('http://localhost:8006/api/v1');
 // DIRECT VM (staging):       const shoreClient = makeClient('http://52.172.91.85:8006/api/v1');
 
 // ── Vessel client (VESSEL role — hits the vessel's LOCAL backend) ──
 // PRODUCTION (vessel intranet):
 const vesselClient = makeClient('/reports/api/v1');
-// DEV (local):              const vesselClient = makeClient('http://localhost:8006/api/v1');
+// DEV (local):              
+// const vesselClient = makeClient('http://localhost:8006/api/v1');
 
 // ── Core client (workplace-backend control plane — owns users & vessels) ──
 // PRODUCTION (Nginx proxy):
 const coreClient = makeClient('/api/v1');
-// DEV (local):              const coreClient = makeClient('http://localhost:8000/api/v1');
+// DEV (local):             
+// const coreClient = makeClient('http://localhost:8000/api/v1');
 
 // --- Shore API (SHORE + ADMIN) ---
 export const reportsApi = {
@@ -66,6 +69,8 @@ export const reportsApi = {
     shoreClient.get(`/reports/${reportId}/pdf`).then((r) => r.data),
   getPdfUrlByPath: (reportId, path) =>
     shoreClient.get(`/reports/${reportId}/pdf`, { params: path ? { path } : {} }).then((r) => r.data),
+  getPdfStreamUrl: (reportId, path) => 
+    `${shoreClient.defaults.baseURL}/reports/${reportId}/pdf/stream${path ? `?path=${encodeURIComponent(path)}` : ''}`,
   getThreads: (reportId) =>
     shoreClient.get(`/reports/${reportId}/threads`).then((r) => r.data),
   postThread: (reportId, payload) =>
@@ -111,6 +116,8 @@ export const vesselReportsApi = {
     vesselClient.get(`/reports/${reportId}/pdf`).then((r) => r.data),
   getPdfUrlByPath: (reportId, path) =>
     vesselClient.get(`/reports/${reportId}/pdf`, { params: path ? { path } : {} }).then((r) => r.data),
+  getPdfStreamUrl: (reportId, path) => 
+    `${vesselClient.defaults.baseURL}/reports/${reportId}/pdf/stream${path ? `?path=${encodeURIComponent(path)}` : ''}`,
   getThreads: (reportId) =>
     vesselClient.get(`/reports/${reportId}/threads`).then((r) => r.data),
   // Message queued offline -> pushed by sync worker when online

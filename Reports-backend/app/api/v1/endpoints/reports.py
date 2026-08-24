@@ -25,9 +25,14 @@ from app.models.sync import SyncQueue
 from app.api.deps import require_shore, require_any
 from app.models.report import Report, ReportThread, ReportConfig, ReportEvent, VerifyStatus
 from app.schemas.report import ReportOut, ReportListOut, SasUrlOut, VerifyRequest
-from app.core.blob_storage import generate_read_sas_url, verify_blob_exists
+from app.core.blob_storage import generate_read_sas_url, verify_blob_exists, download_blob_bytes
+import mimetypes
+import io
+from fastapi.responses import StreamingResponse
+import logging
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
+logger = logging.getLogger("reports.endpoints")
 
 
 def _should_sync() -> bool:
@@ -268,3 +273,44 @@ async def get_report_pdf_url(
 
     sas_url = generate_read_sas_url(target_path)
     return SasUrlOut(sas_url=sas_url, blob_path=target_path)
+
+
+@router.get("/{report_id}/pdf/stream")
+async def stream_report_pdf(
+    report_id: UUID,
+    path: Optional[str] = Query(None, description="Specific blob path to stream"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Streams the attachment bytes through this API instead of handing the
+    browser a direct blob-storage URL. On the vessel, a raw SAS URL always
+    points at 127.0.0.1 (local Azurite) -- that only resolves correctly for
+    a browser running on the server machine itself, not for other crew PCs
+    on the vessel's LAN. Routing the bytes through this endpoint (reachable
+    via the same nginx proxy as everything else) fixes that regardless of
+    which machine the request comes from.
+    """
+    stmt = select(Report).where(Report.id == report_id).options(selectinload(Report.attachments))
+    result = await db.execute(stmt)
+    report = result.scalars().first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if not report.attachments:
+        raise HTTPException(status_code=404, detail="Attachment not available")
+
+    if path:
+        valid_paths = [att.blob_path for att in report.attachments]
+        if path not in valid_paths:
+            raise HTTPException(status_code=403, detail="Requested path does not belong to this report")
+        target_path = path
+    else:
+        target_path = report.attachments[0].blob_path
+
+    try:
+        data = download_blob_bytes(target_path)
+    except Exception as e:
+        logger.warning(f"Could not stream '{target_path}': {e}")
+        raise HTTPException(status_code=404, detail="Attachment not available")
+
+    content_type, _ = mimetypes.guess_type(target_path)
+    return StreamingResponse(io.BytesIO(data), media_type=content_type or "application/octet-stream")

@@ -3,9 +3,32 @@ import React, { useState, useMemo, useCallback, useRef } from 'react';
 import JSZip from 'jszip';
 import {
   X, Search, Download, Ship, FileText, Check, Loader2,
-  Package, ChevronLeft, AlertCircle, CheckSquare, Square, Minus,
+  Package, ChevronLeft, AlertCircle, CheckSquare, Square, Minus, CalendarDays,
 } from 'lucide-react';
 import { reportsApi } from '../api/reportsApi';
+
+const FREQUENCIES = [
+  { id: 'ALL',       label: 'All' },
+  { id: 'WEEKLY',    label: 'Weekly' },
+  { id: 'MONTHLY',   label: 'Monthly' },
+  { id: 'QUARTERLY', label: 'Quarterly' },
+];
+
+function normalizeFreq(f) {
+  if (!f) return 'OTHER';
+  const u = f.toUpperCase().replace(/[\s-]/g, '_');
+  if (u.includes('WEEK')) return 'WEEKLY';
+  if (u.includes('MONTH') || u === '1_MONTH') return 'MONTHLY';
+  if (u.includes('QUARTER') || u === '3_MONTH') return 'QUARTERLY';
+  if (u.includes('HALF') || u === '6_MONTH') return 'HALF_YEARLY';
+  if (u.includes('YEAR') || u === '12_MONTH') return 'YEARLY';
+  return 'OTHER';
+}
+
+function reportDate(r) {
+  const d = r.due_date || r.job_date || r.created_at;
+  return d ? new Date(d) : null;
+}
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
 function getOriginalFilename(att) {
@@ -23,7 +46,13 @@ function hasValidAttachment(attachments) {
   return Array.isArray(attachments) &&
     attachments.some(a => a.blob_path && !a.blob_path.startsWith('MISSING:'));
 }
-function today() { return new Date().toISOString().slice(0, 10); }
+/* Compact date for filenames, e.g. "15Aug2026". */
+function fmtFilenameDate(date) {
+  if (!date) return '';
+  const d = String(date.getDate()).padStart(2, '0');
+  const m = date.toLocaleDateString('en-GB', { month: 'short' });
+  return `${d}${m}${date.getFullYear()}`;
+}
 
 export default function BulkDownloadModal({ vessels = [], reports = [], onClose }) {
   const [step, setStep] = useState(1);
@@ -31,6 +60,9 @@ export default function BulkDownloadModal({ vessels = [], reports = [], onClose 
   const [vesselSearch, setVesselSearch] = useState('');
   const [reportSearch, setReportSearch] = useState('');
   const [selectedReportNames, setSelectedReportNames] = useState(new Set());
+  const [frequency, setFrequency] = useState('ALL');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, label: '' });
   const [error, setError] = useState('');
@@ -38,11 +70,30 @@ export default function BulkDownloadModal({ vessels = [], reports = [], onClose 
 
   const selectedVessel = vessels.find(v => v.imo === selectedVesselImo);
 
+  /* A report instance passes if it belongs to the selected vessel, matches
+     the chosen frequency (or ALL), and its report date falls inside the
+     chosen from/to range (either side left blank = unbounded). */
+  const passesFilters = useCallback((r) => {
+    if (r.vessel_imo !== selectedVesselImo) return false;
+    if (frequency !== 'ALL' && normalizeFreq(r.frequency) !== frequency) return false;
+    if (fromDate || toDate) {
+      const d = reportDate(r);
+      if (!d) return false;
+      if (fromDate && d < new Date(`${fromDate}T00:00:00`)) return false;
+      if (toDate && d > new Date(`${toDate}T23:59:59`)) return false;
+    }
+    return true;
+  }, [selectedVesselImo, frequency, fromDate, toDate]);
+
+  const filteredVesselReports = useMemo(
+    () => reports.filter(passesFilters),
+    [reports, passesFilters]
+  );
+
   const availableReports = useMemo(() => {
     if (!selectedVesselImo) return [];
     const map = new Map();
-    reports.forEach(r => {
-      if (r.vessel_imo !== selectedVesselImo) return;
+    filteredVesselReports.forEach(r => {
       if (!hasValidAttachment(r.attachments)) return;
       const name = r.report_name || 'Unknown';
       const prev = map.get(name) || { count: 0, files: 0 };
@@ -52,7 +103,7 @@ export default function BulkDownloadModal({ vessels = [], reports = [], onClose 
       });
     });
     return [...map.entries()].map(([name, info]) => ({ name, ...info })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [selectedVesselImo, reports]);
+  }, [selectedVesselImo, filteredVesselReports]);
 
   const filteredVessels = useMemo(() =>
     vesselSearch ? vessels.filter(v => v.name.toLowerCase().includes(vesselSearch.toLowerCase())) : vessels,
@@ -83,7 +134,8 @@ export default function BulkDownloadModal({ vessels = [], reports = [], onClose 
 
   const handleVesselSelect = useCallback((imo) => {
     setSelectedVesselImo(imo); setSelectedReportNames(new Set());
-    setReportSearch(''); setError(''); setStep(2);
+    setReportSearch(''); setFrequency('ALL'); setFromDate(''); setToDate('');
+    setError(''); setStep(2);
   }, []);
 
   const handleBackToVessels = useCallback(() => { setStep(1); setError(''); }, []);
@@ -93,12 +145,18 @@ export default function BulkDownloadModal({ vessels = [], reports = [], onClose 
     if (n === 2 && selectedVesselImo) setStep(2);
   }, [downloading, selectedVesselImo]);
 
+  /* Changing a filter can invalidate report names picked under a different
+     filter, so drop the selection whenever frequency or the date range moves. */
+  const handleFrequencyChange = useCallback((id) => { setFrequency(id); setSelectedReportNames(new Set()); }, []);
+  const handleFromDateChange = useCallback((v) => { setFromDate(v); setSelectedReportNames(new Set()); }, []);
+  const handleToDateChange = useCallback((v) => { setToDate(v); setSelectedReportNames(new Set()); }, []);
+  const handleClearDates = useCallback(() => { setFromDate(''); setToDate(''); setSelectedReportNames(new Set()); }, []);
+
   const handleDownload = useCallback(async () => {
     if (!selectedVesselImo || selectedReportNames.size === 0 || downloading) return;
     abortRef.current = false; setDownloading(true); setError('');
     const tasks = [];
-    reports.forEach(r => {
-      if (r.vessel_imo !== selectedVesselImo) return;
+    filteredVesselReports.forEach(r => {
       if (!selectedReportNames.has(r.report_name)) return;
       r.attachments?.forEach(att => { if (att.blob_path && !att.blob_path.startsWith('MISSING:')) tasks.push({ report: r, att }); });
     });
@@ -132,13 +190,26 @@ export default function BulkDownloadModal({ vessels = [], reports = [], onClose 
       setProgress({ current: tasks.length, total: tasks.length, label: 'Building ZIP…' });
       const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
       const url = URL.createObjectURL(zipBlob);
+
+      // Filename: Vessel + Frequency + the actual date span of the reports
+      // included (not today's date) — falls back to "AllDates" if none of
+      // the included reports carry a usable date.
+      const vesselPart = (selectedVessel?.name || 'vessel').replace(/\s+/g, '_');
+      const freqPart = frequency === 'ALL' ? 'All' : FREQUENCIES.find(f => f.id === frequency)?.label || 'All';
+      const dates = tasks.map(t => reportDate(t.report)).filter(Boolean).sort((a, b) => a - b);
+      const datePart = dates.length === 0
+        ? 'AllDates'
+        : (fmtFilenameDate(dates[0]) === fmtFilenameDate(dates[dates.length - 1])
+          ? fmtFilenameDate(dates[0])
+          : `${fmtFilenameDate(dates[0])}-${fmtFilenameDate(dates[dates.length - 1])}`);
+
       const a = document.createElement('a');
-      a.href = url; a.download = `${(selectedVessel?.name || 'vessel').replace(/\s+/g, '_')}_reports_${today()}.zip`;
+      a.href = url; a.download = `${vesselPart}_${freqPart}_${datePart}.zip`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
       if (failed > 0) setError(`${failed} file${failed > 1 ? 's' : ''} could not be downloaded and were skipped.`);
     }
     setDownloading(false); setProgress({ current: 0, total: 0, label: '' });
-  }, [selectedVesselImo, selectedReportNames, reports, selectedVessel, downloading]);
+  }, [selectedVesselImo, selectedReportNames, filteredVesselReports, selectedVessel, frequency, downloading]);
 
   const pct = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
   const canDownload = step === 2 && selectedVesselImo && selectedReportNames.size > 0 && !downloading;
@@ -203,7 +274,7 @@ export default function BulkDownloadModal({ vessels = [], reports = [], onClose 
             </div>
           )}
 
-          {/* Step 2 — Reports */}
+          {/* Step 2 — Reports, with the frequency/date filter bar above the list */}
           {step === 2 && (
             <div className="bdl-step-panel">
               <div className="bdl-step2-toolbar">
@@ -211,8 +282,35 @@ export default function BulkDownloadModal({ vessels = [], reports = [], onClose 
                 <span className="bdl-vessel-chip"><Ship size={12} />{selectedVessel?.name}</span>
               </div>
 
+              <div className="bdl-filter-bar">
+                <div className="bdl-freq-tabs">
+                  {FREQUENCIES.map(f => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className={`bdl-freq-tab ${frequency === f.id ? 'active' : ''}`}
+                      onClick={() => handleFrequencyChange(f.id)}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="bdl-date-input-wrap">
+                  <CalendarDays size={13} />
+                  <input type="date" className="bdl-date-input" value={fromDate} max={toDate || undefined} onChange={e => handleFromDateChange(e.target.value)} />
+                </div>
+                <span className="bdl-date-range-sep">to</span>
+                <div className="bdl-date-input-wrap">
+                  <CalendarDays size={13} />
+                  <input type="date" className="bdl-date-input" value={toDate} min={fromDate || undefined} onChange={e => handleToDateChange(e.target.value)} />
+                </div>
+                {(fromDate || toDate) && (
+                  <button className="bdl-filter-clear" onClick={handleClearDates} title="Clear date range"><X size={12} /></button>
+                )}
+              </div>
+
               {availableReports.length === 0 ? (
-                <div className="bdl-placeholder"><AlertCircle size={28} strokeWidth={1.2} /><p>No reports with attachments found for this vessel</p></div>
+                <div className="bdl-placeholder"><AlertCircle size={28} strokeWidth={1.2} /><p>No reports with attachments match these filters</p></div>
               ) : (
                 <>
                   <div className="bdl-search-wrap">

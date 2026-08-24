@@ -233,7 +233,7 @@ export default function ShoreDashboard() {
       ...(statusMode === 'open' ? { status: 'open' } : {}),
       ...(statusMode === 'closed' ? { status: 'closed' } : {}),
     })
-    const res = await fetch(`http://localhost:8004/api/export?${params}`, {
+    const res = await fetch(`/jira/api/export?${params}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     const blob = await res.blob()

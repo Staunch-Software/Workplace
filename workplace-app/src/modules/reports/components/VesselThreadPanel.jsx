@@ -4,7 +4,6 @@ import { Send, MessageSquare, CheckCircle, Loader2, ChevronDown, ChevronUp, Pape
 import { vesselReportsApi } from "../api/reportsApi";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
-import { getUsers } from "../../../pages/admin/lib/adminApi";
 
 const ThreadAttachmentLink = ({ reportId, threadId, attachment, isMine }) => {
   const [downloading, setDownloading] = useState(false);
@@ -53,21 +52,20 @@ export default function VesselThreadPanel({ reportId, reportName, reportMeta, is
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const { data: allUsers = [] } = useQuery({
-    queryKey: ['admin-users'],
-    queryFn: async () => {
-      const res = await getUsers();
-      return Array.isArray(res.data) ? res.data : res.data?.results || [];
-    }
+  // Mention list is scoped to this report's own vessel, sourced from
+  // GET /vessels (any authenticated user) rather than the admin-only
+  // GET /users -- SHORE/VESSEL users aren't ADMIN, so the old admin-users
+  // fetch 403'd for them and silently left the @mention picker empty.
+  const { data: vessels = [] } = useQuery({
+    queryKey: ['core-vessels'],
+    queryFn: () => vesselReportsApi.getVessels(),
   });
 
   const vesselUsers = reportMeta?.vessel_imo
-    ? allUsers.filter(u =>
-        u.assigned_vessels?.some(v => String(v.imo) === String(reportMeta.vessel_imo))
-      )
-    : allUsers;
+    ? (vessels.find(v => String(v.imo) === String(reportMeta.vessel_imo))?.assigned_users || [])
+    : [];
 
-  const allUserNames = allUsers.map(u => u.full_name).filter(Boolean);
+  const allUserNames = vesselUsers.map(u => u.full_name).filter(Boolean);
   const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const mentionPattern = allUserNames.length > 0 
     ? `(@(?:${allUserNames.map(escapeRegExp).join('|')}))` 

@@ -32,13 +32,21 @@ const EVENT_CONFIG = {
     border: '#fde68a',
     label: 'Pending',
   },
+  // Both missing_job and missing_report (actual backend type) — show as amber Pending
   missing_job: {
     icon: FileText,
-    color: '#ef4444',
-    bg: '#fef2f2',
-    border: '#fecaca',
-    label: 'Missing',
-  }
+    color: '#f59e0b',
+    bg: '#fffbeb',
+    border: '#fde68a',
+    label: 'Pending',
+  },
+  missing_report: {
+    icon: FileText,
+    color: '#f59e0b',
+    bg: '#fffbeb',
+    border: '#fde68a',
+    label: 'Pending',
+  },
 };
 
 const formatDateTime = (dateStr) => {

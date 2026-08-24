@@ -11,7 +11,8 @@ import {
 /* ─── Event metadata ─────────────────────────────────────────────── */
 const EVENT_META = {
   NEW_REPORT:     { label: 'New Report',     color: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe', icon: FileText },
-  MISSING_REPORT: { label: 'Missing',        color: '#ef4444', bg: '#fef2f2', border: '#fecaca', icon: AlertTriangle },
+  // MISSING_REPORT is now treated as Pending (amber) — no red "Missing" in the UI
+  MISSING_REPORT: { label: 'Pending',        color: '#f59e0b', bg: '#fffbeb', border: '#fde68a', icon: Clock },
   PENDING_REPORT: { label: 'Pending',        color: '#f59e0b', bg: '#fffbeb', border: '#fde68a', icon: Clock },
   MENTION:        { label: 'Mention',        color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe', icon: MessageSquare },
   VERIFIED:       { label: 'Verified',       color: '#10b981', bg: '#f0fdf4', border: '#a7f3d0', icon: CheckCircle },
@@ -128,9 +129,8 @@ export default function ActivityFeedPage() {
   /* ── Stats ── */
   const stats = useMemo(() => ({
     total:   events.length,
-    missing: (typeCounts['MISSING_REPORT'] || 0),
+    pending: (typeCounts['MISSING_REPORT'] || 0) + (typeCounts['PENDING_REPORT'] || 0),
     mention: (typeCounts['MENTION'] || 0),
-    verified:(typeCounts['VERIFIED'] || 0),
   }), [events, typeCounts]);
 
   /* ── Filtered & grouped ── */
@@ -194,9 +194,8 @@ export default function ActivityFeedPage() {
           {/* Stat chips */}
           <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
             <StatChip icon={Activity}      label="Total Events" value={stats.total}   color="#6366f1" />
-            <StatChip icon={AlertTriangle} label="Missing"      value={stats.missing} color="#ef4444" />
+            <StatChip icon={Clock}         label="Pending"      value={stats.pending} color="#f59e0b" />
             <StatChip icon={MessageSquare} label="Mentions"     value={stats.mention} color="#8b5cf6" />
-            <StatChip icon={CheckCircle}   label="Verified"     value={stats.verified}color="#10b981" />
           </div>
         </div>
       </div>
