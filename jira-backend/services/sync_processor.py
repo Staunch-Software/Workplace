@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import httpx
 from datetime import datetime, timedelta
 from sqlalchemy import select
@@ -77,7 +77,7 @@ class SyncProcessor:
             await self._handle_failure(record, error_msg)
 
     async def _push_to_cloud(self, record: SyncQueue):
-        url = f"{self.cloud_url}/sync/{record.entity_type.lower()}"
+        url = f"{self.cloud_url}/api/jira/sync/{record.entity_type.lower()}"
         sync_data = {
             "entity_id": str(record.entity_id),
             "operation": record.operation,
@@ -88,7 +88,7 @@ class SyncProcessor:
         }
         headers = {"X-Sync-API-Key": settings.SYNC_API_KEY}
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(verify=False) as client:
                 response = await client.post(
                     url,
                     json=sync_data,
@@ -125,9 +125,9 @@ class SyncProcessor:
         last_pull = state.last_pull_at if state else datetime(2000, 1, 1)
 
         headers = {"X-Sync-API-Key": settings.SYNC_API_KEY}
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=False) as client:
             resp = await client.get(
-                f"{self.cloud_url}/sync/changes",
+                f"{self.cloud_url}/api/jira/sync/changes",
                 params={"since": last_pull.isoformat()},
                 headers=headers,
                 timeout=settings.NETWORK_TIMEOUT_SECONDS * 2,
@@ -162,9 +162,9 @@ class SyncProcessor:
     #     last_pull = state.last_pull_at if state else datetime(2000, 1, 1)
 
     #     headers = {"X-Sync-API-Key": settings.SYNC_API_KEY}
-    #     async with httpx.AsyncClient() as client:
+    #     async with httpx.AsyncClient(verify=False) as client:
     #         resp = await client.get(
-    #             f"{settings.WORKPLACE_BASE_URL}/sync/config/changes",
+    #             f"{settings.WORKPLACE_BASE_URL}/api/jira/sync/config/changes",
     #             params={"since": last_pull.isoformat()},
     #             headers=headers,
     #             timeout=settings.NETWORK_TIMEOUT_SECONDS * 2,

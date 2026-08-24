@@ -352,15 +352,17 @@ export default function VesselReportsPage() {
                     ) : (
                       tableData.map((r, idx) => {
                         const isPending = r.job_status === 'PENDING';
-                        let isOverdue = false;
-                        if (isPending && r.due_date) {
-                            const due = new Date(r.due_date);
-                            due.setHours(0,0,0,0);
-                            const now = new Date();
-                            now.setHours(0,0,0,0);
-                            isOverdue = due < now;
-                        }
-                        
+                            let isOverdue = false;
+                            if (isPending && r.due_date) {
+                                const due = new Date(r.due_date);
+                                const day = due.getDay();
+                                const daysToSunday = day === 0 ? 0 : 7 - day;
+                                const graceEnd = new Date(due);
+                                graceEnd.setDate(graceEnd.getDate() + daysToSunday + 2);
+                                graceEnd.setHours(23, 59, 59, 999);
+                                const now = new Date();
+                                isOverdue = now > graceEnd;
+                            }                      
                         const isHighlighted = r.id === highlightRowId;
 
                         return (
@@ -383,7 +385,7 @@ export default function VesselReportsPage() {
                           <td>
                             {isPending ? (
                               <span className={`rt-due-status-label ${isOverdue ? 'overdue' : 'planned'}`}>
-                                {isOverdue ? '⚠ MISSING' : 'TODAY PLANNED'}
+                                {isOverdue ? '⚠ PENDING' : 'THIS WEEK'}
                               </span>
                             ) : (
                               r.job_status || '—'

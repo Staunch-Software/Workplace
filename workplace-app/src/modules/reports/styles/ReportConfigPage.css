@@ -1,7 +1,11 @@
 /* ============================================================
    ReportConfigPage.css — Full-page admin config
    ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+/* Google Font Inter removed -- this @import gets bundled straight into the
+   built CSS chunk, and Vite's dynamic-import preload for that chunk throws
+   an uncaught error if the nested @import can't be fetched (i.e. offline),
+   which aborts loading the entire lazy-loaded Reports module. Falls back to
+   the system font stack below instead. */
 
 /* Redefined variables for Little Purple Theme (mirroring Reports.css) */
 :root {

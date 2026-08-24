@@ -450,17 +450,17 @@
 
 /* Overdue / planned rows */
 .rt-data-table tbody tr.rt-row-overdue {
-  background: var(--rt-red-bg);
-  border-left: 3px solid var(--rt-red);
+  background: var(--rt-amber-bg);
+  border-left: 3px solid var(--rt-amber);
 }
-.rt-data-table tbody tr.rt-row-overdue:hover { background: #fde8e8; }
+.rt-data-table tbody tr.rt-row-overdue:hover { background: #fef3d6; }
 .rt-data-table tbody tr.rt-row-today-planned {
   background: var(--rt-amber-bg);
   border-left: 3px solid var(--rt-amber);
 }
 .rt-data-table tbody tr.rt-row-today-planned:hover { background: #fef3d6; }
 
-.rt-due-pin-icon { color: var(--rt-red); }
+.rt-due-pin-icon { color: var(--rt-amber); }
 .rt-row-today-planned .rt-due-pin-icon { color: var(--rt-amber); }
 
 .rt-due-status-label {
@@ -469,7 +469,7 @@
   font-size: 0.7rem; font-weight: 800; white-space: nowrap;
   text-transform: uppercase; letter-spacing: 0.04em;
 }
-.rt-due-status-label.overdue { background: var(--rt-red-bg); color: var(--rt-red); border: 1px solid var(--rt-red-border); }
+.rt-due-status-label.overdue { background: var(--rt-amber-bg); color: var(--rt-amber); border: 1px solid var(--rt-amber-border); }
 .rt-due-status-label.planned { background: var(--rt-amber-bg); color: var(--rt-amber); border: 1px solid var(--rt-amber-border); }
 
 /* Premium Action Button */
@@ -1057,6 +1057,45 @@
 }
 .bdl-list-reports { flex: 1; min-height: 0; }
 .bdl-report-icon { color: #94a3b8; flex-shrink: 0; display: flex; align-items: center; }
+
+/* ── Filter bar: frequency + date range, its own row above the report list ── */
+.bdl-filter-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; border-radius: 11px;
+  background: #f8fafc; border: 1px solid #eaecf0; flex-shrink: 0;
+}
+.bdl-freq-tabs {
+  display: flex; align-items: center; gap: 2px;
+  background: #fff; border: 1px solid #eaecf0; border-radius: 999px;
+  padding: 3px; flex-shrink: 0;
+}
+.bdl-freq-tab {
+  padding: 6px 14px; border-radius: 999px; border: none; background: transparent;
+  font-size: 0.78rem; font-weight: 600; color: #64748b; cursor: pointer;
+  transition: all 0.15s; white-space: nowrap;
+}
+.bdl-freq-tab:hover { color: var(--rt-primary); }
+.bdl-freq-tab.active { background: var(--rt-primary); color: #fff; box-shadow: 0 2px 8px rgba(79,70,229,0.3); }
+
+.bdl-date-input-wrap {
+  display: flex; align-items: center; gap: 6px;
+  border: 1.5px solid #eaecf0; border-radius: 8px;
+  padding: 6px 10px; background: #fff; transition: border-color 0.15s;
+}
+.bdl-date-input-wrap:focus-within { border-color: var(--rt-primary-2); }
+.bdl-date-input-wrap svg { color: #94a3b8; flex-shrink: 0; }
+.bdl-date-input {
+  border: none; outline: none; font-size: 0.78rem; color: #0f172a;
+  background: transparent; font-family: inherit;
+}
+.bdl-date-range-sep { font-size: 0.75rem; color: #94a3b8; font-weight: 600; }
+.bdl-filter-clear {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  border: none; background: #f1f5f9; color: #64748b; cursor: pointer;
+  transition: all 0.15s;
+}
+.bdl-filter-clear:hover { background: #fee2e2; color: #dc2626; }
 .bdl-report-item.checked .bdl-report-icon { color: var(--rt-primary); }
 
 /* Search */

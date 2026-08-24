@@ -472,10 +472,13 @@ export default function ShoreReportsPage() {
                     let isOverdue = false;
                     if (isPending && r.due_date) {
                         const due = new Date(r.due_date);
-                        due.setHours(0,0,0,0);
+                        const day = due.getDay();
+                        const daysToSunday = day === 0 ? 0 : 7 - day;
+                        const graceEnd = new Date(due);
+                        graceEnd.setDate(graceEnd.getDate() + daysToSunday + 2);
+                        graceEnd.setHours(23, 59, 59, 999);
                         const now = new Date();
-                        now.setHours(0,0,0,0);
-                        isOverdue = due < now;
+                        isOverdue = now > graceEnd;
                     }
 
                     const isHighlighted = r.id === highlightRowId;
@@ -500,7 +503,7 @@ export default function ShoreReportsPage() {
                       <td>
                         {isPending ? (
                           <span className={`rt-due-status-label ${isOverdue ? 'overdue' : 'planned'}`}>
-                            {isOverdue ? '⚠ MISSING' : 'TODAY PLANNED'}
+                            {isOverdue ? '⚠ PENDING' : 'THIS WEEK'}
                           </span>
                         ) : (
                           r.job_status || '—'

@@ -1,7 +1,9 @@
 /* OverviewPage.css — Premium Fleet Report Overview Styles */
-/* Depends on: Google Font Inter (imported below) */
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Google Font Inter removed -- this @import gets bundled straight into the
+   built CSS chunk, and Vite's dynamic-import preload for that chunk throws
+   an uncaught error if the nested @import can't be fetched (i.e. offline),
+   which aborts loading the entire lazy-loaded Reports module. Falls back to
+   the system font stack below instead. */
 
 /* ─── CSS Custom Properties ─────────────────────────────────────────────── */
 .ovw-root {
@@ -797,7 +799,7 @@ thead {
   line-height: 1;
 }
 
-/* Pending attachment — not yet due */
+/* ── Pending chip — amber/orange: overdue, needs submission */
 .ovw-chip-pending-icon {
   position: relative;
   display: flex;
@@ -819,9 +821,7 @@ thead {
   line-height: 1;
 }
 
-/* Missing/Pending chips carry a status label + a date line, so they grow
-   taller than the single-line "has" chip */
-.ovw-chip-missing,
+/* Pending chips carry a status label + a date line */
 .ovw-chip-pending {
   height: auto;
   min-height: 44px;
@@ -835,9 +835,34 @@ thead {
   line-height: 1;
 }
 
-.ovw-chip-missing .ovw-chip-sub-date,
 .ovw-chip-pending .ovw-chip-sub-date {
   color: var(--ovw-text-muted);
+}
+
+/* ── Current-week header highlight ───────────────────────────────────────── */
+
+.ovw-th-week-current {
+  background: #eef2ff !important;
+  color: var(--ovw-accent) !important;
+  border-bottom: 3px solid var(--ovw-accent) !important;
+  position: relative;
+}
+
+/* Small live-dot indicator inside the current-week header */
+.ovw-current-week-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  background: var(--ovw-accent);
+  border-radius: 50%;
+  margin-left: 4px;
+  vertical-align: middle;
+  animation: ovwPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes ovwPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.7); }
 }
 
 /* ─── Loading State ─────────────────────────────────────────────────────── */
