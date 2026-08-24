@@ -73,7 +73,16 @@ function hasValidAttachment(attachments) {
 
 function normalizeName(name) {
   if (!name) return 'UNKNOWN';
-  return name.trim().toUpperCase().replace(/\s+/g, ' ');
+  // 1. Trim edges
+  // 2. Convert to uppercase
+  // 3. Condense multiple spaces to single space
+  // 4. Remove all spaces around any hyphens or dashes to merge "TECH -16" and "TECH-16"
+  let cleaned = name.trim().toUpperCase().replace(/\s+/g, ' ').replace(/\s*[-\u2013\u2014]\s*/g, '-');
+  // 5. Strip " REVIEW" suffix to merge "REPORT" and "REPORT REVIEW" variations
+  if (cleaned.endsWith(' REVIEW')) {
+    cleaned = cleaned.replace(/ REVIEW$/, '').trim();
+  }
+  return cleaned;
 }
 
 /* Monday on/before Jan 1 of `year` — start of ISO week 1. */

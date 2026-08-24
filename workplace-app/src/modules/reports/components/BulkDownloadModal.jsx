@@ -196,12 +196,12 @@ export default function BulkDownloadModal({ vessels = [], reports = [], onClose 
       // the included reports carry a usable date.
       const vesselPart = (selectedVessel?.name || 'vessel').replace(/\s+/g, '_');
       const freqPart = frequency === 'ALL' ? 'All' : FREQUENCIES.find(f => f.id === frequency)?.label || 'All';
-      const dates = tasks.map(t => reportDate(t.report)).filter(Boolean).sort((a, b) => a - b);
-      const datePart = dates.length === 0
-        ? 'AllDates'
-        : (fmtFilenameDate(dates[0]) === fmtFilenameDate(dates[dates.length - 1])
-          ? fmtFilenameDate(dates[0])
-          : `${fmtFilenameDate(dates[0])}-${fmtFilenameDate(dates[dates.length - 1])}`);
+      let datePart = 'AllDates';
+      if (fromDate || toDate) {
+        const fromStr = fromDate ? fmtFilenameDate(new Date(fromDate)) : 'Start';
+        const toStr = toDate ? fmtFilenameDate(new Date(toDate)) : 'End';
+        datePart = fromStr === toStr ? fromStr : `${fromStr}-${toStr}`;
+      }
 
       const a = document.createElement('a');
       a.href = url; a.download = `${vesselPart}_${freqPart}_${datePart}.zip`;
