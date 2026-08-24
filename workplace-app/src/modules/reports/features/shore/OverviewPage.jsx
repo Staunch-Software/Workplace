@@ -71,6 +71,11 @@ function hasValidAttachment(attachments) {
   return Array.isArray(attachments) && attachments.some(a => a.blob_path && !a.blob_path.startsWith('MISSING:'));
 }
 
+function normalizeName(name) {
+  if (!name) return 'UNKNOWN';
+  return name.trim().toUpperCase().replace(/\s+/g, ' ');
+}
+
 /* Monday on/before Jan 1 of `year` — start of ISO week 1. */
 function isoWeekOneStart(year) {
   const jan1 = new Date(year, 0, 1);
@@ -390,7 +395,7 @@ export default function OverviewPage() {
     const set = new Set();
     configs
       .filter(c => normalizeFreq(c.frequency) === frequency)
-      .forEach(c => set.add(`${c.vessel_imo}|${c.report_name}`));
+      .forEach(c => set.add(`${c.vessel_imo}|${normalizeName(c.report_name)}`));
     return set;
   }, [configs, frequency]);
 
@@ -402,7 +407,7 @@ export default function OverviewPage() {
   const instanceIndex = useMemo(() => {
     const idx = {};
     reportsForFreq.forEach(r => {
-      const name = (r.report_name || 'Unknown').trim();
+      const name = normalizeName(r.report_name);
       if (!idx[name]) idx[name] = {};
       if (!idx[name][r.vessel_imo]) idx[name][r.vessel_imo] = [];
       // Pass normalized name down just in case
@@ -412,7 +417,7 @@ export default function OverviewPage() {
   }, [reportsForFreq]);
 
   const reportNames = useMemo(() => {
-    const set = new Set(reportsForFreq.map(r => (r.report_name || 'Unknown').trim()));
+    const set = new Set(reportsForFreq.map(r => normalizeName(r.report_name)));
     let names = [...set].filter(name =>
       vessels.some(v => (instanceIndex[name]?.[v.imo] || []).some(r => hasValidAttachment(r.attachments)))
     );
