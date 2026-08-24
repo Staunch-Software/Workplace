@@ -330,6 +330,29 @@ async def run_startup_migrations():
             except Exception as e_user3:
                 logger.info(f"Migration notice (user created_by): {e_user3}")
 
+            # access_type and last_login are declared on
+            # app/model/control/user.py's User model (used by auth.py's
+            # login endpoints) but were never actually migrated onto the
+            # table -- caused a hard 500 (UndefinedColumnError) on every
+            # local login attempt.
+            try:
+                await conn.execute(text(
+                    "ALTER TABLE users "
+                    "ADD COLUMN IF NOT EXISTS access_type VARCHAR DEFAULT 'SHORE'"
+                ))
+                logger.info("✅ Migration applied: added access_type column to users")
+            except Exception as e_user4:
+                logger.info(f"Migration notice (user access_type): {e_user4}")
+
+            try:
+                await conn.execute(text(
+                    "ALTER TABLE users "
+                    "ADD COLUMN IF NOT EXISTS last_login TIMESTAMP NULL"
+                ))
+                logger.info("✅ Migration applied: added last_login column to users")
+            except Exception as e_user5:
+                logger.info(f"Migration notice (user last_login): {e_user5}")
+
     except Exception as e:
         logger.error(f"Startup migrations failed: {e}")
         return False
