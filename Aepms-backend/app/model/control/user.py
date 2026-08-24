@@ -17,5 +17,13 @@ class User(ControlBase):
     is_active = Column(Boolean, default=True, nullable=False)
     job_title = Column(String, nullable=True)
     permissions = Column(JSONB, nullable=True)
+    # These columns already exist on the "users" table (added via the
+    # app/database.py migrations and used by admin.py when creating local
+    # accounts) but were never declared here, so SQLAlchemy raised
+    # AttributeError the moment auth.py touched them on a loaded row.
+    access_type = Column(String, default="SHORE")
+    last_login = Column(DateTime, nullable=True)
+    created_by = Column(String, nullable=True)
+    password_hash = Column(String, nullable=True)
 
     vessels = relationship("Vessel", secondary=user_vessel_link, back_populates="users")
