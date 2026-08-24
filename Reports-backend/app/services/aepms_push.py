@@ -31,8 +31,12 @@ logger = logging.getLogger("aepms_push")
 # monthly performance reports that feed AEPMS.
 ME_REPORT_CODES = {
     "MO-02-TECH-07_ME_PERFORMANCE_SHEET",
-    "MO-03-TECH-06_ENGINE_PERFORMANCE_TRE",
 }
+# TECH-06 (Engine Performance TREND) is deliberately excluded for the same
+# reason as TECH-13 below -- it's a trend/summary document, not the raw
+# data sheet. AEPMS's ME extractor can't find an IMO number in it, and
+# rejects it with 400 "IMO number is required but not found in PDF" --
+# confirmed against a real upload failure on 2026-08-24 (AM TARANG).
 AE_REPORT_CODES = {
     "MO-06-TECH-12_AE-1_PERFORMANCE_SHEET",
     "MO-07-TECH-12_AE-2_PERFORMANCE_SHEET",
