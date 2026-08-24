@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     AEPMS_BASE_URL: str = ""
     AEPMS_SERVICE_EMAIL: str = ""
     AEPMS_SERVICE_PASSWORD: str = ""
+    # Set to false ONLY when AEPMS_BASE_URL is an internal/private address
+    # serving a self-signed certificate (e.g. VM-to-VM on a private network).
+    # Never disable this if AEPMS_BASE_URL is reachable over the public
+    # internet -- that would accept a certificate from anyone.
+    AEPMS_VERIFY_SSL: bool = True
 
     # Path to Excel file containing vessel/report mapping (used only to
     # regenerate DEFAULT_REPORTS_JSON_PATH offline, not read on every request)

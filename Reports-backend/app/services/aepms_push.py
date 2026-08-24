@@ -101,6 +101,7 @@ async def push_pending_reports(db) -> None:
             Report.aepms_push_status.is_distinct_from("PUSHED"),
             Report.aepms_push_status.is_distinct_from("PUSHED_UNVERIFIED"),
             Report.aepms_push_status.is_distinct_from("MISMATCH"),
+            Report.aepms_push_status.is_distinct_from("UNSUPPORTED_FORMAT"),
         )
     )
     reports = (await db.execute(stmt)).scalars().all()
@@ -110,7 +111,7 @@ async def push_pending_reports(db) -> None:
 
     logger.info(f"[AEPMS PUSH] {len(reports)} report(s) pending push to AEPMS.")
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(verify=settings.AEPMS_VERIFY_SSL) as client:
         for report in reports:
             await _push_one(db, client, report)
 
@@ -139,6 +140,21 @@ async def _push_one(db, client: httpx.AsyncClient, report: Report) -> None:
 
     blob_path = report.attachments[0].blob_path
     file_name = report.attachments[0].file_name or "report.pdf"
+
+    # AEPMS's upload endpoints hard-reject anything not named *.pdf.
+    # SmartPAL occasionally serves this report type as .xlsx instead of
+    # .pdf for some vessels -- that's a permanent mismatch, not a
+    # transient error, so don't let it retry forever every cron run.
+    if not file_name.lower().endswith(".pdf"):
+        logger.warning(
+            f"[AEPMS PUSH] Report {report.id} ({report.vessel_name}/{report.report_code}) "
+            f"attachment '{file_name}' is not a PDF -- AEPMS only accepts PDFs. Skipping, "
+            f"needs the correct PDF re-uploaded/re-scraped from SmartPAL."
+        )
+        report.aepms_push_status = "UNSUPPORTED_FORMAT"
+        report.aepms_pushed_at = datetime.utcnow()
+        await db.commit()
+        return
 
     try:
         pdf_bytes = download_blob_bytes(blob_path)
