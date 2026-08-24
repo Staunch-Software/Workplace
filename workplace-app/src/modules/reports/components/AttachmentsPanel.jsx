@@ -5,7 +5,8 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Paperclip, AlertCircle, ChevronDown, ChevronUp, Download, ZoomIn, ZoomOut, RotateCcw, RefreshCw, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { reportsApi } from '../api/reportsApi';
+import { reportsApi, vesselReportsApi } from '../api/reportsApi';
+import { useAuth } from '@/context/AuthContext';
 
 function getFilename(path) {
   if (!path) return 'Document';
@@ -54,9 +55,13 @@ function isPdfFile(path) {
   return !!path && path.toLowerCase().endsWith('.pdf');
 }
 
-function isBrowserRenderable(path) {
+function isBrowserRenderable(path, isVessel) {
   if (!path) return false;
   const lower = path.toLowerCase();
+  
+  // Microsoft Office Viewer requires public internet access, which the vessel LAN does not have.
+  if (isVessel && isOfficeViewerFile(path)) return false;
+
   return lower.endsWith('.pdf') || lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.gif') || lower.endsWith('.txt') || isSpreadsheetFile(path) || isOfficeViewerFile(path);
 }
 
@@ -86,6 +91,10 @@ function isImageFile(path) {
 }
 
 export default function AttachmentsPanel({ reportId, reportName, attachments = [], isCollapsed, onToggle }) {
+  const { user } = useAuth();
+  const isVessel = user?.role === 'VESSEL';
+  const api = isVessel ? vesselReportsApi : reportsApi;
+
   const [activeIdx, setActiveIdx] = useState(0);
   const [sasUrl, setSasUrl] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -135,10 +144,17 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
       return;
     }
 
-    reportsApi.getPdfUrlByPath(reportId, path)
-      .then(d => setSasUrl(d.sas_url))
-      .catch(e => setError(e.response?.data?.detail || 'Could not load PDF.'))
-      .finally(() => setLoading(false));
+    // Office Viewer needs a public Azure SAS URL (doesn't work with stream URL)
+    if (!isVessel && isOfficeViewerFile(path)) {
+      api.getPdfUrlByPath(reportId, path)
+        .then(d => setSasUrl(d.sas_url))
+        .catch(e => setError(e.response?.data?.detail || 'Could not load document.'))
+        .finally(() => setLoading(false));
+    } else {
+      const streamUrl = api.getPdfStreamUrl(reportId, path);
+      setSasUrl(streamUrl);
+      setLoading(false);
+    }
   }, [reportId, activeIdx]); // eslint-disable-line
 
   // Once we have a SAS URL for a CSV attachment, fetch and parse it into an HTML table.
@@ -318,7 +334,7 @@ export default function AttachmentsPanel({ reportId, reportName, attachments = [
               )}
               {!loading && !error && !pdfChecking && sasUrl && (
                 <>
-                  {!isBrowserRenderable(attachments[activeIdx]?.file_name) ? (
+                  {!isBrowserRenderable(attachments[activeIdx]?.file_name, isVessel) ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', gap: '16px', background: '#f8fafc', padding: '24px', textAlign: 'center' }}>
                       <FileText size={48} color="#10b981" />
                       <div>
