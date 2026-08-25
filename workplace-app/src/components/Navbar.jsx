@@ -42,14 +42,6 @@ function formatAgo(iso) {
     return `${Math.floor(diff / 86400)}d ago`;
 }
 
-function ageClass(iso) {
-    if (!iso) return 'never';
-    const h = (Date.now() - new Date(iso).getTime()) / 3_600_000;
-    if (h < 1) return 'fresh';
-    if (h < 12) return 'stale';
-    return 'old';
-}
-
 const SYNC_COLORS = {
     fresh: { bg: '#EAF3DE', border: '#C0DD97', text: '#3B6D11' },
     stale: { bg: '#FAEEDA', border: '#FAC775', text: '#854F0B' },
@@ -577,14 +569,13 @@ const LiveModuleDetail = ({ imo, moduleKey, isInstalled, prefetchedData }) => {
     );
 };
 
-const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
+const VesselStatusModal = ({ onClose }) => {
     const [vessels, setVessels] = useState([]);
     const [syncLogs, setSyncLogs] = useState({});  // { imo: { drs: {...}, lubeoil: {...}, jira: {...} } }
     const [filter, setFilter] = useState('all');
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [drawer, setDrawer] = useState(null); // { vessel, moduleKey }
-    const [syncDetails, setSyncDetails] = useState({});
 
     useEffect(() => {
         getVesselStatus().then(res => {
@@ -1060,6 +1051,7 @@ const Navbar = ({ setSearchQuery }) => {
             setUser(updatedUser);
             setVesselPickerOpen(false);
         } catch (err) {
+            console.error(err);
             alert('Failed to save vessel assignments');
         } finally {
             setSaving(false);
