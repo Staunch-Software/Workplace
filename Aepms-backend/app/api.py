@@ -78,7 +78,8 @@ from app.routes.dashboard import router as dashboard_router
 from app.routes import auth
 from app.routes import admin  
 from app.routes.aux_engine_routes import router as aux_router
-from app.routes.engine_sync import router as engine_sync_router 
+from app.routes.engine_sync import router as engine_sync_router
+from app.routes.engine_sync import vessels_status_router
 from app.me_iso_corrector import MEISOCorrector
 from app.middleware.permission_check import check_endpoint_permission
 from app.models import MENormalStatus, MEWarningAlert, MECriticalAlert, MEAlertSummary
@@ -171,6 +172,7 @@ app.include_router(admin.router, tags=["Admin"])
 app.include_router(aux_router)
 # CHANGE TO
 app.include_router(engine_sync_router, tags=["Engine Sync"])
+app.include_router(vessels_status_router, tags=["Vessel Status"])
 
 
 # ============================================
