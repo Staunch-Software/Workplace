@@ -503,7 +503,12 @@ export default function OverviewPage() {
     const ro = new ResizeObserver(recompute);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [vessels.length, buckets.length, isWeekly]);
+  }, [vessels.length, buckets.length, isWeekly, isLoading, reportNames.length]);
+
+  const totalDataColsForWidth = isWeekly ? vessels.length * buckets.length : vessels.length;
+  const baseWidthForWidth = isWeekly ? BASE_WEEK_COL_W : BASE_STD_COL_W;
+  const actualDataColWidth = dataColWidth || baseWidthForWidth;
+  const totalTableWidth = REPORT_COL_W + (totalDataColsForWidth * actualDataColWidth);
 
   return (
     <div className="rt-root ovw-root">
@@ -648,7 +653,17 @@ export default function OverviewPage() {
               '--ovw-cell-std-w': `${dataColWidth}px`,
             } : undefined}
           >
-            <table className="ovw-table">
+            <table className="ovw-table" style={{ width: `${totalTableWidth}px` }}>
+              <colgroup>
+                <col style={{ width: 'var(--ovw-col-report-w)', minWidth: 'var(--ovw-col-report-w)', maxWidth: 'var(--ovw-col-report-w)' }} />
+                {vessels.flatMap(v => 
+                  isWeekly 
+                    ? buckets.map(b => (
+                        <col key={`${v.imo}-${b.key}`} style={{ width: 'var(--ovw-cell-week-w)', minWidth: 'var(--ovw-cell-week-w)', maxWidth: 'var(--ovw-cell-week-w)' }} />
+                      ))
+                    : [<col key={v.imo} style={{ width: 'var(--ovw-cell-std-w)', minWidth: 'var(--ovw-cell-std-w)', maxWidth: 'var(--ovw-cell-std-w)' }} />]
+                )}
+              </colgroup>
               <thead>
                 {/* ── Row 1: Report Name + Vessel Names ── */}
                 <tr className="ovw-thead-row1">

@@ -467,7 +467,7 @@ export default function ShoreReportsPage() {
                         const day = due.getDay();
                         const daysToSunday = day === 0 ? 0 : 7 - day;
                         const graceEnd = new Date(due);
-                        graceEnd.setDate(graceEnd.getDate() + daysToSunday + 2);
+                        graceEnd.setDate(graceEnd.getDate() + daysToSunday + 1);
                         graceEnd.setHours(23, 59, 59, 999);
                         const now = new Date();
                         isOverdue = now > graceEnd;

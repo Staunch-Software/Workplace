@@ -252,14 +252,18 @@ export default function VesselThreadPanel({ reportId, reportName, reportMeta, is
                 borderBottomLeftRadius: isMine ? '12px' : '4px',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
               }}>
-                {t.body.split(mentionRegex).map((part, i) =>
+                {(t.body || '').split(mentionRegex).map((part, i) =>
                   part.startsWith('@') ? 
                     <span key={i} style={{ color: isMine ? '#93c5fd' : '#3b82f6', fontWeight: '600' }}>{part}</span> : 
                     part
                 )}
-                {t.attachments && t.attachments.map(att => (
-                  <ThreadAttachmentLink key={att.id} reportId={reportId} threadId={t.id} attachment={att} isMine={isMine} />
-                ))}
+                {t.attachments && t.attachments.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: t.body ? '8px' : '0' }}>
+                    {t.attachments.map(att => (
+                      <ThreadAttachmentLink key={att.id} reportId={reportId} threadId={t.id} attachment={att} isMine={isMine} />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );
