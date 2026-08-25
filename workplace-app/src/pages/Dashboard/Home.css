@@ -200,18 +200,6 @@
   background: #0052cc;
 }
 
-.hm-card-voyage .hm-icon-container {
-  background: #ecfeff;
-  color: #0891b2;
-}
-
-.hm-card-voyage:hover {
-  border-color: rgba(8, 145, 178, 0.3);
-}
-
-.hm-card-voyage:hover .hm-icon-container {
-  background: #0891b2;
-}
 
 .hm-card-lube .hm-icon-container {
   background: #fffbeb;

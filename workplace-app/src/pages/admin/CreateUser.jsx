@@ -7,7 +7,6 @@ const CheckIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="n
 const InfoIcon = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>);
 const DrsIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" /><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /></svg>);
 const JiraIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><rect x="7" y="7" width="3" height="9" /><rect x="14" y="7" width="3" height="5" /></svg>);
-const VoyageIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1 .6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" /><path d="M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6" /></svg>);
 const LubeIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" /></svg>);
 const EngineIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="2" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2" /></svg>);
 const ReportsIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg>);
@@ -15,7 +14,6 @@ const ReportsIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill=
 const MODULE_LIST = [
     { id: "drs", name: "Defect Reporting System", Icon: DrsIcon },
     { id: "jira", name: "SmartPAL JIRA", Icon: JiraIcon },
-    { id: "voyage", name: "Voyage Management", Icon: VoyageIcon },
     { id: "lubeoil", name: "Lubeoil Analysis", Icon: LubeIcon },
     { id: "engine_performance", name: "Engine Performance", Icon: EngineIcon },
     { id: "report_tracker", name: "SmartPAL Reports", Icon: ReportsIcon },
@@ -24,7 +22,7 @@ const MODULE_LIST = [
 export default function CreateUser() {
     const navigate = useNavigate();
     const [form, setForm] = useState({ full_name: "", email: "", password: "", job_title: "", role: "VESSEL" });
-    const [permissions, setPermissions] = useState({ drs: false, jira: false, voyage: false, lubeoil: false, engine_performance: false, report_tracker: false });
+    const [permissions, setPermissions] = useState({ drs: false, jira: false, lubeoil: false, engine_performance: false, report_tracker: false });
     const [selectedVessels, setSelectedVessels] = useState([]);
     const [canSelfAssign, setCanSelfAssign] = useState(false);
     const [vessels, setVessels] = useState([]);

@@ -8,6 +8,7 @@ import apiDrs from '../modules/drs/api/axiosDrs';
 import axiosJira from '../modules/jira/api/axiosJira';
 import api from '../api/axios';
 import apiLuboil from '../modules/lubeoil/api/axiosLub';
+import apiReports from '../modules/reports/api/axiosReports';
 
 
 // ── Module metadata keyed by backend permission key ───────────────────────────
@@ -26,9 +27,9 @@ const THEME = {
 const MODULE_META = {
     drs: { label: 'DRS (Defects)', icon: <FileText size={14} />, color: '#3b82f6' },
     jira: { label: 'JIRA Sync', icon: <Trello size={14} />, color: '#f97316' },
-    voyage: { label: 'Voyage Perf', icon: <Ship size={14} />, color: '#8b5cf6' },
     lubeoil: { label: 'Lube Analysis', icon: <Droplet size={14} />, color: '#06b6d4' },
     engine_performance: { label: 'Engine Perf', icon: <Zap size={14} />, color: '#22c55e' },
+    report_tracker: { label: 'Report Tracker', icon: <FileText size={14} />, color: '#7c3aed' },
 };
 function formatAgo(iso) {
     if (!iso) return 'Never';
@@ -431,6 +432,7 @@ const LiveModuleDetail = ({ imo, moduleKey, isInstalled, prefetchedData }) => {
             if (moduleKey === 'drs') res = await apiDrs.get(`/vessels/${imo}/sync-log`);
             else if (moduleKey === 'lubeoil') res = await apiLuboil.get(`api/vessels/${imo}/sync-log`);
             else if (moduleKey === 'jira') res = await axiosJira.get(`api/vessels/${imo}/sync-log`);
+            else if (moduleKey === 'report_tracker') res = await apiReports.get(`/vessels/${imo}/sync-log`);
             else { setData(null); setLoading(false); return; }
             setData(res.data);
         } catch (err) {
@@ -594,6 +596,7 @@ const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
                 { promise: apiDrs.get("/vessels/sync-status/all"), key: 'drs' },
                 { promise: apiLuboil.get("api/vessels/sync-status/all"), key: 'lubeoil' },
                 { promise: axiosJira.get("api/vessels/sync-status/all"), key: 'jira' },
+                { promise: apiReports.get("/vessels/sync-status/all"), key: 'report_tracker' },
             ];
 
             // Fire all requests, update state as each one resolves
@@ -625,8 +628,8 @@ const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
         { key: 'drs', label: 'DRS' },
         { key: 'jira', label: 'JIRA' },
         { key: 'lubeoil', label: 'Lube oil' },
-        { key: 'voyage', label: 'Voyage perf' },
         { key: 'engine_performance', label: 'Engine perf' },
+        { key: 'report_tracker', label: 'Report Tracker' },
     ];
 
     function getTotalErrors(imo) {
