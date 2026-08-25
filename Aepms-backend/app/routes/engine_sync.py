@@ -552,15 +552,31 @@ async def get_engine_changes(
             imo_int = int(vessel_imo)
             if hasattr(model, "imo_number"):
                 stmt = stmt.where(model.imo_number == imo_int)
+            elif hasattr(model, "generator_id"):
+                # GeneratorMonthlyReportHeader has no imo_number column of its own —
+                # route through VesselGenerator instead (also covers ae_* alert tables).
+                stmt = stmt.join(VesselGenerator, model.generator_id == VesselGenerator.generator_id).where(VesselGenerator.imo_number == imo_int)
             elif hasattr(model, "report_id"):
                 if key.startswith("ae_") or key.startswith("generator_"):
-                    stmt = stmt.join(GeneratorMonthlyReportHeader, model.report_id == GeneratorMonthlyReportHeader.report_id).where(GeneratorMonthlyReportHeader.imo_number == imo_int)
+                    stmt = (
+                        stmt.join(GeneratorMonthlyReportHeader, model.report_id == GeneratorMonthlyReportHeader.report_id)
+                        .join(VesselGenerator, GeneratorMonthlyReportHeader.generator_id == VesselGenerator.generator_id)
+                        .where(VesselGenerator.imo_number == imo_int)
+                    )
                 else:
                     stmt = stmt.join(MonthlyReportHeader, model.report_id == MonthlyReportHeader.report_id).where(MonthlyReportHeader.imo_number == imo_int)
             elif hasattr(model, "engine_no"):
                 stmt = stmt.join(VesselInfo, model.engine_no == VesselInfo.engine_no).where(VesselInfo.imo_number == imo_int)
             elif hasattr(model, "generator_no"):
                 stmt = stmt.join(VesselGenerator, model.generator_no == VesselGenerator.generator_no).where(VesselGenerator.imo_number == imo_int)
+            elif hasattr(model, "session_id"):
+                # ShopTrialPerformanceData has no imo_number/engine_no of its own —
+                # route through ShopTrialSession.engine_no -> VesselInfo.
+                stmt = (
+                    stmt.join(ShopTrialSession, model.session_id == ShopTrialSession.session_id)
+                    .join(VesselInfo, ShopTrialSession.engine_no == VesselInfo.engine_no)
+                    .where(VesselInfo.imo_number == imo_int)
+                )
 
         items = (await db.execute(stmt)).scalars().all()
         results[key] = [
