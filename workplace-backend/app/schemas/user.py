@@ -9,11 +9,12 @@ class UserCreate(BaseModel):
     password: str
     job_title: Optional[str] = None
     role: str = "VESSEL"
+    role_code: Optional[str] = None  # SURVEY_COORDINATOR | TA | TSI | TM — task_management module only
     can_self_assign_vessels: bool = False
     permissions: dict = {
         "drs": False, "jira": False,
         "voyage": False, "lubeoil": False,
-        "engine_performance": False,
+        "engine_performance": False, "task_management": False,
     }
 
 
@@ -23,6 +24,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     job_title: Optional[str] = None
     role: Optional[str] = None
+    role_code: Optional[str] = None
     is_active: Optional[bool] = None
     can_self_assign_vessels: Optional[bool] = None
     permissions: Optional[dict] = None
@@ -34,6 +36,7 @@ class UserOut(BaseModel):
     email: str
     job_title: Optional[str]
     role: str
+    role_code: Optional[str] = None
     is_active: bool
     can_self_assign_vessels: bool = False
     permissions: dict
@@ -56,6 +59,7 @@ class UserDetail(BaseModel):
     email: str
     job_title: Optional[str]
     role: str
+    role_code: Optional[str] = None
     is_active: bool
     can_self_assign_vessels: bool = False
     permissions: dict
