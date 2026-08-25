@@ -569,6 +569,14 @@ async def get_engine_changes(
                 stmt = stmt.join(VesselInfo, model.engine_no == VesselInfo.engine_no).where(VesselInfo.imo_number == imo_int)
             elif hasattr(model, "generator_no"):
                 stmt = stmt.join(VesselGenerator, model.generator_no == VesselGenerator.generator_no).where(VesselGenerator.imo_number == imo_int)
+            elif hasattr(model, "session_id"):
+                # ShopTrialPerformanceData has no imo_number/engine_no of its own —
+                # route through ShopTrialSession.engine_no -> VesselInfo.
+                stmt = (
+                    stmt.join(ShopTrialSession, model.session_id == ShopTrialSession.session_id)
+                    .join(VesselInfo, ShopTrialSession.engine_no == VesselInfo.engine_no)
+                    .where(VesselInfo.imo_number == imo_int)
+                )
 
         items = (await db.execute(stmt)).scalars().all()
         results[key] = [
