@@ -71,7 +71,7 @@ async def get_all_vessel_sync_status(
             result[imo] = {
                 "name": v["name"],
                 "last_sync_success": (report_count == 0 and len(active_errors) == 0),
-                "failed_items_count": report_count,
+                "failed_items_count": max(report_count, len(active_errors)),
                 "latest_error": active_errors[0] if active_errors else None,
                 "vessel_reported_push": state.last_push_at if state else None,
                 "vessel_reported_pull": state.last_pull_at if state else None,
@@ -125,7 +125,7 @@ async def get_vessel_sync_log(
         "vessel_reported_pull": sync_state.last_pull_at if sync_state else None,
 
         "active_errors": active_errors,
-        "failed_items_count": report_count,
+        "failed_items_count": max(report_count, len(active_errors)),
 
         "error_history": (
             json.loads(vessel["last_sync_error"])
