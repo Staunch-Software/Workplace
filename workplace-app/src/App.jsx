@@ -17,6 +17,7 @@ const JiraModule = lazy(() => import('./modules/jira/JiraModule'));
 const AepmsModule = lazy(() => import('./modules/aepms/AepmsModule'));
 const ReportsModule = lazy(() => import('./modules/reports/ReportsModule'));
 const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
+const TaskMgmtModule = lazy(() => import('./modules/taskmgmt/TaskMgmtModule'));
 // const VoyageModule = lazy(() => import('./modules/voyage/VoyageModule'));
 
 const moduleLoaderStyle = {
@@ -130,6 +131,15 @@ function App() {
             <ProtectedRoute allowedRoles={['SHORE', 'ADMIN', 'VESSEL']}>
               <Suspense fallback={<ModuleLoader label="Loading Reports..." />}>
                 <ReportsModule />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+
+          {/* ── TASK MANAGEMENT MODULE ──────────────────── */}
+          <Route path="/taskmgmt/*" element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <Suspense fallback={<ModuleLoader label="Loading Task Management..." />}>
+                <TaskMgmtModule />
               </Suspense>
             </ProtectedRoute>
           } />

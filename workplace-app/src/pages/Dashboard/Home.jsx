@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { FileText, Trello, Ship, Droplet, Activity, FileBarChart2 } from "lucide-react";
+import { FileText, Trello, Ship, Droplet, Activity, FileBarChart2, ListChecks } from "lucide-react";
 import api from '../../api/axios';
 import './Home.css';
 
@@ -93,6 +93,10 @@ const Home = ({ searchQuery = '' }) => {
     if (appId === 'reports') {
       window.open('/reports/overview', '_blank');
     }
+
+    if (appId === 'taskmgmt') {
+      window.open('/taskmgmt', '_blank');
+    }
   };
 
   const allApps = [
@@ -102,10 +106,13 @@ const Home = ({ searchQuery = '' }) => {
     { id: 'lube', permKey: 'lubeoil', name: 'Lubeoil Analysis', desc: 'Shore Analysis Portal', icon: <Droplet size={32} />, class: 'hm-card-lube', delay: '0.3s' },
     { id: 'engine', permKey: 'engine_performance', name: 'Engine Performance', desc: 'Metrics & Health', icon: <Activity size={32} />, class: 'hm-card-engine', delay: '0.4s' },
     { id: 'reports', permKey: 'report_tracker', name: 'Report Tracker', desc: 'Report Tracking & Threads', icon: <FileBarChart2 size={32} />, class: 'hm-card-reports', delay: '0.5s' },
+    // Admin-only for now — the module currently only has the admin config screen (see /taskmgmt route in App.jsx)
+    { id: 'taskmgmt', permKey: 'task_management', name: 'Task Management', desc: 'RACI Task Configuration', icon: <ListChecks size={32} />, class: 'hm-card-taskmgmt', delay: '0.6s', requireAdmin: true },
   ];
 
   const apps = allApps
     .filter(app => user?.permissions?.[app.permKey] === true)
+    .filter(app => !app.requireAdmin || user?.role === 'ADMIN')
     .filter(app =>
       !searchQuery.trim() ||
       app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

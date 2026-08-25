@@ -11,6 +11,7 @@ const VoyageIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="
 const LubeIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" /></svg>);
 const EngineIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="2" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2" /></svg>);
 const ReportsIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg>);
+const TaskMgmtIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="7" y1="8" x2="17" y2="8" /><line x1="7" y1="12" x2="17" y2="12" /><line x1="7" y1="16" x2="13" y2="16" /></svg>);
 
 const MODULE_LIST = [
     { id: "drs", name: "Defect Reporting System", Icon: DrsIcon },
@@ -19,12 +20,16 @@ const MODULE_LIST = [
     { id: "lubeoil", name: "Lubeoil Analysis", Icon: LubeIcon },
     { id: "engine_performance", name: "Engine Performance", Icon: EngineIcon },
     { id: "report_tracker", name: "SmartPAL Reports", Icon: ReportsIcon },
+    { id: "task_management", name: "Task Management", Icon: TaskMgmtIcon },
 ];
+
+const TASK_MGMT_ROLE_CODES = ["SURVEY_COORDINATOR", "TA", "TSI", "TM"];
 
 export default function CreateUser() {
     const navigate = useNavigate();
     const [form, setForm] = useState({ full_name: "", email: "", password: "", job_title: "", role: "VESSEL" });
-    const [permissions, setPermissions] = useState({ drs: false, jira: false, voyage: false, lubeoil: false, engine_performance: false, report_tracker: false });
+    const [permissions, setPermissions] = useState({ drs: false, jira: false, voyage: false, lubeoil: false, engine_performance: false, report_tracker: false, task_management: false });
+    const [roleCode, setRoleCode] = useState("");
     const [selectedVessels, setSelectedVessels] = useState([]);
     const [canSelfAssign, setCanSelfAssign] = useState(false);
     const [vessels, setVessels] = useState([]);
@@ -51,7 +56,12 @@ export default function CreateUser() {
         if (!validate()) return;
         setSubmitting(true);
         try {
-            const res = await createUser({ ...form, permissions, can_self_assign_vessels: canSelfAssign, });
+            const res = await createUser({
+                ...form,
+                permissions,
+                can_self_assign_vessels: canSelfAssign,
+                role_code: permissions.task_management ? (roleCode || null) : null,
+            });
             await assignVessels(res.data.id, selectedVessels, form.password);
             navigate("/admin/users");
         } catch (err) {
@@ -176,6 +186,19 @@ export default function CreateUser() {
                                     </button>
                                 </div>
                             ))}
+                            {permissions.task_management && (
+                                <div className="ap-form-group" style={{ marginTop: 12 }}>
+                                    <label className="ap-label">Task Management Role</label>
+                                    <div className="ap-role-grid">
+                                        {TASK_MGMT_ROLE_CODES.map(code => (
+                                            <div key={code} className={"ap-role-option" + (roleCode === code ? " selected" : "")}
+                                                onClick={() => setRoleCode(code)}>
+                                                {code}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         <div className="ap-card ap-card-body">
                             <button type="submit" className="ap-btn ap-btn-primary ap-btn-full" disabled={submitting}>

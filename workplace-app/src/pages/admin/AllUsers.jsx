@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, Filter, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Activity, FileBarChart2, Mail, Trash2 } from "lucide-react";
+import { Search, Filter, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Activity, FileBarChart2, Mail, Trash2, ListChecks } from "lucide-react";
 import { getUsers, updateUser, assignVessels, getVessels, resendWelcomeEmail, deleteUser } from "./lib/adminApi";
 import ConfirmModal from "./ConfirmModal";
 
@@ -16,7 +16,10 @@ const MODULE_ICONS = [
     { key: "lubeoil", Icon: () => <Droplet size={14} />, label: "Lubeoil" },
     { key: "engine_performance", Icon: () => <Activity size={14} />, label: "Engine" },
     { key: "report_tracker", Icon: () => <FileBarChart2 size={14} />, label: "Reports" },
+    { key: "task_management", Icon: () => <ListChecks size={14} />, label: "Task Mgmt" },
 ];
+
+const TASK_MGMT_ROLE_CODES = ["SURVEY_COORDINATOR", "TA", "TSI", "TM"];
 
 function roleBadgeClass(role) {
     if (role === "ADMIN") return "ap-badge ap-badge-admin";
@@ -139,6 +142,7 @@ function EditSlideOver({ user, vessels, onClose, onSave }) {
         password: "",
         job_title: user.job_title || "",
         role: user.role,
+        role_code: user.role_code || "",
         is_active: user.is_active,
         permissions: { ...user.permissions },
         can_self_assign_vessels: user.can_self_assign_vessels ?? false,
@@ -158,6 +162,9 @@ function EditSlideOver({ user, vessels, onClose, onSave }) {
         try {
             const updatePayload = { ...data };
             if (!updatePayload.password) delete updatePayload.password;
+            updatePayload.role_code = updatePayload.permissions.task_management
+                ? (updatePayload.role_code || null)
+                : null;
             await updateUser(user.id, updatePayload);
             await assignVessels(user.id, selectedVessels);
             onSave();
@@ -230,6 +237,20 @@ function EditSlideOver({ user, vessels, onClose, onSave }) {
                                 </button>
                             </div>
                         ))}
+
+                        {data.permissions.task_management && (
+                            <div className="ap-form-group" style={{ marginTop: 12 }}>
+                                <label className="ap-label">Task Management Role</label>
+                                <div className="ap-role-grid">
+                                    {TASK_MGMT_ROLE_CODES.map(code => (
+                                        <div key={code} className={"ap-role-option" + (data.role_code === code ? " selected" : "")}
+                                            onClick={() => setData({ ...data, role_code: code })}>
+                                            {code}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {data.role === 'SHORE' && (
                             <div className="ap-module-toggle-row" style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--ap-border)' }}>
