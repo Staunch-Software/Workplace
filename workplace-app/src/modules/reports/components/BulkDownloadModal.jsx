@@ -6,6 +6,7 @@ import {
   Package, ChevronLeft, AlertCircle, CheckSquare, Square, Minus, CalendarDays,
 } from 'lucide-react';
 import { reportsApi } from '../api/reportsApi';
+import { fmtFilenameDate } from '@/utils/dateUtils';
 
 const FREQUENCIES = [
   { id: 'ALL',       label: 'All' },
@@ -45,13 +46,6 @@ function sanitizeFolderName(name) {
 function hasValidAttachment(attachments) {
   return Array.isArray(attachments) &&
     attachments.some(a => a.blob_path && !a.blob_path.startsWith('MISSING:'));
-}
-/* Compact date for filenames, e.g. "15Aug2026". */
-function fmtFilenameDate(date) {
-  if (!date) return '';
-  const d = String(date.getDate()).padStart(2, '0');
-  const m = date.toLocaleDateString('en-GB', { month: 'short' });
-  return `${d}${m}${date.getFullYear()}`;
 }
 
 export default function BulkDownloadModal({ vessels = [], reports = [], onClose }) {

@@ -88,8 +88,15 @@ class SyncService:
                 local_updated = local_updated.replace(tzinfo=timezone.utc)
 
             if incoming_updated and local_updated and incoming_updated <= local_updated:
-                logger.info(f"SYNC IGNORE (local same/newer): {model_class.__tablename__} {entity_id}")
-                return
+                # SELF-HEALING: If the local timestamp is somehow in the future compared to real UTC time,
+                # it means the Shore DB was polluted by the vessel's incorrect future clock.
+                # We must accept the incoming payload to overwrite and fix the polluted timestamp!
+                now_utc = datetime.now(timezone.utc)
+                if local_updated > now_utc:
+                    logger.warning(f"SYNC RECOVERY: Overwriting future-polluted local record {model_class.__tablename__} {entity_id}")
+                else:
+                    logger.info(f"SYNC IGNORE (local same/newer): {model_class.__tablename__} {entity_id}")
+                    return
 
             if not incoming_updated or not local_updated:
                 # No comparable timestamps on either side -- log a conflict

@@ -497,7 +497,7 @@
   content: '';
   position: absolute;
   top: 0;
-  right: 0;
+  right: -18px;
   bottom: 0;
   width: 18px;
   background: linear-gradient(to right, rgba(0,0,0,0.06), transparent);
