@@ -8,6 +8,7 @@ import apiDrs from '../modules/drs/api/axiosDrs';
 import axiosJira from '../modules/jira/api/axiosJira';
 import api from '../api/axios';
 import apiLuboil from '../modules/lubeoil/api/axiosLub';
+import apiAepms from '../modules/aepms/api/axiosAepms';
 
 
 // ── Module metadata keyed by backend permission key ───────────────────────────
@@ -431,6 +432,7 @@ const LiveModuleDetail = ({ imo, moduleKey, isInstalled, prefetchedData }) => {
             if (moduleKey === 'drs') res = await apiDrs.get(`/vessels/${imo}/sync-log`);
             else if (moduleKey === 'lubeoil') res = await apiLuboil.get(`api/vessels/${imo}/sync-log`);
             else if (moduleKey === 'jira') res = await axiosJira.get(`api/vessels/${imo}/sync-log`);
+            else if (moduleKey === 'engine_performance') res = await apiAepms.get(`/vessels/${imo}/sync-log`);
             else { setData(null); setLoading(false); return; }
             setData(res.data);
         } catch (err) {
@@ -594,6 +596,7 @@ const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
                 { promise: apiDrs.get("/vessels/sync-status/all"), key: 'drs' },
                 { promise: apiLuboil.get("api/vessels/sync-status/all"), key: 'lubeoil' },
                 { promise: axiosJira.get("api/vessels/sync-status/all"), key: 'jira' },
+                { promise: apiAepms.get("/vessels/sync-status/all"), key: 'engine_performance' },
             ];
 
             // Fire all requests, update state as each one resolves
