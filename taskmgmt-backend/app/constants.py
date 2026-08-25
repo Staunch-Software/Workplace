@@ -1,0 +1,2 @@
+ROLE_CODES = ["SURVEY_COORDINATOR", "TA", "TSI", "TM"]
+RACI_LETTERS = ["R", "A", "C", "I"]

@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+.env
+scraper_worker/venv/
+scraper_worker/__pycache__/
+scraper_worker/.env
+scraper_worker/downloads/
+scraper_worker/temp/
+scraper_worker/*_browser_state.json
+scraper_worker/*_debug.png

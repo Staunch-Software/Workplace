@@ -1,0 +1,132 @@
+[
+  {
+    "imo": "9481697",
+    "name": "GCL GANGA",
+    "code": "GCGA",
+    "id": "315500",
+    "objecT_ID": "875343",
+    "cmpid": "966741",
+    "coid": "966745",
+    "coname": "Umang Shipping Private LTD"
+  },
+  {
+    "imo": "9481685",
+    "name": "GCL NARMADA",
+    "code": "GCNA",
+    "id": "315497",
+    "objecT_ID": "875344",
+    "cmpid": "966741",
+    "coid": "966745",
+    "coname": "Umang Shipping Private LTD"
+  },
+  {
+    "imo": "9481661",
+    "name": "GCL SABARMATI",
+    "code": "GCSA",
+    "id": "315499",
+    "objecT_ID": "875346",
+    "cmpid": "966741",
+    "coid": "966745",
+    "coname": "Umang Shipping Private LTD"
+  },
+  {
+    "imo": "9481659",
+    "name": "GCL TAPI",
+    "code": "GCT",
+    "id": "315502",
+    "objecT_ID": "875340",
+    "cmpid": "966741",
+    "coid": "966745",
+    "coname": "Umang Shipping Private LTD"
+  },
+  {
+    "imo": "9481219",
+    "name": "GCL YAMUNA",
+    "code": "GCYA",
+    "id": "315501",
+    "objecT_ID": "875345",
+    "cmpid": "966741",
+    "coid": "966745",
+    "coname": "Umang Shipping Private LTD"
+  },
+  {
+    "imo": "9832925",
+    "name": "AM KIRTI",
+    "code": "AMKI",
+    "id": "315492",
+    "objecT_ID": "875339",
+    "cmpid": "966741",
+    "coid": "966742",
+    "coname": "Global Chartering Limited"
+  },
+  {
+    "imo": "9832913",
+    "name": "AM TARANG",
+    "code": "AMTA",
+    "id": "315511",
+    "objecT_ID": "875341",
+    "cmpid": "966741",
+    "coid": "966742",
+    "coname": "Global Chartering Limited"
+  },
+  {
+    "imo": "9792058",
+    "name": "AM UMANG",
+    "code": "AMUM",
+    "id": "315495",
+    "objecT_ID": "875342",
+    "cmpid": "966741",
+    "coid": "966742",
+    "coname": "Global Chartering Limited"
+  },
+  {
+    "imo": "9644500",
+    "name": "GCL SARASWATI",
+    "code": "GCSW",
+    "id": "315507",
+    "objecT_ID": "875349",
+    "cmpid": "966741",
+    "coid": "966742",
+    "coname": "Global Chartering Limited"
+  },
+  {
+    "imo": "9521813",
+    "name": "AMNS POLAR",
+    "code": "AMPO",
+    "id": "315515",
+    "objecT_ID": "875351",
+    "cmpid": "966741",
+    "coid": "968412",
+    "coname": "AMNS Shipping & Logistics Private Limited"
+  },
+  {
+    "imo": "9486295",
+    "name": "AMNS TUFMAX",
+    "code": "ATMX",
+    "id": "315516",
+    "objecT_ID": "875356",
+    "cmpid": "966741",
+    "coid": "968412",
+    "coname": "AMNS Shipping & Logistics Private Limited"
+  },
+  {
+    "imo": "9628893",
+    "name": "AMNSI MAXIMUS",
+    "code": "AMAX",
+    "id": "315512",
+    "objecT_ID": "875352",
+    "cmpid": "966741",
+    "coid": "968412",
+    "coname": "AMNS Shipping & Logistics Private Limited"
+  },
+  {
+    "imo": "9628910",
+    "name": "AMNSI STALLION",
+    "code": "AMST",
+    "id": "315513",
+    "objecT_ID": "875353",
+    "cmpid": "966741",
+    "coid": "968412",
+    "coname": "AMNS Shipping & Logistics Private Limited"
+  }
+]
