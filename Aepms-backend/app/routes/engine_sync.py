@@ -12,7 +12,8 @@ of app/routes/sync.py (the luboil vessel-side router).
 from fastapi import APIRouter, Depends, HTTPException, Query, Security
 from fastapi.security import APIKeyHeader
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func, cast
+from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime, timezone
 from pydantic import BaseModel
 
@@ -447,14 +448,19 @@ async def record_vessel_sync_time(
             if error_msg:
                 active_errors.insert(0, {"entity": "Shore-API", "msg": error_msg, "ts": now.isoformat()})
 
-            module_status = dict(vessel.module_status or {})
-            if not module_status.get(MODULE_KEY):
-                module_status[MODULE_KEY] = True
-            vessel_update["module_status"] = module_status
+            # Atomic JSONB merge — avoids the lost-update race where another
+            # module's heartbeat (e.g. DRS, firing every few seconds) reads a
+            # stale module_status snapshot and overwrites this key on commit.
+            vessel_update["module_status"] = func.coalesce(
+                Vessel.module_status, cast({}, JSONB)
+            ).op("||")(cast({MODULE_KEY: True}, JSONB))
+
+            vessel_update["module_error_counts"] = func.coalesce(
+                Vessel.module_error_counts, cast({}, JSONB)
+            ).op("||")(cast({MODULE_KEY: reported_count}, JSONB))
 
             current_counts = dict(vessel.module_error_counts or {})
             current_counts[MODULE_KEY] = reported_count
-            vessel_update["module_error_counts"] = current_counts
             vessel_update["total_error_count"] = sum(current_counts.values())
             vessel_update["last_sync_success"] = (sum(current_counts.values()) == 0)
 
