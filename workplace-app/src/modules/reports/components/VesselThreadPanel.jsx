@@ -4,6 +4,8 @@ import { Send, MessageSquare, CheckCircle, Loader2, ChevronDown, ChevronUp, Pape
 import { vesselReportsApi } from "../api/reportsApi";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
+import { v4 as uuidv4 } from "uuid";
+import { fmtDateTime } from "@/utils/dateUtils";
 
 const ThreadAttachmentLink = ({ reportId, threadId, attachment, isMine }) => {
   const [downloading, setDownloading] = useState(false);
@@ -119,7 +121,7 @@ export default function VesselThreadPanel({ reportId, reportName, reportMeta, is
       try {
         const timestamp = Date.now();
         const sanitizedFileName = selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const attachmentId = crypto.randomUUID();
+        const attachmentId = uuidv4();
         const blobPath = `reports/${reportId}/attachments/${attachmentId}_${timestamp}_${sanitizedFileName}`;
         
         const sasData = await vesselReportsApi.getThreadUploadSasUrl(reportId, blobPath);
@@ -239,9 +241,7 @@ export default function VesselThreadPanel({ reportId, reportName, reportMeta, is
           return (
             <div key={t.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
               <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, marginBottom: '4px', padding: '0 4px' }}>
-                {t.author_name} · {new Date(t.created_at).toLocaleString("en-GB", {
-                  day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
-                })}
+                {t.author_name} · {fmtDateTime(t.created_at)}
               </span>
               <div style={{
                 maxWidth: '85%', padding: '12px 16px', borderRadius: '12px', fontSize: '0.85rem', lineHeight: 1.5,

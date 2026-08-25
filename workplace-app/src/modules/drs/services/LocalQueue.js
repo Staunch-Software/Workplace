@@ -1,4 +1,5 @@
 import { openDB } from 'idb';
+import { v4 as uuidv4 } from "uuid";
 
 const DB_NAME = 'defect_chat_queue';
 const DB_VERSION = 1;
@@ -43,7 +44,7 @@ export const initDB = async () => {
 
 export const enqueueDefect = async (formData) => {
   const db = await initDB();
-  const localDefectId = `LOCAL-${crypto.randomUUID()}`;
+  const localDefectId = `LOCAL-${uuidv4()}`;
   await db.put('pending_defects', {
     local_defect_id: localDefectId,
     ...formData,
@@ -55,7 +56,7 @@ export const enqueueDefect = async (formData) => {
 
 export const enqueueMessage = async (defectId, sender, message, hasAttachment = false) => {
   const db = await initDB();
-  const localId = crypto.randomUUID();
+  const localId = uuidv4();
   await db.put('messages', {
     local_id: localId,
     defect_id: defectId,
@@ -70,7 +71,7 @@ export const enqueueMessage = async (defectId, sender, message, hasAttachment = 
 
 export const enqueueAttachment = async (localId, file) => {
   const db = await initDB();
-  const attachmentId = crypto.randomUUID();
+  const attachmentId = uuidv4();
   await db.put('attachments', {
     attachment_id: attachmentId,
     local_id: localId,

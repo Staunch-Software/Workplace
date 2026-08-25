@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { vesselReportsApi } from '../../api/reportsApi';
 import ReportsNavbar from '../../components/ReportsNavbar';
 import '../../../drs/components/shared/live-feed.css';
+import { fmtRelativeDateTime } from '@/utils/dateUtils';
 
 import {
   FileText, AtSign, CheckCircle, Eye,
@@ -49,17 +50,6 @@ const EVENT_CONFIG = {
   },
 };
 
-const formatDateTime = (dateStr) => {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diffDays = Math.floor((now - d) / (1000 * 60 * 60 * 24));
-  
-  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  if (diffDays === 0) return `Today at ${time}`;
-  if (diffDays === 1) return `Yesterday at ${time}`;
-  return `${d.toLocaleDateString()} ${time}`;
-};
 
 export default function VesselReportFeedPage() {
   const { user } = useAuth();
@@ -210,7 +200,7 @@ export default function VesselReportFeedPage() {
 
                   <div className="feed-row-actions" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'space-between' }}>
                     <span className="timestamp" style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 500 }}>
-                      {formatDateTime(item.created_at)}
+                      {fmtRelativeDateTime(item.created_at)}
                     </span>
                     <div className="btn-group" style={{ display: 'flex', gap: '6px' }}>
                       {item.report_id && (

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { reportsApi, vesselReportsApi } from '../../api/reportsApi';
 import ReportsNavbar from '../../components/ReportsNavbar';
+import { fmtTime, fmtRelativeDateLabel } from '@/utils/dateUtils';
 import {
   FileText, AlertTriangle, MessageSquare, CheckCircle,
   RefreshCw, Eye, Search, Anchor, Zap, Clock, Activity
@@ -23,17 +24,6 @@ const DEFAULT_META = { label: 'Event', color: '#64748b', bg: '#f8fafc', border: 
 function getMeta(type) { return EVENT_META[type] || DEFAULT_META; }
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
-function fmtTime(iso) {
-  return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-}
-function fmtDateLabel(iso) {
-  const d   = new Date(iso);
-  const now = new Date();
-  const diffDays = Math.floor((now - d) / 86400000);
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-}
 function initials(name) {
   if (!name) return '?';
   return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
@@ -147,7 +137,7 @@ export default function ActivityFeedPage() {
   const groupedEvents = useMemo(() => {
     const groups = {};
     filteredEvents.forEach(e => {
-      const label = fmtDateLabel(e.created_at);
+      const label = fmtRelativeDateLabel(e.created_at);
       if (!groups[label]) groups[label] = [];
       groups[label].push(e);
     });

@@ -15,6 +15,7 @@ import {
 import '../../styles/Reports.css';
 import '../../styles/OverviewPage.css';
 import { compareReportNames } from '../../reportOrder';
+import { fmtDateShort, fmtDate } from '@/utils/dateUtils';
 
 const FREQUENCIES = [
   { id: 'WEEKLY',    label: 'Weekly' },
@@ -58,15 +59,6 @@ function reportDate(r) {
   return d ? new Date(d) : null;
 }
 
-function fmtShort(date) {
-  if (!date) return '—';
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-}
-
-function fmtFull(date) {
-  if (!date) return '—';
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-}
 
 function hasValidAttachment(attachments) {
   return Array.isArray(attachments) && attachments.some(a => a.blob_path && !a.blob_path.startsWith('MISSING:'));
@@ -112,7 +104,7 @@ function buildYearWeeks(year) {
       key: `w${n}`,
       number: n,
       label: `W${n}`,
-      sub: `${fmtShort(start)} – ${fmtShort(end)}`,
+      sub: `${fmtDateShort(start)} – ${fmtDateShort(end)}`,
       start,
       end,
     });
@@ -273,7 +265,7 @@ function AttachmentPreviewModal({ report, onClose }) {
         <div className="rt-modal-header">
           <div className="rt-modal-title-group">
             <h2 className="rt-modal-title">{report.report_name}</h2>
-            <span className="rt-modal-subtitle">{report.vessel_name} · {fmtFull(date)}</span>
+            <span className="rt-modal-subtitle">{report.vessel_name} · {fmtDate(date)}</span>
           </div>
           <div className="rt-modal-controls">
             <button className="rt-modal-close" onClick={onClose}><X size={18} /></button>
@@ -315,12 +307,12 @@ function AttachmentCell({ instances, bucket, now, onOpen, viewerRole, buckets })
   }
   if (status === 'pending') {
     return (
-      <div className="ovw-chip ovw-chip-pending" title={`${bucket.label}: ${fmtShort(date)} — Pending submission`}>
+      <div className="ovw-chip ovw-chip-pending" title={`${bucket.label}: ${fmtDateShort(date)} — Pending submission`}>
         <span className="ovw-chip-pending-icon">
           <AlertCircle size={13} />
         </span>
         <span>Pending</span>
-        <span className="ovw-chip-sub-date">{fmtShort(date)}</span>
+        <span className="ovw-chip-sub-date">{fmtDateShort(date)}</span>
       </div>
     );
   }
@@ -328,7 +320,7 @@ function AttachmentCell({ instances, bucket, now, onOpen, viewerRole, buckets })
     <button
       type="button"
       className="ovw-chip ovw-chip-has"
-      title={`${bucket.label}: ${fmtShort(date)} — View attachment`}
+      title={`${bucket.label}: ${fmtDateShort(date)} — View attachment`}
       onClick={() => onOpen(match)}
     >
       <span className="ovw-chip-has-icon">
@@ -339,7 +331,7 @@ function AttachmentCell({ instances, bucket, now, onOpen, viewerRole, buckets })
           </span>
         )}
       </span>
-      <span>{fmtShort(date)}</span>
+      <span>{fmtDateShort(date)}</span>
     </button>
   );
 }

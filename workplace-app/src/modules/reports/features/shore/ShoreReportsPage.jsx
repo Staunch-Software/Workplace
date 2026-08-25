@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import '../../styles/Reports.css';
 import { compareReportNames } from '../../reportOrder';
+import { fmtDate } from '@/utils/dateUtils';
 
 const FREQ_ORDER = ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'YEARLY', 'OTHER'];
 const FREQ_LABELS = {
@@ -31,10 +32,6 @@ function normalizeFreq(f) {
   return 'OTHER';
 }
 
-function fmt(dateStr) {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-}
 
 function StatusBadge({ scrape_status }) {
   const map = {
@@ -493,8 +490,8 @@ export default function ShoreReportsPage() {
                          )}
                          {r.job_order_no || '—'}
                       </td>
-                      <td className="rt-col-date">{fmt(r.due_date)}</td>
-                      <td className="rt-col-date">{fmt(r.next_due_date)}</td>
+                      <td className="rt-col-date">{fmtDate(r.due_date)}</td>
+                      <td className="rt-col-date">{fmtDate(r.next_due_date)}</td>
                       <td>
                         {isPending ? (
                           <span className={`rt-due-status-label ${isOverdue ? 'overdue' : 'planned'}`}>
@@ -504,8 +501,8 @@ export default function ShoreReportsPage() {
                           r.job_status || '—'
                         )}
                       </td>
-                      <td className="rt-col-date">{fmt(r.job_start_date)}</td>
-                      <td className="rt-col-date">{fmt(r.job_end_date)}</td>
+                      <td className="rt-col-date">{fmtDate(r.job_start_date)}</td>
+                      <td className="rt-col-date">{fmtDate(r.job_end_date)}</td>
                       <td>{r.job_type || '—'}</td>
                       <td>{r.job_category || '—'}</td>
                       <td style={{color:'#334155'}}>{r.approved_by || '—'}</td>
