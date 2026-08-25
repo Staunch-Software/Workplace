@@ -31,14 +31,27 @@ logger = logging.getLogger("aepms_push")
 # monthly performance reports that feed AEPMS.
 ME_REPORT_CODES = {
     "MO-02-TECH-07_ME_PERFORMANCE_SHEET",
-    "MO-03-TECH-06_ENGINE_PERFORMANCE_TRE",
 }
+# TECH-06 (Engine Performance TREND) is deliberately excluded for the same
+# reason as TECH-13 below -- it's a trend/summary document, not the raw
+# data sheet. AEPMS's ME extractor can't find an IMO number in it, and
+# rejects it with 400 "IMO number is required but not found in PDF" --
+# confirmed against a real upload failure on 2026-08-24 (AM TARANG).
 AE_REPORT_CODES = {
     "MO-06-TECH-12_AE-1_PERFORMANCE_SHEET",
     "MO-07-TECH-12_AE-2_PERFORMANCE_SHEET",
     "MO-08-TECH-12_AE-3_PERFORMANCE_SHEET",
-    "MO-09-TECH-13_AUXILIARY_ENGINE_PERFO",
 }
+# TECH-13 (Auxiliary Engine Performance TREND) is deliberately excluded --
+# it's a summary across all AE generators, not a per-generator data sheet.
+# AEPMS's AE upload endpoint identifies which generator (AE-1/2/3) a report
+# belongs to by reading an "engineselection" field that only exists on the
+# per-generator TECH-12 sheet (see ae_report_processor.py). A TECH-13 file
+# doesn't have that field, so AEPMS can't identify the generator and
+# rejects it with 400 "could not identify Generator or IMO from PDF" --
+# confirmed against real upload failures on 2026-08-24. TECH-13 was never
+# a valid AEPMS input; don't re-add it without a corresponding TECH-13
+# ingestion path actually existing on the AEPMS side.
 
 _UPLOAD_PATH = {
     "ME": "/upload-monthly-report/",
@@ -161,6 +174,7 @@ async def _push_one(db, client: httpx.AsyncClient, report: Report) -> None:
     except Exception as e:
         logger.error(f"[AEPMS PUSH] Failed to download '{blob_path}': {e}")
         report.aepms_push_status = "FAILED"
+        report.aepms_pushed_at = datetime.utcnow()
         await db.commit()
         return
 
@@ -174,9 +188,26 @@ async def _push_one(db, client: httpx.AsyncClient, report: Report) -> None:
         )
         resp.raise_for_status()
         payload = resp.json()
+    except httpx.HTTPStatusError as e:
+        # AEPMS's error responses carry the real reason in a "detail" field
+        # (FastAPI's HTTPException body) -- surface that instead of just
+        # the generic status code, or every failure looks identical.
+        try:
+            body = e.response.json()
+        except Exception:
+            body = e.response.text
+        logger.error(
+            f"[AEPMS PUSH] Upload failed for report {report.id} "
+            f"({report.vessel_name}/{report.report_code}): {e.response.status_code} -- {body}"
+        )
+        report.aepms_push_status = "FAILED"
+        report.aepms_pushed_at = datetime.utcnow()
+        await db.commit()
+        return
     except Exception as e:
         logger.error(f"[AEPMS PUSH] Upload failed for report {report.id}: {e}")
         report.aepms_push_status = "FAILED"
+        report.aepms_pushed_at = datetime.utcnow()
         await db.commit()
         return
 
