@@ -418,7 +418,7 @@ async def sync_shop_trial_performance(payload: SyncPayload, db: AsyncSession = D
 # ---------------------------------------------------------------------------
 
 SYNC_SCOPE = "AEPMS"
-MODULE_KEY = "aepms"
+MODULE_KEY = "engine_performance"
 
 async def record_vessel_sync_time(
     control_db: AsyncSession,
