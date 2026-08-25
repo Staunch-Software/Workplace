@@ -12,7 +12,8 @@ of app/routes/sync.py (the luboil vessel-side router).
 from fastapi import APIRouter, Depends, HTTPException, Query, Security
 from fastapi.security import APIKeyHeader
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func, cast
+from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime, timezone
 from pydantic import BaseModel
 
@@ -57,6 +58,7 @@ from app.generator_models import (
 )
 
 router = APIRouter(prefix="/engine-sync", tags=["Engine Sync"])
+vessels_status_router = APIRouter(prefix="/vessels", tags=["Vessel Status"])
 
 sync_api_key_header = APIKeyHeader(name="X-Sync-API-Key", auto_error=True)
 
@@ -418,7 +420,7 @@ async def sync_shop_trial_performance(payload: SyncPayload, db: AsyncSession = D
 # ---------------------------------------------------------------------------
 
 SYNC_SCOPE = "AEPMS"
-MODULE_KEY = "aepms"
+MODULE_KEY = "engine_performance"
 
 async def record_vessel_sync_time(
     control_db: AsyncSession,
@@ -447,14 +449,19 @@ async def record_vessel_sync_time(
             if error_msg:
                 active_errors.insert(0, {"entity": "Shore-API", "msg": error_msg, "ts": now.isoformat()})
 
-            module_status = dict(vessel.module_status or {})
-            if not module_status.get(MODULE_KEY):
-                module_status[MODULE_KEY] = True
-            vessel_update["module_status"] = module_status
+            # Atomic JSONB merge — avoids the lost-update race where another
+            # module's heartbeat (e.g. DRS, firing every few seconds) reads a
+            # stale module_status snapshot and overwrites this key on commit.
+            vessel_update["module_status"] = func.coalesce(
+                Vessel.module_status, cast({}, JSONB)
+            ).op("||")(cast({MODULE_KEY: True}, JSONB))
+
+            vessel_update["module_error_counts"] = func.coalesce(
+                Vessel.module_error_counts, cast({}, JSONB)
+            ).op("||")(cast({MODULE_KEY: reported_count}, JSONB))
 
             current_counts = dict(vessel.module_error_counts or {})
             current_counts[MODULE_KEY] = reported_count
-            vessel_update["module_error_counts"] = current_counts
             vessel_update["total_error_count"] = sum(current_counts.values())
             vessel_update["last_sync_success"] = (sum(current_counts.values()) == 0)
 
@@ -489,6 +496,72 @@ async def receive_heartbeat(
     telemetry = payload.get("vessel_telemetry") or payload
     await record_vessel_sync_time(control_db, imo, is_vessel_pushing=False, error_msg=None, telemetry=telemetry)
     return {"status": "ok"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VESSEL STATUS  (dashboard reads these — built entirely from the Vessel
+# control-table row, since AEPMS has no shared multi-vessel module DB the
+# shore server can query directly; the heartbeat above is the only channel
+# that populates last_pull_at / last_push_at / module_error_counts / errors.)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@vessels_status_router.get("/sync-status/all")
+async def get_all_vessel_sync_status(control_db: AsyncSession = Depends(get_control_db)):
+    try:
+        v_res = await control_db.execute(select(Vessel))
+        vessels = v_res.scalars().all()
+
+        result = {}
+        for v in vessels:
+            counts_map = v.module_error_counts or {}
+            engine_count = counts_map.get(MODULE_KEY, 0)
+            try:
+                history = json.loads(v.last_sync_error) if v.last_sync_error else []
+            except Exception:
+                history = []
+            latest_error = next(
+                (e for e in history if e.get("module") == MODULE_KEY.upper()), None
+            )
+
+            result[v.imo] = {
+                "name": v.name,
+                "last_sync_success": (engine_count == 0),
+                "failed_items_count": engine_count,
+                "latest_error": latest_error,
+                "vessel_reported_push": v.last_push_at,
+                "vessel_reported_pull": v.last_pull_at,
+            }
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@vessels_status_router.get("/{imo}/sync-log")
+async def get_vessel_sync_log(imo: str, control_db: AsyncSession = Depends(get_control_db)):
+    v_res = await control_db.execute(select(Vessel).where(Vessel.imo == imo))
+    vessel = v_res.scalar_one_or_none()
+    if not vessel:
+        raise HTTPException(status_code=404, detail=f"Vessel {imo} not found")
+
+    counts_map = vessel.module_error_counts or {}
+    engine_count = counts_map.get(MODULE_KEY, 0)
+    try:
+        history = json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
+    except Exception:
+        history = []
+    active_errors = [e for e in history if e.get("module") == MODULE_KEY.upper()]
+
+    return {
+        "imo": imo,
+        "name": vessel.name,
+        "last_sync_success": (engine_count == 0),
+        "vessel_reported_push": vessel.last_push_at,
+        "vessel_reported_pull": vessel.last_pull_at,
+        "active_errors": active_errors,
+        "failed_items_count": engine_count,
+        "error_history": history,
+    }
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CHANGES FEED  (vessel pulls from shore, or shore pulls from vessel)

@@ -1378,6 +1378,17 @@ class ApiService {
       },
     );
   }
+
+  // ==================== VESSEL STATUS (Navbar sync dashboard) ====================
+  /**
+   * axios-style .get() wrapper — returns { data } to match apiDrs/apiLuboil/
+   * axiosJira's response shape, since this class otherwise uses fetch-based
+   * .request() which returns the parsed body directly.
+   */
+  async get(endpoint) {
+    const data = await this.request(endpoint);
+    return { data };
+  }
 }
 // In axiosAepms.js
 const checkUserPermissions = async () => {
