@@ -1,14 +1,39 @@
 /**
  * dateUtils.js — Shared date formatting utility for the Reports module.
  *
- * RULES:
- *  - All dates from the backend/DB are stored as UTC (naive datetimes without timezone).
- *  - The browser's `new Date(isoString)` already treats a naive ISO string as UTC and
- *    converts it to the LOCAL timezone of the device automatically.
- *  - Therefore all helpers here simply use the browser's local timezone for DISPLAY.
- *  - DO NOT use moment/dayjs; DO NOT pass timezone strings — browser handles TZ correctly.
- *  - Locale is always 'en-GB' for consistent dd-mmm-yyyy display order across browsers.
+ * THE UTC PARSING BUG & FIX:
+ *  - Python's datetime.utcnow() serializes WITHOUT a timezone marker:
+ *      "2026-08-25T04:06:00"  ← no "Z" suffix
+ *  - JavaScript's new Date("2026-08-25T04:06:00") treats a naive string as LOCAL time,
+ *    NOT UTC. On IST (UTC+5:30) this shows 04:06 instead of the correct 09:36.
+ *  - FIX: parseUtc() appends "Z" to any naive ISO string before passing to new Date().
+ *    This forces the browser to interpret it as UTC and display it in the device's
+ *    local timezone correctly (e.g. 04:06 UTC → 09:36 IST).
+ *
+ *  - Backend/sync: All datetimes remain stored & transmitted as UTC. No backend change.
+ *  - Locale: Always 'en-GB' for consistent dd-mmm-yyyy order across browsers.
  */
+
+/**
+ * Parse a date string from the backend, always treating naive ISO strings as UTC.
+ * Python datetime.utcnow() → "2026-08-25T04:06:00" (no "Z") → appends "Z" → UTC.
+ * @param {string|Date|null} dateStr
+ * @returns {Date|null}
+ */
+function parseUtc(dateStr) {
+  if (!dateStr) return null;
+  if (dateStr instanceof Date) return dateStr;
+  const s = String(dateStr).trim();
+  // If the string matches YYYY-MM-DDTHH:MM... but has NO timezone suffix, treat as UTC.
+  if (
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s) &&
+    !/[Zz]$/.test(s) &&
+    !/[+-]\d{2}:\d{2}$/.test(s)
+  ) {
+    return new Date(s + 'Z');
+  }
+  return new Date(s);
+}
 
 /**
  * Format a date string as "25 Aug 2026" (local time, date only).
@@ -17,8 +42,9 @@
  * @returns {string}
  */
 export function fmtDate(dateStr) {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-GB', {
+  const d = parseUtc(dateStr);
+  if (!d || isNaN(d)) return '—';
+  return d.toLocaleDateString('en-GB', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -32,8 +58,9 @@ export function fmtDate(dateStr) {
  * @returns {string}
  */
 export function fmtDateShort(dateStr) {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-GB', {
+  const d = parseUtc(dateStr);
+  if (!d || isNaN(d)) return '—';
+  return d.toLocaleDateString('en-GB', {
     day: '2-digit',
     month: 'short',
   });
@@ -46,8 +73,9 @@ export function fmtDateShort(dateStr) {
  * @returns {string}
  */
 export function fmtDateLong(dateStr) {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-GB', {
+  const d = parseUtc(dateStr);
+  if (!d || isNaN(d)) return '—';
+  return d.toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -55,14 +83,15 @@ export function fmtDateLong(dateStr) {
 }
 
 /**
- * Format a date string as "25 Aug 2026, 10:30" (local date + time).
+ * Format a date string as "25 Aug, 10:30" (local date + time).
  * Used in thread message timestamps.
  * @param {string|Date|null} dateStr
  * @returns {string}
  */
 export function fmtDateTime(dateStr) {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleString('en-GB', {
+  const d = parseUtc(dateStr);
+  if (!d || isNaN(d)) return '—';
+  return d.toLocaleString('en-GB', {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -77,8 +106,9 @@ export function fmtDateTime(dateStr) {
  * @returns {string}
  */
 export function fmtTime(dateStr) {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleTimeString('en-GB', {
+  const d = parseUtc(dateStr);
+  if (!d || isNaN(d)) return '—';
+  return d.toLocaleTimeString('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -86,22 +116,20 @@ export function fmtTime(dateStr) {
 
 /**
  * Format a date string as a relative feed label with a time component:
- *   - Same day  → "Today at 10:30"
- *   - Yesterday → "Yesterday at 10:30"
- *   - Older     → "25 Aug 2026, 10:30"
- * Uses LOCAL time for all comparisons. The "Today/Yesterday" boundary is
- * computed from the device's local midnight, not UTC midnight.
- * Used in ReportFeedPage and VesselReportFeedPage.
+ *   - Same local day  → "Today at 10:30"
+ *   - Previous day   → "Yesterday at 10:30"
+ *   - Older          → "25 Aug 2026, 10:30"
+ * "Today/Yesterday" is computed from local calendar days, not UTC midnight.
  * @param {string|Date|null} dateStr
  * @returns {string}
  */
 export function fmtRelativeDateTime(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
+  const d = parseUtc(dateStr);
+  if (!d || isNaN(d)) return '';
   const now = new Date();
 
-  // Compare calendar days in local time
-  const localDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  // Strip to midnight in LOCAL time for calendar-day comparison
+  const localDate  = new Date(d.getFullYear(),   d.getMonth(),   d.getDate());
   const localToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const diffDays = Math.floor((localToday - localDate) / 86400000);
 
@@ -113,19 +141,19 @@ export function fmtRelativeDateTime(dateStr) {
 
 /**
  * Format a date string as a relative date label (NO time):
- *   - Same day  → "Today"
- *   - Yesterday → "Yesterday"
- *   - Older     → "25 August 2026"
+ *   - Same local day  → "Today"
+ *   - Previous day   → "Yesterday"
+ *   - Older          → "25 August 2026"
  * Used in ActivityFeedPage date group dividers.
  * @param {string|Date|null} dateStr
  * @returns {string}
  */
 export function fmtRelativeDateLabel(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
+  const d = parseUtc(dateStr);
+  if (!d || isNaN(d)) return '';
   const now = new Date();
 
-  const localDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const localDate  = new Date(d.getFullYear(),   d.getMonth(),   d.getDate());
   const localToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const diffDays = Math.floor((localToday - localDate) / 86400000);
 
@@ -141,7 +169,9 @@ export function fmtRelativeDateLabel(dateStr) {
  */
 export function fmtFilenameDate(date) {
   if (!date) return '';
-  const d = String(date.getDate()).padStart(2, '0');
-  const m = date.toLocaleDateString('en-GB', { month: 'short' });
-  return `${d}${m}${date.getFullYear()}`;
+  const d = parseUtc(date);
+  if (!d || isNaN(d)) return '';
+  const day = String(d.getDate()).padStart(2, '0');
+  const m   = d.toLocaleDateString('en-GB', { month: 'short' });
+  return `${day}${m}${d.getFullYear()}`;
 }
