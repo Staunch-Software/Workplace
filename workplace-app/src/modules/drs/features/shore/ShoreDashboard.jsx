@@ -131,9 +131,14 @@ const ConfirmModal = ({ message, onConfirm, onCancel, danger = false }) => (
   }}>
     <div className="confirm-box" style={{
       background: 'white', borderRadius: '12px', padding: '24px 28px',
-      maxWidth: '380px', width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)'
+      maxWidth: '380px', width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+      boxSizing: 'border-box', wordBreak: 'break-word', overflowWrap: 'break-word'
     }}>
-      <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#1e293b', fontWeight: '600', lineHeight: '1.5' }}>
+      <p style={{
+        margin: '0 0 20px 0', fontSize: '14px', color: '#1e293b',
+        fontWeight: '600', lineHeight: '1.5',
+        wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal'
+      }}>
         {message}
       </p>
       <div className="confirm-btn-row" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
