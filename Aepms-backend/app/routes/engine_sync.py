@@ -17,6 +17,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime, timezone
 from pydantic import BaseModel
 
+import logging
+logger = logging.getLogger(__name__)
+
 from app.database import get_db
 from app.config import settings
 from app.services.sync_service import SyncService
@@ -483,7 +486,7 @@ async def record_vessel_sync_time(
         await control_db.execute(update(Vessel).where(Vessel.imo == imo).values(vessel_update))
         await control_db.commit()
     except Exception as e:
-        print(f"record_vessel_sync_time: Vessel update failed: {e}")
+        logger.error(f"record_vessel_sync_time: Vessel update failed: {e}")
 
 @router.post("/heartbeat", dependencies=[Depends(verify_sync_key)])
 async def receive_heartbeat(
@@ -519,14 +522,14 @@ async def get_all_vessel_sync_status(control_db: AsyncSession = Depends(get_cont
                 history = json.loads(v.last_sync_error) if v.last_sync_error else []
             except Exception:
                 history = []
-            latest_error = next(
-                (e for e in history if e.get("module") == MODULE_KEY.upper()), None
-            )
+            
+            active_errors = [e for e in history if e.get("module") == MODULE_KEY.upper()]
+            latest_error = active_errors[0] if active_errors else None
 
             result[v.imo] = {
                 "name": v.name,
-                "last_sync_success": (engine_count == 0),
-                "failed_items_count": engine_count,
+                "last_sync_success": (engine_count == 0 and len(active_errors) == 0),
+                "failed_items_count": max(engine_count, len(active_errors)),
                 "latest_error": latest_error,
                 "vessel_reported_push": v.last_push_at,
                 "vessel_reported_pull": v.last_pull_at,
@@ -554,11 +557,11 @@ async def get_vessel_sync_log(imo: str, control_db: AsyncSession = Depends(get_c
     return {
         "imo": imo,
         "name": vessel.name,
-        "last_sync_success": (engine_count == 0),
+        "last_sync_success": (engine_count == 0 and len(active_errors) == 0),
         "vessel_reported_push": vessel.last_push_at,
         "vessel_reported_pull": vessel.last_pull_at,
         "active_errors": active_errors,
-        "failed_items_count": engine_count,
+        "failed_items_count": max(engine_count, len(active_errors)),
         "error_history": history,
     }
 
