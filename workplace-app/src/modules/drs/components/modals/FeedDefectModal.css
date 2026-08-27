@@ -94,12 +94,22 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  flex-shrink: 0;
+}
+
+.fm-field-description {
+  flex: 1 1 200px;
+  min-width: 200px;
+}
+
+.fm-field-value {
+  display: flex;
+  align-items: center;
+  min-height: 20px;
 }
 
 .feed-modal-header-row.is-edit-mode .fm-field-value {
   flex: 1;
-  display: flex;
-  align-items: center;
   width: 100%;
 }
 
@@ -123,12 +133,14 @@
   letter-spacing: 0.4px;
   color: #94a3b8;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .fm-value {
   font-size: 13px;
   font-weight: 600;
   color: #0f172a;
+  white-space: nowrap;
 }
 
 .fm-priority-value {

@@ -411,7 +411,7 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                     </div>
                   </div>
                   {!canEditFields && (
-                    <div className="fm-field">
+                    <div className="fm-field fm-field-description">
                       <span className="fm-label">Description</span>
                       <div className="fm-field-value"><span className="fm-value fm-description-value">{defect.description}</span></div>
                     </div>
