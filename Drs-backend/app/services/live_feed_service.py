@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.models.tasks import LiveFeed, FeedEventType
+from app.models.tasks import LiveFeed, FeedEventType, LiveFeedRead
 from app.models.vessel import Vessel
 from app.models.user import User
 from app.models.defect import Defect
@@ -80,6 +80,20 @@ async def _write(
     )
     db.add(entry)
     await db.flush()
+
+    # The actor already knows about their own action — auto-mark it read
+    # for them (per-user), while everyone else still sees it as unread.
+    # Shore-only: vessel logins are often shared by multiple crew members,
+    # so one person's action can't be assumed "seen" by whoever else is
+    # using that same vessel account.
+    if user_id and triggered_by_role in ("SHORE", "ADMIN"):
+        db.add(LiveFeedRead(
+            feed_id=entry.id,
+            user_id=user_id,
+            is_read=True,
+            read_at=datetime.now(timezone.utc),
+        ))
+
     return entry
 
 

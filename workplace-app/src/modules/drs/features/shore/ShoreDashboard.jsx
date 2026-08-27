@@ -257,6 +257,15 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
     return filtered;
   }, [allThreads, chatMode, defectStatus, closureRemarks]);
 
+  // ✅ Timestamp of the "Closure requested" system message, for the pending-approval banner
+  const closureRequestedAt = useMemo(() => {
+    const safeThreads = Array.isArray(allThreads) ? allThreads : [];
+    const marker = safeThreads
+      .filter(t => t.is_system_message && typeof t.body === 'string' && t.body.startsWith('Closure requested by'))
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+    return marker?.created_at || null;
+  }, [allThreads]);
+
   const { data: vesselUsers = [] } = useQuery({
     queryKey: ['vessel-users', defectId],
     queryFn: () => defectApi.getVesselUsers(defectId),
@@ -610,6 +619,18 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
               }}>
                 Closure Requested
               </h4>
+              {closureRequestedAt && (
+                <p className='closure-requested-at' style={{
+                  margin: '0 0 6px 0',
+                  fontSize: '12px',
+                  color: '#9a3412',
+                  opacity: 0.8
+                }}>
+                  Requested on {new Date(closureRequestedAt).toLocaleString('en-GB', {
+                    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                  })}
+                </p>
+              )}
               <p className='closure-remark' style={{
                 margin: 0,
                 fontSize: '13px',
@@ -2073,10 +2094,8 @@ const ShoreDashboard = () => {
       filters.target_close_date_sort;
 
     if (!hasExplicitSort) {
-      // Default: flagged to top, then newest date
+      // Default: newest date first (flag no longer affects order)
       data.sort((a, b) => {
-        const flagDiff = (b.is_flagged ? 1 : 0) - (a.is_flagged ? 1 : 0);
-        if (flagDiff !== 0) return flagDiff;
         const da = a.date_identified ? new Date(a.date_identified) : new Date(0);
         const db = b.date_identified ? new Date(b.date_identified) : new Date(0);
         return db - da;
@@ -2186,12 +2205,7 @@ const ShoreDashboard = () => {
         };
       })();
 
-      data.sort((a, b) => {
-        const primaryResult = primarySort(a, b);
-        if (primaryResult !== 0) return primaryResult;
-        // 🚩 Flagged rows rise within same primary-sort group
-        return (b.is_flagged ? 1 : 0) - (a.is_flagged ? 1 : 0);
-      });
+      data.sort(primarySort);
     }
     // ─── END UNIFIED SORT ───
     return data;

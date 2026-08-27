@@ -538,11 +538,11 @@ function SectionCard({ title, subtitle, icon, accentColor, bgColor, borderColor,
 const AnalyticsDashboard = () => {
     const { user } = useAuth();
     const [selectedVessels, setSelectedVessels] = useState([]);
-    const [selectedDays, setSelectedDays] = useState(180);
+    const [selectedDays, setSelectedDays] = useState(7);
     const chartRefs = useRef({});
     const [vesselChartMode, setVesselChartMode] = useState('status');
     const [activeSection, setActiveSection] = useState(null);
-    const [vesselActivityDays, setVesselActivityDays] = useState(30);
+    const [vesselActivityDays, setVesselActivityDays] = useState(7);
     const [expandedActivityVessel, setExpandedActivityVessel] = useState(null);
     const { data: allDefects = [], isLoading, refetch } = useQuery({
         queryKey: ['defects', 'analytics'],
@@ -1148,164 +1148,7 @@ const AnalyticsDashboard = () => {
             </div>
 
             {/* ═══════════════════════════════════════════════════════════════
-                SECTION 1 — FLEET ANALYTICS (no vessel filter)
-            ════════════════════════════════════════════════════════════════ */}
-            <SectionCard
-                title="Fleet Analytics"
-                subtitle={`Overall fleet health · ${fleetStats.total} total defects across all vessels`}
-                icon={<Globe size={18} color="#fff" />}
-                accentColor="#2563eb"
-                className="defect-section-card"
-                bgColor="#f0f7ff"
-                borderColor="#bfdbfe"
-                defaultOpen={true}
-                isOpen={activeSection === 'fleet'}
-                onToggle={(isOpening) => {
-                    setActiveSection(isOpening ? 'fleet' : null);
-                    if (isOpening) setTimeout(buildTrendChart, 50);
-                }}
-            // onOpen={() => setTimeout(buildTrendChart, 0)}
-            >
-                {/* Donut row */}
-                <div className="stats-donut-grid" style={{ display: 'grid', overflowX: "auto", gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-                    <div className="table-card " style={{ padding: 0 }}>
-                        <div className="defect-card-header" style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                            <span className="defect-card-title">Status Distribution</span>
-                        </div>
-                        <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
-                            <DonutChart size={100} label="total" data={[
-                                { label: 'Open', value: fleetStats.open, color: STATUS_COLORS.OPEN },
-                                { label: 'Pending', value: fleetStats.pending, color: STATUS_COLORS.PENDING_CLOSURE },
-                                { label: 'Closed', value: fleetStats.closed, color: STATUS_COLORS.CLOSED },
-                            ]} />
-                            <Legend items={[
-                                { label: 'Open', value: fleetStats.open, color: STATUS_COLORS.OPEN, pct: pct(fleetStats.open, fleetStats.total) },
-                                { label: 'Pending Closure', value: fleetStats.pending, color: STATUS_COLORS.PENDING_CLOSURE, pct: pct(fleetStats.pending, fleetStats.total) },
-                                { label: 'Closed', value: fleetStats.closed, color: STATUS_COLORS.CLOSED, pct: pct(fleetStats.closed, fleetStats.total) },
-                            ]} />
-                        </div>
-                    </div>
-
-                    <div className="table-card" style={{ padding: 0 }}>
-                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                            <span className="defect-card-title">Priority Distribution</span>
-                        </div>
-                        <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
-                            <DonutChart size={100} label="total" data={[
-                                { label: 'Critical', value: fleetStats.critical, color: PRIORITY_COLORS.CRITICAL },
-                                { label: 'High', value: fleetStats.high, color: PRIORITY_COLORS.HIGH },
-                                { label: 'Medium', value: fleetStats.medium, color: PRIORITY_COLORS.MEDIUM },
-                                { label: 'Low', value: fleetStats.low, color: PRIORITY_COLORS.LOW },
-                            ]} />
-                            <Legend items={[
-                                { label: 'Critical', value: fleetStats.critical, color: PRIORITY_COLORS.CRITICAL, pct: pct(fleetStats.critical, fleetStats.total) },
-                                { label: 'High', value: fleetStats.high, color: PRIORITY_COLORS.HIGH, pct: pct(fleetStats.high, fleetStats.total) },
-                                { label: 'Medium', value: fleetStats.medium, color: PRIORITY_COLORS.MEDIUM, pct: pct(fleetStats.medium, fleetStats.total) },
-                                { label: 'Low', value: fleetStats.low, color: PRIORITY_COLORS.LOW, pct: pct(fleetStats.low, fleetStats.total) },
-                            ]} />
-                        </div>
-                    </div>
-
-                    <div className="table-card" style={{ padding: 0 }}>
-                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                            <span className="defect-card-title">Deadline Status</span>
-                        </div>
-                        <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
-                            <DonutChart size={100} label="active" data={[
-                                { label: 'On track', value: fleetStats.onTrack, color: DEADLINE_COLORS.NORMAL },
-                                { label: 'Warning', value: fleetStats.warning, color: DEADLINE_COLORS.WARNING },
-                                { label: 'Overdue', value: fleetStats.overdue, color: DEADLINE_COLORS.OVERDUE },
-                            ]} />
-                            <Legend items={[
-                                { label: 'On track', value: fleetStats.onTrack, color: DEADLINE_COLORS.NORMAL, pct: pct(fleetStats.onTrack, fleetStats.open + fleetStats.pending) },
-                                { label: 'Within 15 days', value: fleetStats.warning, color: DEADLINE_COLORS.WARNING, pct: pct(fleetStats.warning, fleetStats.open + fleetStats.pending) },
-                                { label: 'Overdue', value: fleetStats.overdue, color: DEADLINE_COLORS.OVERDUE, pct: pct(fleetStats.overdue, fleetStats.open + fleetStats.pending) },
-                            ]} />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Trend chart */}
-                <div className="table-card defect-trend-card" style={{ padding: 0 }}>
-                    <div className="defect-trend-header" style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <TrendingUp size={14} color="#ea580c" />
-                            <span className="defect-card-title" >Defect Trend</span>
-                            <span style={{ fontSize: 11, color: '#94a3b8' }}>· last {rangeLabel(selectedDays)}</span>
-                        </div>
-                        <div className="defect-trend-stats" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 10, background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', display: 'flex', alignItems: 'center', gap: 5 }}>
-                                <span style={{ width: 7, height: 7, borderRadius: 2, background: '#ea580c', display: 'inline-block' }} />
-                                {totalCreated} reported
-                            </span>
-                            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 10, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: 5 }}>
-                                <span style={{ width: 7, height: 7, borderRadius: 2, background: '#16a34a', display: 'inline-block' }} />
-                                {totalClosed} closed
-                            </span>
-                            <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#64748b' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#ea580c', display: 'inline-block' }} /> Reported</span>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#16a34a', display: 'inline-block' }} /> Closed</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div style={{ padding: '16px 16px 8px' }}>
-                        <ChartCanvas id="trend-chart" height={200} />
-                    </div>
-                    {/* Slider */}
-                    <div style={{ padding: '8px 20px 16px' }}>
-                        <div style={{ position: 'relative', height: 20, marginBottom: 10 }}>
-                            <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 4, background: '#e2e8f0', borderRadius: 2, transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                            <div style={{ position: 'absolute', top: '50%', left: 0, height: 4, borderRadius: 2, background: '#ea580c', transform: 'translateY(-50%)', width: `${((selectedDays - 1) / 729) * 100}%`, transition: 'width .04s', pointerEvents: 'none' }} />
-                            <input
-                                type="range" min={1} max={730} step={1}
-                                value={selectedDays}
-                                onChange={e => setSelectedDays(Number(e.target.value))}
-                                className="drs-slider"
-                                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', appearance: 'none', background: 'transparent', outline: 'none', cursor: 'pointer', margin: 0, zIndex: 1 }}
-                            />
-                        </div>
-                        <div style={{ position: 'relative', height: 18, marginBottom: 4 }}>
-                            {[
-                                { days: 1, label: '1D' }, { days: 7, label: '1W' },
-                                { days: 30, label: '1M' }, { days: 90, label: '3M' },
-                                { days: 180, label: '6M' }, { days: 365, label: '1Y' },
-                                { days: 730, label: '2Y' },
-                            ].map(({ days, label }) => {
-                                const pctPos = ((days - 1) / 729) * 100;
-                                const isActive = selectedDays >= days;
-                                const isNearest = (() => {
-                                    const snaps = [1, 7, 30, 90, 180, 365, 730];
-                                    return snaps.reduce((a, b) =>
-                                        Math.abs(b - selectedDays) < Math.abs(a - selectedDays) ? b : a
-                                    ) === days;
-                                })();
-                                return (
-                                    <div key={days} onClick={() => setSelectedDays(days)}
-                                        style={{ position: 'absolute', left: `${pctPos}%`, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}>
-                                        <div style={{ width: isNearest ? 3 : 1.5, height: isNearest ? 8 : 5, background: isNearest ? '#ea580c' : isActive ? '#f97316' : '#cbd5e1', borderRadius: 1, marginBottom: 2, transition: 'all .15s' }} />
-                                        <span style={{ fontSize: 9, fontWeight: isNearest ? 800 : 600, color: isNearest ? '#ea580c' : isActive ? '#94a3b8' : '#cbd5e1', letterSpacing: '0.03em', transition: 'all .15s' }}>
-                                            {label}
-                                        </span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 2 }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                                <span style={{ fontSize: 13, fontWeight: 700, color: '#ea580c', padding: '2px 14px', borderRadius: 16, background: '#fff7ed', border: '1px solid #fed7aa' }}>
-                                    {rangeLabel(selectedDays)}
-                                </span>
-                                <span style={{ fontSize: 9, color: '#cbd5e1', letterSpacing: '0.04em' }}>
-                                    by {trendData.grouping}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </SectionCard>
-
-            {/* ═══════════════════════════════════════════════════════════════
-                SECTION 2 — VESSEL ANALYTICS (with vessel filter)
+                SECTION 1 — VESSEL ANALYTICS (with vessel filter)
             ════════════════════════════════════════════════════════════════ */}
             <SectionCard
                 title="Vessel Analytics"
@@ -1695,6 +1538,163 @@ const AnalyticsDashboard = () => {
                         }
                     </div>
                 </div> */}
+            </SectionCard>
+
+            {/* ═══════════════════════════════════════════════════════════════
+                SECTION 2 — FLEET ANALYTICS (no vessel filter)
+            ════════════════════════════════════════════════════════════════ */}
+            <SectionCard
+                title="Fleet Analytics"
+                subtitle={`Overall fleet health · ${fleetStats.total} total defects across all vessels`}
+                icon={<Globe size={18} color="#fff" />}
+                accentColor="#2563eb"
+                className="defect-section-card"
+                bgColor="#f0f7ff"
+                borderColor="#bfdbfe"
+                defaultOpen={true}
+                isOpen={activeSection === 'fleet'}
+                onToggle={(isOpening) => {
+                    setActiveSection(isOpening ? 'fleet' : null);
+                    if (isOpening) setTimeout(buildTrendChart, 50);
+                }}
+            // onOpen={() => setTimeout(buildTrendChart, 0)}
+            >
+                {/* Donut row */}
+                <div className="stats-donut-grid" style={{ display: 'grid', overflowX: "auto", gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                    <div className="table-card " style={{ padding: 0 }}>
+                        <div className="defect-card-header" style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            <span className="defect-card-title">Status Distribution</span>
+                        </div>
+                        <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <DonutChart size={100} label="total" data={[
+                                { label: 'Open', value: fleetStats.open, color: STATUS_COLORS.OPEN },
+                                { label: 'Pending', value: fleetStats.pending, color: STATUS_COLORS.PENDING_CLOSURE },
+                                { label: 'Closed', value: fleetStats.closed, color: STATUS_COLORS.CLOSED },
+                            ]} />
+                            <Legend items={[
+                                { label: 'Open', value: fleetStats.open, color: STATUS_COLORS.OPEN, pct: pct(fleetStats.open, fleetStats.total) },
+                                { label: 'Pending Closure', value: fleetStats.pending, color: STATUS_COLORS.PENDING_CLOSURE, pct: pct(fleetStats.pending, fleetStats.total) },
+                                { label: 'Closed', value: fleetStats.closed, color: STATUS_COLORS.CLOSED, pct: pct(fleetStats.closed, fleetStats.total) },
+                            ]} />
+                        </div>
+                    </div>
+
+                    <div className="table-card" style={{ padding: 0 }}>
+                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            <span className="defect-card-title">Priority Distribution</span>
+                        </div>
+                        <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <DonutChart size={100} label="total" data={[
+                                { label: 'Critical', value: fleetStats.critical, color: PRIORITY_COLORS.CRITICAL },
+                                { label: 'High', value: fleetStats.high, color: PRIORITY_COLORS.HIGH },
+                                { label: 'Medium', value: fleetStats.medium, color: PRIORITY_COLORS.MEDIUM },
+                                { label: 'Low', value: fleetStats.low, color: PRIORITY_COLORS.LOW },
+                            ]} />
+                            <Legend items={[
+                                { label: 'Critical', value: fleetStats.critical, color: PRIORITY_COLORS.CRITICAL, pct: pct(fleetStats.critical, fleetStats.total) },
+                                { label: 'High', value: fleetStats.high, color: PRIORITY_COLORS.HIGH, pct: pct(fleetStats.high, fleetStats.total) },
+                                { label: 'Medium', value: fleetStats.medium, color: PRIORITY_COLORS.MEDIUM, pct: pct(fleetStats.medium, fleetStats.total) },
+                                { label: 'Low', value: fleetStats.low, color: PRIORITY_COLORS.LOW, pct: pct(fleetStats.low, fleetStats.total) },
+                            ]} />
+                        </div>
+                    </div>
+
+                    <div className="table-card" style={{ padding: 0 }}>
+                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            <span className="defect-card-title">Deadline Status</span>
+                        </div>
+                        <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <DonutChart size={100} label="active" data={[
+                                { label: 'On track', value: fleetStats.onTrack, color: DEADLINE_COLORS.NORMAL },
+                                { label: 'Warning', value: fleetStats.warning, color: DEADLINE_COLORS.WARNING },
+                                { label: 'Overdue', value: fleetStats.overdue, color: DEADLINE_COLORS.OVERDUE },
+                            ]} />
+                            <Legend items={[
+                                { label: 'On track', value: fleetStats.onTrack, color: DEADLINE_COLORS.NORMAL, pct: pct(fleetStats.onTrack, fleetStats.open + fleetStats.pending) },
+                                { label: 'Within 15 days', value: fleetStats.warning, color: DEADLINE_COLORS.WARNING, pct: pct(fleetStats.warning, fleetStats.open + fleetStats.pending) },
+                                { label: 'Overdue', value: fleetStats.overdue, color: DEADLINE_COLORS.OVERDUE, pct: pct(fleetStats.overdue, fleetStats.open + fleetStats.pending) },
+                            ]} />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Trend chart */}
+                <div className="table-card defect-trend-card" style={{ padding: 0 }}>
+                    <div className="defect-trend-header" style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <TrendingUp size={14} color="#ea580c" />
+                            <span className="defect-card-title" >Defect Trend</span>
+                            <span style={{ fontSize: 11, color: '#94a3b8' }}>· last {rangeLabel(selectedDays)}</span>
+                        </div>
+                        <div className="defect-trend-stats" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 10, background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: 2, background: '#ea580c', display: 'inline-block' }} />
+                                {totalCreated} reported
+                            </span>
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 10, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: 2, background: '#16a34a', display: 'inline-block' }} />
+                                {totalClosed} closed
+                            </span>
+                            <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#64748b' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#ea580c', display: 'inline-block' }} /> Reported</span>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#16a34a', display: 'inline-block' }} /> Closed</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style={{ padding: '16px 16px 8px' }}>
+                        <ChartCanvas id="trend-chart" height={200} />
+                    </div>
+                    {/* Slider */}
+                    <div style={{ padding: '8px 20px 16px' }}>
+                        <div style={{ position: 'relative', height: 20, marginBottom: 10 }}>
+                            <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 4, background: '#e2e8f0', borderRadius: 2, transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                            <div style={{ position: 'absolute', top: '50%', left: 0, height: 4, borderRadius: 2, background: '#ea580c', transform: 'translateY(-50%)', width: `${((selectedDays - 1) / 729) * 100}%`, transition: 'width .04s', pointerEvents: 'none' }} />
+                            <input
+                                type="range" min={1} max={730} step={1}
+                                value={selectedDays}
+                                onChange={e => setSelectedDays(Number(e.target.value))}
+                                className="drs-slider"
+                                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', appearance: 'none', background: 'transparent', outline: 'none', cursor: 'pointer', margin: 0, zIndex: 1 }}
+                            />
+                        </div>
+                        <div style={{ position: 'relative', height: 18, marginBottom: 4 }}>
+                            {[
+                                { days: 1, label: '1D' }, { days: 7, label: '1W' },
+                                { days: 30, label: '1M' }, { days: 90, label: '3M' },
+                                { days: 180, label: '6M' }, { days: 365, label: '1Y' },
+                                { days: 730, label: '2Y' },
+                            ].map(({ days, label }) => {
+                                const pctPos = ((days - 1) / 729) * 100;
+                                const isActive = selectedDays >= days;
+                                const isNearest = (() => {
+                                    const snaps = [1, 7, 30, 90, 180, 365, 730];
+                                    return snaps.reduce((a, b) =>
+                                        Math.abs(b - selectedDays) < Math.abs(a - selectedDays) ? b : a
+                                    ) === days;
+                                })();
+                                return (
+                                    <div key={days} onClick={() => setSelectedDays(days)}
+                                        style={{ position: 'absolute', left: `${pctPos}%`, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}>
+                                        <div style={{ width: isNearest ? 3 : 1.5, height: isNearest ? 8 : 5, background: isNearest ? '#ea580c' : isActive ? '#f97316' : '#cbd5e1', borderRadius: 1, marginBottom: 2, transition: 'all .15s' }} />
+                                        <span style={{ fontSize: 9, fontWeight: isNearest ? 800 : 600, color: isNearest ? '#ea580c' : isActive ? '#94a3b8' : '#cbd5e1', letterSpacing: '0.03em', transition: 'all .15s' }}>
+                                            {label}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 2 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: '#ea580c', padding: '2px 14px', borderRadius: 16, background: '#fff7ed', border: '1px solid #fed7aa' }}>
+                                    {rangeLabel(selectedDays)}
+                                </span>
+                                <span style={{ fontSize: 9, color: '#cbd5e1', letterSpacing: '0.04em' }}>
+                                    by {trendData.grouping}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </SectionCard>
 
         </div>

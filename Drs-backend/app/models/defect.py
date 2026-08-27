@@ -66,6 +66,7 @@ class Defect(Base):
     # VESSEL / SHORE / SYNC
 
     # Closure information
+    closure_requested_at = Column(DateTime(timezone=True), nullable=True)
     closed_at = Column(DateTime(timezone=True), nullable=True)
     closed_by_id = Column(UUID(as_uuid=True), nullable=True)
     closure_remarks = Column(Text, nullable=True)

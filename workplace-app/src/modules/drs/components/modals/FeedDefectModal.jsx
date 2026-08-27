@@ -148,6 +148,21 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
     onSuccess: () => queryClient.invalidateQueries(['live-feed']),
   });
 
+  const markReadMutation = useMutation({
+    mutationFn: (id) => defectApi.markFeedRead(id),
+    onSuccess: () => queryClient.invalidateQueries(['live-feed']),
+  });
+
+  // Mark every feed event for the defect currently shown as read — fires on
+  // initial open and again each time next/prev lands on a different defect,
+  // since viewing the defect here shows all that info already.
+  useEffect(() => {
+    if (!defectId || !items) return;
+    items
+      .filter(i => i.defect_id === defectId && !i.is_read)
+      .forEach(i => markReadMutation.mutate(i.id));
+  }, [defectId]);
+
   // Jump straight to the next/previous event for a *different* defect —
   // consecutive events on the same defect (e.g. "Priority Changed" then
   // "Before Image Made Mandatory" fired seconds apart) show identical

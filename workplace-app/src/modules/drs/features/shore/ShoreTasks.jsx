@@ -11,7 +11,7 @@ import "../../components/shared/live-feed.css"
 
 import {
   AlertCircle, AlertTriangle, Info, Zap,
-  Eye, CheckCircle, Search, Filter,
+  CheckCircle, Search, Filter,
   Anchor, Wrench, Image, GitPullRequest,
   Lock, Unlock, ChevronDown, X, RefreshCw, AtSign, CheckCheck, Flag
 } from 'lucide-react';
@@ -299,8 +299,12 @@ const LiveFeed = () => {
   }, [modalItemIds, feedItems]);
 
   const handleOpenFeedItem = (item) => {
-    if (!item.is_read) markReadMutation.mutate(item.id);
-    if (!item.defect_id) return;
+    if (!item.defect_id) {
+      // No modal opens for these — mark read here since FeedDefectModal
+      // won't get a chance to (it covers every defect-linked event itself).
+      if (!item.is_read) markReadMutation.mutate(item.id);
+      return;
+    }
     const ids = displayItems.map(i => i.id);
     const idx = ids.indexOf(item.id);
     setModalItemIds(ids);
@@ -671,13 +675,6 @@ const FeedRow = ({ item, onOpen }) => {
               <Flag size={14} color="#e8290b" fill="#e8290b" style={{ marginRight: '2px' }} />
             </Tooltip>
           )}
-          {item.defect_id && (
-            <Tooltip text="View Defect">
-              <button onClick={(e) => { e.stopPropagation(); onOpen(item); }} className="action-btn view-btn">
-                <Eye size={14} />
-              </button>
-            </Tooltip>
-          )}
         </div>
       </div>
     </div>
@@ -769,13 +766,6 @@ const MentionRow = ({ item, onOpen }) => {
           {item.defect?.is_flagged && (
             <Tooltip text="Flagged defect">
               <Flag size={14} color="#e8290b" fill="#e8290b" style={{ marginRight: '2px' }} />
-            </Tooltip>
-          )}
-          {item.defect_id && (
-            <Tooltip text="View Defect">
-              <button onClick={(e) => { e.stopPropagation(); onOpen(item); }} className="action-btn view-btn">
-                <Eye size={14} />
-              </button>
             </Tooltip>
           )}
         </div>

@@ -298,6 +298,7 @@ class DefectService:
                             )
 
                         defect.closure_remarks = defect_update.closure_remarks
+                        defect.closure_requested_at = datetime.now()
                         db.add(Thread(
                             id=uuid.uuid4(),
                             defect_id=defect.id,
@@ -395,6 +396,12 @@ class DefectService:
         if auto_image_required:
             update_data["before_image_required"] = True
             update_data["after_image_required"] = True
+
+        if defect.status == DefectStatus.PENDING_CLOSURE:
+            update_data["closure_remarks"] = defect.closure_remarks
+            update_data["closure_requested_at"] = (
+                defect.closure_requested_at.isoformat() if defect.closure_requested_at else None
+            )
 
         # --- SyncQueue: VESSEL ONLY ---
         if _should_sync():
