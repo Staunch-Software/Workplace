@@ -396,7 +396,7 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                       </span>
                     </div>
                   </div>
-                  <div className="fm-field fm-field-grow">
+                  <div className={`fm-field ${canEditFields ? 'fm-field-grow' : ''}`}>
                     <span className="fm-label">Area of Concern</span>
                     <div className="fm-field-value">
                       {canEditFields ? (
@@ -411,7 +411,7 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                     </div>
                   </div>
                   {!canEditFields && (
-                    <div className="fm-field fm-field-grow">
+                    <div className="fm-field">
                       <span className="fm-label">Description</span>
                       <div className="fm-field-value"><span className="fm-value fm-description-value">{defect.description}</span></div>
                     </div>
