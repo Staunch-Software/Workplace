@@ -8,6 +8,7 @@ import apiDrs from '../modules/drs/api/axiosDrs';
 import axiosJira from '../modules/jira/api/axiosJira';
 import api from '../api/axios';
 import apiLuboil from '../modules/lubeoil/api/axiosLub';
+import apiReports from '../modules/reports/api/axiosReports';
 import apiAepms from '../modules/aepms/api/axiosAepms';
 
 
@@ -27,9 +28,9 @@ const THEME = {
 const MODULE_META = {
     drs: { label: 'DRS (Defects)', icon: <FileText size={14} />, color: '#3b82f6' },
     jira: { label: 'JIRA Sync', icon: <Trello size={14} />, color: '#f97316' },
-    voyage: { label: 'Voyage Perf', icon: <Ship size={14} />, color: '#8b5cf6' },
     lubeoil: { label: 'Lube Analysis', icon: <Droplet size={14} />, color: '#06b6d4' },
     engine_performance: { label: 'Engine Perf', icon: <Zap size={14} />, color: '#22c55e' },
+    report_tracker: { label: 'Report Tracker', icon: <FileText size={14} />, color: '#7c3aed' },
 };
 function formatAgo(iso) {
     if (!iso) return 'Never';
@@ -39,14 +40,6 @@ function formatAgo(iso) {
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     return `${Math.floor(diff / 86400)}d ago`;
-}
-
-function ageClass(iso) {
-    if (!iso) return 'never';
-    const h = (Date.now() - new Date(iso).getTime()) / 3_600_000;
-    if (h < 1) return 'fresh';
-    if (h < 12) return 'stale';
-    return 'old';
 }
 
 const SYNC_COLORS = {
@@ -433,6 +426,7 @@ const LiveModuleDetail = ({ imo, moduleKey, isInstalled, prefetchedData }) => {
             else if (moduleKey === 'lubeoil') res = await apiLuboil.get(`api/vessels/${imo}/sync-log`);
             else if (moduleKey === 'jira') res = await axiosJira.get(`api/vessels/${imo}/sync-log`);
             else if (moduleKey === 'engine_performance') res = await apiAepms.get(`/vessels/${imo}/sync-log`);
+            else if (moduleKey === 'report_tracker') res = await apiReports.get(`/vessels/${imo}/sync-log`);
             else { setData(null); setLoading(false); return; }
             setData(res.data);
         } catch (err) {
@@ -575,14 +569,13 @@ const LiveModuleDetail = ({ imo, moduleKey, isInstalled, prefetchedData }) => {
     );
 };
 
-const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
+const VesselStatusModal = ({ onClose }) => {
     const [vessels, setVessels] = useState([]);
     const [syncLogs, setSyncLogs] = useState({});  // { imo: { drs: {...}, lubeoil: {...}, jira: {...} } }
     const [filter, setFilter] = useState('all');
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [drawer, setDrawer] = useState(null); // { vessel, moduleKey }
-    const [syncDetails, setSyncDetails] = useState({});
 
     useEffect(() => {
         getVesselStatus().then(res => {
@@ -597,6 +590,7 @@ const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
                 { promise: apiLuboil.get("api/vessels/sync-status/all"), key: 'lubeoil' },
                 { promise: axiosJira.get("api/vessels/sync-status/all"), key: 'jira' },
                 { promise: apiAepms.get("/vessels/sync-status/all"), key: 'engine_performance' },
+                { promise: apiReports.get("/vessels/sync-status/all"), key: 'report_tracker' },
             ];
 
             // Fire all requests, update state as each one resolves
@@ -628,8 +622,8 @@ const VesselStatusModal = ({ onClose, userPermissions = {} }) => {
         { key: 'drs', label: 'DRS' },
         { key: 'jira', label: 'JIRA' },
         { key: 'lubeoil', label: 'Lube oil' },
-        { key: 'voyage', label: 'Voyage perf' },
         { key: 'engine_performance', label: 'Engine perf' },
+        { key: 'report_tracker', label: 'Report Tracker' },
     ];
 
     function getTotalErrors(imo) {
@@ -1057,6 +1051,7 @@ const Navbar = ({ setSearchQuery }) => {
             setUser(updatedUser);
             setVesselPickerOpen(false);
         } catch (err) {
+            console.error(err);
             alert('Failed to save vessel assignments');
         } finally {
             setSaving(false);

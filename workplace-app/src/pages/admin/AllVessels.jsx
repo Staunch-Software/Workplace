@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Zap, Trash2 } from "lucide-react";
+import { Search, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Zap, Trash2, FileBarChart2 } from "lucide-react";
 import { getVessels, updateVessel, updateVesselModuleStatus, deleteVessel } from "./lib/adminApi";
 import ConfirmModal from "./ConfirmModal";
 
@@ -11,9 +11,9 @@ const XIcon = () => <X size={20} />;
 const MODULE_META = [
   { key: "drs", label: "DRS", icon: <FileText size={14} />, color: "#3b82f6" },
   { key: "jira", label: "SmartPAL JIRA", icon: <Trello size={14} />, color: "#f97316" },
-  { key: "voyage", label: "Voyage Performance", icon: <Ship size={14} />, color: "#8b5cf6" },
   { key: "lubeoil", label: "Lubeoil Analysis", icon: <Droplet size={14} />, color: "#06b6d4" },
   { key: "engine_performance", label: "Engine Performance", icon: <Zap size={14} />, color: "#22c55e" },
+  { key: "report_tracker", label: "Report Tracker", icon: <FileBarChart2 size={14} />, color: "#7c3aed" },
 ];
 function getRoleStyle(role) {
   const r = role?.toUpperCase();

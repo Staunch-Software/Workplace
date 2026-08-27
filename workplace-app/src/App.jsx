@@ -17,7 +17,6 @@ const JiraModule = lazy(() => import('./modules/jira/JiraModule'));
 const AepmsModule = lazy(() => import('./modules/aepms/AepmsModule'));
 const ReportsModule = lazy(() => import('./modules/reports/ReportsModule'));
 const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
-// const VoyageModule = lazy(() => import('./modules/voyage/VoyageModule'));
 
 const moduleLoaderStyle = {
   position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
@@ -133,15 +132,6 @@ function App() {
               </Suspense>
             </ProtectedRoute>
           } />
-
-          {/* ── VOYAGE MODULE ───────────────────────────── */}
-          {/* <Route path="/voyage/*" element={
-            <ProtectedRoute allowedRoles={['SHORE', 'ADMIN']}>
-              <Suspense fallback={<ModuleLoader label="Loading Voyage..." />}>
-                <VoyageModule />
-              </Suspense>
-            </ProtectedRoute>
-          } /> */}
 
           {/* ── USER GUIDE ─────────────────────────────── */}
           <Route path="/help" element={

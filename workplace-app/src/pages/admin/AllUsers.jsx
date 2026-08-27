@@ -12,7 +12,6 @@ const XIcon = () => <X size={20} />;
 const MODULE_ICONS = [
     { key: "drs", Icon: () => <FileText size={14} />, label: "DRS" },
     { key: "jira", Icon: () => <Trello size={14} />, label: "JIRA" },
-    { key: "voyage", Icon: () => <Ship size={14} />, label: "Voyage" },
     { key: "lubeoil", Icon: () => <Droplet size={14} />, label: "Lubeoil" },
     { key: "engine_performance", Icon: () => <Activity size={14} />, label: "Engine" },
     { key: "report_tracker", Icon: () => <FileBarChart2 size={14} />, label: "Reports" },

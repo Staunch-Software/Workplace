@@ -73,25 +73,41 @@ async def record_vessel_sync_time(
 
     # Update Vessel row in control DB
     try:
-        from app.models.vessel import Vessel
-        res = await control_db.execute(select(Vessel).where(Vessel.imo == imo))
-        vessel = res.scalar_one_or_none()
-        if not vessel:
+        from sqlalchemy import table, column, JSON, Integer, String, Boolean, DateTime
+        from sqlalchemy import select, update
+        
+        vessels_t = table('vessels', 
+            column('imo', String),
+            column('updated_at', DateTime),
+            column('last_push_at', DateTime),
+            column('last_pull_at', DateTime),
+            column('module_status', JSON),
+            column('module_error_counts', JSON),
+            column('total_error_count', Integer),
+            column('last_sync_success', Boolean),
+            column('last_sync_error', String)
+        )
+        
+        res = await control_db.execute(select(vessels_t).where(vessels_t.c.imo == imo))
+        vessel_row = res.mappings().fetchone()
+        if not vessel_row:
             return
 
-        vessel_update = {"updated_at": now}
+        module_status = dict(vessel_row["module_status"] or {})
+        if not module_status.get(MODULE_KEY):
+            module_status[MODULE_KEY] = True
+
+        vessel_update = {
+            "updated_at": now,
+            "module_status": module_status,
+        }
         vessel_update["last_push_at" if is_vessel_pushing else "last_pull_at"] = now
 
         if telemetry is not None:
             reported_count = telemetry.get("failed_items_count", 0)
             active_errors = telemetry.get("active_errors", [])
 
-            module_status = dict(vessel.module_status or {})
-            if not module_status.get(MODULE_KEY):
-                module_status[MODULE_KEY] = True
-            vessel_update["module_status"] = module_status
-
-            current_counts = dict(vessel.module_error_counts or {})
+            current_counts = dict(vessel_row["module_error_counts"] or {})
             current_counts[MODULE_KEY] = reported_count
             vessel_update["module_error_counts"] = current_counts
             vessel_update["total_error_count"] = sum(current_counts.values())
@@ -99,7 +115,7 @@ async def record_vessel_sync_time(
 
             if active_errors:
                 try:
-                    history = json.loads(vessel.last_sync_error) if vessel.last_sync_error else []
+                    history = json.loads(vessel_row["last_sync_error"]) if vessel_row["last_sync_error"] else []
                     latest_msg = active_errors[0].get("msg", "")
                     if not history or history[0].get("msg") != latest_msg:
                         history.insert(0, {
@@ -112,7 +128,7 @@ async def record_vessel_sync_time(
                 except Exception:
                     pass
 
-        await control_db.execute(update(Vessel).where(Vessel.imo == imo).values(vessel_update))
+        await control_db.execute(update(vessels_t).where(vessels_t.c.imo == imo).values(vessel_update))
         await control_db.commit()
     except Exception as e:
         print(f"record_vessel_sync_time: Vessel update failed: {e}")

@@ -60,9 +60,10 @@ const SectionContent = ({ id }) => {
                         <ul>
                             <li><strong>DRS</strong> — Defect Reporting System</li>
                             <li><strong>SmartPAL JIRA Portal</strong> — Ticket Tracking for SmartPAL Portal</li>
-                            <li><strong>Voyage Performance</strong> — Analytics &amp; Tracking</li>
                             <li><strong>Lubeoil Analysis</strong> — Shore Analysis Portal</li>
                             <li><strong>Engine Performance</strong> — Metrics &amp; Health</li>
+                            <li><strong>Report Tracker</strong> — Report Tracking &amp; Threads</li>
+                            <li><strong>Task Manager</strong> — Task Tracking &amp; Management</li>
                         </ul>
                     </li>
                     <li>Only the modules enabled for your account appear. If a module you expect is missing, ask your administrator to enable it.</li>
@@ -137,9 +138,10 @@ const SectionContent = ({ id }) => {
                         <ul>
                             <li>Defect Reporting System</li>
                             <li>SmartPAL JIRA</li>
-                            <li>Voyage Management</li>
                             <li>Lubeoil Analysis</li>
                             <li>Engine Performance</li>
+                            <li>SmartPAL Reports</li>
+                            <li>Task Manager</li>
                         </ul>
                     </li>
                     <li>Click <strong>Create User</strong>. The button shows <em>"Creating..."</em> while processing.</li>
