@@ -622,18 +622,6 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
               }}>
                 Closure Requested
               </h4>
-              {closureRequestedAt && (
-                <p className='closure-requested-at' style={{
-                  margin: '0 0 6px 0',
-                  fontSize: '12px',
-                  color: '#9a3412',
-                  opacity: 0.8
-                }}>
-                  Requested on {new Date(closureRequestedAt).toLocaleString('en-GB', {
-                    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                  })}
-                </p>
-              )}
               <p className='closure-remark' style={{
                 margin: 0,
                 fontSize: '13px',
@@ -654,49 +642,66 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
                 <div style={{
                   display: 'flex',
                   gap: '10px',
-                  flexWrap: 'wrap'
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
                 }}>
-                  <button
-                    className='closre-btn-accept'
-                    onClick={() => handleDecision('ACCEPT')}
-                    style={{
-                      background: '#16a34a',
-                      color: 'white',
-                      border: 'none',
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                      fontWeight: '600',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    <CheckCircle size={14} /> Accept & Close
-                  </button>
-                  <button
-                    onClick={() => handleDecision('REJECT')}
-                    className='closre-btn-accept'
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button
+                      className='closre-btn-accept'
+                      onClick={() => handleDecision('ACCEPT')}
+                      style={{
+                        background: '#16a34a',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      <CheckCircle size={14} /> Accept & Close
+                    </button>
+                    <button
+                      onClick={() => handleDecision('REJECT')}
+                      className='closre-btn-accept'
 
-                    style={{
-                      background: '#dc2626',
-                      color: 'white',
-                      border: 'none',
-                      padding: '6px 12px',
-                      borderRadius: '6px',
+                      style={{
+                        background: '#dc2626',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      <X size={14} /> Reject
+                    </button>
+                  </div>
+                  {closureRequestedAt && (
+                    <span className='closure-requested-at' style={{
                       fontSize: '12px',
-                      cursor: 'pointer',
-                      fontWeight: '600',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    <X size={14} /> Reject
-                  </button>
+                      color: '#9a3412',
+                      opacity: 0.8,
+                      whiteSpace: 'nowrap',
+                      marginLeft: 'auto'
+                    }}>
+                      Requested on {new Date(closureRequestedAt).toLocaleString('en-GB', {
+                        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                      })}
+                    </span>
+                  )}
                 </div>
               ) : (
                 <div
