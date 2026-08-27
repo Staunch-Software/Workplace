@@ -239,6 +239,7 @@ class DefectService:
         auto_image_required = False
         old_priority = defect.priority
         update_data = defect_update.model_dump(exclude_unset=True)
+        system_threads = []  # collects system Thread rows so they can be queued for sync below
 
         for field, value in update_data.items():
 
@@ -298,15 +299,18 @@ class DefectService:
                             )
 
                         defect.closure_remarks = defect_update.closure_remarks
-                        defect.closure_requested_at = datetime.now()
-                        db.add(Thread(
+                        defect.closure_requested_at = datetime.now(timezone.utc)
+                        closure_requested_thread = Thread(
                             id=uuid.uuid4(),
                             defect_id=defect.id,
                             user_id=user.id,
                             author_role="SYSTEM",
                             is_system_message=True,
                             body=f"Closure requested by {user.full_name}. Awaiting shore approval.",
-                        ))
+                            created_at=defect.closure_requested_at,
+                        )
+                        db.add(closure_requested_thread)
+                        system_threads.append(closure_requested_thread)
                         notification_task = {
                             "type": "Closure Requested",
                             "message": f"Closure requested: {defect.title}",
@@ -317,16 +321,19 @@ class DefectService:
                         new_status == DefectStatus.CLOSED
                         and defect.status == DefectStatus.PENDING_CLOSURE
                     ):
-                        defect.closed_at = datetime.now()
+                        defect.closed_at = datetime.now(timezone.utc)
                         defect.closed_by_id = user.id
-                        db.add(Thread(
+                        closure_approved_thread = Thread(
                             id=uuid.uuid4(),
                             defect_id=defect.id,
                             user_id=user.id,
                             author_role="SYSTEM",
                             is_system_message=True,
                             body=f" Closure APPROVED by {user.full_name}",
-                        ))
+                            created_at=defect.closed_at,
+                        )
+                        db.add(closure_approved_thread)
+                        system_threads.append(closure_approved_thread)
                         notification_task = {
                             "type": "Closure Approved",
                             "message": f"Closure approved: {defect.title}",
@@ -338,14 +345,17 @@ class DefectService:
                         and defect.status == DefectStatus.PENDING_CLOSURE
                     ):
                         defect.closure_remarks = None
-                        db.add(Thread(
+                        closure_rejected_thread = Thread(
                             id=uuid.uuid4(),
                             defect_id=defect.id,
                             user_id=user.id,
                             author_role="SYSTEM",
                             is_system_message=True,
                             body=f"Closure REJECTED by {user.full_name}",
-                        ))
+                            created_at=datetime.now(timezone.utc),
+                        )
+                        db.add(closure_rejected_thread)
+                        system_threads.append(closure_rejected_thread)
                         notification_task = {
                             "type": "Closure Rejected",
                             "message": f"Closure rejected: {defect.title}",
@@ -380,14 +390,17 @@ class DefectService:
         if priority_changed:
             old_str = old_priority.value if hasattr(old_priority, "value") else str(old_priority)
             new_str = defect.priority.value if hasattr(defect.priority, "value") else str(defect.priority)
-            db.add(Thread(
+            priority_thread = Thread(
                 id=uuid.uuid4(),
                 defect_id=defect.id,
                 user_id=user.id,
                 author_role="SYSTEM",
                 is_system_message=True,
                 body=f"priority escalated from {old_str} to {new_str} by {user.full_name}",
-            ))
+                created_at=datetime.now(timezone.utc),
+            )
+            db.add(priority_thread)
+            system_threads.append(priority_thread)
 
         # --- Version bump (guard against None) ---
         defect.version = (defect.version or 0) + 1
@@ -415,6 +428,29 @@ class DefectService:
                 status="PENDING",
             ))
             logger.debug(f"[DefectService] SyncQueue queued: DEFECT UPDATE {defect.id}")
+
+            # System messages (closure requested/approved/rejected, priority escalation)
+            # were never queued for sync before — without this, shore never sees them
+            # or the timestamps carried on them.
+            for sys_thread in system_threads:
+                db.add(SyncQueue(
+                    entity_id=sys_thread.id,
+                    entity_type="THREAD",
+                    operation="CREATE",
+                    payload={
+                        "id": str(sys_thread.id),
+                        "defect_id": str(sys_thread.defect_id),
+                        "user_id": str(sys_thread.user_id),
+                        "author_role": sys_thread.author_role,
+                        "body": sys_thread.body,
+                        "is_system_message": sys_thread.is_system_message,
+                        "created_at": sys_thread.created_at.isoformat() if sys_thread.created_at else None,
+                    },
+                    version=1,
+                    origin="VESSEL",
+                    status="PENDING",
+                ))
+                logger.debug(f"[DefectService] SyncQueue queued: THREAD CREATE {sys_thread.id}")
 
         # --- Atomic commit ---
         await db.commit()
