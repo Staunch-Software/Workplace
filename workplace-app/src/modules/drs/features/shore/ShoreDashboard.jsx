@@ -197,7 +197,7 @@ const useColumnResize = (setColumnWidths) => {
 
 // ✅ FIXED: ThreadSection with corrected internal mention filtering
 
-export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, closedById, initialChatMode = 'external', readOnly = false, fixedHeight = null }) => {
+export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt, closedById, closureRequestedAt: closureRequestedAtProp = null, initialChatMode = 'external', readOnly = false, fixedHeight = null }) => {
   const { user } = useAuth();
   const toast = useToast();
   const [confirmModal, setConfirmModal] = useState(null);
@@ -257,14 +257,17 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
     return filtered;
   }, [allThreads, chatMode, defectStatus, closureRemarks]);
 
-  // ✅ Timestamp of the "Closure requested" system message, for the pending-approval banner
+  // ✅ Timestamp of the closure request, for the pending-approval banner.
+  // Prefer the defects.closure_requested_at DB column; fall back to the
+  // "Closure requested by" system message for older records that predate the column.
   const closureRequestedAt = useMemo(() => {
+    if (closureRequestedAtProp) return closureRequestedAtProp;
     const safeThreads = Array.isArray(allThreads) ? allThreads : [];
     const marker = safeThreads
       .filter(t => t.is_system_message && typeof t.body === 'string' && t.body.startsWith('Closure requested by'))
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
     return marker?.created_at || null;
-  }, [allThreads]);
+  }, [allThreads, closureRequestedAtProp]);
 
   const { data: vesselUsers = [] } = useQuery({
     queryKey: ['vessel-users', defectId],
@@ -4036,6 +4039,7 @@ const ShoreDashboard = () => {
                                     closureRemarks={defect.closure_remarks}
                                     closedAt={defect.closed_at || defect.updated_at}
                                     closedById={defect.closed_by_id}
+                                    closureRequestedAt={defect.closure_requested_at}
                                     initialChatMode={autoChatModes[defect.id] || 'external'}
                                   />
                                   {/* ✅ RIGHT COLUMN: Evidence & Requirements */}
