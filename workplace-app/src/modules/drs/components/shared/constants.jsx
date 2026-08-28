@@ -41,6 +41,26 @@ export const StatusStageIcon = ({ size = 16, color = '#94a3b8', status, title })
   </svg>
 );
 
+// Owner icon: a medal seal with ribbon tails. Filled with a checkmark when
+// this is the owner; a plain hollow outline (no checkmark) otherwise.
+export const OwnerSealIcon = ({ size = 20, color = '#9ca3af', outline = false, title }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+    {title && <title>{title}</title>}
+    {outline ? (
+      <>
+        <circle cx="12" cy="9" r="6.2" fill="none" stroke={color} strokeWidth="1.4" />
+        <path d="M8.2 13.6 L6.2 20.5 L12 17.6 L17.8 20.5 L15.8 13.6" fill="none" stroke={color} strokeWidth="1.4" strokeLinejoin="round" />
+      </>
+    ) : (
+      <>
+        <circle cx="12" cy="9" r="6.2" fill={color} />
+        <path d="M8.2 13.6 L6.2 20.5 L12 17.6 L17.8 20.5 L15.8 13.6" fill={color} />
+        <path d="M9 9.3 L11 11.2 L15.3 6.6" fill="none" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </>
+    )}
+  </svg>
+);
+
 // ✅ ONLY SHOW THESE TWO IN DROPDOWNS (PENDING_CLOSURE is internal state only)
 export const STATUS_OPTIONS = ['OPEN', 'CLOSED'];
 export const PRIORITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];

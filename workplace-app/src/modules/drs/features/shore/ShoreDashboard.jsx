@@ -47,7 +47,7 @@ import { CSS } from '@dnd-kit/utilities';
 import {
   STATUS_OPTIONS, FILTER_STATUS_OPTIONS, PRIORITY_OPTIONS, DEADLINE_STATUS_OPTIONS, PR_STATUS_OPTIONS, COMPONENT_OPTIONS, DEFECT_SOURCE_OPTIONS,
   DEFECT_SOURCE_MAP, formatDate, toLocalDateInput, getDeadlineStatus, getDefectSourceLabel, paginate, SHORE_COLUMN_DEFINITIONS, COLUMN_MIN_WIDTHS,
-  PrioritySignalBarsIcon, StatusStageIcon
+  PrioritySignalBarsIcon, StatusStageIcon, OwnerSealIcon
 } from '@drs/components/shared/constants';
 
 const PRIORITY_PILL_COLORS = { CRITICAL: '#dc2626', HIGH: '#f97316', MEDIUM: '#2563eb', LOW: '#16a34a' };
@@ -2538,17 +2538,19 @@ const ShoreDashboard = () => {
 
 
   const OwnerIcon = (value) => (
-    <UserCircle
+    <OwnerSealIcon
       size={20}
       color={value ? '#22c55e' : '#9ca3af'} // green / gray
+      outline={!value}
       title={value ? 'Owner' : 'Others'}
     />
   );
 
   const getOwnerIcon = (value) => (
-    <UserCircle
+    <OwnerSealIcon
       size={20}
       color={value ? '#22c55e' : '#9ca3af'} // green / gray
+      outline={!value}
       title={value ? 'Owner' : 'Others'}
     />
   );
@@ -2962,7 +2964,7 @@ const ShoreDashboard = () => {
             <div className="legend-item">
               <strong>Other:</strong>
               <span className="legend-icons">
-                <UserCircle size={14} color="#22c55e" /> <label>Owner</label>
+                <OwnerSealIcon size={14} color="#22c55e" /> <label>Owner</label>
                 <Flag size={14} color="#e8290b" fill="#e8290b" /> <label>Flag</label>
                 <div className="dd-icon-small">DD</div> <label>DryDock</label>
               </span>
@@ -3261,7 +3263,7 @@ const ShoreDashboard = () => {
                                   style={{ cursor: 'pointer', display: 'inline-flex' }}
                                   title="Sort by Owner"
                                 >
-                                  <UserCircle size={16} color={
+                                  <OwnerSealIcon size={16} color={
                                     filters.text_sort.field === 'owner' && sf.is_owner.length > 0 ? '#7c3aed'
                                       : filters.text_sort.field === 'owner' ? '#2563eb'
                                         : sf.is_owner.length > 0 ? '#ea580c' : '#64748b'
@@ -3278,7 +3280,7 @@ const ShoreDashboard = () => {
                                     { label: "Others", value: "false" }
                                   ]}
                                   iconRenderer={(val) => (
-                                    <UserCircle size={13} color={val === 'true' ? '#22c55e' : '#9ca3af'} />
+                                    <OwnerSealIcon size={13} color={val === 'true' ? '#22c55e' : '#9ca3af'} outline={val !== 'true'} />
                                   )}
                                 />
                               </div>
