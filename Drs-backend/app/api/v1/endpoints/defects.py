@@ -2327,7 +2327,7 @@ async def update_defect(
         import traceback
 
         traceback.print_exc()  # ← ADD THIS LINE
-        logger.error(f"❌ Error updating defect: {str(e)}", exc_info=True)
+        logger.error(f"Error updating defect: {str(e)}", exc_info=True)
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -2394,7 +2394,8 @@ async def update_defect(
 
         await db.commit()
     except Exception as e:
-        logger.error(f"⚠️ Live feed error (non-fatal): {e}")
+        await db.rollback()
+        logger.error(f"Live feed error (non-fatal): {e}")
 
     # ── Background email ─────────────────────────────────────────────────────
     email_data = prepare_email_data(updated_defect)

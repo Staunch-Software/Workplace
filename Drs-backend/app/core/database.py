@@ -52,4 +52,4 @@ async def init_models():
         
         # Create all tables
         await conn.run_sync(Base.metadata.create_all)
-        print("✅ DRS Database Tables Created Successfully (No Comments Table)!")
+        print("DRS Database Tables Created Successfully (No Comments Table)!")

@@ -281,6 +281,29 @@ const ImageGalleryModal = ({ images, initialIndex = 0, onClose }) => {
 };
 
 
+// Caret helpers for the contentEditable mention box in ThreadSection
+const getCaretOffset = (root) => {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  if (!root.contains(range.startContainer)) return null;
+  const preRange = range.cloneRange();
+  preRange.selectNodeContents(root);
+  preRange.setEnd(range.endContainer, range.endOffset);
+  return preRange.toString().length;
+};
+
+const getNodeOffsetAt = (root, charOffset) => {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  let node;
+  let remaining = charOffset;
+  while ((node = walker.nextNode())) {
+    if (remaining <= node.length) return { node, offset: remaining };
+    remaining -= node.length;
+  }
+  return { node: root, offset: root.childNodes.length };
+};
+
 // ✅ UPDATED: Teams-like Thread Section with PENDING_CLOSURE Approval Workflow
 const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
   const { user } = useAuth();
@@ -296,6 +319,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
   const [cursorPosition, setCursorPosition] = useState(0);
   const messagesEndRef = useRef(null);
   const threadScrollRef = useRef(null);
+  const editorRef = useRef(null);
 
   // ✅ Determine if this user has authority to approve (Shore/Admin)
   const canApprove = user?.role === 'SHORE' || user?.role === 'ADMIN';
@@ -350,10 +374,28 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
   });
 
 
-  const handleTextChange = (e) => {
-    const text = e.target.value;
-    const cursorPos = e.target.selectionStart;
+  // Pressing Enter in a contentEditable div normally wraps each line in its own
+  // <div>, which turns into extra blank lines in innerText. Insert a plain <br>
+  // instead so multi-line replies match the old textarea's single-newline behavior.
+  const handleEditorKeyDown = (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    document.execCommand('insertLineBreak');
+    handleEditorInput();
+  };
+
+  const handleEditorInput = () => {
+    const root = editorRef.current;
+    if (!root) return;
+
+    const text = root.innerText;
     setReplyText(text);
+
+    const cursorPos = getCaretOffset(root);
+    if (cursorPos === null) {
+      setShowMentions(false);
+      return;
+    }
     setCursorPosition(cursorPos);
 
     const textBeforeCursor = text.slice(0, cursorPos);
@@ -372,12 +414,55 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
     }
   };
 
+  // Inserts a blue, non-editable @Name chip into the mention editor at the caret
   const selectMention = (u) => {
-    const textBeforeCursor = replyText.slice(0, cursorPosition);
+    const root = editorRef.current;
+    if (!root) {
+      const newText = replyText.slice(0, cursorPosition) + `@${u.full_name} ` + replyText.slice(cursorPosition);
+      setReplyText(newText);
+      if (!taggedUsers.includes(u.id)) setTaggedUsers([...taggedUsers, u.id]);
+      setShowMentions(false);
+      return;
+    }
+
+    root.focus();
+
+    const text = root.innerText;
+    const textBeforeCursor = text.slice(0, cursorPosition);
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
-    const textAfterCursor = replyText.slice(cursorPosition);
-    const newText = replyText.slice(0, lastAtIndex) + `@${u.full_name} ` + textAfterCursor;
+    if (lastAtIndex === -1) {
+      setShowMentions(false);
+      return;
+    }
+
+    const startPos = getNodeOffsetAt(root, lastAtIndex);
+    const endPos = getNodeOffsetAt(root, cursorPosition);
+
+    const range = document.createRange();
+    range.setStart(startPos.node, startPos.offset);
+    range.setEnd(endPos.node, endPos.offset);
+    range.deleteContents();
+
+    const mentionSpan = document.createElement('span');
+    mentionSpan.contentEditable = 'false';
+    mentionSpan.className = 'mention-chip';
+    mentionSpan.textContent = `@${u.full_name}`;
+    range.insertNode(mentionSpan);
+
+    const spaceNode = document.createTextNode(' ');
+    mentionSpan.after(spaceNode);
+
+    const newRange = document.createRange();
+    newRange.setStartAfter(spaceNode);
+    newRange.collapse(true);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+
+    const newText = root.innerText;
     setReplyText(newText);
+    setCursorPosition(getCaretOffset(root) ?? newText.length);
+
     if (!taggedUsers.includes(u.id)) {
       setTaggedUsers([...taggedUsers, u.id]);
     }
@@ -413,6 +498,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
       for (const meta of uploadedAttachments) await defectApi.createAttachment(meta);
 
       setReplyText("");
+      if (editorRef.current) editorRef.current.innerHTML = '';
       setFiles([]);
       setTaggedUsers([]);
       queryClient.invalidateQueries(['threads', defectId]);
@@ -549,8 +635,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                         fontWeight: '500',
                         lineHeight: '1.5',
                         whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        overflowWrap: 'anywhere'
+                        overflowWrap: 'break-word'
                       }}>
                         {t.body}
                       </div>
@@ -604,17 +689,15 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                   {/* <SyncStatusBadge status={t.sync_status} /> */}
 
                 </div>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', maxWidth: '70%' }}>
                   <div style={{
-                    maxWidth: '70%',
                     padding: '10px 14px',
                     background: isMine ? '#0084ff' : 'white',
                     color: isMine ? 'white' : '#1e293b',
                     borderRadius: isMine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
                     boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                    wordBreak: 'break-word',
-                    whiteSpace: 'pre-wrap',
-                    overflowWrap: 'anywhere'
+                    overflowWrap: 'break-word',
+                    whiteSpace: 'pre-wrap'
                   }}>
                     <div className='fsize-18' style={{ fontSize: '14px', lineHeight: '1.4' }}>
                       {messageParts.map((part, idx) => (
@@ -768,22 +851,41 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
       {defectStatus !== 'CLOSED' ? (
         <div style={{ padding: '12px', borderTop: '1px solid #e2e8f0', background: 'white' }}>
           <div style={{ position: 'relative' }}>
-            <textarea
-              className='fsize-17'
+            <div
+              ref={editorRef}
+              className='fsize-17 mention-editor'
+              contentEditable={!isUploading}
+              suppressContentEditableWarning
+              onInput={handleEditorInput}
+              onKeyDown={handleEditorKeyDown}
+              onKeyUp={handleEditorInput}
+              onClick={handleEditorInput}
+              data-placeholder="Type an update (@ to mention)..."
               style={{
                 width: '100%',
                 border: '1px solid #cbd5e1',
                 borderRadius: '8px',
                 padding: '10px 70px 10px 10px',
                 fontSize: '13px',
-                height: '80px',      // 👈 FIXED
-                resize: 'none',      // 👈 IMPORTANT
-                outline: 'none'
+                height: '80px',
+                overflowY: 'auto',
+                outline: 'none',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                boxSizing: 'border-box'
               }}
-              placeholder="Type an update (@ to mention)..."
-              value={replyText}
-              onChange={handleTextChange}
             />
+            <style>{`
+              .mention-editor:empty:before {
+                content: attr(data-placeholder);
+                color: #94a3b8;
+                pointer-events: none;
+              }
+              .mention-editor .mention-chip {
+                color: #3b82f6;
+                font-weight: 600;
+              }
+            `}</style>
 
             {/* SEND BUTTON INSIDE TEXTAREA */}
             <button

@@ -198,6 +198,56 @@ const useColumnResize = (setColumnWidths) => {
 };
 
 
+// Caret helpers for the contentEditable mention box in ThreadSection
+const getCaretOffset = (root) => {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  if (!root.contains(range.startContainer)) return null;
+  const preRange = range.cloneRange();
+  preRange.selectNodeContents(root);
+  preRange.setEnd(range.endContainer, range.endOffset);
+  return preRange.toString().length;
+};
+
+const getNodeOffsetAt = (root, charOffset) => {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  let node;
+  let remaining = charOffset;
+  while ((node = walker.nextNode())) {
+    if (remaining <= node.length) return { node, offset: remaining };
+    remaining -= node.length;
+  }
+  return { node: root, offset: root.childNodes.length };
+};
+
+// Splits message text into plain-text/blue-mention parts for rendering, e.g. "Hi @John Doe how are you"
+// Matches only against known user names (not a greedy @\w\s pattern) so trailing
+// message text after the mention isn't swallowed into the highlighted span.
+const renderMentionText = (text, vesselUsers = []) => {
+  if (!text) return text;
+
+  const names = vesselUsers
+    .map(u => (u.name || u.full_name || '').replace(/[-]/g, '\\-'))
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length); // longest first, so "John Doe" beats "John"
+
+  if (names.length === 0) return text;
+
+  const mentionRegex = new RegExp(`@(${names.join('|')})`, 'g');
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  while ((match = mentionRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+    parts.push(<span key={match.index} style={{ color: '#3b82f6', fontWeight: '600' }}>{match[0]}</span>);
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+
+  return parts.length > 0 ? parts : text;
+};
+
 // ✅ UPDATED ThreadSection with Internal/External Chat Toggle
 
 // ✅ FIXED: ThreadSection with corrected internal mention filtering
@@ -218,6 +268,7 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
   const [taggedUsers, setTaggedUsers] = useState([]);
   const [cursorPosition, setCursorPosition] = useState(0);
   const threadScrollRef = useRef(null);
+  const editorRef = useRef(null);
 
   const [chatMode, setChatMode] = useState(initialChatMode);
 
@@ -299,10 +350,31 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
     }
   }, [defectId, initialChatMode]);
 
+  // Re-populate the mention editor whenever the visible draft changes source
+  // (switching Internal/External, or moving to a different defect). Typing
+  // itself doesn't run this — only these external triggers.
+  useEffect(() => {
+    if (editorRef.current) {
+      editorRef.current.innerText = chatMode === 'internal' ? internalDraft : externalDraft;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatMode, defectId]);
 
-  const handleTextChange = (e) => {
-    const text = e.target.value;
-    const cursorPos = e.target.selectionStart;
+  // Pressing Enter in a contentEditable div normally wraps each line in its own
+  // <div>, which turns into extra blank lines in innerText. Insert a plain <br>
+  // instead so multi-line replies match the old textarea's single-newline behavior.
+  const handleEditorKeyDown = (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    document.execCommand('insertLineBreak');
+    handleEditorInput();
+  };
+
+  const handleEditorInput = () => {
+    const root = editorRef.current;
+    if (!root) return;
+
+    const text = root.innerText;
 
     // ✅ Save to the correct draft based on mode
     if (chatMode === 'internal') {
@@ -311,6 +383,11 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
       setExternalDraft(text);
     }
 
+    const cursorPos = getCaretOffset(root);
+    if (cursorPos === null) {
+      setShowMentions(false);
+      return;
+    }
     setCursorPosition(cursorPos);
 
     const textBeforeCursor = text.slice(0, cursorPos);
@@ -344,16 +421,59 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
     }
   };
 
+  // Inserts a blue, non-editable @Name chip into the mention editor at the caret
   const selectMention = (mentionedUser) => {
-    const textBeforeCursor = currentReplyText.slice(0, cursorPosition);
-    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
-    const textAfterCursor = currentReplyText.slice(cursorPosition);
+    const root = editorRef.current;
     const userName = mentionedUser.name || mentionedUser.full_name || '';
-    const newText = currentReplyText.slice(0, lastAtIndex) + `@${userName} ` + textAfterCursor;
 
-    // ✅ Update correct draft
+    if (!root) {
+      // Fallback: plain string splice (shouldn't normally happen)
+      const newText = currentReplyText.slice(0, cursorPosition) + `@${userName} ` + currentReplyText.slice(cursorPosition);
+      if (chatMode === 'internal') setInternalDraft(newText);
+      else setExternalDraft(newText);
+      setTaggedUsers([...taggedUsers, mentionedUser.id]);
+      setShowMentions(false);
+      return;
+    }
+
+    root.focus();
+
+    const text = root.innerText;
+    const textBeforeCursor = text.slice(0, cursorPosition);
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+    if (lastAtIndex === -1) {
+      setShowMentions(false);
+      return;
+    }
+
+    const startPos = getNodeOffsetAt(root, lastAtIndex);
+    const endPos = getNodeOffsetAt(root, cursorPosition);
+
+    const range = document.createRange();
+    range.setStart(startPos.node, startPos.offset);
+    range.setEnd(endPos.node, endPos.offset);
+    range.deleteContents();
+
+    const mentionSpan = document.createElement('span');
+    mentionSpan.contentEditable = 'false';
+    mentionSpan.className = 'mention-chip';
+    mentionSpan.textContent = `@${userName}`;
+    range.insertNode(mentionSpan);
+
+    const spaceNode = document.createTextNode(' ');
+    mentionSpan.after(spaceNode);
+
+    const newRange = document.createRange();
+    newRange.setStartAfter(spaceNode);
+    newRange.collapse(true);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+
+    const newText = root.innerText;
     if (chatMode === 'internal') setInternalDraft(newText);
     else setExternalDraft(newText);
+    setCursorPosition(getCaretOffset(root) ?? newText.length);
 
     setTaggedUsers([...taggedUsers, mentionedUser.id]);
     setShowMentions(false);
@@ -390,6 +510,7 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
       });
       if (chatMode === 'internal') setInternalDraft("");
       else setExternalDraft("");
+      if (editorRef.current) editorRef.current.innerHTML = '';
       setTaggedUsers([]);
 
       for (const meta of uploadedAttachments)
@@ -498,8 +619,7 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
                         fontWeight: '500',
                         lineHeight: '1.5',
                         whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        overflowWrap: 'anywhere'
+                        overflowWrap: 'break-word'
                       }}>
                         {t.body}
                       </div>
@@ -547,16 +667,15 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
                 justifyContent: isMyMessage ? 'flex-end' : 'flex-start',
                 marginBottom: '15px'
               }}>
+                <div style={{ maxWidth: '70%' }}>
                 <div style={{
-                  maxWidth: '70%',
                   padding: '12px',
                   background: messageBg,
                   borderRadius: isMyMessage ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
                   border: '1px solid #e2e8f0',
                   boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                  wordBreak: 'break-word',
-                  whiteSpace: 'pre-wrap',
-                  overflowWrap: 'anywhere'
+                  overflowWrap: 'break-word',
+                  whiteSpace: 'pre-wrap'
                 }}>
                   <div style={{
                     display: 'flex',
@@ -584,12 +703,13 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
                       {new Date(t.created_at).toLocaleString()}
                     </span>
                   </div>
-                  <p className='thread-body' style={{ fontSize: '14px', color: '#334155', margin: '0' }}>{t.body}</p>
+                  <p className='thread-body' style={{ fontSize: '14px', color: '#334155', margin: '0' }}>{renderMentionText(t.body, vesselUsers)}</p>
                   {t.attachments?.length > 0 && (
                     <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {t.attachments.map(a => <AttachmentLink key={a.id} attachment={a} />)}
                     </div>
                   )}
+                </div>
                 </div>
               </div>
             );
@@ -748,8 +868,20 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
           )}
 
           <div style={{ position: 'relative' }}>
-            <textarea
-              className='input-thread-text'
+            <div
+              ref={editorRef}
+              className='input-thread-text mention-editor'
+              contentEditable={!isUploading}
+              suppressContentEditableWarning
+              onInput={handleEditorInput}
+              onKeyDown={handleEditorKeyDown}
+              onKeyUp={handleEditorInput}
+              onClick={handleEditorInput}
+              data-placeholder={
+                chatMode === 'internal'
+                  ? "Internal note (@ to mention shore team)..."
+                  : "Type an update (@ to mention)..."
+              }
               style={{
                 width: '100%',
                 border: chatMode === 'internal' ? '2px solid #3b82f6' : '1px solid #cbd5e1',
@@ -757,18 +889,25 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
                 padding: '10px 70px 10px 10px',
                 fontSize: '13px',
                 height: '80px',
-                resize: 'none',
+                overflowY: 'auto',
                 outline: 'none',
-                background: chatMode === 'internal' ? '#f0f9ff' : 'white'
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                background: chatMode === 'internal' ? '#f0f9ff' : 'white',
+                boxSizing: 'border-box'
               }}
-              placeholder={
-                chatMode === 'internal'
-                  ? "Internal note (@ to mention shore team)..."
-                  : "Type an update (@ to mention)..."
-              }
-              value={currentReplyText}
-              onChange={handleTextChange}
             />
+            <style>{`
+              .mention-editor:empty:before {
+                content: attr(data-placeholder);
+                color: #94a3b8;
+                pointer-events: none;
+              }
+              .mention-editor .mention-chip {
+                color: #3b82f6;
+                font-weight: 600;
+              }
+            `}</style>
 
             <button
               onClick={handleReply}
