@@ -502,6 +502,9 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
       setFiles([]);
       setTaggedUsers([]);
       queryClient.invalidateQueries(['threads', defectId]);
+      // So the chat-icon badge picks up this new message on the list's next
+      // fetch (invalidate matches both dashboards' ['defects', ...] keys).
+      queryClient.invalidateQueries(['defects']);
 
     } catch (err) {
       toast("Failed: " + err.message, 'error');

@@ -776,8 +776,17 @@ async def get_defects(
         defect.__dict__['is_flagged'] = defect.id in flagged_ids
 
         last_message_at = latest_message_at.get(defect.id)
-        last_read_raw = (defect.thread_read_state or {}).get(current_user_key)
-        last_read_at = datetime.fromisoformat(last_read_raw) if last_read_raw else None
+        read_state = defect.thread_read_state or {}
+        # "_baseline" is a one-time backfill marker (not a real user id) meaning
+        # "everyone without their own entry is caught up as of this timestamp" —
+        # set once via SQL when this feature ships, so pre-existing messages
+        # don't all show as unread on day one. A user's own entry overrides it.
+        candidates = [
+            datetime.fromisoformat(raw)
+            for key in (current_user_key, "_baseline")
+            if (raw := read_state.get(key))
+        ]
+        last_read_at = max(candidates) if candidates else None
         defect.__dict__['has_thread_messages'] = bool(
             last_message_at and (not last_read_at or last_message_at > last_read_at)
         )

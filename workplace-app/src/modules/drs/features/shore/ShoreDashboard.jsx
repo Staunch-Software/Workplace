@@ -518,6 +518,9 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
 
       setFiles([]);
       queryClient.invalidateQueries(['threads', defectId]);
+      // So the chat-icon badge picks up this new message on the list's next
+      // fetch (invalidate matches both dashboards' ['defects', ...] keys).
+      queryClient.invalidateQueries(['defects']);
     } catch (err) {
       toast("Failed to send reply: " + err.message, 'error');
     } finally {
