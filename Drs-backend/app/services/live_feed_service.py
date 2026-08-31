@@ -91,7 +91,7 @@ async def _write(
             feed_id=entry.id,
             user_id=user_id,
             is_read=True,
-            read_at=datetime.now(timezone.utc),
+            read_at=datetime.utcnow(),
         ))
 
     return entry

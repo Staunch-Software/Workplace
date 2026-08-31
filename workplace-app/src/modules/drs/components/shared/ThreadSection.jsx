@@ -1,114 +1,34 @@
-// components/shared/ThreadSection.jsx
-import React, { useState, useEffect } from 'react';
+﻿// components/shared/ThreadSection.jsx
+import React, { useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Send, Paperclip, Download, CheckCircle, X, Loader2 } from 'lucide-react';
+import { Send, Paperclip, CheckCircle, X, Loader2 } from 'lucide-react';
 import { defectApi } from '@drs/services/defectApi';
 import { blobUploadService } from '@drs/services/blobUploadService';
 import { generateId } from '@drs/services/idGenerator';
 import { useAuth } from '@/context/AuthContext';
 import AttachmentLink from '@drs/components/shared/AttachmentLink';
 
-/**
- * 🆕 AttachmentLink Component
- * Fetches fresh SAS URL when component mounts
- * Solves the "attachment not opening after reload" issue
- */
-const AttachmentLink = ({ attachment }) => {
-  const [downloadUrl, setDownloadUrl] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+// Caret helpers for the contentEditable mention box
+const getCaretOffset = (root) => {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  if (!root.contains(range.startContainer)) return null;
+  const preRange = range.cloneRange();
+  preRange.selectNodeContents(root);
+  preRange.setEnd(range.endContainer, range.endOffset);
+  return preRange.toString().length;
+};
 
-  useEffect(() => {
-    const fetchUrl = async () => {
-      try {
-        setLoading(true);
-        console.log('🔗 Fetching fresh URL for:', attachment.file_name);
-        
-        // Fetch fresh signed URL from backend
-        const freshUrl = await defectApi.getAttachmentUrl(attachment.blob_path);
-        
-        setDownloadUrl(freshUrl);
-        setError(null);
-        console.log('✅ Fresh URL obtained');
-      } catch (err) {
-        console.error('❌ Failed to load attachment URL:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUrl();
-  }, [attachment.blob_path, attachment.file_name]);
-
-  if (loading) {
-    return (
-      <div style={{ 
-        display: 'inline-flex', 
-        alignItems: 'center', 
-        gap: '4px', 
-        fontSize: '12px', 
-        color: '#94a3b8',
-        padding: '4px 8px',
-        background: '#f8fafc',
-        borderRadius: '4px',
-        border: '1px solid #e2e8f0'
-      }}>
-        <Loader2 size={12} className="animate-spin" />
-        Loading...
-      </div>
-    );
+const getNodeOffsetAt = (root, charOffset) => {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  let node;
+  let remaining = charOffset;
+  while ((node = walker.nextNode())) {
+    if (remaining <= node.length) return { node, offset: remaining };
+    remaining -= node.length;
   }
-
-  if (error) {
-    return (
-      <div style={{ 
-        display: 'inline-flex', 
-        alignItems: 'center', 
-        gap: '4px', 
-        fontSize: '12px', 
-        color: '#ef4444',
-        padding: '4px 8px',
-        background: '#fef2f2',
-        borderRadius: '4px',
-        border: '1px solid #fecaca'
-      }}>
-        ⚠️ Failed to load
-      </div>
-    );
-  }
-
-  return (
-    <a 
-      href={downloadUrl} 
-      target="_blank" 
-      rel="noreferrer" 
-      download={attachment.file_name}
-      style={{ 
-        display: 'inline-flex',
-        alignItems: 'center', 
-        gap: '4px', 
-        fontSize: '12px', 
-        color: '#3b82f6', 
-        textDecoration: 'none',
-        padding: '4px 8px',
-        background: '#eff6ff',
-        borderRadius: '4px',
-        border: '1px solid #bfdbfe',
-        transition: 'all 0.2s'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = '#dbeafe';
-        e.currentTarget.style.borderColor = '#93c5fd';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = '#eff6ff';
-        e.currentTarget.style.borderColor = '#bfdbfe';
-      }}
-    >
-      <Download size={12} /> {attachment.file_name}
-    </a>
-  );
+  return { node: root, offset: root.childNodes.length };
 };
 
 /**
@@ -119,7 +39,8 @@ const AttachmentLink = ({ attachment }) => {
 const ThreadSection = ({ defectId, defectStatus }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  
+
+  const editorRef = useRef(null);
   const [replyText, setReplyText] = useState("");
   const [files, setFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -145,42 +66,85 @@ const ThreadSection = ({ defectId, defectStatus }) => {
     staleTime: 1000 * 60 * 5 // Cache for 5 minutes
   });
 
-  // Handle text change with @mention detection
-  const handleTextChange = (e) => {
-    const text = e.target.value;
-    const cursorPos = e.target.selectionStart;
-    setReplyText(text);
-    setCursorPosition(cursorPos);
+  // Handle text change with @mention detection (contentEditable box)
+  const handleEditorInput = () => {
+    const root = editorRef.current;
+    if (!root) return;
 
-    const textBeforeCursor = text.slice(0, cursorPos);
+    const text = root.innerText.replace(/\u00A0/g, ' ');
+    setReplyText(text);
+
+    const caretOffset = getCaretOffset(root);
+    if (caretOffset === null) {
+      setShowMentions(false);
+      return;
+    }
+    setCursorPosition(caretOffset);
+
+    const textBeforeCursor = text.slice(0, caretOffset);
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
 
-    if (lastAtIndex !== -1 && (lastAtIndex === 0 || text[lastAtIndex - 1] === ' ')) {
+    if (lastAtIndex !== -1 && (lastAtIndex === 0 || /\s/.test(text[lastAtIndex - 1]))) {
       const searchTerm = textBeforeCursor.slice(lastAtIndex + 1);
-      const filtered = vesselUsers.filter(u =>
-        u.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setMentionList(filtered);
-      setShowMentions(filtered.length > 0);
-    } else {
-      setShowMentions(false);
+      if (!/\s/.test(searchTerm)) {
+        const filtered = vesselUsers.filter(u =>
+          u.name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setMentionList(filtered);
+        setShowMentions(filtered.length > 0);
+        return;
+      }
     }
+    setShowMentions(false);
   };
 
-  // Select a user from mention dropdown
+  // Select a user from mention dropdown — inserts a blue, non-editable @Name chip
   const selectMention = (selectedUser) => {
-    const textBeforeCursor = replyText.slice(0, cursorPosition);
-    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
-    const textAfterCursor = replyText.slice(cursorPosition);
+    const root = editorRef.current;
+    if (!root) return;
+    root.focus();
 
-    const newText = replyText.slice(0, lastAtIndex) + `@${selectedUser.name} ` + textAfterCursor;
+    const text = root.innerText.replace(/\u00A0/g, ' ');
+    const textBeforeCursor = text.slice(0, cursorPosition);
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+    if (lastAtIndex === -1) {
+      setShowMentions(false);
+      return;
+    }
+
+    const startPos = getNodeOffsetAt(root, lastAtIndex);
+    const endPos = getNodeOffsetAt(root, cursorPosition);
+
+    const range = document.createRange();
+    range.setStart(startPos.node, startPos.offset);
+    range.setEnd(endPos.node, endPos.offset);
+    range.deleteContents();
+
+    const mentionSpan = document.createElement('span');
+    mentionSpan.contentEditable = 'false';
+    mentionSpan.className = 'mention-chip';
+    mentionSpan.textContent = `@${selectedUser.name}`;
+    range.insertNode(mentionSpan);
+
+    const spaceNode = document.createTextNode('\u00A0');
+    mentionSpan.after(spaceNode);
+
+    const newRange = document.createRange();
+    newRange.setStartAfter(spaceNode);
+    newRange.collapse(true);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+
+    const newText = root.innerText.replace(/\u00A0/g, ' ');
     setReplyText(newText);
-    
+    setCursorPosition(getCaretOffset(root) ?? newText.length);
+
     // Avoid duplicate tags
     if (!taggedUsers.includes(selectedUser.id)) {
       setTaggedUsers([...taggedUsers, selectedUser.id]);
     }
-    
+
     setShowMentions(false);
   };
 
@@ -269,6 +233,7 @@ const ThreadSection = ({ defectId, defectStatus }) => {
       setReplyText("");
       setFiles([]);
       setTaggedUsers([]);
+      if (editorRef.current) editorRef.current.innerHTML = '';
       
       // Refresh threads
       queryClient.invalidateQueries(['threads', defectId]);
@@ -388,25 +353,45 @@ const ThreadSection = ({ defectId, defectStatus }) => {
       {/* Reply Box (Conditional based on defect status) */}
       {defectStatus !== 'CLOSED' ? (
         <div className="reply-box" style={{ position: 'relative' }}>
-          {/* Textarea */}
-          <textarea
-            className="input-field"
-            placeholder="Type a reply (use @ to mention)..."
-            value={replyText}
-            onChange={handleTextChange}
-            style={{ 
-              width: '100%', 
-              minHeight: '80px', 
+          {/* Mention-aware reply box (contentEditable so @Name can be colored inline) */}
+          <div
+            ref={editorRef}
+            className="input-field mention-editor"
+            contentEditable={!isUploading}
+            suppressContentEditableWarning
+            onInput={handleEditorInput}
+            onKeyUp={handleEditorInput}
+            onClick={handleEditorInput}
+            data-placeholder="Type a reply (use @ to mention)..."
+            style={{
+              width: '100%',
+              minHeight: '80px',
+              maxHeight: '200px',
+              overflowY: 'auto',
               marginBottom: '10px',
-              resize: 'vertical',
               padding: '12px',
               borderRadius: '8px',
               border: '1px solid #e2e8f0',
-              fontSize: '14px'
+              fontSize: '14px',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              outline: 'none',
+              background: isUploading ? '#f8fafc' : 'white',
+              cursor: isUploading ? 'not-allowed' : 'text'
             }}
-            disabled={isUploading}
           />
-          
+          <style>{`
+            .mention-editor:empty:before {
+              content: attr(data-placeholder);
+              color: #94a3b8;
+              pointer-events: none;
+            }
+            .mention-editor .mention-chip {
+              color: #3b82f6;
+              font-weight: 600;
+            }
+          `}</style>
+
           {/* @Mention Dropdown */}
           {showMentions && (
             <div style={{ 
@@ -423,10 +408,11 @@ const ThreadSection = ({ defectId, defectStatus }) => {
               minWidth: '200px' 
             }}>
               {mentionList.map(u => (
-                <div 
-                  key={u.id} 
-                  onClick={() => selectMention(u)} 
-                  style={{ 
+                <div
+                  key={u.id}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => selectMention(u)}
+                  style={{
                     padding: '10px', 
                     cursor: 'pointer', 
                     fontSize: '13px', 

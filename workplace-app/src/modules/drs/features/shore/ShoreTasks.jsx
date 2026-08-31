@@ -362,13 +362,9 @@ const LiveFeed = () => {
     return filtered.sort((a, b) => {
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const dA = new Date(a.created_at), dB = new Date(b.created_at);
-      const getGroup = (item, date) => item.is_read ? 3 : date >= today ? 1 : 2;
+      const getGroup = (item, date) => date >= today ? 1 : item.is_read ? 3 : 2;
       const gA = getGroup(a, dA), gB = getGroup(b, dB);
       if (gA !== gB) return gA - gB;
-      if (gA === 1) return dB - dA;
-      const pA = PRIORITY_ORDER[a.defect?.priority || a.meta?.new_priority] || 99;
-      const pB = PRIORITY_ORDER[b.defect?.priority || b.meta?.new_priority] || 99;
-      if (pA !== pB) return pA - pB;
       return dB - dA;
     });
   }, [feedItems, vesselFilter, priorityFilter, sourceFilter, search, dateFrom, dateTo]);
@@ -391,9 +387,9 @@ const LiveFeed = () => {
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const grouped = useMemo(() => {
-    const todayUnread = displayItems.filter(i => !i.is_read && new Date(i.created_at) >= today);
+    const todayUnread = displayItems.filter(i => new Date(i.created_at) >= today);
     const olderUnread = displayItems.filter(i => !i.is_read && new Date(i.created_at) < today);
-    const read = displayItems.filter(i => i.is_read);
+    const read = displayItems.filter(i => i.is_read && new Date(i.created_at) < today);
     return { todayUnread, olderUnread, read };
   }, [displayItems]);
 
