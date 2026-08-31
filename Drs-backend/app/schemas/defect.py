@@ -113,6 +113,7 @@ class DefectResponse(BaseModel):
     is_owner: bool = False
     is_flagged: bool = False
     is_dd: bool = False
+    has_thread_messages: bool = False
     defect_number: Optional[str] = None
     # Other fields
     responsibility: Optional[str] = None

@@ -757,12 +757,22 @@ async def get_defects(
     )
     flagged_ids = {row[0] for row in flag_result.all()}
 
+    # Defects whose thread has at least one real (non-system) message
+    thread_result = await db.execute(
+        select(Thread.defect_id).where(
+            Thread.defect_id.in_([d.id for d in defects]),
+            Thread.is_system_message == False,
+        ).distinct()
+    )
+    defect_ids_with_messages = {row[0] for row in thread_result.all()}
+
     for defect in defects:
         # Use __dict__ to avoid mutating the ORM collection (prevents SQLAlchemy
         # from nullifying defect_id on removed items at session flush)
         defect.__dict__['pr_entries'] = [pr for pr in defect.pr_entries if not pr.is_deleted]
         defect.vessel_name = vessel_map.get(defect.vessel_imo, defect.vessel_imo)
         defect.__dict__['is_flagged'] = defect.id in flagged_ids
+        defect.__dict__['has_thread_messages'] = defect.id in defect_ids_with_messages
 
     return defects
 

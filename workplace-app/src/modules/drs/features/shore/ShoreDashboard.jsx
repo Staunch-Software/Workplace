@@ -3848,6 +3848,7 @@ const ShoreDashboard = () => {
                                       }
                                     }}
                                     style={{
+                                      position: 'relative',
                                       background: 'transparent',
                                       border: 'none',
                                       cursor: 'pointer',
@@ -3858,6 +3859,21 @@ const ShoreDashboard = () => {
                                       size={20}
                                       color={expandedId === defect.id ? '#ea580c' : '#545454'}
                                     />
+                                    {defect.has_thread_messages && (
+                                      <span
+                                        title="This discussion has messages"
+                                        style={{
+                                          position: 'absolute',
+                                          top: 2,
+                                          right: 2,
+                                          width: 8,
+                                          height: 8,
+                                          borderRadius: '50%',
+                                          background: '#ef4444',
+                                          border: '1.5px solid #fff'
+                                        }}
+                                      />
+                                    )}
                                   </button>
                                 </td>
                               )
