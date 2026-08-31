@@ -3559,6 +3559,16 @@ const VesselDashboard = () => {
                                         setTimeout(() => {
                                           scrollRowBelowHeader(defect.id);
                                         }, 50);
+
+                                        // Per-user "seen" marker only — doesn't affect other users' badges.
+                                        queryClient.setQueryData(['defects', vesselImo], (old) => {
+                                          const list = Array.isArray(old) ? old : old?.items ?? old?.data ?? [];
+                                          if (!Array.isArray(list)) return old;
+                                          return list.map((d) =>
+                                            d.id === defect.id ? { ...d, has_thread_messages: false } : d
+                                          );
+                                        });
+                                        defectApi.markThreadRead(defect.id).catch(() => {});
                                       }
                                     }}
                                     style={{

@@ -56,7 +56,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from sqlalchemy import insert
+from sqlalchemy import insert, func
 import logging
 import io
 import xlsxwriter
@@ -757,14 +757,16 @@ async def get_defects(
     )
     flagged_ids = {row[0] for row in flag_result.all()}
 
-    # Defects whose thread has at least one real (non-system) message
+    # Latest real (non-system) message time per defect — compared per-defect
+    # below against this user's own thread_read_state to decide "unread".
     thread_result = await db.execute(
-        select(Thread.defect_id).where(
+        select(Thread.defect_id, func.max(Thread.created_at)).where(
             Thread.defect_id.in_([d.id for d in defects]),
             Thread.is_system_message == False,
-        ).distinct()
+        ).group_by(Thread.defect_id)
     )
-    defect_ids_with_messages = {row[0] for row in thread_result.all()}
+    latest_message_at = {row[0]: row[1] for row in thread_result.all()}
+    current_user_key = str(current_user.id)
 
     for defect in defects:
         # Use __dict__ to avoid mutating the ORM collection (prevents SQLAlchemy
@@ -772,7 +774,13 @@ async def get_defects(
         defect.__dict__['pr_entries'] = [pr for pr in defect.pr_entries if not pr.is_deleted]
         defect.vessel_name = vessel_map.get(defect.vessel_imo, defect.vessel_imo)
         defect.__dict__['is_flagged'] = defect.id in flagged_ids
-        defect.__dict__['has_thread_messages'] = defect.id in defect_ids_with_messages
+
+        last_message_at = latest_message_at.get(defect.id)
+        last_read_raw = (defect.thread_read_state or {}).get(current_user_key)
+        last_read_at = datetime.fromisoformat(last_read_raw) if last_read_raw else None
+        defect.__dict__['has_thread_messages'] = bool(
+            last_message_at and (not last_read_at or last_message_at > last_read_at)
+        )
 
     return defects
 
@@ -2783,6 +2791,28 @@ async def get_defect_threads(
     except Exception as e:
         logger.error(f"❌ Error fetching threads: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{defect_id}/threads/mark-read")
+async def mark_defect_thread_read(
+    defect_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Record that current_user has viewed this defect's discussion "now".
+    Per-user — does not affect any other user's unread state for this defect.
+    """
+    defect = await db.get(Defect, defect_id)
+    if not defect:
+        raise HTTPException(status_code=404, detail="Defect not found")
+
+    read_state = dict(defect.thread_read_state or {})
+    read_state[str(current_user.id)] = datetime.now(timezone.utc).isoformat()
+    defect.thread_read_state = read_state
+
+    await db.commit()
+    return {"ok": True}
 
 
 # =============================================================================

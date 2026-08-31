@@ -426,6 +426,11 @@ export const defectApi = {
     return response.data;
   },
 
+  markThreadRead: async (defectId) => {
+    const response = await api.post(`/defects/${defectId}/threads/mark-read`);
+    return response.data;
+  },
+
   createThread: async (threadData) => {
     const response = await api.post("/defects/threads", threadData);
     return response.data;

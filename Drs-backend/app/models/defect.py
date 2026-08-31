@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import Column, String, Integer, Text, DateTime, Boolean, ForeignKey, Enum as SQLEnum, ARRAY, CheckConstraint
 from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -80,6 +81,10 @@ class Defect(Base):
     # is_flagged = Column(Boolean, default=False, nullable=False)
     is_dd = Column(Boolean, default=False, nullable=False)
     defect_number = Column(String(20), nullable=True, unique=True, index=True)
+    # Per-user "last time this user opened the discussion thread" markers.
+    # Shape: { "<user_id>": "<iso-8601 timestamp>" }. Never joined/queried on —
+    # just read alongside the defect row to compute the unread badge.
+    thread_read_state = Column(JSONB, nullable=False, default=dict, server_default='{}')
     # Relationships
     # vessel = relationship("Vessel", back_populates="defects")
     # reporter = relationship(
