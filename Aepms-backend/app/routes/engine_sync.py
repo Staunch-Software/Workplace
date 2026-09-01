@@ -492,10 +492,18 @@ async def record_vessel_sync_time(
 async def receive_heartbeat(
     payload: Dict[str, Any],
     control_db: AsyncSession = Depends(get_control_db),
+    db: AsyncSession = Depends(get_db),
 ):
     imo = payload.get("vessel_imo")
     if not imo:
         raise HTTPException(status_code=400, detail="vessel_imo missing from payload")
+
+    provisioned = await db.execute(
+        select(VesselInfo).where(VesselInfo.imo_number == int(imo))
+    )
+    if not provisioned.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Vessel not provisioned for AEPMS")
+
     telemetry = payload.get("vessel_telemetry") or payload
     await record_vessel_sync_time(control_db, imo, is_vessel_pushing=False, error_msg=None, telemetry=telemetry)
     return {"status": "ok"}
