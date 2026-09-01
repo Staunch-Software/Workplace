@@ -45,6 +45,7 @@ from app.models import (
     BaselinePerformanceData,
     Organization,
     RolePermission,
+    SyncState,
 )
 from app.generator_models import (
     GeneratorMonthlyReportHeader,
@@ -431,12 +432,37 @@ async def record_vessel_sync_time(
     is_vessel_pushing: bool,
     error_msg: str = None,
     telemetry: dict = None,
+    db: AsyncSession = None,
 ):
     if not imo:
         return
     now = datetime.now(timezone.utc)
 
-    # Update Vessel row in control DB
+    # Module-scoped sync state (AEPMS's own — this is what the dashboard's
+    # Engine Perf column should read, instead of the shared vessels row
+    # below, which every module writes to and is therefore not AEPMS-specific).
+    if db is not None:
+        try:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            update_set = {"updated_at": now}
+            update_set["last_push_at" if is_vessel_pushing else "last_pull_at"] = now
+            if telemetry is not None or error_msg:
+                active_errors = telemetry.get("active_errors", []) if telemetry else []
+                if error_msg:
+                    active_errors.insert(0, {"entity": "Vessel-Sync", "msg": error_msg, "ts": now.isoformat()})
+                update_set["active_errors"] = active_errors
+            await db.execute(
+                pg_insert(SyncState)
+                .values(vessel_imo=imo, sync_scope="ENGINE_PERFORMANCE", **update_set)
+                .on_conflict_do_update(index_elements=["vessel_imo", "sync_scope"], set_=update_set)
+            )
+            await db.commit()
+        except Exception as e:
+            logger.error(f"record_vessel_sync_time: SyncState upsert failed: {e}")
+
+    # Update Vessel row in control DB (existing behaviour, unchanged — still
+    # kept for module_status/module_error_counts/last_sync_error, which are
+    # correctly namespaced by MODULE_KEY already)
     try:
         res = await control_db.execute(select(Vessel).where(Vessel.imo == imo))
         vessel = res.scalar_one_or_none()
@@ -505,32 +531,44 @@ async def receive_heartbeat(
         raise HTTPException(status_code=403, detail="Vessel not provisioned for AEPMS")
 
     telemetry = payload.get("vessel_telemetry") or payload
-    await record_vessel_sync_time(control_db, imo, is_vessel_pushing=False, error_msg=None, telemetry=telemetry)
+    await record_vessel_sync_time(control_db, imo, is_vessel_pushing=False, error_msg=None, telemetry=telemetry, db=db)
     return {"status": "ok"}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# VESSEL STATUS  (dashboard reads these — built entirely from the Vessel
-# control-table row, since AEPMS has no shared multi-vessel module DB the
-# shore server can query directly; the heartbeat above is the only channel
-# that populates last_pull_at / last_push_at / module_error_counts / errors.)
+# VESSEL STATUS  (dashboard reads these. Timestamps now come from AEPMS's own
+# aepms_sync_state table — scoped per vessel_imo + sync_scope="ENGINE_PERFORMANCE"
+# — not from the shared vessels control-table row, which every module writes
+# to and is therefore not reliable as AEPMS-specific activity. module_status /
+# module_error_counts / last_sync_error stay on the shared row since those
+# are already correctly namespaced by MODULE_KEY.)
 # ─────────────────────────────────────────────────────────────────────────────
 
 @vessels_status_router.get("/sync-status/all")
-async def get_all_vessel_sync_status(control_db: AsyncSession = Depends(get_control_db)):
+async def get_all_vessel_sync_status(
+    control_db: AsyncSession = Depends(get_control_db),
+    db: AsyncSession = Depends(get_db),
+):
     try:
         v_res = await control_db.execute(select(Vessel))
         vessels = v_res.scalars().all()
 
+        ss_res = await db.execute(
+            select(SyncState).where(SyncState.sync_scope == "ENGINE_PERFORMANCE")
+        )
+        sync_states = {s.vessel_imo: s for s in ss_res.scalars().all()}
+
         result = {}
         for v in vessels:
+            state = sync_states.get(v.imo)
+
             counts_map = v.module_error_counts or {}
             engine_count = counts_map.get(MODULE_KEY, 0)
             try:
                 history = json.loads(v.last_sync_error) if v.last_sync_error else []
             except Exception:
                 history = []
-            
+
             active_errors = [e for e in history if e.get("module") == MODULE_KEY.upper()]
             latest_error = active_errors[0] if active_errors else None
 
@@ -539,8 +577,8 @@ async def get_all_vessel_sync_status(control_db: AsyncSession = Depends(get_cont
                 "last_sync_success": (engine_count == 0 and len(active_errors) == 0),
                 "failed_items_count": max(engine_count, len(active_errors)),
                 "latest_error": latest_error,
-                "vessel_reported_push": v.last_push_at,
-                "vessel_reported_pull": v.last_pull_at,
+                "vessel_reported_push": state.last_push_at if state else None,
+                "vessel_reported_pull": state.last_pull_at if state else None,
             }
         return result
     except Exception as e:
@@ -548,11 +586,23 @@ async def get_all_vessel_sync_status(control_db: AsyncSession = Depends(get_cont
 
 
 @vessels_status_router.get("/{imo}/sync-log")
-async def get_vessel_sync_log(imo: str, control_db: AsyncSession = Depends(get_control_db)):
+async def get_vessel_sync_log(
+    imo: str,
+    control_db: AsyncSession = Depends(get_control_db),
+    db: AsyncSession = Depends(get_db),
+):
     v_res = await control_db.execute(select(Vessel).where(Vessel.imo == imo))
     vessel = v_res.scalar_one_or_none()
     if not vessel:
         raise HTTPException(status_code=404, detail=f"Vessel {imo} not found")
+
+    ss_res = await db.execute(
+        select(SyncState).where(
+            SyncState.vessel_imo == imo,
+            SyncState.sync_scope == "ENGINE_PERFORMANCE",
+        )
+    )
+    sync_state = ss_res.scalar_one_or_none()
 
     counts_map = vessel.module_error_counts or {}
     engine_count = counts_map.get(MODULE_KEY, 0)
@@ -566,8 +616,8 @@ async def get_vessel_sync_log(imo: str, control_db: AsyncSession = Depends(get_c
         "imo": imo,
         "name": vessel.name,
         "last_sync_success": (engine_count == 0 and len(active_errors) == 0),
-        "vessel_reported_push": vessel.last_push_at,
-        "vessel_reported_pull": vessel.last_pull_at,
+        "vessel_reported_push": sync_state.last_push_at if sync_state else None,
+        "vessel_reported_pull": sync_state.last_pull_at if sync_state else None,
         "active_errors": active_errors,
         "failed_items_count": max(engine_count, len(active_errors)),
         "error_history": history,
