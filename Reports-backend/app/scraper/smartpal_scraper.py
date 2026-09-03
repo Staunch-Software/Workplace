@@ -32,6 +32,44 @@ from app.models.report import Report, ScrapeStatus, VerifyStatus, ReportConfig, 
 
 logger = logging.getLogger("scraper")
 
+# SmartPAL loads the Attachments tab's file list asynchronously after the
+# tab click -- Knockout renders either the real row list or the genuine
+# "No Attachments Found" empty state only once that call resolves. Waiting
+# on this selector (instead of a fixed sleep) means we only ever read the
+# DOM once one of those two states has actually appeared.
+_ATTACHMENT_READY_SELECTOR = (
+    "#Attachments .attachment-grid table tbody tr, "
+    "#Attachments .no-attachment, "
+    "#Attachments .k-grid tbody tr, "
+    "#Attachments table.rgMasterTable tr.rgRow, "
+    "#Attachments .rgMasterTable tr.rgRow"
+)
+
+
+async def _click_attachments_tab_and_wait(page, timeout: int = 15000):
+    """Click the Attachments tab and wait for it to actually finish loading.
+
+    Replaces the old fixed `wait_for_timeout(3000)` pattern, which raced
+    SmartPAL's async attachment-list fetch: on a slow response the scraper
+    would read the DOM before either the file list or the empty state had
+    rendered, silently recording 0 attachments on jobs that genuinely had
+    files attached.
+    """
+    await page.evaluate('''() => {
+        const tab = document.querySelector('a[href="#Attachments"]');
+        if (tab) tab.click();
+        else {
+            const links = Array.from(document.querySelectorAll("a, span, div"));
+            const fallback = links.find(el => el.innerText && (el.innerText.includes("Attachments") || el.innerText.includes("Files") || el.innerText.includes("Documents")));
+            if (fallback) fallback.click();
+        }
+    }''')
+    try:
+        await page.wait_for_selector(_ATTACHMENT_READY_SELECTOR, timeout=timeout)
+    except PlaywrightTimeout:
+        logger.warning(f"Attachments panel did not signal ready within {timeout}ms -- proceeding anyway (may miss attachments).")
+        await page.wait_for_timeout(1500)
+
 
 # ---------------------------------------------------------------------------
 # Main Scraper Entry Point
@@ -675,17 +713,8 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                         await pending_details_page.wait_for_timeout(3000)
                         
                         # Click Attachments tab in pending job
-                        await pending_details_page.evaluate('''() => {
-                            const tab = document.querySelector('a[href="#Attachments"]');
-                            if (tab) tab.click();
-                            else {
-                                const links = Array.from(document.querySelectorAll("a, span, div"));
-                                const fallback = links.find(el => el.innerText && el.innerText.includes("Attachments") || el.innerText.includes("Files") || el.innerText.includes("Documents"));
-                                if (fallback) fallback.click();
-                            }
-                        }''')
-                        await pending_details_page.wait_for_timeout(3000)
-                        
+                        await _click_attachments_tab_and_wait(pending_details_page)
+
                         # Fallback dump for diagnostics
                         html_content = await pending_details_page.content()
                         with open(f"attachments_dump_pending_{vessel_imo}.html", "w", encoding="utf-8") as f:
@@ -913,17 +942,7 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
 
         # Step 10: Click Attachments tab and wait for content to render
         logger.info("Clicking 'Attachments' tab...")
-        await job_page.evaluate('''() => {
-            const tab = document.querySelector('a[href="#Attachments"]');
-            if (tab) tab.click();
-            else {
-                const links = Array.from(document.querySelectorAll("a, span, div"));
-                const fallback = links.find(el => el.innerText && el.innerText.includes("Attachments"));
-                if (fallback) fallback.click();
-            }
-        }''')
-        # Wait for the attachment panel to load
-        await job_page.wait_for_timeout(3000)
+        await _click_attachments_tab_and_wait(job_page)
 
         # Step 11: Use NETWORK REQUEST INTERCEPTION to capture all attachment URLs
         # When each row is clicked, SmartPAL fires a GET request to load the file.
@@ -942,7 +961,7 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
             if (!visibleGrid) return 0;
             return visibleGrid.querySelectorAll("tbody tr, tr.rgRow, tr.rgAltRow").length;
         }''')
-        
+
         pdf_files = []
         seen_urls = set()
 

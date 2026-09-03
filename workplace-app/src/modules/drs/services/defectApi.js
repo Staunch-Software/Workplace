@@ -223,7 +223,12 @@ export const defectApi = {
   // ✅ After — proper async/await, returns response.data, full logging
   shoreCloseDefect: async (id, data) => {
     const response = await api.patch(`/defects/${id}/shore-close`, data);
-    return response.data; // consistent with all other methods
+    return response.data;
+  },
+
+  reopenDefect: async (id, data) => {
+    const response = await api.patch(`/defects/${id}/reopen`, data);
+    return response.data;
   },
 
   removeDefect: async (defectId) => {
