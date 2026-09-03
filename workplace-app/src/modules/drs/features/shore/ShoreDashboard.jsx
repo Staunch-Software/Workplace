@@ -4092,7 +4092,10 @@ const ShoreDashboard = () => {
                                       {getStatusIcon(defect.status)}
                                     </div>
                                   ) : (
-                                    isEditMode && !isClosed ? (
+                                    // 🚫 Shore / Admin: status is read-only (like report date).
+                                    // They can only close via "Accept & Close" after vessel
+                                    // submits a PENDING_CLOSURE request.
+                                    isEditMode && !isClosed && !(user?.role?.toUpperCase() === 'SHORE' || user?.role?.toUpperCase() === 'ADMIN') ? (
                                       <FloatingSelectWithIcon
                                         icon={getStatusIcon(defect.status)}
                                         value={defect.status}

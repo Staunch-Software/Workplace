@@ -533,43 +533,18 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
   };
 
 
-  const isMyMessage = (authorRole) => {
-    return authorRole === user?.full_name || authorRole === user?.job_title;
-  };
-
-  // const extractMentions = (text) => {
-  //   const parts = [];
-  //   const mentionRegex = /@([\w][\w\s\-]*[\w]|[\w]+)/g;
-  //   let lastIndex = 0;
-  //   let match;
-
-  //   while ((match = mentionRegex.exec(text)) !== null) {
-  //     if (match.index > lastIndex) {
-  //       parts.push({ type: 'text', content: text.slice(lastIndex, match.index) });
-  //     }
-  //     parts.push({ type: 'mention', content: match[0] });
-  //     lastIndex = match.index + match[0].length;
-  //   }
-
-  //   if (lastIndex < text.length) {
-  //     parts.push({ type: 'text', content: text.slice(lastIndex) });
-  //   }
-
-  //   return parts.length > 0 ? parts : [{ type: 'text', content: text }];
-  // };
+  // ✅ FIXED: Use user_id comparison (same as ShoreDashboard) — reliable alignment
+  const isMyMessage = (thread) => thread.user_id === user?.id;
 
   const extractMentions = (text) => {
     const parts = [];
-    // Build pattern from actual user names
     const names = vesselUsers.map(u =>
       (u.full_name || u.name || '').replace(/[-]/g, '\\-')
-    ).filter(Boolean).sort((a, b) => b.length - a.length); // longest first
+    ).filter(Boolean).sort((a, b) => b.length - a.length);
 
     if (names.length === 0) return [{ type: 'text', content: text }];
 
-    const mentionRegex = new RegExp(
-      `@(${names.join('|')})`, 'g'
-    );
+    const mentionRegex = new RegExp(`@(${names.join('|')})`, 'g');
 
     let lastIndex = 0;
     let match;
@@ -669,7 +644,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
               );
             }
 
-            const isMine = isMyMessage(t.author_role);
+            const isMine = isMyMessage(t);
             const messageParts = extractMentions(t.body);
 
             return (
@@ -687,10 +662,8 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                   alignItems: 'center',
                   gap: '8px'
                 }}>
-                  <span style={{ fontWeight: '600' }}>{t.author_role}</span>
+                  <span style={{ fontWeight: '600' }}>{t.author || t.author_role}</span>
                   <span>{new Date(t.created_at).toLocaleString()}</span>
-                  {/* <SyncStatusBadge status={t.sync_status} /> */}
-
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', maxWidth: '70%' }}>
                   <div style={{
@@ -725,7 +698,6 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                         {t.attachments.map(a => (
                           <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <AttachmentLink attachment={a} />
-                            {/* ✅ ADD THIS: Sync status for the specific file */}
                             <SyncStatusBadge status={a.sync_status} size={9} />
                           </div>
                         ))}
