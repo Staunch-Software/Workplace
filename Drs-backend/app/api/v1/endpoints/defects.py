@@ -18,6 +18,7 @@
 #   ✅ GET  /{defect_id}              — single defect
 #   ✅ PATCH /{defect_id}             — update defect (status machine via service)
 #   ✅ PATCH /{defect_id}/shore-close — shore direct closure (50 char remarks)
+#   ✅ PATCH /{defect_id}/reopen      — shore reopen closed defect (role-gated, system thread, feed, notify)
 #   ✅ PATCH /{defect_id}/close       — legacy close with evidence
 #   ✅ DELETE /{defect_id}            — soft delete
 #   ✅ POST /threads                  — create thread (is_internal, @mention filter)
@@ -80,6 +81,7 @@ from app.schemas.defect import (
     AttachmentBase,
     DefectCloseRequest,
     ShoreCloseRequest,
+    ReopenDefectRequest,
     VesselUserResponse,
     PrEntryCreate,
     PrEntryResponse,
@@ -104,6 +106,7 @@ from app.services.notification_service import (
 from app.services.live_feed_service import (
     feed_defect_opened,
     feed_defect_closed,
+    feed_defect_reopened,
     feed_priority_changed,
     feed_image_uploaded,
     feed_pic_mandatory_changed,
@@ -2542,6 +2545,76 @@ async def shore_close_defect(
         raise
     except Exception as e:
         logger.error(f"❌ Error in shore closure: {str(e)}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# REOPEN DEFECT  (Shore / Admin only)
+# =============================================================================
+@router.patch("/{defect_id}/reopen", response_model=DefectResponse)
+async def reopen_defect(
+    defect_id: UUID,
+    reopen_data: ReopenDefectRequest,
+    db: AsyncSession = Depends(get_db),
+    control_db: AsyncSession = Depends(get_control_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Reopen a CLOSED defect — Shore / Admin only.
+
+    - Vessel users receive HTTP 403.
+    - Defect must be in CLOSED status; any other status returns HTTP 400.
+    - `reason` is mandatory (min 10 chars) and is stored in a SYSTEM thread
+      so the full audit trail (who, when, why) is visible in the defect
+      thread panel on both shore and vessel dashboards.
+    - A DEFECT_REOPENED live-feed entry is written (non-fatal).
+    - Notifications are sent to all vessel + shore users linked to the vessel
+      (excluding the actor who performed the reopen).
+    - NO SyncQueue write — this is a shore-only operation; vessel picks up
+      the status change on next sync.
+    """
+    # ── Role guard: Shore / Admin only ───────────────────────────────────────
+    if current_user.role not in [UserRole.SHORE, UserRole.ADMIN]:
+        raise HTTPException(
+            status_code=403,
+            detail="Only Shore or Admin users can reopen a defect.",
+        )
+
+    try:
+        defect = await DefectService.reopen_defect(
+            db=db,
+            control_db=control_db,
+            defect_id=defect_id,
+            reason=reopen_data.reason,
+            user=current_user,
+        )
+
+        if defect is None:
+            raise HTTPException(status_code=404, detail="Defect not found")
+
+        # Live feed (non-fatal — defect is already reopened at this point)
+        try:
+            await feed_defect_reopened(
+                db=db,
+                control_db=control_db,
+                defect=defect,
+                reason=reopen_data.reason,
+                actor_id=current_user.id,
+            )
+            await db.commit()
+        except Exception as feed_err:
+            logger.error(f"[reopen_defect] Live feed error (non-fatal): {feed_err}")
+
+        return defect
+
+    except HTTPException:
+        raise
+    except ValueError as ve:
+        # Raised by service when status is not CLOSED
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"[reopen_defect] Unexpected error: {e}", exc_info=True)
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
