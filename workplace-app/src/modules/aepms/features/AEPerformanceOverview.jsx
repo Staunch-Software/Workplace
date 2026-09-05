@@ -160,32 +160,59 @@ const getDeviationStatus = (actual, baseline, paramKey = "") => {
     p.includes("cyl out");
 
   if (isExhaust) {
-    // REPLICATE PERFORMANCE LOGIC:
-    // Actual 490 - Baseline 0 = 490. 490 > 60.0 -> Critical.
-    if (absDiff > 60.0) {
+    // REPLICATE PERFORMANCE LOGIC (REVISED 2026-09): Amber @ 50°C, Red @ 90°C (was 40°C / 60°C)
+    if (absDiff > 90.0) {
       status = "critical";
       colorClass = "text-red-600";
-    } else if (absDiff >= 40.0) {
+    } else if (absDiff >= 50.0) {
       status = "warning";
       colorClass = "text-amber-500";
     }
   }
-  // --- 2. GROUP A & B BUCKET: Pressures, Index, SFOC ---
+  // --- 2. Pmax / Scav Air / FIPI / other groups ---
   else {
     // If baseline is 0 but we have an actual value, it's an anomaly
     if (base === 0 && actual > 0) {
       status = "critical";
       colorClass = "text-red-600";
+    } else if (p.includes("pmax")) {
+      // Pmax (REVISED 2026-09): ONE-SIDED — only a drop below baseline is 'bad'.
+      // >= -4% is Normal (green, includes any rise), -4% to -7% is Warning, < -7% is Critical.
+      if (devPercent < -7.0) {
+        status = "critical";
+        colorClass = "text-red-600";
+      } else if (devPercent < -4.0) {
+        status = "warning";
+        colorClass = "text-amber-500";
+      }
+    } else if (p.includes("fipi") || p.includes("fuelindex") || p.includes("fuel index")) {
+      // FIPI (REVISED 2026-09): Amber @ 10%, Red @ 20% (was 5% / 10%)
+      if (absDev > 20.0) {
+        status = "critical";
+        colorClass = "text-red-600";
+      } else if (absDev >= 10.0) {
+        status = "warning";
+        colorClass = "text-amber-500";
+      }
+    } else if (p.includes("scav")) {
+      // Scavenge Air Pressure (REVISED 2026-09): ONE-SIDED — only a drop below baseline is 'bad'.
+      // >= -10% is Normal (green, includes any rise), -10% to -15% is Warning, < -15% is Critical.
+      if (devPercent < -15.0) {
+        status = "critical";
+        colorClass = "text-red-600";
+      } else if (devPercent < -10.0) {
+        status = "warning";
+        colorClass = "text-amber-500";
+      }
     } else {
       const isGroupA =
-        p.includes("pmax") ||
         p.includes("pcomp") ||
         p.includes("speed") ||
         p.includes("rpm") ||
         p.includes("turbo");
 
       if (isGroupA) {
-        // STRICT % LOGIC: AMBER @ 3%, RED @ 5%
+        // STRICT % LOGIC: AMBER @ 3%, RED @ 5% (unchanged — Pcomp not respecified for AE in revised sheet)
         if (absDev > 5.0) {
           status = "critical";
           colorClass = "text-red-600";
@@ -194,7 +221,7 @@ const getDeviationStatus = (actual, baseline, paramKey = "") => {
           colorClass = "text-amber-500";
         }
       } else {
-        // GROUP B BUCKET: FIPI, SFOC, Scav Air (5% / 10%)
+        // GROUP B BUCKET: SFOC and any other unlisted metric (5% / 10%, unchanged)
         if (absDev > 10.0) {
           status = "critical";
           colorClass = "text-red-600";

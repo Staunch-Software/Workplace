@@ -5466,18 +5466,18 @@ const confirmDelete = async () => {
                         displayDelta = rawMargin;
                       }
 
-                      // 4. Styling Logic
-                      // > 5% Heavy = Error (Red)
-                      // 0 - 5% Heavy = Warning (Orange)
-                      // < 0% Light = Success (Green)
+                      // 4. Styling Logic (REVISED 2026-09)
+                      // > 10% Heavy = Error (Red) — was > 5%
+                      // 5 - 10% Heavy = Warning (Orange) — was 0 - 5%
+                      // < 5% Light = Success (Green) — was < 0%
                       let devClass = "";
                       let txtColor = "";
 
                       // --- POWER MARGIN SPECIFIC LOGIC ---
-                      if (displayDelta > 5.0) {
+                      if (displayDelta > 10.0) {
                         devClass = "error-row";
                         txtColor = "#dc2626"; // Red
-                      } else if (displayDelta >= 0) {
+                      } else if (displayDelta >= 5.0) {
                         devClass = "warning-row";
                         txtColor = "#ca8a04"; // Amber
                       } else {
@@ -5556,37 +5556,62 @@ const confirmDelete = async () => {
                     ];
                     const absDelta = Math.abs(delta); // Use absolute difference for temps
                     if (metricKey === "Turbospeed") {
-                      // NEW TURBO LOGIC: Absolute RPM Difference
-                      if (absDelta >= 1000) {
+                      // TURBO LOGIC (REVISED 2026-09): Amber @ 750 RPM, Red @ 1250 RPM (was 500 / 1000)
+                      if (absDelta >= 1250) {
                         devClass = "error-row";
                         txtColor = "#dc2626";
-                      } else if (absDelta >= 500) {
+                      } else if (absDelta >= 750) {
                         devClass = "warning-row";
                         txtColor = "#ca8a04";
                       }
                     } else if (exhaustKeys.includes(metricKey)) {
-                      // NEW LOGIC: AMBER @ 40°C, RED @ 60°C
-                      if (absDelta > 60) {
+                      // REVISED 2026-09: AMBER @ 50°C, RED @ 90°C (was 40°C / 60°C)
+                      if (absDelta > 90) {
                         devClass = "error-row";
                         txtColor = "#dc2626";
-                      } else if (absDelta >= 40) {
+                      } else if (absDelta >= 50) {
+                        devClass = "warning-row";
+                        txtColor = "#ca8a04";
+                      }
+                    } else if (metricKey === "Pmax" || metricKey === "Pcomp") {
+                      // REVISED 2026-09: ONE-SIDED — only a drop below baseline is 'bad'.
+                      // >= -4% Normal (green, incl. any rise), -4% to -7% Warning, < -7% Critical.
+                      if (devPct < -7.0) {
+                        devClass = "error-row";
+                        txtColor = "#dc2626";
+                      } else if (devPct < -4.0) {
+                        devClass = "warning-row";
+                        txtColor = "#ca8a04";
+                      }
+                    } else if (metricKey === "ScavAir" || metricKey === "ScavAirPressure") {
+                      // REVISED 2026-09: ONE-SIDED — only a drop below baseline is 'bad'.
+                      // >= -10% Normal (green, incl. any rise), -10% to -15% Warning, < -15% Critical.
+                      if (devPct < -15.0) {
+                        devClass = "error-row";
+                        txtColor = "#dc2626";
+                      } else if (devPct < -10.0) {
+                        devClass = "warning-row";
+                        txtColor = "#ca8a04";
+                      }
+                    } else if (metricKey === "FIPI") {
+                      // FIPI (REVISED 2026-09): ME uses Amber @ 5% / Red @ 7% (was 10%);
+                      // AE uses Amber @ 10% / Red @ 20% (was 5% / 10%)
+                      const fipiWarn = isAux ? 10.0 : 5.0;
+                      const fipiCrit = isAux ? 20.0 : 7.0;
+                      if (absDev > fipiCrit) {
+                        devClass = "error-row";
+                        txtColor = "#dc2626";
+                      } else if (absDev >= fipiWarn) {
                         devClass = "warning-row";
                         txtColor = "#ca8a04";
                       }
                     } else {
-                      // Standard logic for non-exhaust parameters (Percentage based)
+                      // Standard logic for remaining parameters (Percentage based)
+                      // "EngSpeed" REMOVED from Group A per revised threshold sheet (2026-09) — commented, not deleted
                       const groupA = [
-                        "Pmax",
-                        "Pcomp",
-                        "Turbospeed",
-                        "EngSpeed",
+                        /* "EngSpeed", */
                       ];
-                      const groupB = [
-                        "FIPI",
-                        "ScavAir",
-                        "ScavAirPressure",
-                        "SFOC",
-                      ];
+                      const groupB = ["SFOC"];
 
                       if (groupA.includes(metricKey)) {
                         if (absDev > 5.0) {
@@ -5887,11 +5912,11 @@ const confirmDelete = async () => {
                         bg = "#f0fdf4";
 
                         if (isProp) {
-                          // Propeller Margin Logic
-                          if (pct > 5.0) {
+                          // Propeller Margin Logic (REVISED 2026-09: Red > 10, Amber 5 to 10, Green < 5 — was Red > 5, Amber 0 to 5, Green < 0)
+                          if (pct > 10.0) {
                             color = "#dc2626";
                             bg = "#fef2f2";
-                          } else if (pct >= 0) {
+                          } else if (pct >= 5.0) {
                             color = "#ca8a04";
                             bg = "#fffbeb";
                           } else {
@@ -5906,32 +5931,58 @@ const confirmDelete = async () => {
                           ];
 
                           if (metricKey === "Turbospeed") {
-                            // Turbo Speed: Absolute RPM Difference (Amber @ 500, Red @ 1000)
-                            if (absDelta >= 1000) {
+                            // Turbo Speed (REVISED 2026-09): Absolute RPM Difference (Amber @ 750, Red @ 1250 — was 500 / 1000)
+                            if (absDelta >= 1250) {
                               color = "#dc2626";
                               bg = "#fef2f2";
-                            } else if (absDelta >= 500) {
+                            } else if (absDelta >= 750) {
                               color = "#ca8a04";
                               bg = "#fffbeb";
                             }
                           } else if (exhaustKeys.includes(metricKey)) {
-                            // Exhaust Temps: Absolute Degree Difference (Amber @ 40, Red @ 60)
-                            if (absDelta > 60) {
+                            // Exhaust Temps (REVISED 2026-09): Absolute Degree Difference (Amber @ 50, Red @ 90 — was 40 / 60)
+                            if (absDelta > 90) {
                               color = "#dc2626";
                               bg = "#fef2f2";
-                            } else if (absDelta >= 40) {
+                            } else if (absDelta >= 50) {
+                              color = "#ca8a04";
+                              bg = "#fffbeb";
+                            }
+                          } else if (metricKey === "Pmax" || metricKey === "Pcomp") {
+                            // REVISED 2026-09: ONE-SIDED — only a drop below baseline is 'bad'.
+                            if (pct < -7.0) {
+                              color = "#dc2626";
+                              bg = "#fef2f2";
+                            } else if (pct < -4.0) {
+                              color = "#ca8a04";
+                              bg = "#fffbeb";
+                            }
+                          } else if (metricKey === "ScavAir" || metricKey === "ScavAirPressure") {
+                            // REVISED 2026-09: ONE-SIDED — only a drop below baseline is 'bad'.
+                            if (pct < -15.0) {
+                              color = "#dc2626";
+                              bg = "#fef2f2";
+                            } else if (pct < -10.0) {
+                              color = "#ca8a04";
+                              bg = "#fffbeb";
+                            }
+                          } else if (metricKey === "FIPI") {
+                            // FIPI (REVISED 2026-09): ME Amber @ 5% / Red @ 7%; AE Amber @ 10% / Red @ 20%
+                            const isAuxMode = analysisMode === "auxiliaryEngine";
+                            const fipiWarn = isAuxMode ? 10.0 : 5.0;
+                            const fipiCrit = isAuxMode ? 20.0 : 7.0;
+                            if (absPct > fipiCrit) {
+                              color = "#dc2626";
+                              bg = "#fef2f2";
+                            } else if (absPct >= fipiWarn) {
                               color = "#ca8a04";
                               bg = "#fffbeb";
                             }
                           } else {
                             // Grouped Percentage Logic
-                            const groupA = [
-                              "Pmax",
-                              "Pcomp",
-                              "Turbospeed",
-                              "EngSpeed",
-                            ];
-                            const groupB = ["FIPI", "ScavAir", "SFOC"];
+                            // "EngSpeed" REMOVED per revised threshold sheet (2026-09) — commented, not deleted
+                            const groupA = [/* "EngSpeed" */];
+                            const groupB = ["SFOC"];
 
                             if (groupA.includes(metricKey)) {
                               if (absPct > 5.0) {
@@ -6527,16 +6578,32 @@ const confirmDelete = async () => {
                               "tc_out",
                               "exh_cyl_out",
                             ];
-                            const aeGroupA = ["pmax", "pcomp", "turbo_rpm"]; // AE strict parameters
+                            const aeGroupA = ["pcomp", "turbo_rpm"]; // AE strict parameters (Pmax moved to one-sided logic below)
 
                             if (param.key === "turbo_rpm") {
-                              // TURBO LOGIC: Absolute RPM
-                              if (absDelta >= 1000) devColor = "#dc2626";
-                              else if (absDelta >= 500) devColor = "#ca8a04";
+                              // TURBO LOGIC (REVISED 2026-09): Absolute RPM (Amber @ 750, Red @ 1250 — was 500 / 1000)
+                              if (absDelta >= 1250) devColor = "#dc2626";
+                              else if (absDelta >= 750) devColor = "#ca8a04";
                               else devColor = "#16a34a";
                             } else if (aeTempKeys.includes(param.key)) {
-                              if (absDelta > 60) devColor = "#dc2626";
-                              else if (absDelta >= 40) devColor = "#ca8a04";
+                              // REVISED 2026-09: Amber @ 50°C, Red @ 90°C (was 40°C / 60°C)
+                              if (absDelta > 90) devColor = "#dc2626";
+                              else if (absDelta >= 50) devColor = "#ca8a04";
+                              else devColor = "#16a34a";
+                            } else if (param.key === "pmax") {
+                              // Pmax (REVISED 2026-09): ONE-SIDED — only a drop below baseline is 'bad'.
+                              if (pct < -7.0) devColor = "#dc2626";
+                              else if (pct < -4.0) devColor = "#ca8a04";
+                              else devColor = "#16a34a";
+                            } else if (param.key === "scav_air" || param.key === "scav") {
+                              // Scav Air Pressure (REVISED 2026-09): ONE-SIDED — only a drop below baseline is 'bad'.
+                              if (pct < -15.0) devColor = "#dc2626";
+                              else if (pct < -10.0) devColor = "#ca8a04";
+                              else devColor = "#16a34a";
+                            } else if (param.key === "fipi" || param.key === "fuel_index") {
+                              // FIPI (REVISED 2026-09, AE): Amber @ 10%, Red @ 20% (was 5% / 10%)
+                              if (absPct > 20.0) devColor = "#dc2626";
+                              else if (absPct >= 10.0) devColor = "#ca8a04";
                               else devColor = "#16a34a";
                             } else if (aeGroupA.includes(param.key)) {
                               if (absPct > 5.0) devColor = "#dc2626";
@@ -6745,10 +6812,10 @@ const confirmDelete = async () => {
                             displayVal = propActual.toFixed(1);
                             displayDev = `${propDev > 0 ? "+" : ""}${propDev.toFixed(1)}%`;
 
-                            // Color Logic for Propeller
-                            if (propDev > 5.0) {
+                            // Color Logic for Propeller (REVISED 2026-09: Red > 10, Amber 5 to 10, Green < 5)
+                            if (propDev > 10.0) {
                               devColor = "#dc2626"; // Red
-                            } else if (propDev >= 0) {
+                            } else if (propDev >= 5.0) {
                               devColor = "#ca8a04"; // Amber
                             } else {
                               devColor = "#16a34a"; // Green
@@ -6787,22 +6854,35 @@ const confirmDelete = async () => {
                                 "exh_tc_out",
                                 "exh_cyl_out",
                               ];
+                              // "engine_rpm" REMOVED per revised threshold sheet (2026-09) — commented, not deleted
                               const groupAKeys = [
-                                "engine_rpm",
-                                "pmax",
-                                "pcomp",
-                                "turbo_rpm",
+                                /* "engine_rpm", */
                               ];
 
                               if (p.key === "turbo_rpm") {
-                                // TURBO LOGIC: Absolute RPM
-                                if (absDelta >= 1000) devColor = "#dc2626";
-                                else if (absDelta >= 500) devColor = "#ca8a04";
+                                // TURBO LOGIC (REVISED 2026-09): Absolute RPM (Amber @ 750, Red @ 1250 — was 500 / 1000)
+                                if (absDelta >= 1250) devColor = "#dc2626";
+                                else if (absDelta >= 750) devColor = "#ca8a04";
                                 else devColor = "#16a34a";
                               } else if (tempKeys.includes(p.key)) {
-                                // EXHAUST LOGIC: Absolute degrees
-                                if (absDelta > 60) devColor = "#dc2626";
-                                else if (absDelta >= 40) devColor = "#ca8a04";
+                                // EXHAUST LOGIC (REVISED 2026-09): Absolute degrees (Amber @ 50, Red @ 90 — was 40 / 60)
+                                if (absDelta > 90) devColor = "#dc2626";
+                                else if (absDelta >= 50) devColor = "#ca8a04";
+                                else devColor = "#16a34a";
+                              } else if (p.key === "pmax" || p.key === "pcomp") {
+                                // REVISED 2026-09: ONE-SIDED — only a drop below baseline is 'bad'.
+                                if (pct < -7.0) devColor = "#dc2626";
+                                else if (pct < -4.0) devColor = "#ca8a04";
+                                else devColor = "#16a34a";
+                              } else if (p.key === "scav") {
+                                // Scav Air Pressure (REVISED 2026-09): ONE-SIDED — only a drop below baseline is 'bad'.
+                                if (pct < -15.0) devColor = "#dc2626";
+                                else if (pct < -10.0) devColor = "#ca8a04";
+                                else devColor = "#16a34a";
+                              } else if (p.key === "fuel_index") {
+                                // FIPI (REVISED 2026-09): Amber @ 5%, Red tightened from 10% to 7%
+                                if (absPct > 7.0) devColor = "#dc2626";
+                                else if (absPct >= 5.0) devColor = "#ca8a04";
                                 else devColor = "#16a34a";
                               } else if (groupAKeys.includes(p.key)) {
                                 // GROUP A LOGIC: Strict % (3/5)
@@ -6810,7 +6890,7 @@ const confirmDelete = async () => {
                                 else if (absPct >= 3.0) devColor = "#ca8a04";
                                 else devColor = "#16a34a";
                               } else {
-                                // OTHERS (SFOC, Scav Air, Fuel Index): Standard % (5/10)
+                                // OTHERS (SFOC): Standard % (5/10)
                                 if (absPct > 10.0) devColor = "#dc2626";
                                 else if (absPct >= 5.0) devColor = "#ca8a04";
                                 else devColor = "#16a34a";
@@ -7182,14 +7262,31 @@ const confirmDelete = async () => {
                 ];
 
                 if (key === "Turbospeed") {
-                  if (absDelta >= 1000) color = [220, 38, 38];
-                  else if (absDelta >= 500) color = [202, 138, 4];
+                  // REVISED 2026-09: Amber @ 750 RPM, Red @ 1250 RPM (was 500 / 1000)
+                  if (absDelta >= 1250) color = [220, 38, 38];
+                  else if (absDelta >= 750) color = [202, 138, 4];
                 } else if (exhaustKeys.includes(key)) {
-                  if (absDelta > 60) color = [220, 38, 38];
-                  else if (absDelta >= 40) color = [202, 138, 4];
+                  // REVISED 2026-09: Amber @ 50°C, Red @ 90°C (was 40°C / 60°C)
+                  if (absDelta > 90) color = [220, 38, 38];
+                  else if (absDelta >= 50) color = [202, 138, 4];
+                } else if (key === "Pmax" || key === "Pcomp") {
+                  // REVISED 2026-09: ONE-SIDED — only a drop below baseline is 'bad'.
+                  if (pct < -7.0) color = [220, 38, 38];
+                  else if (pct < -4.0) color = [202, 138, 4];
+                } else if (key === "ScavAir" || key === "ScavAirPressure") {
+                  // REVISED 2026-09: ONE-SIDED — only a drop below baseline is 'bad'.
+                  if (pct < -15.0) color = [220, 38, 38];
+                  else if (pct < -10.0) color = [202, 138, 4];
+                } else if (key === "FIPI") {
+                  // FIPI (REVISED 2026-09): ME Amber @ 5% / Red @ 7%; AE Amber @ 10% / Red @ 20%
+                  const fipiWarn = isAuxPDF ? 10.0 : 5.0;
+                  const fipiCrit = isAuxPDF ? 20.0 : 7.0;
+                  if (absPct > fipiCrit) color = [220, 38, 38];
+                  else if (absPct >= fipiWarn) color = [202, 138, 4];
                 } else {
-                  const groupA = ["Pmax", "Pcomp", "Turbospeed", "EngSpeed"];
-                  const groupB = ["FIPI", "ScavAir", "ScavAirPressure", "SFOC"];
+                  // "EngSpeed" REMOVED per revised threshold sheet (2026-09) — commented, not deleted
+                  const groupA = [/* "EngSpeed", */ "Turbospeed"];
+                  const groupB = ["SFOC"];
                   if (groupA.includes(key)) {
                     if (absPct > 5.0) color = [220, 38, 38];
                     else if (absPct >= 3.0) color = [202, 138, 4];
@@ -8083,12 +8180,16 @@ const confirmDelete = async () => {
         {
           const isAuxMode = analysisMode === "auxiliaryEngine";
 
+          // Groups REVISED 2026-09: Pmax/Pcomp → "PMAX_PCOMP" (one-sided drop-only),
+          // ScavAir → "SCAV" (one-sided drop-only), FIPI → own "FIPI" group (ME/AE differ).
+          // NOTE: this trend chart still draws symmetric ± bands — see getThresholds below
+          // for the magnitude used; the one-sided direction isn't visually distinguished here.
           const MAIN_TREND_PARAMS = [
             { key: "Turbospeed", label: "Turbo Speed", group: "ABS_TURBO" },
-            { key: "FIPI", label: "Fuel Index", group: "B" },
-            { key: "Pmax", label: "Pmax", group: "A" },
-            { key: "Pcomp", label: "Pcomp", group: "A" },
-            { key: "ScavAir", label: "Scav Air", group: "B" },
+            { key: "FIPI", label: "Fuel Index", group: "FIPI" },
+            { key: "Pmax", label: "Pmax", group: "PMAX_PCOMP" },
+            { key: "Pcomp", label: "Pcomp", group: "PMAX_PCOMP" },
+            { key: "ScavAir", label: "Scav Air", group: "SCAV" },
             {
               key: "Exh_Cylinder_outlet",
               label: "Exh Cyl Outlet",
@@ -8097,9 +8198,9 @@ const confirmDelete = async () => {
             { key: "SFOC", label: "SFOC", group: "B" },
           ];
           const AUX_TREND_PARAMS = [
-            { key: "Pmax", label: "Pmax", group: "A" },
-            { key: "FIPI", label: "Fuel Index", group: "B" },
-            { key: "ScavAirPressure", label: "Scav Air", group: "B" },
+            { key: "Pmax", label: "Pmax", group: "PMAX_PCOMP" },
+            { key: "FIPI", label: "Fuel Index", group: "FIPI" },
+            { key: "ScavAirPressure", label: "Scav Air", group: "SCAV" },
             {
               key: "Exh_Cylinder_outlet",
               label: "Exh Cyl Outlet",
@@ -8204,10 +8305,16 @@ const confirmDelete = async () => {
             const xAxisStr = isAuxMode ? "load_percentage" : "load";
 
             const getThresholds = (group) => {
-              if (group === "A") return { amber: 3, red: 5 };
+              // REVISED 2026-09
+              if (group === "PMAX_PCOMP") return { amber: 4, red: 7 };
+              if (group === "SCAV") return { amber: 10, red: 15 };
+              if (group === "FIPI")
+                return isAuxMode
+                  ? { amber: 10, red: 20 }
+                  : { amber: 5, red: 7 };
               if (group === "B") return { amber: 5, red: 10 };
-              if (group === "ABS_TURBO") return { amber: 500, red: 1000 };
-              if (group === "ABS_EXHAUST") return { amber: 40, red: 60 };
+              if (group === "ABS_TURBO") return { amber: 750, red: 1250 };
+              if (group === "ABS_EXHAUST") return { amber: 50, red: 90 };
               return { amber: 5, red: 10 };
             };
 
@@ -8333,9 +8440,9 @@ const confirmDelete = async () => {
               const maxAbs = Math.max(...validVals.map(Math.abs), red * 1.1);
               const minExtent =
                 param.group === "ABS_TURBO"
-                  ? 1200
+                  ? 1500
                   : param.group === "ABS_EXHAUST"
-                    ? 70
+                    ? 110
                     : 15;
               const yExtent = Math.max(maxAbs * 1.2, minExtent);
 
@@ -8457,7 +8564,7 @@ const confirmDelete = async () => {
                     t += tickStep
                   )
                     raw.push(t);
-                  return [...new Set([...raw, -1000, -500, 0, 500, 1000])].sort(
+                  return [...new Set([...raw, -1250, -750, 0, 750, 1250])].sort(
                     (a, b) => a - b,
                   );
                 }
@@ -8470,7 +8577,7 @@ const confirmDelete = async () => {
                     t += tickStep
                   )
                     raw.push(t);
-                  return [...new Set([...raw, -60, -40, 0, 40, 60])].sort(
+                  return [...new Set([...raw, -90, -50, 0, 50, 90])].sort(
                     (a, b) => a - b,
                   );
                 }
@@ -9263,16 +9370,40 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
               "tc_in",
               "tc_out",
             ];
-            const groupA = ["engine_rpm", "pmax", "pcomp", "turbo_rpm"];
+            // "engine_rpm" REMOVED per revised threshold sheet (2026-09) — commented, not deleted
+            const groupA = [/* "engine_rpm", */ "turbo_rpm"];
 
             if (key === "turbo_rpm") {
-              if (absDelta >= 1000) return [220, 38, 38]; // red
-              if (absDelta >= 500) return [202, 138, 4]; // amber
+              // REVISED 2026-09: Amber @ 750 RPM, Red @ 1250 RPM (was 500 / 1000)
+              if (absDelta >= 1250) return [220, 38, 38]; // red
+              if (absDelta >= 750) return [202, 138, 4]; // amber
               return [22, 163, 74]; // green
             }
             if (tempKeys.includes(key)) {
-              if (absDelta > 60) return [220, 38, 38];
-              if (absDelta >= 40) return [202, 138, 4];
+              // REVISED 2026-09: Amber @ 50°C, Red @ 90°C (was 40°C / 60°C)
+              if (absDelta > 90) return [220, 38, 38];
+              if (absDelta >= 50) return [202, 138, 4];
+              return [22, 163, 74];
+            }
+            if (key === "pmax" || key === "pcomp") {
+              // REVISED 2026-09: ONE-SIDED — only a drop below baseline is 'bad'.
+              if (pct < -7.0) return [220, 38, 38];
+              if (pct < -4.0) return [202, 138, 4];
+              return [22, 163, 74];
+            }
+            if (key === "scav" || key === "scav_air") {
+              // Scav Air Pressure (REVISED 2026-09): ONE-SIDED — only a drop below baseline is 'bad'.
+              if (pct < -15.0) return [220, 38, 38];
+              if (pct < -10.0) return [202, 138, 4];
+              return [22, 163, 74];
+            }
+            if (key === "fipi" || key === "fuel_index") {
+              // FIPI (REVISED 2026-09): ME Amber @ 5% / Red @ 7%; AE Amber @ 10% / Red @ 20%
+              const isAuxMode = analysisMode !== "mainEngine";
+              const fipiWarn = isAuxMode ? 10.0 : 5.0;
+              const fipiCrit = isAuxMode ? 20.0 : 7.0;
+              if (absPct > fipiCrit) return [220, 38, 38];
+              if (absPct >= fipiWarn) return [202, 138, 4];
               return [22, 163, 74];
             }
             if (groupA.includes(key)) {
@@ -9280,7 +9411,7 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
               if (absPct >= 3.0) return [202, 138, 4];
               return [22, 163, 74];
             }
-            // Group B (FIPI, ScavAir, SFOC etc)
+            // Group B (SFOC etc)
             if (absPct > 10.0) return [220, 38, 38];
             if (absPct >= 5.0) return [202, 138, 4];
             return [22, 163, 74];
@@ -10772,38 +10903,42 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
                   "#7c3aed",
                 ];
 
-                // ── GROUP DEFINITIONS ──
-                // Percentage groups (unchanged behaviour)
-                const GROUP_A = ["EngSpeed", "Pmax", "Pcomp"];
-                const GROUP_B = ["FIPI", "ScavAir", "ScavAirPressure", "SFOC"];
-                // Absolute delta groups (NEW)
+                // ── GROUP DEFINITIONS (REVISED 2026-09) ──
+                // "EngSpeed" REMOVED per revised threshold sheet — commented, not deleted.
+                // Pmax/Pcomp → "PMAX_PCOMP" (one-sided drop-only); ScavAir → "SCAV" (one-sided drop-only);
+                // FIPI → its own "FIPI" group (ME/AE magnitudes differ).
+                // NOTE: this chart still draws symmetric ± bands — the one-sided direction
+                // isn't visually distinguished, only the boundary magnitude is correct.
+                const GROUP_A = [/* "EngSpeed" */];
+                const GROUP_B = ["SFOC"];
+                // Absolute delta groups
                 const GROUP_ABS_TURBO = ["Turbospeed"];
                 const GROUP_ABS_EXHAUST = [
                   "Exh_T/C_inlet",
                   "Exh_T/C_outlet",
                   "Exh_Cylinder_outlet",
                 ];
+                const GROUP_PMAX_PCOMP = ["Pmax", "Pcomp"];
+                const GROUP_SCAV = ["ScavAir", "ScavAirPressure"];
+                const GROUP_FIPI = ["FIPI"];
 
                 const getParamGroup = (key) => {
-                  if (isAuxMode) {
-                    // Aux: treat Pmax as GROUP_A, FIPI+ScavAir as GROUP_B together
-                    if (["Pmax"].includes(key)) return "A";
-                    if (["FIPI", "ScavAir"].includes(key)) return "B";
-                    if (
-                      [
-                        "Exh_T/C_inlet",
-                        "Exh_T/C_outlet",
-                        "Exh_Cylinder_outlet",
-                      ].includes(key)
-                    )
-                      return "ABS_EXHAUST";
-                    return null;
-                  }
-                  // Main engine — original logic
+                  if (GROUP_PMAX_PCOMP.includes(key)) return "PMAX_PCOMP";
+                  if (GROUP_SCAV.includes(key)) return "SCAV";
+                  if (GROUP_FIPI.includes(key)) return "FIPI";
+                  if (
+                    [
+                      "Exh_T/C_inlet",
+                      "Exh_T/C_outlet",
+                      "Exh_Cylinder_outlet",
+                    ].includes(key)
+                  )
+                    return "ABS_EXHAUST";
+                  if (isAuxMode) return null;
+                  // Main engine — remaining groups
                   if (GROUP_A.includes(key)) return "A";
                   if (GROUP_B.includes(key)) return "B";
                   if (GROUP_ABS_TURBO.includes(key)) return "ABS_TURBO";
-                  if (GROUP_ABS_EXHAUST.includes(key)) return "ABS_EXHAUST";
                   return null;
                 };
 
@@ -11012,8 +11147,10 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
                 // ── SYMMETRIC Y-DOMAIN ──
                 const yDomain = (() => {
                   if (!activeTrendData || activeTrendData.length === 0) {
-                    if (activeTrendGroup === "ABS_TURBO") return [-1200, 1200];
-                    if (activeTrendGroup === "ABS_EXHAUST") return [-70, 70];
+                    if (activeTrendGroup === "ABS_TURBO") return [-1500, 1500];
+                    if (activeTrendGroup === "ABS_EXHAUST") return [-110, 110];
+                    if (activeTrendGroup === "FIPI" && isAuxMode)
+                      return [-25, 25];
                     return [-15, 15];
                   }
                   let maxAbs = 0;
@@ -11025,8 +11162,10 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
                     });
                   });
                   let minExtent;
-                  if (activeTrendGroup === "ABS_TURBO") minExtent = 1200;
-                  else if (activeTrendGroup === "ABS_EXHAUST") minExtent = 70;
+                  if (activeTrendGroup === "ABS_TURBO") minExtent = 1500;
+                  else if (activeTrendGroup === "ABS_EXHAUST") minExtent = 110;
+                  else if (activeTrendGroup === "FIPI" && isAuxMode)
+                    minExtent = 25;
                   else minExtent = 15;
                   const extent = Math.max(maxAbs * 1.2, minExtent);
                   return [-extent, extent];
@@ -11034,32 +11173,48 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
 
                 const [yMin, yMax] = yDomain;
 
-                // ── THRESHOLD VALUES ──
-                // % groups (unchanged)
+                // ── THRESHOLD VALUES (REVISED 2026-09) ──
+                // % groups
                 const tAmber =
                   activeTrendGroup === "A"
                     ? 3
                     : activeTrendGroup === "B"
                       ? 5
-                      : null;
+                      : activeTrendGroup === "PMAX_PCOMP"
+                        ? 4
+                        : activeTrendGroup === "SCAV"
+                          ? 10
+                          : activeTrendGroup === "FIPI"
+                            ? isAuxMode
+                              ? 10
+                              : 5
+                            : null;
                 const tRed =
                   activeTrendGroup === "A"
                     ? 5
                     : activeTrendGroup === "B"
                       ? 10
-                      : null;
-                // Absolute thresholds (NEW)
+                      : activeTrendGroup === "PMAX_PCOMP"
+                        ? 7
+                        : activeTrendGroup === "SCAV"
+                          ? 15
+                          : activeTrendGroup === "FIPI"
+                            ? isAuxMode
+                              ? 20
+                              : 7
+                            : null;
+                // Absolute thresholds
                 const tAbsAmber =
                   activeTrendGroup === "ABS_TURBO"
-                    ? 500
+                    ? 750
                     : activeTrendGroup === "ABS_EXHAUST"
-                      ? 40
+                      ? 50
                       : null;
                 const tAbsRed =
                   activeTrendGroup === "ABS_TURBO"
-                    ? 1000
+                    ? 1250
                     : activeTrendGroup === "ABS_EXHAUST"
-                      ? 60
+                      ? 90
                       : null;
 
                 // ── Y-AXIS UNIT ──
@@ -11082,7 +11237,7 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
                     )
                       raw.push(t);
                     return [
-                      ...new Set([...raw, -1000, -500, 0, 500, 1000]),
+                      ...new Set([...raw, -1250, -750, 0, 750, 1250]),
                     ].sort((a, b) => a - b);
                   }
                   if (activeTrendGroup === "ABS_EXHAUST") {
@@ -11094,13 +11249,21 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
                       t += step
                     )
                       raw.push(t);
-                    return [...new Set([...raw, -60, -40, 0, 40, 60])].sort(
+                    return [...new Set([...raw, -90, -50, 0, 50, 90])].sort(
                       (a, b) => a - b,
                     );
                   }
-                  // % ticks — original logic preserved exactly
+                  // % ticks — REVISED 2026-09: core ticks now derived from the active
+                  // group's actual amber/red boundary instead of the old hardcoded 3/5/10
                   const extent = yMax;
-                  const coreTicks = [-10, -5, -3, 0, 3, 5, 10];
+                  const boundaryVal = tRed != null ? tRed : 10;
+                  const coreTicks = [
+                    -boundaryVal,
+                    ...(tAmber != null ? [-tAmber] : [-5, -3]),
+                    0,
+                    ...(tAmber != null ? [tAmber] : [3, 5]),
+                    boundaryVal,
+                  ];
                   const outerStep = extent <= 30 ? 10 : extent <= 60 ? 20 : 30;
                   const extraTicks = [];
                   for (
@@ -11108,14 +11271,14 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
                     t <= Math.floor(yMax);
                     t += outerStep
                   ) {
-                    if (t > 10) extraTicks.push(t);
+                    if (t > boundaryVal) extraTicks.push(t);
                   }
                   for (
                     let t = -outerStep;
                     t >= Math.ceil(yMin);
                     t -= outerStep
                   ) {
-                    if (t < -10) extraTicks.push(t);
+                    if (t < -boundaryVal) extraTicks.push(t);
                   }
                   return [...new Set([...coreTicks, ...extraTicks])].sort(
                     (a, b) => a - b,
@@ -11303,10 +11466,12 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
                                     }}
                                   />
 
-                                  {/* ── % THRESHOLD BANDS (Group A / B) — original logic unchanged ──
-                          Group A → amber ±3%,  red ±5%
-                          Group B → amber ±5%,  red ±10%
-                          Mixed   → no bands                                              */}
+                                  {/* ── % THRESHOLD BANDS (REVISED 2026-09) ──
+                          Group B (SFOC)      → amber ±5%,  red ±10%
+                          PMAX_PCOMP          → amber ±4%,  red ±7% (one-sided drop in practice; band drawn symmetric)
+                          SCAV                → amber ±10%, red ±15% (one-sided drop in practice; band drawn symmetric)
+                          FIPI                → ME amber ±5%/red ±7%; AE amber ±10%/red ±20%
+                          Mixed               → no bands                                              */}
                                   {!isAbsoluteMode &&
                                     tAmber !== null &&
                                     tRed !== null && (
@@ -11373,9 +11538,9 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
                                       </>
                                     )}
 
-                                  {/* ── ABSOLUTE THRESHOLD BANDS (Turbo / Exhaust) — NEW ──
-                          Turbo:   amber ±500 RPM,  red ±1000 RPM
-                          Exhaust: amber ±40 °C,    red ±60 °C
+                                  {/* ── ABSOLUTE THRESHOLD BANDS (Turbo / Exhaust) — REVISED 2026-09 ──
+                          Turbo:   amber ±750 RPM,  red ±1250 RPM
+                          Exhaust: amber ±50 °C,    red ±90 °C
                           Shown only when ALL selected params are same abs group.  */}
                                   {isAbsoluteMode &&
                                     tAbsAmber !== null &&
@@ -11523,12 +11688,30 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
                                       let color = "#16a34a";
 
                                       if (paramGroup === "ABS_TURBO") {
-                                        if (absVal >= 1000) color = "#dc2626";
-                                        else if (absVal >= 500)
+                                        // REVISED 2026-09: Amber @ 750, Red @ 1250 (was 500 / 1000)
+                                        if (absVal >= 1250) color = "#dc2626";
+                                        else if (absVal >= 750)
                                           color = "#ca8a04";
                                       } else if (paramGroup === "ABS_EXHAUST") {
-                                        if (absVal > 60) color = "#dc2626";
-                                        else if (absVal >= 40)
+                                        // REVISED 2026-09: Amber @ 50°C, Red @ 90°C (was 40°C / 60°C)
+                                        if (absVal > 90) color = "#dc2626";
+                                        else if (absVal >= 50)
+                                          color = "#ca8a04";
+                                      } else if (paramGroup === "PMAX_PCOMP") {
+                                        // REVISED 2026-09: ONE-SIDED — only a drop below baseline is 'bad'.
+                                        if (curr < -7) color = "#dc2626";
+                                        else if (curr < -4) color = "#ca8a04";
+                                      } else if (paramGroup === "SCAV") {
+                                        // REVISED 2026-09: ONE-SIDED — only a drop below baseline is 'bad'.
+                                        if (curr < -15) color = "#dc2626";
+                                        else if (curr < -10) color = "#ca8a04";
+                                      } else if (paramGroup === "FIPI") {
+                                        // FIPI (REVISED 2026-09): ME Amber @ 5% / Red @ 7%; AE Amber @ 10% / Red @ 20%
+                                        const badgeAmber = isAuxMode ? 10 : 5;
+                                        const badgeRed = isAuxMode ? 20 : 7;
+                                        if (absVal > badgeRed)
+                                          color = "#dc2626";
+                                        else if (absVal > badgeAmber)
                                           color = "#ca8a04";
                                       } else {
                                         // % groups — original logic preserved exactly
