@@ -315,6 +315,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [mentionList, setMentionList] = useState([]);
   const [showMentions, setShowMentions] = useState(false);
+  const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
   const [taggedUsers, setTaggedUsers] = useState([]);
   const [cursorPosition, setCursorPosition] = useState(0);
   const messagesEndRef = useRef(null);
@@ -378,6 +379,29 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
   // <div>, which turns into extra blank lines in innerText. Insert a plain <br>
   // instead so multi-line replies match the old textarea's single-newline behavior.
   const handleEditorKeyDown = (e) => {
+    if (showMentions && mentionList.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setHighlightedMentionIndex(i => (i + 1) % mentionList.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setHighlightedMentionIndex(i => (i - 1 + mentionList.length) % mentionList.length);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        selectMention(mentionList[highlightedMentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowMentions(false);
+        return;
+      }
+    }
+
     if (e.key !== 'Enter') return;
     e.preventDefault();
     document.execCommand('insertLineBreak');
@@ -408,6 +432,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
         u.id !== user?.id
       );
       setMentionList(filtered);
+      setHighlightedMentionIndex(0);
       setShowMentions(filtered.length > 0);
     } else {
       setShowMentions(false);
@@ -833,7 +858,10 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
               suppressContentEditableWarning
               onInput={handleEditorInput}
               onKeyDown={handleEditorKeyDown}
-              onKeyUp={handleEditorInput}
+              onKeyUp={(e) => {
+                if (showMentions && ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) return;
+                handleEditorInput();
+              }}
               onClick={handleEditorInput}
               data-placeholder="Type an update (@ to mention)..."
               style={{
@@ -904,10 +932,12 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                   overflowY: 'auto'
                 }}
               >
-                {mentionList.map(u => (
+                {mentionList.map((u, index) => (
                   <div
                     key={u.id}
+                    ref={index === highlightedMentionIndex ? (el) => el?.scrollIntoView({ block: 'nearest' }) : null}
                     onClick={() => selectMention(u)}
+                    onMouseEnter={() => setHighlightedMentionIndex(index)}
                     className='fsize-17'
                     style={{
                       padding: '8px 12px',
@@ -916,10 +946,9 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      fontSize: '13px'
+                      fontSize: '13px',
+                      background: index === highlightedMentionIndex ? '#f8fafc' : 'white'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                   >
                     <UserCircle size={14} /> {u.full_name}
                   </div>

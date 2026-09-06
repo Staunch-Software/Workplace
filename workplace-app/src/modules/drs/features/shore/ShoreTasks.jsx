@@ -236,7 +236,7 @@ const LiveFeed = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState('all');
+  const [viewMode, setViewMode] = useState('unread');
 
   const { data: feedItems = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['live-feed'],
@@ -403,7 +403,7 @@ const LiveFeed = () => {
             {/* FIX 4: clearFilters() on every tab switch */}
             <div className="tab-container">
               <button
-                onClick={() => { setActiveTab('mine'); setViewMode('all'); clearFilters(); }}
+                onClick={() => { setActiveTab('mine'); setViewMode('unread'); clearFilters(); }}
                 className={`tab-btn ${activeTab === 'mine' ? 'active' : ''}`}
               >
                 <AtSign size={13} />
@@ -415,7 +415,7 @@ const LiveFeed = () => {
                 )}
               </button>
               <button
-                onClick={() => { setActiveTab('live'); setViewMode('all'); clearFilters(); }}
+                onClick={() => { setActiveTab('live'); setViewMode('unread'); clearFilters(); }}
                 className={`tab-btn ${activeTab === 'live' ? 'active' : ''}`}
               >
                 Live Feed
