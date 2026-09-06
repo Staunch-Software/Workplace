@@ -84,7 +84,7 @@ const getParamUnit = (paramName) => {
 };
 
 const STANDARD_PARAMS = [
-  { key: "engspeed", label: "Engine Speed" },
+  // { key: "engspeed", label: "Engine Speed" }, // REMOVED per revised threshold sheet (2026-09) — commented, not deleted
   { key: "turbospeed", label: "Turbo Speed" },
   { key: "fipi", label: "Fuel Pump Index" },
   { key: "pmax", label: "Pmax" },
@@ -640,23 +640,24 @@ const getParamStatus = (paramName, deviationPct, absoluteDiff, value) => {
   const absValue = Math.abs(value); // Raw value or pre-calculated deviation
 
   if (p.includes("turbo") || p.includes("turbospeed")) {
-    if (absDelta >= 1000) return "Critical";
-    if (absDelta >= 500) return "Warning";
+    // REVISED (2026-09): Amber @ 750 RPM, Red @ 1250 RPM (was 500 / 1000)
+    if (absDelta >= 1250) return "Critical";
+    if (absDelta >= 750) return "Warning";
     return "Normal";
   }
-  // 1. Power Margin Logic (Red > 5, Amber 0 to 5, Green < 0)
+  // 1. Power Margin Logic (REVISED 2026-09: Red > 10, Amber 5 to 10, Green < 5 — was Red > 5, Amber 0 to 5, Green < 0)
   if (p.includes("propeller") || p.includes("powermargin")) {
-    if (value > 5.0) return "Critical";
-    if (value >= 0.0) return "Warning";
+    if (value > 10.0) return "Critical";
+    if (value >= 5.0) return "Warning";
     return "Normal";
   }
 
-  // 2. NEW: Exhaust Temperature Logic (Amber: 40°C, Red: 60°C absolute difference)
+  // 2. Exhaust Temperature Logic (REVISED 2026-09: Amber: 50°C, Red: 90°C absolute difference — was 40°C / 60°C)
   // We check this before the percentage groups to ensure absolute limits take priority
   const exhaustKeys = ["exh", "temp", "cyl", "inlet", "outlet"];
   if (exhaustKeys.some((key) => p.includes(key))) {
-    if (absDelta > 60) return "Critical";
-    if (absDelta >= 40) return "Warning";
+    if (absDelta > 90) return "Critical";
+    if (absDelta >= 50) return "Warning";
     return "Normal";
   }
 
@@ -668,20 +669,43 @@ const getParamStatus = (paramName, deviationPct, absoluteDiff, value) => {
   //     return "Normal";
   // }
 
-  // 4. Group A: 5% Red / 3% Amber (Pressures, Speeds, RPM)
-  const groupA = ["pmax", "pcomp", "engspeed", "rpm"];
+  // 4a. Pmax / Pcomp (REVISED 2026-09): now ONE-SIDED — only a drop below baseline is 'bad'.
+  //     >= -4% is Normal (green, includes any rise), -4% to -7% is Warning, < -7% is Critical.
+  if (p.includes("pmax") || p.includes("pcomp")) {
+    if (deviationPct < -7.0) return "Critical";
+    if (deviationPct < -4.0) return "Warning";
+    return "Normal";
+  }
+
+  // 4b. Remaining Group A (RPM-type params other than Turbo/Pmax/Pcomp): 5% Red / 3% Amber
+  // "engspeed" REMOVED per revised threshold sheet (2026-09) — commented, not deleted, for future use
+  const groupA = [/* "engspeed", */ "rpm"];
   if (groupA.some((key) => p.includes(key))) {
     if (absDev > 5.0) return "Critical";
     if (absDev >= 3.0) return "Warning";
     return "Normal";
   }
 
-  // 5. Group B: 10% Red / 5% Amber (SFOC, FOC, FIPI/Fuel Index, Scavenge Air)
-  // (Note: Exhaust strings removed here as they are handled in the absolute logic above)
-  const groupB = ["sfoc", "foc", "fipi", "fuelindex", "scav", "scavair"];
+  // 5. FIPI (REVISED 2026-09): Amber @ 5%, Red tightened from 10% to 7%
+  if (p.includes("fipi") || p.includes("fuelindex")) {
+    if (absDev > 7.0) return "Critical";
+    if (absDev >= 5.0) return "Warning";
+    return "Normal";
+  }
+
+  // 6. Group B: SFOC / FOC — 10% Red / 5% Amber (unchanged)
+  const groupB = ["sfoc", "foc"];
   if (groupB.some((key) => p.includes(key))) {
     if (absDev > 10.0) return "Critical";
     if (absDev >= 5.0) return "Warning";
+    return "Normal";
+  }
+
+  // 7. Scavenge Air Pressure (REVISED 2026-09): now ONE-SIDED — only a drop below baseline is 'bad'.
+  //    >= -10% is Normal (green, includes any rise), -10% to -15% is Warning, < -15% is Critical.
+  if (p.includes("scav") || p.includes("scavair")) {
+    if (deviationPct < -15.0) return "Critical";
+    if (deviationPct < -10.0) return "Warning";
     return "Normal";
   }
 
@@ -1306,7 +1330,7 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
           let counts = { Critical: 0, Warning: 0, Normal: 0 };
 
           const checkMap = [
-            { key: "engspeed", histKey: "engine_rpm" },
+            // { key: "engspeed", histKey: "engine_rpm" }, // REMOVED per revised threshold sheet (2026-09) — commented, not deleted
             { key: "turbospeed", histKey: "turbo_rpm" },
             { key: "fipi", histKey: "fuel_index" },
             { key: "pmax", histKey: "pmax" },

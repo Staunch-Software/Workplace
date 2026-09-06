@@ -258,66 +258,74 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
   };
 
   // ── Raw values ────────────────────────────────────────────────────────
+  // REVISED 2026-09: Pcomp is one-sided (drop-only) — Amber @ -4%, Red @ -7% (was -3% / -5%)
   const pcompAct = Number(report.Pcomp);
   const pcompBase = getBase("Pcomp");
   const pcompPct = pctDev(pcompAct, pcompBase);
-  const pcompIsLow = pcompPct != null && pcompPct <= -3;
-  const pcompIsCritical = pcompPct != null && pcompPct <= -5;
+  const pcompIsLow = pcompPct != null && pcompPct <= -4;
+  const pcompIsCritical = pcompPct != null && pcompPct <= -7;
 
+  // REVISED 2026-09: Pmax is one-sided (drop-only) — Amber @ -4%, Red @ -7% (was ±3% / ±5%).
+  // A rise in Pmax is no longer flagged at all, per the revised threshold sheet — this also
+  // means the "Early Injection Timing" finding below (which relied on detecting a Pmax rise)
+  // no longer fires. pmaxIsHigh kept here commented, not deleted, in case it's needed again.
   const pmaxAct = Number(report.Pmax);
   const pmaxBase = getBase("Pmax");
   const pmaxPct = pctDev(pmaxAct, pmaxBase);
-  const pmaxIsLow = pmaxPct != null && pmaxPct <= -3;
-  const pmaxIsHigh = pmaxPct != null && pmaxPct >= 3;
-  const pmaxIsCritical = pmaxPct != null && Math.abs(pmaxPct) > 5;
+  const pmaxIsLow = pmaxPct != null && pmaxPct <= -4;
+  // const pmaxIsHigh = pmaxPct != null && pmaxPct >= 3; // REMOVED per revised threshold sheet (2026-09)
+  const pmaxIsCritical = pmaxPct != null && pmaxPct <= -7;
 
   const pressureRise =
     pmaxAct != null && pcompAct != null && !isNaN(pmaxAct) && !isNaN(pcompAct)
       ? pmaxAct - pcompAct
       : null;
 
-  // Turbocharger — ME only
+  // Turbocharger — ME only (REVISED 2026-09: Amber @ 750 RPM, Red @ 1250 RPM, was 500 / 1000)
   const turboAct = isME ? Number(report.Turbospeed) : null;
   const turboBase = isME ? getBase("Turbospeed") : null;
   const turboDelta = isME ? absDelta(turboAct, turboBase) : null;
-  const turboIsLow = turboDelta != null && turboDelta <= -500;
-  const turboIsLowCritical = turboDelta != null && turboDelta <= -1000;
+  const turboIsLow = turboDelta != null && turboDelta <= -750;
+  const turboIsLowCritical = turboDelta != null && turboDelta <= -1250;
 
   // Scavenge air — key differs between ME and AE
+  // REVISED 2026-09: one-sided (drop-only) — Amber @ -10%, Red @ -15% (was -5% / -10%)
   const scavKey = isME ? "ScavAir" : "ScavAirPressure";
   const scavAct = Number(isME ? report.ScavAir : report.ScavAirPressure);
   const scavBase = getBase(scavKey);
   const scavPct = pctDev(scavAct, scavBase);
-  const scavIsLow = scavPct != null && scavPct <= -5;
-  const scavIsLowCritical = scavPct != null && scavPct <= -10;
+  const scavIsLow = scavPct != null && scavPct <= -10;
+  const scavIsLowCritical = scavPct != null && scavPct <= -15;
 
-  // Exhaust temperatures
+  // Exhaust temperatures (REVISED 2026-09: Amber @ 50°C, Red @ 90°C, was 40°C / 60°C)
   const tcInAct = Number(report["Exh_T/C_inlet"]);
   const tcInBase = getBase("Exh_T/C_inlet");
   const tcInDelta = absDelta(tcInAct, tcInBase);
-  const tcInIsHigh = tcInDelta != null && tcInDelta >= 40;
-  const tcInIsCritical = tcInDelta != null && tcInDelta >= 60;
+  const tcInIsHigh = tcInDelta != null && tcInDelta >= 50;
+  const tcInIsCritical = tcInDelta != null && tcInDelta >= 90;
 
   const tcOutAct = Number(report["Exh_T/C_outlet"]);
   const tcOutBase = getBase("Exh_T/C_outlet");
   const tcOutDelta = absDelta(tcOutAct, tcOutBase);
-  const tcOutIsHigh = tcOutDelta != null && tcOutDelta >= 40;
-  const tcOutIsCritical = tcOutDelta != null && tcOutDelta >= 60;
+  const tcOutIsHigh = tcOutDelta != null && tcOutDelta >= 50;
+  const tcOutIsCritical = tcOutDelta != null && tcOutDelta >= 90;
 
   const cylOutAct = Number(report.Exh_Cylinder_outlet);
   const cylOutBase = getBase("Exh_Cylinder_outlet");
   const cylOutDelta = absDelta(cylOutAct, cylOutBase);
-  const cylOutIsHigh = cylOutDelta != null && cylOutDelta >= 40;
-  const cylOutIsCritical = cylOutDelta != null && cylOutDelta >= 60;
+  const cylOutIsHigh = cylOutDelta != null && cylOutDelta >= 50;
+  const cylOutIsCritical = cylOutDelta != null && cylOutDelta >= 90;
 
-  // FIPI
+  // FIPI — mm-delta thresholds (2/4mm) are a separate, unlisted diagnostic rule, unchanged.
   const fipiAct = Number(report.FIPI);
   const fipiBase = getBase("FIPI");
   const fipiDelta = absDelta(fipiAct, fipiBase);
   const fipiIsHigh = fipiDelta != null && fipiDelta >= 2;
   const fipiIsHighCritical = fipiDelta != null && fipiDelta >= 4;
   const fipiPct = pctDev(fipiAct, fipiBase);
-  const fipiNeedsOverhaul = fipiPct != null && fipiPct >= 10;
+  // fipiNeedsOverhaul REMOVED per revised threshold sheet (2026-09) — this was the CYL & TC
+  // sheet's standalone "FIPI >10% above baseline" row, marked "To be removed". Commented, not deleted.
+  // const fipiNeedsOverhaul = fipiPct != null && fipiPct >= 10;
 
   // Propeller margin
   const rawMargin = report.propeller_margin_percent;
@@ -751,29 +759,32 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
         "If fuel quality confirmed poor, increase fuel pump lead to compensate.",
       evidence: ["Pmax", "Pcomp"],
     });
-  } else if (pmaxIsHigh && !pcompIsLow) {
-    const severity = pmaxIsCritical ? "critical" : "warning";
-    concerns.push({
-      parameter: "Early Injection Timing",
-      pattern: "EARLY_INJECTION",
-      severity,
-      comparedAgainst: "Shop Trial",
-      finding:
-        `Pmax is ${pmaxPct != null ? pmaxPct.toFixed(1) : "N/A"}% above baseline while Pcomp is normal. ` +
-        `This is the diagnostic fingerprint of early injection — fuel fires before TDC, ` +
-        `creating excessive peak pressure while the compression boundary remains healthy.`,
-      causes: [
-        "VIT index set too early advancing injection point",
-        "HCU timing fault in electronically controlled ME engines",
-        "Incorrect fuel cam position on mechanically timed engines",
-      ],
-      remedy:
-        "Check and correct VIT index calibration. " +
-        "If HCU-controlled, verify HCU timing against manufacturer schedule. " +
-        "Reduce fuel pump lead until Pmax returns to baseline.",
-      evidence: ["Pmax", "Pcomp"],
-    });
   }
+  // "Early Injection Timing" finding REMOVED per revised threshold sheet (2026-09) — Pmax is
+  // now one-sided (drop-only), so a Pmax rise is never flagged. Commented, not deleted.
+  // else if (pmaxIsHigh && !pcompIsLow) {
+  //   const severity = pmaxIsCritical ? "critical" : "warning";
+  //   concerns.push({
+  //     parameter: "Early Injection Timing",
+  //     pattern: "EARLY_INJECTION",
+  //     severity,
+  //     comparedAgainst: "Shop Trial",
+  //     finding:
+  //       `Pmax is ${pmaxPct != null ? pmaxPct.toFixed(1) : "N/A"}% above baseline while Pcomp is normal. ` +
+  //       `This is the diagnostic fingerprint of early injection — fuel fires before TDC, ` +
+  //       `creating excessive peak pressure while the compression boundary remains healthy.`,
+  //     causes: [
+  //       "VIT index set too early advancing injection point",
+  //       "HCU timing fault in electronically controlled ME engines",
+  //       "Incorrect fuel cam position on mechanically timed engines",
+  //     ],
+  //     remedy:
+  //       "Check and correct VIT index calibration. " +
+  //       "If HCU-controlled, verify HCU timing against manufacturer schedule. " +
+  //       "Reduce fuel pump lead until Pmax returns to baseline.",
+  //     evidence: ["Pmax", "Pcomp"],
+  //   });
+  // }
 
   // ── Absolute pressure rise limit checks ────────────────────────────────
   if (pressureRise != null && pressureRise > 40) {
@@ -799,15 +810,16 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
     });
   }
 
-  if (pressureRise != null && load > 75 && pressureRise < 20) {
+  // REVISED 2026-09: the ">75% load" qualifier is dropped — this now applies at any load.
+  if (pressureRise != null && pressureRise < 20) {
     concerns.push({
-      parameter: "Pressure Rise Too Low at High Load",
+      parameter: "Pressure Rise Too Low",
       pattern: "PRESSURE_RISE_LOW",
       severity: "warning",
-      comparedAgainst: "Fixed Engineering Limit (min 20 bar at >75% load)",
+      comparedAgainst: "Fixed Engineering Limit (min 20 bar)",
       finding:
         `Pressure rise (Pmax − Pcomp) is only ${pressureRise.toFixed(1)} bar at ${load != null ? load.toFixed(1) : "N/A"}% load. ` +
-        `At loads above 75%, pressure rise must exceed 20 bar for efficient combustion. ` +
+        `Pressure rise must exceed 20 bar for efficient combustion. ` +
         `Poor energy release and elevated SFOC are expected.`,
       causes: [
         "Significantly delayed ignition (very high CCAI fuel)",
@@ -826,9 +838,8 @@ const getDetectedConcerns = (report, baseline, analysisMode) => {
   // ====================================================================
   if (fipiIsHigh) {
     const severity = fipiIsHighCritical ? "critical" : "warning";
-    const overhaulNote = fipiNeedsOverhaul
-      ? " FIPI has risen ≥10% above baseline — fuel pump overhaul is now recommended."
-      : "";
+    // overhaulNote REMOVED per revised threshold sheet (2026-09) — see fipiNeedsOverhaul above
+    const overhaulNote = "";
     concerns.push({
       parameter: "Fuel System Wear — FIPI Elevated",
       pattern: "FUEL_SYSTEM_WEAR",
@@ -987,13 +998,15 @@ const getTrendDiagnosisFindings = (
 
   const TREND_PARAMS = isME
     ? [
+        // REVISED 2026-09: magnitudes updated per revised threshold sheet;
+        // Pmax is now lowerOnly (one-sided), matching the instantaneous check above.
         {
           key: "Turbospeed",
           label: "Turbocharger Speed",
           group: "AIR_SUPPLY",
           isAbs: true,
-          amber: 500,
-          red: 1000,
+          amber: 750,
+          red: 1250,
           lowerOnly: true,
         },
         {
@@ -1001,8 +1014,8 @@ const getTrendDiagnosisFindings = (
           label: "Scavenge Air Press",
           group: "AIR_SUPPLY",
           isAbs: false,
-          amber: 5,
-          red: 10,
+          amber: 10,
+          red: 15,
           lowerOnly: true,
         },
         {
@@ -1010,8 +1023,8 @@ const getTrendDiagnosisFindings = (
           label: "Exh T/C Inlet",
           group: "AIR_SUPPLY",
           isAbs: true,
-          amber: 40,
-          red: 60,
+          amber: 50,
+          red: 90,
           lowerOnly: false,
         },
         {
@@ -1019,8 +1032,8 @@ const getTrendDiagnosisFindings = (
           label: "Exh T/C Outlet",
           group: "AIR_SUPPLY",
           isAbs: true,
-          amber: 40,
-          red: 60,
+          amber: 50,
+          red: 90,
           lowerOnly: false,
         },
         {
@@ -1028,8 +1041,8 @@ const getTrendDiagnosisFindings = (
           label: "Pcomp",
           group: "COMBUSTION",
           isAbs: false,
-          amber: 3,
-          red: 5,
+          amber: 4,
+          red: 7,
           lowerOnly: true,
         },
         {
@@ -1037,17 +1050,17 @@ const getTrendDiagnosisFindings = (
           label: "Pmax",
           group: "COMBUSTION",
           isAbs: false,
-          amber: 3,
-          red: 5,
-          lowerOnly: false,
+          amber: 4,
+          red: 7,
+          lowerOnly: true,
         },
         {
           key: "Exh_Cylinder_outlet",
           label: "Exh Cyl Outlet",
           group: "COMBUSTION",
           isAbs: true,
-          amber: 40,
-          red: 60,
+          amber: 50,
+          red: 90,
           lowerOnly: false,
         },
         {
@@ -1056,27 +1069,28 @@ const getTrendDiagnosisFindings = (
           group: "FUEL_DELIVERY",
           isAbs: false,
           amber: 5,
-          red: 10,
+          red: 7,
           upperOnly: true,
         },
       ]
     : [
+        // REVISED 2026-09 (AE): Pmax lowerOnly (one-sided); FIPI amber/red widened to 10/20
         {
           key: "Pmax",
           label: "Pmax",
           group: "COMBUSTION",
           isAbs: false,
-          amber: 3,
-          red: 5,
-          lowerOnly: false,
+          amber: 4,
+          red: 7,
+          lowerOnly: true,
         },
         {
           key: "ScavAirPressure",
           label: "Scavenge Air Press",
           group: "AIR_SUPPLY",
           isAbs: false,
-          amber: 5,
-          red: 10,
+          amber: 10,
+          red: 15,
           lowerOnly: true,
         },
         {
@@ -1084,8 +1098,8 @@ const getTrendDiagnosisFindings = (
           label: "Exh T/C Inlet",
           group: "AIR_SUPPLY",
           isAbs: true,
-          amber: 40,
-          red: 60,
+          amber: 50,
+          red: 90,
           lowerOnly: false,
         },
         {
@@ -1093,8 +1107,8 @@ const getTrendDiagnosisFindings = (
           label: "Exh T/C Outlet",
           group: "AIR_SUPPLY",
           isAbs: true,
-          amber: 40,
-          red: 60,
+          amber: 50,
+          red: 90,
           lowerOnly: false,
         },
         {
@@ -1102,8 +1116,8 @@ const getTrendDiagnosisFindings = (
           label: "Fuel Index (FIPI)",
           group: "FUEL_DELIVERY",
           isAbs: false,
-          amber: 5,
-          red: 10,
+          amber: 10,
+          red: 20,
           upperOnly: true,
         },
         {
@@ -1111,8 +1125,8 @@ const getTrendDiagnosisFindings = (
           label: "Exh Cyl Outlet",
           group: "COMBUSTION",
           isAbs: true,
-          amber: 40,
-          red: 60,
+          amber: 50,
+          red: 90,
           lowerOnly: false,
         },
       ];
@@ -1317,6 +1331,9 @@ const getTrendDiagnosisFindings = (
       remedy =
         "Check fuel pump lead and VIT settings. Pressure test injectors.";
     } else if (pmaxDrift && pmaxDrift.latest > 0) {
+      // NOTE: unreachable since Pmax's TREND_PARAMS entry is now lowerOnly (2026-09 revision) —
+      // a rising Pmax never registers a drift, so pmaxDrift here is always a downward one.
+      // Left in place, not deleted, in case lowerOnly is reverted later.
       diagnosisText =
         "Pmax drifting upward while Pcomp remains stable — early injection timing trend.";
       causes = [
