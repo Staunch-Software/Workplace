@@ -28,9 +28,10 @@ import asyncio
 import logging
 
 from sqlalchemy import select, delete
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.pool import NullPool
 
-from app.database import AsyncSessionLocal
+from app.database import SQLALCHEMY_DATABASE_URL
 from app.models import (
     MonthlyReportHeader,
     MonthlyISOPerformanceData,
@@ -44,10 +45,22 @@ from app.models import (
 from app.report_processor import process_me_alerts, update_me_alert_summary
 from app.generator_models import GeneratorMonthlyReportHeader
 from app.ae_alert_processor import process_ae_alerts
+from app.me_iso_corrector import MEISOCorrector
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger("backfill_thresholds")
 logger.setLevel(logging.INFO)
+
+# This script runs as its OWN OS process, separate from the live backend service.
+# The app's shared engine (app.database.AsyncSessionLocal) pools up to 10 connections
+# (pool_size=5 + max_overflow=5) PER PROCESS — using it here would add up to 10 more
+# connections on top of whatever the running backend already holds, which can exhaust
+# a VM's Postgres max_connections. NullPool here guarantees this script holds at most
+# ONE connection at a time, opened and closed around each individual query/report.
+_backfill_engine = create_async_engine(SQLALCHEMY_DATABASE_URL, poolclass=NullPool, echo=False)
+AsyncSessionLocal = async_sessionmaker(
+    _backfill_engine, class_=AsyncSession, expire_on_commit=False, autoflush=False, autocommit=False,
+)
 
 
 async def _build_me_baseline_and_monthly(session: AsyncSession, header: MonthlyReportHeader, iso_record: MonthlyISOPerformanceData):
@@ -104,7 +117,12 @@ async def _build_me_baseline_and_monthly(session: AsyncSession, header: MonthlyR
 
 
 async def backfill_me(dry_run: bool) -> dict:
-    counts = {"reports_seen": 0, "reports_reprocessed": 0, "skipped_no_baseline": 0}
+    counts = {
+        "reports_seen": 0,
+        "reports_reprocessed": 0,
+        "iso_generated": 0,
+        "skipped_no_baseline": 0,
+    }
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(MonthlyReportHeader.report_id).order_by(MonthlyReportHeader.report_id)
@@ -122,12 +140,55 @@ async def backfill_me(dry_run: bool) -> dict:
                 select(MonthlyISOPerformanceData).where(MonthlyISOPerformanceData.report_id == report_id)
             )
             iso_record = iso_result.scalar_one_or_none()
-            if not header or not iso_record:
+            if not header:
+                logger.warning(f"SKIPPED ME report {report_id}: no MonthlyReportHeader row found")
                 counts["skipped_no_baseline"] += 1
                 continue
+            if not iso_record:
+                # This report was never given its ISO-corrected data at upload time —
+                # the original pipeline only calls process_me_alerts "if iso_record exists",
+                # so a report missing this row has ZERO alert rows to this day, and its
+                # me_alert_summary (if any) was never derived from real data. Generate the
+                # missing ISO record now (same step the original upload runs), instead of
+                # skipping, so this report can finally get correctly classified.
+                if dry_run:
+                    logger.warning(
+                        f"[DRY RUN] ME report {report_id} (imo {header.imo_number}, {header.report_month}): "
+                        f"no MonthlyISOPerformanceData row found — would generate it and reprocess"
+                    )
+                    counts["iso_generated"] += 1
+                    counts["reports_reprocessed"] += 1
+                    continue
+
+                logger.warning(
+                    f"ME report {report_id} (imo {header.imo_number}, {header.report_month}): "
+                    f"no MonthlyISOPerformanceData row found — generating it now"
+                )
+                try:
+                    iso_corrector = MEISOCorrector(session)
+                    iso_record = await iso_corrector.process_and_save_iso_correction(report_id)
+                    await session.commit()
+                except Exception as e:
+                    logger.error(f"SKIPPED ME report {report_id}: ISO correction failed: {e}")
+                    counts["skipped_no_baseline"] += 1
+                    continue
+                if not iso_record:
+                    logger.error(f"SKIPPED ME report {report_id}: ISO correction returned nothing")
+                    counts["skipped_no_baseline"] += 1
+                    continue
+                counts["iso_generated"] += 1
 
             built = await _build_me_baseline_and_monthly(session, header, iso_record)
             if built[0] is None:
+                vessel_result = await session.execute(
+                    select(VesselInfo).where(VesselInfo.imo_number == header.imo_number)
+                )
+                vessel_info_dbg = vessel_result.scalar_one_or_none()
+                logger.warning(
+                    f"SKIPPED ME report {report_id} ({vessel_info_dbg.vessel_name if vessel_info_dbg else '?'}, "
+                    f"{header.report_month}): no shop-trial baseline rows found for engine_no="
+                    f"{vessel_info_dbg.engine_no if vessel_info_dbg else '?'}"
+                )
                 counts["skipped_no_baseline"] += 1
                 continue
             baseline_list, monthly_dict, vessel_info = built
