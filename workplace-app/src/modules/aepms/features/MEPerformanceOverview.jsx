@@ -647,8 +647,8 @@ const getParamStatus = (paramName, deviationPct, absoluteDiff, value) => {
   }
   // 1. Power Margin Logic (REVISED 2026-09: Red > 10, Amber 5 to 10, Green < 5 — was Red > 5, Amber 0 to 5, Green < 0)
   if (p.includes("propeller") || p.includes("powermargin")) {
-    if (value > 10.0) return "Critical";
-    if (value >= 5.0) return "Warning";
+    if (deviationPct > 10.0) return "Critical";
+    if (deviationPct >= 5.0) return "Warning";
     return "Normal";
   }
 
