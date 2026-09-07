@@ -74,68 +74,73 @@ logger = logging.getLogger(__name__)
 #         'deviation_type': 'absolute'  # Special handling - compare against baseline+offset
 #     }
 # }
+# REVISED 2026-09 per the AE Threshold revision sheet:
+#   - Pmax: now ONE-SIDED drop-only, Amber @ -4%, Red @ -7% (was ±3%/±5% both directions)
+#   - Scavenge Air Pressure: now ONE-SIDED drop-only, Amber @ -10%, Red @ -15% (was ±5%/±10%)
+#   - Fuel Index (FIPI): widened to Amber @ 10%, Red @ 20% (was 5%/10%), still two-sided
+#   - Exhaust temps: widened to Amber @ 50°C, Red @ 90°C (was 40°C/60°C)
+#   - Pcomp, Engine Speed, Turbocharger Speed: NOT mentioned in the AE Threshold sheet
+#     (original or revised) — left unchanged.
 THRESHOLDS = {
-    # --- GROUP A: Pressures & Speeds (Amber @ 3%, Red @ 5%) ---
-    'pmax_graph_bar': {'name': 'Pmax', 'type': 'percent_3_5'},
+    # --- GROUP A: Pressures & Speeds (Amber @ 3%, Red @ 5%) — Pcomp only now ---
     'compression_pressure_bar': {'name': 'Pcomp', 'type': 'percent_3_5'},
     'engine_speed_rpm': {'name': 'EngSpeed', 'type': 'percent_3_5'},
 
-    # --- TURBO GROUP: Absolute RPM (Amber @ 500, Red @ 1000) ---
+    # --- Pmax (REVISED): one-sided drop-only, Amber @ -4%, Red @ -7% ---
+    'pmax_graph_bar': {'name': 'Pmax', 'type': 'percent_onesided_4_7'},
+
+    # --- TURBO GROUP: Absolute RPM (Amber @ 500, Red @ 1000) — unchanged, not in AE sheet ---
     'turbocharger_speed_rpm': {
-        'name': 'TurboSpeed', 
+        'name': 'TurboSpeed',
         'type': 'absolute_500_1000' # Changed from percent
     },
 
-    # --- GROUP B: Scavenge, Index, SFOC (Amber @ 5%, Red @ 10%) ---
-    # Note: Ensure this key matches your DB column (boost_air_pressure vs scav_air_pressure)
-    'boost_air_pressure_graph_bar': {'name': 'ScavAir', 'type': 'percent_5_10'},
-    'fuel_pump_index_graph': {'name': 'Fuel Index', 'type': 'percent_5_10'},
+    # --- Scavenge Air Pressure (REVISED): one-sided drop-only, Amber @ -10%, Red @ -15% ---
+    'boost_air_pressure_graph_bar': {'name': 'ScavAir', 'type': 'percent_onesided_10_15'},
+
+    # --- Fuel Index / FIPI (REVISED): Amber @ 10%, Red @ 20% (was 5%/10%), still two-sided ---
+    'fuel_pump_index_graph': {'name': 'Fuel Index', 'type': 'percent_10_20'},
+
+    # --- SFOC: unchanged (Amber @ 5%, Red @ 10%) ---
     'sfoc_graph_g_kwh': {'name': 'SFOC', 'type': 'percent_5_10'},
 
-    # --- TEMPERATURE GROUP: Absolute Degrees (Amber @ 40°C, Red @ 60°C) ---
-    'exh_temp_tc_inlet_graph_c': {'name': 'Exh T/C In', 'type': 'temperature_40_60'},
-    'exh_temp_tc_outlet_graph_c': {'name': 'Exh T/C Out', 'type': 'temperature_40_60'},
-    'exh_temp_cyl_outlet_avg_graph_c': {'name': 'Exh Cyl Out', 'type': 'temperature_40_60'}
+    # --- TEMPERATURE GROUP (REVISED): Absolute Degrees, Amber @ 50°C, Red @ 90°C (was 40°C/60°C) ---
+    'exh_temp_tc_inlet_graph_c': {'name': 'Exh T/C In', 'type': 'temperature_50_90'},
+    'exh_temp_tc_outlet_graph_c': {'name': 'Exh T/C Out', 'type': 'temperature_50_90'},
+    'exh_temp_cyl_outlet_avg_graph_c': {'name': 'Exh Cyl Out', 'type': 'temperature_50_90'}
 }
 
 # =================================================================
 # CORE CALCULATION FUNCTIONS
 # =================================================================
 
-def calculate_deviation(baseline: Decimal, actual: Decimal, deviation_type: str) -> Dict[str, Optional[Decimal]]:
+def calculate_deviation(baseline: Decimal, actual: Decimal, deviation_type: str = 'signed') -> Dict[str, Optional[Decimal]]:
     """
-    Calculate deviation based on type.
-    
-    Args:
-        baseline: Baseline value from shop trial
-        actual: Actual measured value
-        deviation_type: 'two_sided', 'positive_only', or 'absolute'
-    
+    Calculate deviation between actual and baseline.
+
+    REVISED 2026-09: always returns the SIGNED deviation now (deviation_type param kept,
+    but only 'signed' is used going forward — 'two_sided'/'positive_only'/'absolute' branches
+    are retained below, commented, since the sign is needed for the new one-sided thresholds
+    (Pmax, Scavenge Air Pressure) and classify_alert() now does its own abs()/sign handling
+    per metric type instead of this function pre-collapsing the sign away.
+
     Returns:
-        Dict with 'deviation' (absolute) and 'deviation_pct' (percentage)
+        Dict with 'deviation' (signed absolute diff) and 'deviation_pct' (signed percentage)
     """
     if baseline is None or actual is None or baseline == Decimal('0'):
         return {'deviation': None, 'deviation_pct': None}
-    
+
     deviation = actual - baseline
-    
-    if deviation_type == 'positive_only':
-        # Only consider positive deviations (increases)
-        if deviation < 0:
-            return {'deviation': Decimal('0'), 'deviation_pct': Decimal('0')}
-        deviation_pct = (deviation / baseline * Decimal('100')).quantize(Decimal('0.01'))
-        
-    elif deviation_type == 'two_sided':
-        # Consider both positive and negative deviations
-        deviation_pct = (abs(deviation) / baseline * Decimal('100')).quantize(Decimal('0.01'))
-        
-    elif deviation_type == 'absolute':
-        # For FIPI - deviation is just the absolute difference (not percentage)
-        deviation_pct = deviation.quantize(Decimal('0.01'))
-    
-    else:
-        return {'deviation': None, 'deviation_pct': None}
-    
+    deviation_pct = (deviation / baseline * Decimal('100')).quantize(Decimal('0.01'))
+
+    # if deviation_type == 'positive_only':
+    #     if deviation < 0:
+    #         return {'deviation': Decimal('0'), 'deviation_pct': Decimal('0')}
+    # elif deviation_type == 'two_sided':
+    #     deviation_pct = (abs(deviation) / baseline * Decimal('100')).quantize(Decimal('0.01'))
+    # elif deviation_type == 'absolute':
+    #     deviation_pct = deviation.quantize(Decimal('0.01'))
+
     return {
         'deviation': deviation.quantize(Decimal('0.01')),
         'deviation_pct': deviation_pct
@@ -145,33 +150,53 @@ def calculate_deviation(baseline: Decimal, actual: Decimal, deviation_type: str)
 def classify_alert(deviation_pct: Decimal, absolute_diff: Decimal, metric_config: Dict) -> str:
     if deviation_pct is None or absolute_diff is None:
         return 'Normal'
-    
+
     abs_diff = abs(absolute_diff)
     abs_dev = abs(deviation_pct)
     logic_type = metric_config['type']
 
-    # 1. Turbo Logic (Absolute RPM)
+    # 1. Turbo Logic (Absolute RPM) — unchanged, not in AE sheet
     if logic_type == 'absolute_500_1000':
         if abs_diff >= Decimal('1000.0'): return 'Critical'
         if abs_diff >= Decimal('500.0'): return 'Warning'
         return 'Normal'
 
-    # 2. Exhaust Temperature Logic (Absolute Degrees)
-    elif logic_type == 'temperature_40_60':
-        if abs_diff > Decimal('60.0'): return 'Critical'
-        if abs_diff >= Decimal('40.0'): return 'Warning'
+    # 2. Exhaust Temperature Logic (REVISED 2026-09: Amber @ 50°C, Red @ 90°C, was 40/60)
+    elif logic_type == 'temperature_50_90':
+        if abs_diff > Decimal('90.0'): return 'Critical'
+        if abs_diff >= Decimal('50.0'): return 'Warning'
         return 'Normal'
 
-    # 3. Group A Logic (3% / 5% Percentage)
+    # 3. Group A Logic (3% / 5% Percentage) — Pcomp / Engine Speed, unchanged
     elif logic_type == 'percent_3_5':
         if abs_dev > Decimal('5.0'): return 'Critical'
         if abs_dev >= Decimal('3.0'): return 'Warning'
         return 'Normal'
 
-    # 4. Group B Logic (5% / 10% Percentage)
+    # 4. SFOC (5% / 10% Percentage) — unchanged
     elif logic_type == 'percent_5_10':
         if abs_dev > Decimal('10.0'): return 'Critical'
         if abs_dev >= Decimal('5.0'): return 'Warning'
+        return 'Normal'
+
+    # 5. FIPI (REVISED 2026-09: Amber @ 10%, Red @ 20%, was 5%/10%) — still two-sided
+    elif logic_type == 'percent_10_20':
+        if abs_dev > Decimal('20.0'): return 'Critical'
+        if abs_dev >= Decimal('10.0'): return 'Warning'
+        return 'Normal'
+
+    # 6. Pmax (REVISED 2026-09): ONE-SIDED drop-only — Amber @ -4%, Red @ -7%.
+    #    A rise (positive deviation_pct) is always Normal.
+    elif logic_type == 'percent_onesided_4_7':
+        if deviation_pct < Decimal('-7.0'): return 'Critical'
+        if deviation_pct < Decimal('-4.0'): return 'Warning'
+        return 'Normal'
+
+    # 7. Scavenge Air Pressure (REVISED 2026-09): ONE-SIDED drop-only — Amber @ -10%, Red @ -15%.
+    #    A rise (positive deviation_pct) is always Normal.
+    elif logic_type == 'percent_onesided_10_15':
+        if deviation_pct < Decimal('-15.0'): return 'Critical'
+        if deviation_pct < Decimal('-10.0'): return 'Warning'
         return 'Normal'
 
     return 'Normal'
@@ -307,12 +332,9 @@ async def process_ae_alerts(session: AsyncSession, report_id: int) -> Dict[str, 
                 logger.debug(f"⊘ Skipping {metric_key} - missing data")
                 continue
             
-            # Calculate deviation
-            dev_result = calculate_deviation(
-                baseline_value,
-                actual_value,
-                'two_sided' # Frontend uses absDiff / absDev, so two_sided is correct
-            )
+            # Calculate deviation (REVISED 2026-09: always signed now — classify_alert()
+            # handles abs()/sign per metric type, needed for one-sided Pmax/Scav Air logic)
+            dev_result = calculate_deviation(baseline_value, actual_value)
             
             if dev_result['deviation_pct'] is None:
                 continue
