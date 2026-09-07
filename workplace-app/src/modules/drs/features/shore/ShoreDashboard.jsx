@@ -266,6 +266,7 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
   const [isUploading, setIsUploading] = useState(false);
   const [mentionList, setMentionList] = useState([]);
   const [showMentions, setShowMentions] = useState(false);
+  const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
   const [taggedUsers, setTaggedUsers] = useState([]);
   const [cursorPosition, setCursorPosition] = useState(0);
   const threadScrollRef = useRef(null);
@@ -387,6 +388,29 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
   // <div>, which turns into extra blank lines in innerText. Insert a plain <br>
   // instead so multi-line replies match the old textarea's single-newline behavior.
   const handleEditorKeyDown = (e) => {
+    if (showMentions && mentionList.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setHighlightedMentionIndex(i => (i + 1) % mentionList.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setHighlightedMentionIndex(i => (i - 1 + mentionList.length) % mentionList.length);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        selectMention(mentionList[highlightedMentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowMentions(false);
+        return;
+      }
+    }
+
     if (e.key !== 'Enter') return;
     e.preventDefault();
     document.execCommand('insertLineBreak');
@@ -438,6 +462,7 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
       });
 
       setMentionList(filtered);
+      setHighlightedMentionIndex(0);
       setShowMentions(filtered.length > 0);
     } else {
       setShowMentions(false);
@@ -901,7 +926,10 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
               suppressContentEditableWarning
               onInput={handleEditorInput}
               onKeyDown={handleEditorKeyDown}
-              onKeyUp={handleEditorInput}
+              onKeyUp={(e) => {
+                if (showMentions && ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) return;
+                handleEditorInput();
+              }}
               onClick={handleEditorInput}
               data-placeholder={
                 chatMode === 'internal'
@@ -976,16 +1004,19 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
                   overflowY: 'auto'
                 }}
               >
-                {mentionList.map(u => {
+                {mentionList.map((u, index) => {
                   const name = u.full_name || u.name || 'Unknown User';
                   const role = (u.role || u.job_title || '').toUpperCase();
                   const isShore = role === 'SHORE' || role === 'ADMIN' || role.includes('SUPERINTENDENT');
+                  const isHighlighted = index === highlightedMentionIndex;
 
                   return (
                     <div
                       className='empty-thread-text'
                       key={u.id}
+                      ref={isHighlighted ? (el) => el?.scrollIntoView({ block: 'nearest' }) : null}
                       onClick={() => selectMention(u)}
+                      onMouseEnter={() => setHighlightedMentionIndex(index)}
                       style={{
                         padding: '10px 12px',
                         cursor: 'pointer',
@@ -995,10 +1026,9 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
                         justifyContent: 'space-between',
                         gap: '10px',
                         fontSize: '13px',
-                        transition: 'background 0.2s'
+                        transition: 'background 0.2s',
+                        background: isHighlighted ? '#f0f9ff' : 'white'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#f0f9ff'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <UserCircle size={16} color={isShore ? '#3b82f6' : '#64748b'} />
