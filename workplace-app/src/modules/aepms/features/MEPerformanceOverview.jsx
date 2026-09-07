@@ -1326,6 +1326,29 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
         const response = await axiosAepms.getMEAlertHistory(imo, 60);
         let reports = response.history || response.data || [];
 
+        // Fetch the live baseline curve and recompute deviations the same way
+        // the Performance Summary / row-level tables do (getInterpolatedBaseline),
+        // instead of trusting the backend's stored historical *_dev fields — those
+        // can go stale relative to the current baseline and disagree with the UI.
+        let dynamicBaseline = {};
+        try {
+          const baselineRes = await axiosAepms.getMEBaselineReference(imo);
+          const rawBaseline = baselineRes.baseline_data || [];
+          STANDARD_PARAMS.forEach((param) => {
+            const key = param.key;
+            const points = rawBaseline
+              .filter((p) => p[key] !== null && p[key] !== undefined)
+              .map((p) => ({
+                load: Number(p.load_percentage),
+                value: Number(p[key]),
+              }))
+              .sort((a, b) => a.load - b.load);
+            if (points.length > 0) dynamicBaseline[key] = points;
+          });
+        } catch (e) {
+          console.warn("Could not fetch baseline for alert history", e);
+        }
+
         const processedReports = reports.map((r) => {
           let counts = { Critical: 0, Warning: 0, Normal: 0 };
 
@@ -1344,19 +1367,30 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
             { key: "propeller", histKey: "propeller_margin" },
           ];
 
+          const currentLoad = Number(r.load_percentage);
+
           checkMap.forEach((item) => {
             const actual = r[`${item.histKey}_actual`];
-            const dev = r[`${item.histKey}_dev`];
 
             let s = "Normal";
             if (actual !== null && actual !== undefined) {
-              let baseline = actual - (dev || 0);
-              if (item.key === "propeller") baseline = 100;
-              let devPct = 0;
-              if (baseline !== 0) devPct = (dev / baseline) * 100;
+              const actualNum = Number(actual);
+              const baseline = getInterpolatedBaseline(
+                dynamicBaseline,
+                item.key,
+                currentLoad,
+              );
 
-              // Determine status for this specific parameter
-              s = getParamStatus(item.key, devPct, dev, actual);
+              let diff = 0;
+              let devPct = 0;
+              if (baseline !== null && baseline !== 0) {
+                diff = actualNum - baseline;
+                devPct = (diff / baseline) * 100;
+              }
+
+              // Determine status for this specific parameter — same call
+              // shape as the Performance Summary / detail tables use.
+              s = getParamStatus(item.key, devPct, diff, actualNum);
 
               if (counts[s] !== undefined) counts[s]++;
               else counts["Normal"]++;
