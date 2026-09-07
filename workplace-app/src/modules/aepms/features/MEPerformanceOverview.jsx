@@ -1603,6 +1603,11 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
         // We calculate the display value as 100 + deviation
         const displayActual = 100.0 + actual;
 
+        const propStatus = getParamStatus(param.key, devPct, diff, actual);
+        let propColor = "green";
+        if (propStatus === "Critical") propColor = "red";
+        else if (propStatus === "Warning") propColor = "yellow";
+
         return {
           parameter: param.label,
           unit: getParamUnit(param.label),
@@ -1610,7 +1615,7 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
           actual: displayActual, // This will now show 100.57
           diff: diff, // This will now show +0.57
           devPct: devPct, // This will now show +0.6%
-          color: actual > 5.0 ? "red" : actual > 0 ? "yellow" : "green",
+          color: propColor,
         };
       }
 
