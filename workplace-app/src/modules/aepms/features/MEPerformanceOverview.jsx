@@ -693,11 +693,14 @@ const getParamStatus = (paramName, deviationPct, absoluteDiff, value) => {
     return "Normal";
   }
 
-  // 6. Group B: SFOC / FOC — 10% Red / 5% Amber (unchanged)
+  // 6. Group B: SFOC / FOC (REVISED 2026-09) — now RISE-ONLY. The revised sheet
+  //    dropped the '+/-' (old: green < +/-5%, amber +/-5 to +/-10%, red > +/-10%),
+  //    so only burning MORE fuel than baseline is a fault. Amber 5% to 10%, red
+  //    > 10%; anything below +5% — including an efficiency improvement — is green.
   const groupB = ["sfoc", "foc"];
   if (groupB.some((key) => p.includes(key))) {
-    if (absDev > 10.0) return "Critical";
-    if (absDev >= 5.0) return "Warning";
+    if (deviationPct > 10.0) return "Critical";
+    if (deviationPct >= 5.0) return "Warning";
     return "Normal";
   }
 

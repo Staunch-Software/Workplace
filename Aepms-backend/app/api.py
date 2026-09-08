@@ -1497,9 +1497,16 @@ async def get_baseline_performance(
                         else (float(record.scav_air_pressure_bar) * 1.01972 if record.scav_air_pressure_bar is not None else None)
                     )
                 ),
+                # UNIT FIX: the shop-trial columns store T/C speed in x1000 units
+                # (DECIMAL(4,1) — they cannot hold a raw RPM figure), but the ACTUAL
+                # this baseline is compared against comes from /performance/history as
+                # raw RPM (MonthlyReportHeader.turbocharger_rpm_avg). Serving x1000 here
+                # made the UI subtract ~12.5 from ~12500 and report Turbo Speed as
+                # Critical on every report. Multiply to raw RPM so both sides match the
+                # UI's 750 / 1250 RPM thresholds. The graph-data path already does this.
                 "turbocharger_speed_x1000_rpm": (
-                    float(record.turbocharger_speed_x1000_iso_rpm) if record.turbocharger_speed_x1000_iso_rpm is not None
-                    else (float(record.turbocharger_speed_x1000_rpm) if record.turbocharger_speed_x1000_rpm is not None else None)
+                    float(record.turbocharger_speed_x1000_iso_rpm) * 1000 if record.turbocharger_speed_x1000_iso_rpm is not None
+                    else (float(record.turbocharger_speed_x1000_rpm) * 1000 if record.turbocharger_speed_x1000_rpm is not None else None)
                 ),
                 "exh_temp_tc_inlet_c": (
                     float(record.exh_temp_tc_inlet_iso_c) if record.exh_temp_tc_inlet_iso_c is not None

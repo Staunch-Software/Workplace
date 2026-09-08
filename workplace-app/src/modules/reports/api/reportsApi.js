@@ -49,7 +49,7 @@ const vesselBase = isDev ? 'http://localhost:8006/api/v1' : '/reports/api/v1';
 const vesselClient = makeClient(vesselBase);
 
 // ── Core client (workplace-backend control plane — owns users & vessels) ──
-const coreBase = isDev ? 'http://localhost:8000/api/v1' : '/api/v1';
+const coreBase = isDev ? 'http://localhost:8003/api/v1' : '/api/v1';
 const coreClient = makeClient(coreBase);
 
 // --- Shore API (SHORE + ADMIN) ---

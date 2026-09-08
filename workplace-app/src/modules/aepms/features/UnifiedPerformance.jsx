@@ -5611,7 +5611,7 @@ const confirmDelete = async () => {
                       const groupA = [
                         /* "EngSpeed", */
                       ];
-                      const groupB = ["SFOC"];
+                      const groupB = ["SFOC", "FOC"];
 
                       if (groupA.includes(metricKey)) {
                         if (absDev > 5.0) {
@@ -5622,10 +5622,13 @@ const confirmDelete = async () => {
                           txtColor = "#ca8a04";
                         }
                       } else if (groupB.includes(metricKey)) {
-                        if (absDev > 10.0) {
+                        // SFOC / FOC (REVISED 2026-09): RISE-ONLY — the sheet dropped the
+                        // '+/-', so only burning MORE than baseline is a fault. Amber 5% to
+                        // 10%, red > 10%; anything below +5% (incl. any improvement) is green.
+                        if (devPct > 10.0) {
                           devClass = "error-row";
                           txtColor = "#dc2626";
-                        } else if (absDev >= 5.0) {
+                        } else if (devPct >= 5.0) {
                           devClass = "warning-row";
                           txtColor = "#ca8a04";
                         }
@@ -5982,7 +5985,7 @@ const confirmDelete = async () => {
                             // Grouped Percentage Logic
                             // "EngSpeed" REMOVED per revised threshold sheet (2026-09) — commented, not deleted
                             const groupA = [/* "EngSpeed" */];
-                            const groupB = ["SFOC"];
+                            const groupB = ["SFOC", "FOC"];
 
                             if (groupA.includes(metricKey)) {
                               if (absPct > 5.0) {
@@ -5993,10 +5996,11 @@ const confirmDelete = async () => {
                                 bg = "#fffbeb";
                               }
                             } else if (groupB.includes(metricKey)) {
-                              if (absPct > 10.0) {
+                              // SFOC / FOC (REVISED 2026-09): RISE-ONLY — a drop is green.
+                              if (pct > 10.0) {
                                 color = "#dc2626";
                                 bg = "#fef2f2";
-                              } else if (absPct >= 5.0) {
+                              } else if (pct >= 5.0) {
                                 color = "#ca8a04";
                                 bg = "#fffbeb";
                               }
@@ -6889,8 +6893,15 @@ const confirmDelete = async () => {
                                 if (absPct > 5.0) devColor = "#dc2626";
                                 else if (absPct >= 3.0) devColor = "#ca8a04";
                                 else devColor = "#16a34a";
+                              } else if (p.key === "sfoc" || p.key === "foc") {
+                                // SFOC / FOC (REVISED 2026-09): RISE-ONLY — the sheet
+                                // dropped the '+/-', so only burning MORE than baseline
+                                // is a fault. Amber 5-10%, red > 10%, a drop is green.
+                                if (pct > 10.0) devColor = "#dc2626";
+                                else if (pct >= 5.0) devColor = "#ca8a04";
+                                else devColor = "#16a34a";
                               } else {
-                                // OTHERS (SFOC): Standard % (5/10)
+                                // Fallback for any metric not named above — two-sided 5/10.
                                 if (absPct > 10.0) devColor = "#dc2626";
                                 else if (absPct >= 5.0) devColor = "#ca8a04";
                                 else devColor = "#16a34a";
@@ -7286,13 +7297,14 @@ const confirmDelete = async () => {
                 } else {
                   // "EngSpeed" REMOVED per revised threshold sheet (2026-09) — commented, not deleted
                   const groupA = [/* "EngSpeed", */ "Turbospeed"];
-                  const groupB = ["SFOC"];
+                  const groupB = ["SFOC", "FOC"];
                   if (groupA.includes(key)) {
                     if (absPct > 5.0) color = [220, 38, 38];
                     else if (absPct >= 3.0) color = [202, 138, 4];
                   } else if (groupB.includes(key)) {
-                    if (absPct > 10.0) color = [220, 38, 38];
-                    else if (absPct >= 5.0) color = [202, 138, 4];
+                    // SFOC / FOC (REVISED 2026-09): RISE-ONLY — a drop is green.
+                    if (pct > 10.0) color = [220, 38, 38];
+                    else if (pct >= 5.0) color = [202, 138, 4];
                   }
                 }
               }
@@ -9373,6 +9385,16 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
             // "engine_rpm" REMOVED per revised threshold sheet (2026-09) — commented, not deleted
             const groupA = [/* "engine_rpm", */ "turbo_rpm"];
 
+            // Power Margin is normally handled by the isProp branch above and never
+            // reaches here, but keep the rule co-located so a future refactor that
+            // drops that early return cannot silently fall through to the SFOC band.
+            // REVISED 2026-09: Red > 10, Amber 5 to 10, Green < 5. Signed, not abs.
+            if (key === "propeller_margin") {
+              if (pct > 10.0) return [220, 38, 38];
+              if (pct >= 5.0) return [202, 138, 4];
+              return [22, 163, 74];
+            }
+
             if (key === "turbo_rpm") {
               // REVISED 2026-09: Amber @ 750 RPM, Red @ 1250 RPM (was 500 / 1000)
               if (absDelta >= 1250) return [220, 38, 38]; // red
@@ -9411,7 +9433,15 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
               if (absPct >= 3.0) return [202, 138, 4];
               return [22, 163, 74];
             }
-            // Group B (SFOC etc)
+            if (key === "sfoc" || key === "foc") {
+              // SFOC / FOC (REVISED 2026-09): RISE-ONLY — the sheet dropped the '+/-',
+              // so only burning MORE than baseline is a fault. Amber 5-10%, red > 10%;
+              // anything below +5% (including any improvement) is green.
+              if (pct > 10.0) return [220, 38, 38];
+              if (pct >= 5.0) return [202, 138, 4];
+              return [22, 163, 74];
+            }
+            // Fallback for any metric not named above — two-sided 5/10.
             if (absPct > 10.0) return [220, 38, 38];
             if (absPct >= 5.0) return [202, 138, 4];
             return [22, 163, 74];
@@ -9479,10 +9509,13 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
                   propActual = 100 + actual;
                   propDev = actual;
                 }
+                // Power Margin (REVISED 2026-09: Red > 10, Amber 5 to 10, Green < 5
+                // — was Red > 5, Amber 0 to 5, Green < 0). Mirrors the UI rule at
+                // the single-report and matrix tables so the PDF cannot drift.
                 const devColor =
-                  propDev > 5
+                  propDev > 10.0
                     ? [220, 38, 38]
-                    : propDev >= 0
+                    : propDev >= 5.0
                       ? [202, 138, 4]
                       : [22, 163, 74];
                 return {
@@ -11467,7 +11500,7 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
                                   />
 
                                   {/* ── % THRESHOLD BANDS (REVISED 2026-09) ──
-                          Group B (SFOC)      → amber ±5%,  red ±10%
+                          Group B (SFOC/FOC)  → amber +5%,  red +10% (rise-only)
                           PMAX_PCOMP          → amber ±4%,  red ±7% (one-sided drop in practice; band drawn symmetric)
                           SCAV                → amber ±10%, red ±15% (one-sided drop in practice; band drawn symmetric)
                           FIPI                → ME amber ±5%/red ±7%; AE amber ±10%/red ±20%
