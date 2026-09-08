@@ -2228,6 +2228,9 @@ export default function Performance({
   const [fleet, setFleet] = useState([]);
   const analysisResultsRef = useRef(null);
   const isUploadInProgressRef = useRef(false);
+  // Guards for the stale-PDF background refresh (see the effect further down).
+  const staleRefreshInFlightRef = useRef(false);
+  const staleRefreshDoneRef = useRef(new Set());
   const [shipId, setShipId] = useState("");
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
@@ -3185,6 +3188,9 @@ const confirmDelete = async () => {
             report_id: report.report_id,
             month: report.report_month,
             report_date: report.report_date,
+            // Stored analytical PDF was produced by an older rule set — the
+            // effect below silently regenerates it when this report is viewed.
+            pdf_stale: report.pdf_stale === true,
             color: getMonthColor(report.report_month),
             displayName: getMonthDisplayName(report.report_month),
             value: report.report_id,
@@ -3807,6 +3813,53 @@ const confirmDelete = async () => {
       );
     }
   }, [triggerLocalDownload, allMonthlyReports, baseline]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // STALE ANALYTICAL PDF — REFRESH ON VIEW
+  // ─────────────────────────────────────────────────────────────────────────
+  // The analytical PDF is rendered here in the browser and stored in blob
+  // storage, so it is frozen at whatever rules were in force when it was made.
+  // The backend tags each stored PDF with a rule-set version and returns
+  // pdf_stale when that tag is out of date. When the user opens such a report
+  // we quietly rebuild it — no bulk job, and only for reports someone actually
+  // looks at.
+  //
+  // Deliberately narrow: exactly ONE report displayed. The stored PDF is keyed
+  // to a single report, so regenerating from a multi-report selection would
+  // replace a single-month PDF with a multi-month one.
+  useEffect(() => {
+    if (allMonthlyReports.length !== 1) return;
+    if (triggerAutoDownload || triggerLocalDownload) return; // a real PDF op owns the renderer
+    if (isGeneratingPDF || staleRefreshInFlightRef.current) return;
+    if (Object.keys(baseline).length === 0) return; // charts not ready → wrong output
+
+    const report = allMonthlyReports[0];
+    const reportId = report?.report_id;
+    if (!reportId || !report.pdf_stale) return;
+    if (staleRefreshDoneRef.current.has(reportId)) return; // already handled this session
+
+    staleRefreshInFlightRef.current = true;
+    staleRefreshDoneRef.current.add(reportId);
+
+    // Same 1.5s the upload path waits — Recharts animates in, and html2canvas
+    // would otherwise capture half-drawn charts.
+    const timer = setTimeout(() => {
+      console.log(`♻️ Refreshing stale analytical PDF for report ${reportId}…`);
+      downloadPDF("cloud", { silent: true });
+    }, 1500);
+
+    return () => {
+      clearTimeout(timer);
+      staleRefreshInFlightRef.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    allMonthlyReports,
+    baseline,
+    isGeneratingPDF,
+    triggerAutoDownload,
+    triggerLocalDownload,
+  ]);
 
   const handleFileUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -6945,8 +6998,12 @@ const confirmDelete = async () => {
     );
   };
 
-  const downloadPDF = async (mode = "local") => {
-    setIsGeneratingPDF(true);
+  // opts.silent — used by the stale-PDF refresh below. A background regeneration
+  // must not pop alerts or flip the "generating" spinner, because the user did
+  // not ask for a PDF; they just opened the report.
+  const downloadPDF = async (mode = "local", opts = {}) => {
+    const silent = opts.silent === true;
+    if (!silent) setIsGeneratingPDF(true);
     const yieldToMain = () => new Promise((resolve) => setTimeout(resolve, 0));
 
     setTimeout(async () => {
@@ -7024,7 +7081,14 @@ const confirmDelete = async () => {
         });
 
         const vesselPart = shipName.replace(/[^a-z0-9]/gi, "_");
-        const fileName = `${analysisMode.toLowerCase()}-${vesselPart}-${downloadDate.replace(/ /g, "_")}.pdf`;
+        // Name the file after the REPORT MONTH, not the day it was generated.
+        // A download date made every regeneration land under a new blob name,
+        // orphaning the previous file instead of replacing it. The backend
+        // appends its own "-revN" rule-set tag to whatever we send.
+        const reportMonthPart = (
+          allMonthlyReports[0]?.month || "unknown"
+        ).replace(/[^a-z0-9-]/gi, "_");
+        const fileName = `${analysisMode.toLowerCase()}-${vesselPart}-${reportMonthPart}.pdf`;
 
         const pdf = new jsPDF("p", "mm", "a4");
         const pageWidth = pdf.internal.pageSize.getWidth();
@@ -9627,13 +9691,21 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
           formData.append("report_id", allMonthlyReports[0]?.report_id);
           formData.append("report_type", analysisMode);
           await axiosAepms.uploadGeneratedReportPDF(formData);
-          alert("Report uploaded to cloud!");
+          if (silent) {
+            console.log(`♻️ Stale analytical PDF refreshed: ${fileName}`);
+          } else {
+            alert("Report uploaded to cloud!");
+          }
         }
       } catch (err) {
         console.error("PDF generation error:", err);
-        alert("❌ Error: " + err.message);
+        // A failed background refresh is deliberately swallowed: the report the
+        // user opened still displays, the old PDF is still served, and the
+        // report stays flagged stale so the next view simply tries again.
+        if (!silent) alert("❌ Error: " + err.message);
       } finally {
-        setIsGeneratingPDF(false);
+        if (!silent) setIsGeneratingPDF(false);
+        staleRefreshInFlightRef.current = false;
       }
     }, 100);
   };

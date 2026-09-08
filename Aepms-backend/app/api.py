@@ -85,6 +85,32 @@ from app.middleware.permission_check import check_endpoint_permission
 from app.models import MENormalStatus, MEWarningAlert, MECriticalAlert, MEAlertSummary
 from app.models import MEDeviationHistory
 from app.blob_storage import upload_file_to_azure, generate_sas_url
+
+# ---------------------------------------------------------------------------
+# ANALYTICAL PDF RULE-SET VERSION
+# ---------------------------------------------------------------------------
+# The analytical PDF is rendered in the BROWSER (jsPDF) and stored in blob
+# storage, so it is a frozen snapshot of whatever alert/threshold rules were in
+# force when it was generated. Changing a threshold does NOT update stored PDFs.
+#
+# This tag is stamped into the stored PDF's filename. A report whose stored URL
+# does not contain the CURRENT tag is considered stale, and the UI silently
+# regenerates it the next time that report is viewed.
+#
+# BUMP THIS whenever anything changes that can alter a colour in the PDF:
+# a threshold number, a direction (two-sided vs one-sided), or a unit.
+PDF_RULESET_VERSION = "rev1"
+
+
+def _is_pdf_stale(generated_report_url: str | None) -> bool:
+    """True when a stored analytical PDF was produced by an older rule set.
+
+    A report with no stored PDF at all returns False - there is nothing to
+    refresh, and callers treat 'missing' differently from 'out of date'.
+    """
+    if not generated_report_url:
+        return False
+    return f"-{PDF_RULESET_VERSION}." not in generated_report_url
 from app.blob_storage import generate_sas_url
 from sqlalchemy import case, literal
 from app.load_excel_data import load_excel_to_database
@@ -1048,10 +1074,19 @@ async def upload_generated_report(
         # 3. Construct Path
         folder_path = f"{folder_base}/{imo_number}/{report_month}"
         
-        # 4. Upload to Azure
+        # 4. Stamp the current rule-set version into the filename.
+        #    The tag is what marks a stored PDF as current, so the backend owns
+        #    it - the browser never decides its own version. Any pre-existing
+        #    "-revN" suffix is stripped first so regenerating the same report
+        #    does not accumulate tags.
+        stem = file.filename[:-4] if file.filename.lower().endswith(".pdf") else file.filename
+        stem = re.sub(r"-rev\d+$", "", stem)
+        stamped_filename = f"{stem}-{PDF_RULESET_VERSION}.pdf"
+
+        # 5. Upload to Azure
         blob_url = upload_file_to_azure(
             file_data=file_content,
-            filename=file.filename,
+            filename=stamped_filename,
             folder_path=folder_path
         )
 
@@ -1260,6 +1295,11 @@ async def get_performance_history(
                     "report_id": report.report_id,
                     "report_month": report.report_month,
                     "report_date": report.report_date.isoformat() if report.report_date else None,
+                    # Stored analytical PDF: present, and produced by the current
+                    # rule set? The UI uses pdf_stale to decide whether to silently
+                    # regenerate this report's PDF when it is viewed.
+                    "generated_report_url": report.generated_report_url,
+                    "pdf_stale": _is_pdf_stale(report.generated_report_url),
                     "cylinder_readings": report.cylinder_readings, 
                     "shaft_power_kw": float(report.shaft_power_kw) if report.shaft_power_kw is not None else None,
                     "effective_power_kw": float(report.effective_power_kw) if report.effective_power_kw is not None else None,
@@ -1406,6 +1446,9 @@ async def get_ae_performance_history(
                     "generator_id": generator_id,
                     "report_month": report.report_month,
                     "report_date": report.report_date.isoformat() if report.report_date else None,
+                    # Same stale-PDF signal as the ME list — see PDF_RULESET_VERSION.
+                    "generated_report_url": report.generated_report_url,
+                    "pdf_stale": _is_pdf_stale(report.generated_report_url),
                     "load_percentage": float(perf_data.load_percentage) if perf_data.load_percentage else None,
                     "cylinder_readings": report.cylinder_readings,
                     "load_kw": float(perf_data.load_kw) if perf_data.load_kw else None,
