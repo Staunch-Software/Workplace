@@ -148,3 +148,42 @@ def download_blob_bytes(blob_url: str) -> bytes:
     except Exception as e:
         logger.error(f"❌ Failed to download blob bytes: {e}")
         raise e
+
+def delete_blob_by_url(blob_url: str) -> bool:
+    """
+    Permanently deletes one blob, addressed by its full URL.
+
+    Used to drop the PREVIOUS analytical PDF once a replacement has been
+    uploaded under a different name (the rule-set version tag changes the
+    filename, so the new upload does not overwrite the old file). Without this
+    every rule-set bump leaves an orphan behind.
+
+    Deliberately forgiving: a missing blob, a malformed URL or an Azure error
+    all return False rather than raising. Callers delete as a cleanup step
+    AFTER the replacement is safely stored, so a failure here must never
+    surface as a failed upload — it just leaves an orphan to sweep later.
+    """
+    if not blob_url:
+        return False
+
+    try:
+        # Same parsing as download_blob_bytes / generate_sas_url
+        parsed = urlparse(blob_url)
+        path_parts = parsed.path.lstrip("/").split("/", 1)
+
+        if len(path_parts) < 2:
+            logger.error(f"Invalid blob URL structure, not deleting: {blob_url}")
+            return False
+
+        blob_name = unquote(path_parts[1])
+
+        blob_service_client = get_blob_service_client()
+        blob_client = blob_service_client.get_blob_client(container=CONTAINER_NAME, blob=blob_name)
+        blob_client.delete_blob()
+
+        logger.info(f"🗑️ Deleted superseded blob: {blob_name}")
+        return True
+
+    except Exception as e:
+        logger.warning(f"Could not delete blob {blob_url}: {e}")
+        return False

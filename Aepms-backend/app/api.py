@@ -84,7 +84,7 @@ from app.me_iso_corrector import MEISOCorrector
 from app.middleware.permission_check import check_endpoint_permission
 from app.models import MENormalStatus, MEWarningAlert, MECriticalAlert, MEAlertSummary
 from app.models import MEDeviationHistory
-from app.blob_storage import upload_file_to_azure, generate_sas_url
+from app.blob_storage import upload_file_to_azure, generate_sas_url, delete_blob_by_url
 
 # ---------------------------------------------------------------------------
 # ANALYTICAL PDF RULE-SET VERSION
@@ -1093,8 +1093,26 @@ async def upload_generated_report(
         if blob_url:
             # Update DB URL if linked to a specific report
             if report_id and model and report:
+                previous_url = report.generated_report_url
                 report.generated_report_url = blob_url
                 await db.commit()
+
+                # Drop the file this one replaces. A rule-set bump changes the
+                # filename, so the new upload does NOT overwrite the old blob —
+                # without this, every bump orphans a PDF that nothing points to
+                # any more and that no screen can reach.
+                #
+                # Ordered deliberately: commit the new URL FIRST, delete second.
+                # If the delete fails we are left with a harmless orphan; if the
+                # order were reversed, a crash between the two would leave the
+                # report pointing at a file that no longer exists.
+                #
+                # The equality check matters — regenerating under the SAME
+                # version produces the identical name, so Azure already
+                # overwrote it in place and `previous_url` now refers to the
+                # file we just wrote. Deleting it would destroy the new PDF.
+                if previous_url and previous_url != blob_url:
+                    delete_blob_by_url(previous_url)
             
             # For Lube Oil, we might just log it or save to a History Log table if you have one
             logger.info(f"✅ Uploaded {report_type} to {blob_url}")
