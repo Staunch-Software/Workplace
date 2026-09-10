@@ -48,6 +48,22 @@ import "../styles/luboil.css"; // Specific styles for luboil page
 import "../styles/luboil-responsive.css";
 import "../styles/luboil-fix.css"
 
+// Equipment excluded from overdue/sampling-interval calculations only.
+// It still displays normally everywhere else (data, history, config, etc.).
+const OVERDUE_EXCLUDED_EQUIPMENT_CODES = ["ME OIL SETTLING"];
+const isExcludedFromOverdue = (code) =>
+  OVERDUE_EXCLUDED_EQUIPMENT_CODES.includes(code);
+
+// Equipment excluded from the dashboard UI entirely (data stays untouched in the DB).
+const DASHBOARD_HIDDEN_EQUIPMENT_CODES = [
+  "DE.CRAN",
+  "DECK.HYS",
+  "STR.SYS",
+  "RC.HYS",
+];
+const isHiddenFromDashboard = (code) =>
+  DASHBOARD_HIDDEN_EQUIPMENT_CODES.includes((code || "").trim());
+
 const getSourceBadgeStyle = (source) => {
   const s = (source || "").toLowerCase();
   if (s.includes("shell")) return { bg: "#fef3c7", text: "#d97706", border: "#fde68a" }; // Amber/Yellow
@@ -2703,9 +2719,10 @@ const LuboilAnalysis = () => {
         const sampleDate = new Date(m.last_sample);
         const dueDate = new Date(sampleDate);
         dueDate.setMonth(dueDate.getMonth() + intervalMonths);
-        const daysOverdue = Math.ceil(
+        const rawDaysOverdue = Math.ceil(
           (today - dueDate) / (1000 * 60 * 60 * 24),
         );
+        const daysOverdue = isExcludedFromOverdue(m.code) ? 0 : rawDaysOverdue;
 
         // Health Logic
         if (daysOverdue > 30) {
@@ -3085,9 +3102,10 @@ const LuboilAnalysis = () => {
         const sampleDate = new Date(m.last_sample);
         const dueDate = new Date(sampleDate);
         dueDate.setMonth(dueDate.getMonth() + interval);
-        const daysOverdue = Math.ceil(
+        const rawDaysOverdue = Math.ceil(
           (today - dueDate) / (1000 * 60 * 60 * 24),
         );
+        const daysOverdue = isExcludedFromOverdue(m.code) ? 0 : rawDaysOverdue;
 
         // 1. Health Status Logic
         if (daysOverdue > 30) {
@@ -3176,6 +3194,23 @@ const LuboilAnalysis = () => {
     setLoading(true);
     try {
       const res = (await axiosLub.get(`/api/v1/fleet/luboil-overview?t=${new Date().getTime()}`)).data;
+
+      // Strip dashboard-hidden equipment from every vessel before it touches any
+      // display logic (matrix, stats, modals). Underlying DB data is untouched.
+      if (res && res.data) {
+        Object.values(res.data).forEach((vesselData) => {
+          if (!vesselData.machineries) return;
+          Object.keys(vesselData.machineries).forEach((key) => {
+            const code = vesselData.machineries[key]?.code || key;
+            if (isHiddenFromDashboard(code)) {
+              delete vesselData.machineries[key];
+            }
+          });
+        });
+      }
+      if (res && Array.isArray(res.columns)) {
+        res.columns = res.columns.filter((c) => !isHiddenFromDashboard(c));
+      }
 
       // 1. Store the Matrix Data directly
       setMatrixData(res);
@@ -4726,9 +4761,14 @@ const LuboilAnalysis = () => {
                                       month: "short",
                                       year: "2-digit",
                                     });
-                                  const daysOverdue = Math.ceil(
+                                  const rawDaysOverdue = Math.ceil(
                                     (today - dueDate) / (1000 * 60 * 60 * 24),
                                   );
+                                  const daysOverdue = isExcludedFromOverdue(
+                                    cell.code,
+                                  )
+                                    ? 0
+                                    : rawDaysOverdue;
                                   const hasRemarks =
                                     cell.officer_remarks || cell.office_remarks;
                                   const isNormal =
