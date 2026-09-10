@@ -66,9 +66,56 @@ async def _click_attachments_tab_and_wait(page, timeout: int = 15000):
     }''')
     try:
         await page.wait_for_selector(_ATTACHMENT_READY_SELECTOR, timeout=timeout)
+        await page.wait_for_timeout(800)  # let Knockout finish re-rendering before we start reading
     except PlaywrightTimeout:
         logger.warning(f"Attachments panel did not signal ready within {timeout}ms -- proceeding anyway (may miss attachments).")
         await page.wait_for_timeout(1500)
+
+
+# A long-running scrape reusing one login/tab the whole way through was
+# observed to degrade abruptly rather than gradually, on TWO separate real
+# runs, at TWO DIFFERENT report counts:
+#   - a 38-report attachment backfill: 100% success through report 15,
+#     100% failure (equipment search) from report 16 onward.
+#   - a fresh vessel's --full scrape: 100% success through report 6,
+#     then a few reports failing at Job History before collapsing into
+#     100% equipment-search failure from report 13 onward.
+# The cutover is NOT a fixed report count or a fixed duration -- it moved
+# from ~16 to ~7 between two runs, presumably depending on MariApps' own
+# session/server load at the time. That means there is no safe fixed
+# threshold to sit just under; the margin has to assume the WORST case
+# seen so far, not the average. Refreshing the entire browser session (new
+# context, fresh login, fresh Job Overview tab) this often keeps a long
+# run comfortably under even the earliest cutover observed so far (~6-7).
+# If a future run collapses again before hitting a multiple of this
+# number, lower it further -- the pattern is empirical, not derived from
+# a known timeout value.
+SESSION_REFRESH_EVERY = 5
+
+
+async def _fresh_session(browser):
+    """New browser context + fresh login + fresh Job Overview tab. Returns
+    (context, page, overview_page) or None if login/navigation fails."""
+    context = await browser.new_context(accept_downloads=True, ignore_https_errors=True)
+    context.set_default_timeout(60000)
+    page = await context.new_page()
+
+    if not await _login(page):
+        try:
+            await context.close()
+        except Exception:
+            pass
+        return None
+
+    overview_page = await _open_job_overview(context, page)
+    if not overview_page:
+        try:
+            await context.close()
+        except Exception:
+            pass
+        return None
+
+    return context, page, overview_page
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +230,33 @@ async def run_scraper(db: AsyncSession, target_frequency: str = None, target_rep
         # Sequential scraping — one report at a time to avoid page-closed conflicts
         total = len(config_entries)
         for idx, entry in enumerate(config_entries):
+            # The SmartPAL session was observed to degrade abruptly during a
+            # long run that reuses one login/tab the whole way through: a
+            # real 38-job backfill run succeeded on every single one of the
+            # first 15 reports, then the equipment-search step failed on
+            # every single one of the remaining 19 with zero exceptions --
+            # not an intermittent slowdown, a hard cutover partway through
+            # (roughly the 13-minute / 15-16th report mark, consistent with
+            # a MariApps session/token timeout). Forcing an entirely fresh
+            # browser context + login well before that point, periodically
+            # through a long run, keeps every report on the safe side of
+            # whatever that cutover is instead of silently failing en masse
+            # once it's crossed.
+            if idx > 0 and idx % SESSION_REFRESH_EVERY == 0:
+                logger.info(f"[{idx}/{total}] Refreshing SmartPAL session (login + Job Overview) "
+                            f"to avoid long-run session degradation observed after ~15 reports...")
+                fresh = await _fresh_session(browser)
+                if fresh:
+                    old_context = context
+                    context, page, overview_page = fresh
+                    try:
+                        await old_context.close()
+                    except Exception:
+                        pass
+                else:
+                    logger.warning("Session refresh failed -- continuing with the existing "
+                                    "(possibly degraded) session; remaining reports may fail.")
+
             vessel_imo  = entry["vessel_imo"].strip()
             vessel_name = entry["vessel_name"].strip()
             report_code = entry["report_code"].strip()
@@ -192,20 +266,34 @@ async def run_scraper(db: AsyncSession, target_frequency: str = None, target_rep
 
             logger.info(f"[{idx+1}/{total}] Scraping: {vessel_name} [{vessel_imo}] -> {report_code}")
 
+            fail_reason = {}
             try:
                 result = await _scrape_report(
                     context, overview_page,
                     vessel_imo, vessel_name,
                     report_code, report_name, department, frequency,
                     entry.get("target_job_order_no"),
-                    entry.get("target_due_date")
+                    entry.get("target_due_date"),
+                    fail_reason=fail_reason,
                 )
                 if result:
                     result["is_smart_scrape"] = smart_cron
                     await _save_report(db, result)
+                else:
+                    # _scrape_report returning None used to mean this config
+                    # vanished with zero trace -- no row, no FAILED marker,
+                    # nothing distinguishing "genuinely not due yet" from
+                    # "the scraper couldn't find it". Every attempt now
+                    # leaves a row so a full re-scrape can be audited
+                    # config-by-config afterwards.
+                    reason = fail_reason.get("msg", "Scrape returned no data for an unlogged reason.")
+                    logger.warning(f"No data captured for {vessel_name}/{report_code}: {reason}")
+                    await _mark_failed(db, vessel_imo, report_code, reason,
+                                       vessel_name=vessel_name, report_name=report_name)
             except Exception as e:
                 logger.error(f"Error scraping {vessel_name}/{report_code}: {e}")
-                await _mark_failed(db, vessel_imo, report_code, str(e))
+                await _mark_failed(db, vessel_imo, report_code, str(e),
+                                   vessel_name=vessel_name, report_name=report_name)
 
         await browser.close()
         logger.info("Scraper run complete.")
@@ -312,7 +400,19 @@ async def _open_job_overview(context, landing_page):
 # Steps 3-11: Scrape one report for one vessel
 # ---------------------------------------------------------------------------
 
-async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report_code, report_name, department, frequency, target_job_order_no=None, target_due_date=None):
+async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report_code, report_name, department, frequency, target_job_order_no=None, target_due_date=None, fail_reason=None):
+    """`fail_reason`, if given, is a dict this function fills in with a
+    human-readable explanation before every early `return None` -- so a run
+    that finds nothing for a report still tells the caller WHY (equipment
+    not found in the tree, no completed job yet, attachments tab empty,
+    etc.) instead of the report simply vanishing with no trace. See
+    run_scraper, which uses this to always write a FAILED row with a reason
+    rather than silently skipping the config."""
+    def _fail(msg):
+        if fail_reason is not None:
+            fail_reason["msg"] = msg
+        return None
+
     eq_page = None
     job_page = None
     job_order_page = None
@@ -423,7 +523,7 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
         is_element = await search_input_handle.evaluate("el => el instanceof HTMLElement")
         if not is_element:
             logger.warning("Could not find 'Search Equipment' input box!")
-            return None
+            return _fail("Could not find the 'Search Equipment' input box on the Job Overview page.")
 
         clicked_node = False
 
@@ -448,7 +548,7 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
             if found > 0:
                 # Click the FIRST dropdown item — this selects the node and loads the grid
                 logger.info(f"AutoComplete returned {found} item(s). Clicking first result...")
-                clicked_node = await overview_page.evaluate('''(code) => {
+                clicked_node = await overview_page.evaluate(r'''(code) => {
                     const items = Array.from(document.querySelectorAll(
                         ".k-animation-container li, .k-list-container li, ul.k-list li, .k-popup li"
                     ));
@@ -486,7 +586,9 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
 
         if not clicked_node:
             logger.warning(f"AutoComplete strategy failed for '{report_name}'. Skipping report.")
-            return None
+            return _fail(f"Equipment search found no match for any of {search_terms!r} -- the "
+                         f"report's title in this vessel's equipment tree may use different wording "
+                         f"than report_configs.report_name.")
             
         await overview_page.wait_for_timeout(1500)
 
@@ -508,7 +610,9 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
         link_count = await overview_page.locator("a.cellEqpNameLink").count()
         if link_count == 0:
             logger.warning(f"No equipment links in grid for: {report_code}")
-            return None
+            return _fail("Equipment was found in the tree/search, but clicking Show produced an "
+                         "empty grid (no equipment link) -- the vessel may have no job plan "
+                         "configured for this equipment code.")
 
         logger.info("Opening Job Order details...")
         # Remove overlay before clicking to prevent pointer-event interception
@@ -533,7 +637,8 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                 
         if not eq_page:
             logger.error(f"Failed to open equipment link for {report_code} after 3 attempts. Skipping.")
-            return None
+            return _fail("Clicking the equipment link never opened a new tab after 3 attempts "
+                         "(SmartPAL popup/navigation timing issue).")
             
         try:
             await eq_page.wait_for_load_state("domcontentloaded", timeout=30000)
@@ -556,18 +661,32 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
 
         # Step 7.5: Click the Job Title link in the Job Plan grid to open Job Order page
         logger.info("Clicking Job Title link in Job Plan grid...")
-        
+
         # Check first if a job title link exists — BEFORE entering expect_page
-        has_job_link = await eq_page.evaluate('''() => {
-            const grids = Array.from(document.querySelectorAll(".k-grid"));
-            const visibleGrids = grids.filter(g => g.offsetWidth > 0);
-            if (visibleGrids.length > 0) {
-                const link = visibleGrids[0].querySelector("tbody tr td a");
-                return !!link;
-            }
-            return false;
-        }''')
-        
+        #
+        # This single unguarded read was a THIRD instance of the same
+        # Kendo-grid rendering race already found and fixed for the Job
+        # History grid and the Attachments grid: a real run showed WK-02 and
+        # WK-04 finding the link fine while WK-03/WK-05/WK-06 -- processed
+        # moments apart in the same session -- found nothing here and fell
+        # back to a path that then (correctly, given the fallback's own
+        # narrower view) found 0 job history rows. The fixed 5s wait above
+        # is not always enough; poll for the link a few more times before
+        # accepting "not found" and giving up on the primary path.
+        has_job_link = False
+        for _ in range(8):
+            has_job_link = await eq_page.evaluate('''() => {
+                const grids = Array.from(document.querySelectorAll(".k-grid"));
+                const visibleGrids = grids.filter(g => g.offsetWidth > 0);
+                for (const g of visibleGrids) {
+                    if (g.querySelector("tbody tr td a")) return true;
+                }
+                return false;
+            }''')
+            if has_job_link:
+                break
+            await eq_page.wait_for_timeout(2000)
+
         if not has_job_link:
             logger.warning(f"Could not find Job Title link in Job Plan grid. Trying 'History' tab on Equipment Page as fallback...")
             job_order_page = eq_page
@@ -584,15 +703,42 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                 await job_order_page.wait_for_selector("#History .k-loading-mask", state="hidden", timeout=15000)
             except Exception:
                 pass
-            await job_order_page.wait_for_timeout(5000)
+            # Poll until the History grid's row count stabilizes, same
+            # pattern used for the primary path's Job History scan below --
+            # a single fixed wait here inherited the exact same Kendo
+            # rendering race with no retry, so a slow render on this
+            # fallback path silently produced "0 rows" even when completed
+            # jobs genuinely existed (confirmed: WK-04-ELECTRICAL found a
+            # COMPLETED job on one run and found nothing on a later run of
+            # the identical report, with no data change on SmartPAL's side).
+            _prev = -1
+            _stable = 0
+            for _ in range(6):
+                _count = await job_order_page.evaluate('''() => {
+                    const grids = Array.from(document.querySelectorAll(".k-grid"));
+                    const visibleGrids = grids.filter(g => g.offsetWidth > 0);
+                    for (const g of visibleGrids) {
+                        const rows = g.querySelectorAll("tbody tr");
+                        if (rows.length > 0) return rows.length;
+                    }
+                    return 0;
+                }''')
+                if _count == _prev and _count > 0:
+                    _stable += 1
+                    if _stable >= 2:
+                        break
+                else:
+                    _stable = 0
+                _prev = _count
+                await job_order_page.wait_for_timeout(1500)
         else:
             async with context.expect_page(timeout=120000) as jo_page_info:
                 await eq_page.evaluate('''() => {
                     const grids = Array.from(document.querySelectorAll(".k-grid"));
                     const visibleGrids = grids.filter(g => g.offsetWidth > 0);
-                    if (visibleGrids.length > 0) {
-                        const link = visibleGrids[0].querySelector("tbody tr td a");
-                        if (link) link.click();
+                    for (const g of visibleGrids) {
+                        const link = g.querySelector("tbody tr td a");
+                        if (link) { link.click(); return; }
                     }
                 }''')
                     
@@ -623,40 +769,64 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
 
         # Step 9: Find latest COMPLETED job in Job History grid and open it
         logger.info("Scanning Job History for a COMPLETED job...")
-        
+
         # Get column indices robustly (without using :visible which is invalid in native querySelectorAll)
-        col_indices = await job_order_page.evaluate('''() => {
-            const grids = Array.from(document.querySelectorAll(".k-grid"));
-            const visibleGrids = grids.filter(g => g.offsetWidth > 0);
-            const map = {};
-            if (visibleGrids.length > 0) {
-                const ths = Array.from(visibleGrids[0].querySelectorAll("thead th"));
-                ths.forEach((th, i) => {
-                    const text = th.innerText.trim();
-                    if (text.includes("Job Order No")) map['jobOrderNo'] = i;
-                    if (text.includes("Job Status")) map['status'] = i;
-                    if (text.includes("Job End")) map['endDate'] = i;
-                    if (text.includes("Approved By")) map['approvedBy'] = i;
-                    if (text.includes("Due Date")) map['dueDate'] = i;
-                    if (text.includes("Job Start")) map['startDate'] = i;
-                    if (text.includes("Job Type")) map['jobType'] = i;
-                    if (text.includes("Job Category")) map['jobCategory'] = i;
-                });
-            }
-            return map;
-        }''')
-        
+        async def _read_col_indices():
+            return await job_order_page.evaluate('''() => {
+                const grids = Array.from(document.querySelectorAll(".k-grid"));
+                const visibleGrids = grids.filter(g => g.offsetWidth > 0);
+                const map = {};
+                if (visibleGrids.length > 0) {
+                    const ths = Array.from(visibleGrids[0].querySelectorAll("thead th"));
+                    ths.forEach((th, i) => {
+                        const text = th.innerText.trim();
+                        if (text.includes("Job Order No")) map['jobOrderNo'] = i;
+                        if (text.includes("Job Status")) map['status'] = i;
+                        if (text.includes("Job End")) map['endDate'] = i;
+                        if (text.includes("Approved By")) map['approvedBy'] = i;
+                        if (text.includes("Due Date")) map['dueDate'] = i;
+                        if (text.includes("Job Start")) map['startDate'] = i;
+                        if (text.includes("Job Type")) map['jobType'] = i;
+                        if (text.includes("Job Category")) map['jobCategory'] = i;
+                    });
+                }
+                return map;
+            }''')
+
+        # The Job History grid can render INCREMENTALLY -- a read taken right
+        # after the tab click was observed returning 2 rows for a job that
+        # genuinely has 4 (2 COMPLETED), because Kendo hadn't finished
+        # appending the rest yet. A simple "retry while count == 0" check
+        # does NOT catch this: 2 is not zero. Instead, poll until the row
+        # count stops changing between two consecutive reads (or we give up),
+        # which catches both "still empty" and "partially populated".
+        rows = await job_order_page.locator(".k-grid:visible tbody tr").all()
+        prev_count = -1
+        stable_reads = 0
+        for _ in range(6):
+            if len(rows) == prev_count and len(rows) > 0:
+                stable_reads += 1
+                if stable_reads >= 2:
+                    break
+            else:
+                stable_reads = 0
+            prev_count = len(rows)
+            await job_order_page.wait_for_timeout(1500)
+            rows = await job_order_page.locator(".k-grid:visible tbody tr").all()
+        if prev_count not in (-1, len(rows)):
+            logger.info(f"Job History row count changed from {prev_count} to {len(rows)} while waiting for it to settle.")
+
+        col_indices = await _read_col_indices()
         idx_no = col_indices.get("jobOrderNo", 6)
         idx_status = col_indices.get("status", 10)
         idx_end = col_indices.get("endDate", 12)
         idx_app = col_indices.get("approvedBy", 15)
-        
+
         idx_due = col_indices.get("dueDate", -1)
         idx_start = col_indices.get("startDate", -1)
         idx_type = col_indices.get("jobType", -1)
         idx_cat = col_indices.get("jobCategory", -1)
 
-        rows = await job_order_page.locator(".k-grid:visible tbody tr").all()
         found_job = False
         
         job_order_no = "UNKNOWN"
@@ -720,14 +890,51 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                         with open(f"attachments_dump_pending_{vessel_imo}.html", "w", encoding="utf-8") as f:
                             f.write(html_content)
                             
-                        # Use same logic to count rows
-                        row_count = await pending_details_page.evaluate('''() => {
-                            const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid, table.rgMasterTable"));
-                            const visibleGrid = grids.find(g => g && g.offsetWidth > 0);
-                            if (!visibleGrid) return 0;
-                            return visibleGrid.querySelectorAll("tbody tr").length;
-                        }''')
-                        
+                        # Poll until the row count stops changing rather than
+                        # trusting the first nonzero read -- see the identical
+                        # comment on the COMPLETED-job attachment read below,
+                        # which documents two real jobs this exact race
+                        # dropped attachments for.
+                        async def _read_pending_row_count():
+                            return await pending_details_page.evaluate('''() => {
+                                const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid, table.rgMasterTable"));
+                                const visibleGrid = grids.find(g => g && g.offsetWidth > 0);
+                                if (!visibleGrid) return 0;
+                                return visibleGrid.querySelectorAll("tbody tr").length;
+                            }''')
+
+                        async def _pending_no_attachment_present():
+                            return await pending_details_page.evaluate('''() => {
+                                const el = document.querySelector("#Attachments .no-attachment");
+                                return !!(el && el.offsetWidth > 0);
+                            }''')
+
+                        row_count = await _read_pending_row_count()
+                        _prev_count = -1
+                        _stable_reads = 0
+                        _empty_confirms = 0
+                        for _ in range(10):
+                            if await _pending_no_attachment_present():
+                                _empty_confirms += 1
+                                if _empty_confirms >= 2:
+                                    row_count = 0
+                                    break
+                                row_count = 0
+                                await pending_details_page.wait_for_timeout(1500)
+                                continue
+                            else:
+                                _empty_confirms = 0
+
+                            if row_count == _prev_count and row_count > 0:
+                                _stable_reads += 1
+                                if _stable_reads >= 2:
+                                    break
+                            else:
+                                _stable_reads = 0
+                            _prev_count = row_count
+                            await pending_details_page.wait_for_timeout(1500)
+                            row_count = await _read_pending_row_count()
+
                         pdf_files = []
                         seen_urls = set()
                         
@@ -759,35 +966,48 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                                             captured_url = url
                                 
                                 pending_details_page.context.on("request", pending_handle_request)
-                                
+                                # try/finally, NOT a bare statement after the try/except below --
+                                # if wait_for_timeout (or anything else in here) throws because
+                                # the tab crashed/closed under a long-running --full scrape, a
+                                # plain post-try statement would never run and this listener
+                                # leaks onto `context` for the rest of the ENTIRE run (the same
+                                # browser context is reused across all ~40 reports). A handful of
+                                # leaked listeners accumulating over a long run was the working
+                                # theory for attachments intermittently failing to capture later
+                                # in a run despite MariApps itself responding fine when checked
+                                # in isolation -- confirmed real jobs (TECH-15 AE-3, Weekly Bunker
+                                # Report) with real attachments on MariApps came back with 0
+                                # attachments captured, inconsistently between adjacent reports
+                                # processed seconds apart in the same run.
                                 try:
-                                    async with pending_details_page.expect_download(timeout=3000) as download_info:
-                                        await pending_details_page.evaluate(f'''(idx) => {{
-                                            const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid, table.rgMasterTable"));
-                                            const visibleGrid = grids.find(g => g && g.offsetWidth > 0);
-                                            if (visibleGrid) {{
-                                                const rows = visibleGrid.querySelectorAll("tbody tr");
-                                                if (rows[idx]) {{
-                                                    const clickables = Array.from(rows[idx].querySelectorAll('a, button'));
-                                                    let dl = clickables.find(a => 
-                                                        (a.innerText && a.innerText.toLowerCase().includes('download')) || 
-                                                        (a.title && a.title.toLowerCase().includes('download')) ||
-                                                        (a.className && typeof a.className === 'string' && a.className.toLowerCase().includes('download')) ||
-                                                        (a.querySelector && a.querySelector('[class*="download"]'))
-                                                    );
-                                                    if (dl) dl.click();
-                                                    else if (clickables.length > 0) clickables[0].click();
+                                    try:
+                                        async with pending_details_page.expect_download(timeout=3000) as download_info:
+                                            await pending_details_page.evaluate(f'''(idx) => {{
+                                                const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid, table.rgMasterTable"));
+                                                const visibleGrid = grids.find(g => g && g.offsetWidth > 0);
+                                                if (visibleGrid) {{
+                                                    const rows = visibleGrid.querySelectorAll("tbody tr");
+                                                    if (rows[idx]) {{
+                                                        const clickables = Array.from(rows[idx].querySelectorAll('a, button'));
+                                                        let dl = clickables.find(a =>
+                                                            (a.innerText && a.innerText.toLowerCase().includes('download')) ||
+                                                            (a.title && a.title.toLowerCase().includes('download')) ||
+                                                            (a.className && typeof a.className === 'string' && a.className.toLowerCase().includes('download')) ||
+                                                            (a.querySelector && a.querySelector('[class*="download"]'))
+                                                        );
+                                                        if (dl) dl.click();
+                                                        else if (clickables.length > 0) clickables[0].click();
+                                                    }}
                                                 }}
-                                            }}
-                                        }}''', row_idx)
-                                    download = await download_info.value
-                                    if not captured_url: captured_url = download.url
-                                except:
-                                    pass
-                                
-                                await pending_details_page.wait_for_timeout(1500)
-                                pending_details_page.context.remove_listener("request", pending_handle_request)
-                                
+                                            }}''', row_idx)
+                                        download = await download_info.value
+                                        if not captured_url: captured_url = download.url
+                                    except:
+                                        pass
+                                    await pending_details_page.wait_for_timeout(1500)
+                                finally:
+                                    pending_details_page.context.remove_listener("request", pending_handle_request)
+
                                 try:
                                     await pending_details_page.evaluate('''() => {
                                         const closeBtns = document.querySelectorAll(".k-window-action .k-i-close, .ui-dialog-titlebar-close, [aria-label='Close'], button.close");
@@ -824,11 +1044,13 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                                         
                         # Download attachments logic
                         attachments = []
+                        report_date, report_date_source = None, None
                         if pdf_files:
                             from urllib.parse import urlparse
+                            from app.utils.report_date import extract_report_period
                             parsed_base = urlparse(pending_details_page.url)
                             base_url = f"{parsed_base.scheme}://{parsed_base.netloc}"
-                            
+
                             for index, pdf_data in enumerate(pdf_files):
                                 pdf_url = pdf_data["url"]
                                 pdf_filename = pdf_data["filename"]
@@ -837,26 +1059,42 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                                     continue
                                 if not pdf_url.startswith("http"):
                                     pdf_url = base_url + "/" + pdf_url.lstrip('/')
-                                    
+
                                 try:
-                                    response = await pending_details_page.context.request.get(pdf_url, timeout=300000)
+                                    response = await pending_details_page.context.request.get(
+                                        pdf_url, timeout=300000,
+                                        headers={"Referer": pending_details_page.url}
+                                    )
+                                    # A 200 response with an empty body (SmartPAL occasionally
+                                    # returns this) must NOT be stored as a real attachment --
+                                    # it silently produced files nobody could ever open.
                                     if response.ok:
                                         pdf_bytes = await response.body()
+                                    else:
+                                        pdf_bytes = b""
+                                    if response.ok and pdf_bytes:
                                         date_str = datetime.utcnow().strftime("%Y-%m-%d")
                                         safe_fname = re.sub(r'[^a-zA-Z0-9_\-\. ]', '', pdf_filename).strip() or f"attachment_{index+1}"
                                         blob_name = f"reports/{vessel_imo}/{report_code}/{date_str}_{index}_{safe_fname}"
                                         upload_pdf_to_blob(pdf_bytes, blob_name)
                                         attachments.append({"file_name": pdf_filename, "blob_path": blob_name})
+                                        if report_date is None:
+                                            try:
+                                                found = await asyncio.to_thread(extract_report_period, pdf_bytes, pdf_filename)
+                                                if found:
+                                                    report_date, report_date_source = found
+                                            except Exception as e:
+                                                logger.warning(f"Report-date extraction failed for '{pdf_filename}': {e}")
                                     else:
                                         attachments.append({"file_name": pdf_filename, "blob_path": f"MISSING:{pdf_filename}"})
                                 except:
                                     attachments.append({"file_name": pdf_filename, "blob_path": f"MISSING:{pdf_filename}"})
-                                    
+
                         try: await pending_details_page.close()
                         except: pass
                         try: await job_order_page.close()
                         except: pass
-                        
+
                         return {
                             "vessel_imo": vessel_imo, "vessel_name": vessel_name,
                             "report_code": report_code, "report_name": report_name,
@@ -864,7 +1102,9 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                             "job_order_no": pend_details.get("job_order_no", f"PEND-{report_code}"),
                             "job_status": "PENDING",
                             "due_date": pend_details.get("due_date"),
-                            "attachments": attachments
+                            "attachments": attachments,
+                            "report_date": report_date,
+                            "report_date_source": report_date_source,
                         }
 
                 if "COMPLETED" in status_text.upper() and not found_completed:
@@ -930,7 +1170,13 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
             if job_order_page != eq_page:
                 try: await eq_page.close()
                 except: pass
-            return None
+            if target_job_order_no and target_due_date:
+                reason = (f"Job History has {len(rows)} row(s) but none is a COMPLETED row matching "
+                          f"the tracked due date {target_due_date.date()} -- still pending, or the "
+                          f"vessel is on a different cycle than expected.")
+            else:
+                reason = f"Job History has {len(rows)} row(s) but none is COMPLETED yet."
+            return _fail(reason)
             
         # We rename 'history_details_page' to 'job_page' to match the rest of the script below
         job_page = history_details_page
@@ -955,12 +1201,63 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
             f.write(html_content)
 
         # Get row count first - added table.rgMasterTable for older Telerik grids
-        row_count = await job_page.evaluate('''() => {
-            const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid, table.rgMasterTable, .rgMasterTable"));
-            const visibleGrid = grids.find(g => g && g.offsetWidth > 0);
-            if (!visibleGrid) return 0;
-            return visibleGrid.querySelectorAll("tbody tr, tr.rgRow, tr.rgAltRow").length;
-        }''')
+        #
+        # _click_attachments_tab_and_wait only waits for ONE of "a row exists"
+        # / "the no-attachment empty state exists" to appear, then returns
+        # immediately -- it does not guarantee every row has finished
+        # rendering by that instant, and (confirmed against real MariApps
+        # data during the AM KIRTI/AM TARANG audit) the grid can also render
+        # INCREMENTALLY, so a naive "retry only while it reads 0" check can
+        # still stop short of the true count. Two real jobs (OPR-06 Monthly
+        # Paint Consumption V-AMKI002581/26, TECH-49 MGPS Log V-AMKI002962/26)
+        # were confirmed via direct MariApps inspection to have 1 and 2
+        # attachments respectively, yet this scraper recorded 0 for both --
+        # not a MariApps gap, a scraper-side race. Poll until the count
+        # stops changing between two consecutive reads (same pattern as the
+        # Job History grid above) instead of stopping at the first nonzero
+        # read, unless SmartPAL's own "No Attachments Found" message is
+        # genuinely showing.
+        async def _read_attachment_row_count():
+            return await job_page.evaluate('''() => {
+                const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid, table.rgMasterTable, .rgMasterTable"));
+                const visibleGrid = grids.find(g => g && g.offsetWidth > 0);
+                if (!visibleGrid) return 0;
+                return visibleGrid.querySelectorAll("tbody tr, tr.rgRow, tr.rgAltRow").length;
+            }''')
+
+        async def _no_attachment_message_present():
+            return await job_page.evaluate('''() => {
+                const el = document.querySelector("#Attachments .no-attachment");
+                return !!(el && el.offsetWidth > 0);
+            }''')
+
+        row_count = await _read_attachment_row_count()
+        prev_count = -1
+        stable_reads = 0
+        empty_confirms = 0
+        for _ in range(10):
+            if await _no_attachment_message_present():
+                empty_confirms += 1
+                if empty_confirms >= 2:
+                    row_count = 0
+                    break
+                row_count = 0
+                await job_page.wait_for_timeout(1500)
+                continue
+            else:
+                empty_confirms = 0
+
+            if row_count == prev_count and row_count > 0:
+                stable_reads += 1
+                if stable_reads >= 2:
+                    break
+            else:
+                stable_reads = 0
+            prev_count = row_count
+            await job_page.wait_for_timeout(1500)
+            row_count = await _read_attachment_row_count()
+        if prev_count not in (-1, row_count):
+            logger.info(f"Attachment row count changed from {prev_count} to {row_count} while waiting for it to settle.")
 
         pdf_files = []
         seen_urls = set()
@@ -1000,39 +1297,52 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                 context = job_page.context
                 context.on("request", handle_request)
 
+                # try/finally, NOT a bare statement after the try/except below -- if
+                # wait_for_timeout (or anything else in here) throws because the tab
+                # crashed/closed under a long-running --full scrape, a plain
+                # post-try statement would never run and this listener leaks onto
+                # `context` for the rest of the ENTIRE run (the same browser
+                # context is reused across all ~40 reports). A handful of leaked
+                # listeners accumulating over a long run was the working theory
+                # for attachments intermittently failing to capture later in a
+                # run despite MariApps itself responding fine when checked in
+                # isolation -- confirmed real jobs (TECH-15 AE-3, Weekly Bunker
+                # Report) with real attachments on MariApps came back with 0
+                # attachments captured, inconsistently between adjacent reports
+                # processed seconds apart in the same run.
                 try:
-                    async with job_page.expect_download(timeout=3000) as download_info:
-                        await job_page.evaluate(f'''(idx) => {{
-                            const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid, table.rgMasterTable, .rgMasterTable"));
-                            const visibleGrid = grids.find(g => g && g.offsetWidth > 0);
-                            if (visibleGrid) {{
-                                const rows = visibleGrid.querySelectorAll("tbody tr, tr.rgRow, tr.rgAltRow");
-                                if (rows[idx]) {{
-                                    const clickables = Array.from(rows[idx].querySelectorAll('a, button'));
-                                    let dl = clickables.find(a => 
-                                        (a.innerText && a.innerText.toLowerCase().includes('download')) || 
-                                        (a.title && a.title.toLowerCase().includes('download')) ||
-                                        (a.className && typeof a.className === 'string' && a.className.toLowerCase().includes('download')) ||
-                                        (a.querySelector && a.querySelector('[class*="download"]'))
-                                    );
-                                    if (dl) dl.click();
-                                    else if (clickables.length > 0) clickables[0].click();
+                    try:
+                        async with job_page.expect_download(timeout=3000) as download_info:
+                            await job_page.evaluate(f'''(idx) => {{
+                                const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid, table.rgMasterTable, .rgMasterTable"));
+                                const visibleGrid = grids.find(g => g && g.offsetWidth > 0);
+                                if (visibleGrid) {{
+                                    const rows = visibleGrid.querySelectorAll("tbody tr, tr.rgRow, tr.rgAltRow");
+                                    if (rows[idx]) {{
+                                        const clickables = Array.from(rows[idx].querySelectorAll('a, button'));
+                                        let dl = clickables.find(a =>
+                                            (a.innerText && a.innerText.toLowerCase().includes('download')) ||
+                                            (a.title && a.title.toLowerCase().includes('download')) ||
+                                            (a.className && typeof a.className === 'string' && a.className.toLowerCase().includes('download')) ||
+                                            (a.querySelector && a.querySelector('[class*="download"]'))
+                                        );
+                                        if (dl) dl.click();
+                                        else if (clickables.length > 0) clickables[0].click();
+                                    }}
                                 }}
-                            }}
-                        }}''', row_idx)
-                    download = await download_info.value
-                    if not captured_url:
-                        captured_url = download.url
-                    logger.info(f"  Download event intercepted: {download.url[:100]}")
-                except Exception:
-                    # No download event occurred. Proceed with request interception fallback.
-                    pass
+                            }}''', row_idx)
+                        download = await download_info.value
+                        if not captured_url:
+                            captured_url = download.url
+                        logger.info(f"  Download event intercepted: {download.url[:100]}")
+                    except Exception:
+                        # No download event occurred. Proceed with request interception fallback.
+                        pass
 
-                # Wait slightly for popups to trigger their requests
-                await job_page.wait_for_timeout(1500)
-
-                # Remove the listener
-                context.remove_listener("request", handle_request)
+                    # Wait slightly for popups to trigger their requests
+                    await job_page.wait_for_timeout(1500)
+                finally:
+                    context.remove_listener("request", handle_request)
 
                 # Close any open document viewer modal that might block clicking the next row
                 try:
@@ -1083,8 +1393,11 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
 
 
         logger.info(f"Found {len(pdf_files)} attachments to download.")
-        
+
+        from app.utils.report_date import extract_report_period
+
         attachments = []
+        report_date, report_date_source = None, None
         for index, pdf_data in enumerate(pdf_files):
             pdf_url = pdf_data["url"]
             pdf_filename = pdf_data["filename"]
@@ -1099,7 +1412,10 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                 pdf_url = base_url + "/" + pdf_url.lstrip('/')
 
             logger.info(f"Downloading Attachment {index+1}/{len(pdf_files)}: {pdf_filename}")
-            response = await context.request.get(pdf_url, timeout=300000)
+            response = await context.request.get(
+                pdf_url, timeout=300000,
+                headers={"Referer": job_page.url}
+            )
 
             if not response.ok:
                 logger.error(f"Failed to download {pdf_filename}. Status: {response.status}")
@@ -1107,6 +1423,15 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                 continue
 
             pdf_bytes = await response.body()
+
+            # A 200 response with an empty body must NOT be recorded as a real
+            # attachment -- SmartPAL occasionally returns exactly this, and
+            # without this guard the row was stored as a "successful" download
+            # (not MISSING:) pointing at a zero-byte blob nobody could open.
+            if not pdf_bytes:
+                logger.error(f"Downloaded 0 bytes for {pdf_filename} -- treating as missing.")
+                attachments.append({"file_name": pdf_filename, "blob_path": f"MISSING:{pdf_filename}"})
+                continue
 
             # Try to get the real filename from Content-Disposition header
             import re
@@ -1126,7 +1451,19 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
 
             upload_pdf_to_blob(pdf_bytes, blob_name)
             attachments.append({"file_name": pdf_filename, "blob_path": blob_name})
-            
+
+            # The report's real period lives inside the file, not in any
+            # SmartPAL date -- see app/utils/report_date.py. First
+            # attachment to yield one wins; later ones (e.g. a scanned
+            # signature page) rarely carry a cleaner answer.
+            if report_date is None:
+                try:
+                    found = await asyncio.to_thread(extract_report_period, pdf_bytes, pdf_filename)
+                    if found:
+                        report_date, report_date_source = found
+                except Exception as e:
+                    logger.warning(f"Report-date extraction failed for '{pdf_filename}': {e}")
+
         if not attachments:
             logger.warning(f"No attachments were downloaded for job: {job_order_no} (Saving record with 0 attachments)")
             
@@ -1154,12 +1491,16 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
             "job_end_date": job_end_date,
             "job_type":     job_type,
             "job_category": job_category,
+            "report_date":  report_date,
+            "report_date_source": report_date_source,
         }
 
     except PlaywrightTimeout as e:
         logger.error(f"Timeout scraping {vessel_name}/{report_code}: {e}")
+        _fail(f"Timed out during scraping: {e}")
     except Exception as e:
         logger.error(f"Error scraping {vessel_name}/{report_code}: {e}")
+        _fail(f"Unhandled error during scraping: {e}")
     finally:
         if eq_page:
             try: await eq_page.close()
@@ -1208,8 +1549,16 @@ async def _save_report(db: AsyncSession, data: dict):
             existing.job_end_date  = data.get("job_end_date")
             existing.job_type      = data.get("job_type")
             existing.job_category  = data.get("job_category")
-            
+            # Only overwrite a previously-recovered report_date if this scrape
+            # actually found one -- a re-scrape that fails to extract a date
+            # (e.g. a transient parse error) must not blank out a good value
+            # from an earlier run.
+            if data.get("report_date") is not None:
+                existing.report_date        = data.get("report_date")
+                existing.report_date_source = data.get("report_date_source")
+
             existing.scrape_status = ScrapeStatus.SCRAPED
+            existing.scrape_error  = None
             existing.updated_at    = datetime.utcnow()
             existing.verify_status = VerifyStatus.UNVERIFIED
             logger.info(f"Updated DB (existing job): {data['vessel_imo']}/{data['report_code']} -> {data['job_order_no']}")
@@ -1233,6 +1582,8 @@ async def _save_report(db: AsyncSession, data: dict):
                 job_end_date=data.get("job_end_date"),
                 job_type=data.get("job_type"),
                 job_category=data.get("job_category"),
+                report_date=data.get("report_date"),
+                report_date_source=data.get("report_date_source"),
                 scrape_status=ScrapeStatus.SCRAPED,
                 verify_status=VerifyStatus.UNVERIFIED,
                 created_at=datetime.utcnow(),
@@ -1248,6 +1599,33 @@ async def _save_report(db: AsyncSession, data: dict):
             
             db.add(new_report)
             logger.info(f"Inserted NEW DB row: {data['vessel_imo']}/{data['report_code']} -> {data['job_order_no']}")
+
+            # A prior failed scrape attempt for this vessel/report leaves a
+            # placeholder row behind (job_order_no="N/A", scrape_status=FAILED --
+            # see _mark_failed). It is matched on vessel_imo+report_code only,
+            # never on job_order_no, so a later successful scrape (this branch)
+            # was never able to find/update it -- it only ever matches by the
+            # EXACT job_order_no, which the placeholder never has. That left a
+            # stale FAILED row sitting in the inbox forever, sorted ABOVE the
+            # new correctly-SCRAPED row (FAILED rows are surfaced first), even
+            # though the report had genuinely succeeded on a re-run. Clean it
+            # up now that we have real data for this vessel/report. .all()
+            # (not .first()) because the pre-fix version of _mark_failed
+            # could already have created more than one of these for the
+            # same vessel/report before this fix went in -- clean up every
+            # leftover, not just one.
+            stmt_placeholder = select(Report).where(
+                Report.vessel_imo == data["vessel_imo"],
+                Report.report_code == data["report_code"],
+                Report.job_order_no == "N/A",
+            )
+            placeholder_result = await db.execute(stmt_placeholder)
+            placeholders = placeholder_result.scalars().all()
+            for placeholder in placeholders:
+                await db.delete(placeholder)
+            if placeholders:
+                logger.info(f"Removed {len(placeholders)} stale FAILED placeholder(s) for {data['vessel_imo']}/{data['report_code']}")
+
             # Activity Feed Event
             if data.get("is_smart_scrape", False):
                 try:
@@ -1327,27 +1705,38 @@ async def _save_report(db: AsyncSession, data: dict):
         logger.error(f"DB save failed: {e}")
 
 
-async def _mark_failed(db: AsyncSession, vessel_imo: str, report_code: str, error: str):
+async def _mark_failed(db: AsyncSession, vessel_imo: str, report_code: str, error: str,
+                        vessel_name: str = None, report_name: str = None):
     try:
+        # Match ONLY our own placeholder row (job_order_no == "N/A"), never
+        # any row for this vessel/report -- the old vessel_imo+report_code-only
+        # match had no job_order_no filter and no ordering, so once a real
+        # SCRAPED row existed alongside a leftover placeholder it could grab
+        # either one, risking flipping an already-successful, real completed
+        # report's status to FAILED just because a later unrelated attempt
+        # failed. Only the placeholder should ever be touched here.
         stmt = select(Report).where(
             Report.vessel_imo == vessel_imo,
             Report.report_code == report_code,
+            Report.job_order_no == "N/A",
         )
         result = await db.execute(stmt)
         existing = result.scalars().first()
 
         if existing:
             existing.scrape_status = ScrapeStatus.FAILED
+            existing.scrape_error  = error
             existing.updated_at = datetime.utcnow()
         else:
             db.add(Report(
                 id=uuid4(),
                 vessel_imo=vessel_imo,
-                vessel_name=vessel_imo,
+                vessel_name=vessel_name or vessel_imo,
                 report_code=report_code,
-                report_name=report_code,
+                report_name=report_name or report_code,
                 job_order_no="N/A",
                 scrape_status=ScrapeStatus.FAILED,
+                scrape_error=error,
                 verify_status=VerifyStatus.UNVERIFIED,
             ))
         await db.commit()

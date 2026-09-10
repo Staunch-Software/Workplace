@@ -82,9 +82,12 @@ class ReportOut(BaseModel):
     job_start_date: Optional[datetime]
     job_end_date:   Optional[datetime]
     job_date:       Optional[datetime]
+    report_date:        Optional[datetime]
+    report_date_source: Optional[str]
 
     # System fields
     scrape_status:  ScrapeStatus
+    scrape_error:   Optional[str]
     verify_status:  VerifyStatus
     verified_by:    Optional[str]
     verified_at:    Optional[datetime]
@@ -118,7 +121,10 @@ class ReportListOut(BaseModel):
     due_hours:      Optional[float]
     job_start_date: Optional[datetime]
     job_end_date:   Optional[datetime]
+    report_date:        Optional[datetime]
+    report_date_source: Optional[str]
     scrape_status:  ScrapeStatus
+    scrape_error:   Optional[str]
     verify_status:  VerifyStatus
     unread_shore:   int
     unread_vessel:  int

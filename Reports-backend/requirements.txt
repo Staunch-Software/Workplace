@@ -23,6 +23,10 @@ playwright>=1.62.0
 # Excel parsing (for vessel/report config)
 openpyxl>=3.1.5
 
+# PDF form-field reading (recovering the real report period from scraped
+# report PDFs -- see app/utils/report_date.py)
+pdfplumber>=0.11.4
+
 # Scheduler (cronjob)
 apscheduler>=3.10.4
 
