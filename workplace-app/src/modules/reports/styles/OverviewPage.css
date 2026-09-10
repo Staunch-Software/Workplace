@@ -692,6 +692,17 @@ thead {
   flex-wrap: wrap;
 }
 
+/* Multiple completed jobs landing in the same bucket (e.g. two monthly
+   jobs finishing in the same calendar month) -- one icon+date per job,
+   wrapped in the same cell shell instead of picking just one. */
+.ovw-chip-multi {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
 /* Empty chip placeholder — must match chip size and be centred in td */
 .ovw-chip-empty {
   width: 30px;

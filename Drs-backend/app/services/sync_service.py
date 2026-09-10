@@ -350,9 +350,29 @@ class SyncService:
                                 setattr(existing_entity, key, value)
 
                     elif incoming_origin == 'VESSEL' and local_origin == 'VESSEL':
-                        # Vessel created it, Vessel already has it → safe to skip, not a real conflict
-                        logger.info(f"⏭️ SYNC SKIP: {model_class.__tablename__} {entity_id} — Vessel already owns this record")
-                        return
+                        # Vessel created it, Vessel already has it at the same version —
+                        # normally a harmless echo, safe to skip. BUT if the actual field
+                        # values differ (e.g. Shore silently corrected something, like the
+                        # temp→final defect_number renumbering, without the Vessel knowing),
+                        # a blind skip would discard that correction forever on every future
+                        # pull, since origin/version never change again on their own.
+                        # So: only skip when the data truly matches; otherwise reconcile it.
+                        has_diff = False
+                        for key, value in clean_data.items():
+                            if not hasattr(existing_entity, key):
+                                continue
+                            if str(getattr(existing_entity, key)) != str(value):
+                                has_diff = True
+                                break
+
+                        if not has_diff:
+                            logger.info(f"⏭️ SYNC SKIP: {model_class.__tablename__} {entity_id} — Vessel already owns this record, no changes")
+                            return
+                        else:
+                            logger.info(f"🔁 SYNC RECONCILE: {model_class.__tablename__} {entity_id} — same version/origin but data differs, applying incoming")
+                            for key, value in clean_data.items():
+                                if hasattr(existing_entity, key):
+                                    setattr(existing_entity, key, value)
                         # falls through to flush + commit below
 
                     # True conflict — both sides independently modified same version

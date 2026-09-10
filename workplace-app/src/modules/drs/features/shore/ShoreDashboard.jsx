@@ -10,6 +10,7 @@ import {
 import { Image as ImageIcon, Eye, Upload } from 'lucide-react';
 import ColumnCustomizationModal from '@drs/components/modals/ColumnCustomizationModal';
 import ShoreClosureModal from '@drs/components/modals/ShoreClosureModal';
+import ShoreReopenModal from '@drs/components/modals/ShoreReopenModal';
 import PrSyncManager from '@drs/components/shared/PrSyncManager';
 
 import { defectApi } from '@drs/services/defectApi';
@@ -265,6 +266,7 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
   const [isUploading, setIsUploading] = useState(false);
   const [mentionList, setMentionList] = useState([]);
   const [showMentions, setShowMentions] = useState(false);
+  const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
   const [taggedUsers, setTaggedUsers] = useState([]);
   const [cursorPosition, setCursorPosition] = useState(0);
   const threadScrollRef = useRef(null);
@@ -275,6 +277,28 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
   const canApprove = user?.role === 'SHORE' || user?.role === 'ADMIN';
   const isShoreUser = user?.role === 'SHORE' || user?.role === 'ADMIN';
   const currentReplyText = chatMode === 'internal' ? internalDraft : externalDraft;
+
+  // Reopen Defect State
+  const [showReopenCard, setShowReopenCard] = useState(false);
+  const [reopenReason, setReopenReason] = useState("");
+
+  const reopenMutation = useMutation({
+    mutationFn: ({ id, reason }) => defectApi.reopenDefect(id, { reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['defects']);
+      queryClient.invalidateQueries(['defect', defectId]);
+      queryClient.invalidateQueries(['threads', defectId]);
+      queryClient.invalidateQueries(['live-feed']);
+      toast('Defect successfully reopened!', 'success');
+      setShowReopenCard(false);
+      setReopenReason("");
+    },
+    onError: (error) => {
+      const msg = error?.response?.data?.detail || error?.message || 'Unknown error';
+      toast('❌ Failed to reopen defect: ' + msg, 'error');
+    }
+  });
+
   const { data: allThreads = [], isLoading } = useQuery({
     queryKey: ['threads', defectId],
     queryFn: () => defectApi.getThreads(defectId),
@@ -364,6 +388,29 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
   // <div>, which turns into extra blank lines in innerText. Insert a plain <br>
   // instead so multi-line replies match the old textarea's single-newline behavior.
   const handleEditorKeyDown = (e) => {
+    if (showMentions && mentionList.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setHighlightedMentionIndex(i => (i + 1) % mentionList.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setHighlightedMentionIndex(i => (i - 1 + mentionList.length) % mentionList.length);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        selectMention(mentionList[highlightedMentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowMentions(false);
+        return;
+      }
+    }
+
     if (e.key !== 'Enter') return;
     e.preventDefault();
     document.execCommand('insertLineBreak');
@@ -415,6 +462,7 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
       });
 
       setMentionList(filtered);
+      setHighlightedMentionIndex(0);
       setShowMentions(filtered.length > 0);
     } else {
       setShowMentions(false);
@@ -518,6 +566,9 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
 
       setFiles([]);
       queryClient.invalidateQueries(['threads', defectId]);
+      // So the chat-icon badge picks up this new message on the list's next
+      // fetch (invalidate matches both dashboards' ['defects', ...] keys).
+      queryClient.invalidateQueries(['defects']);
     } catch (err) {
       toast("Failed to send reply: " + err.message, 'error');
     } finally {
@@ -875,7 +926,10 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
               suppressContentEditableWarning
               onInput={handleEditorInput}
               onKeyDown={handleEditorKeyDown}
-              onKeyUp={handleEditorInput}
+              onKeyUp={(e) => {
+                if (showMentions && ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) return;
+                handleEditorInput();
+              }}
               onClick={handleEditorInput}
               data-placeholder={
                 chatMode === 'internal'
@@ -950,16 +1004,19 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
                   overflowY: 'auto'
                 }}
               >
-                {mentionList.map(u => {
+                {mentionList.map((u, index) => {
                   const name = u.full_name || u.name || 'Unknown User';
                   const role = (u.role || u.job_title || '').toUpperCase();
                   const isShore = role === 'SHORE' || role === 'ADMIN' || role.includes('SUPERINTENDENT');
+                  const isHighlighted = index === highlightedMentionIndex;
 
                   return (
                     <div
                       className='empty-thread-text'
                       key={u.id}
+                      ref={isHighlighted ? (el) => el?.scrollIntoView({ block: 'nearest' }) : null}
                       onClick={() => selectMention(u)}
+                      onMouseEnter={() => setHighlightedMentionIndex(index)}
                       style={{
                         padding: '10px 12px',
                         cursor: 'pointer',
@@ -969,10 +1026,9 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
                         justifyContent: 'space-between',
                         gap: '10px',
                         fontSize: '13px',
-                        transition: 'background 0.2s'
+                        transition: 'background 0.2s',
+                        background: isHighlighted ? '#f0f9ff' : 'white'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#f0f9ff'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <UserCircle size={16} color={isShore ? '#3b82f6' : '#64748b'} />
@@ -1020,21 +1076,163 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
           </div>
         </div>
       ) : (
-        <div
-          className='empty-thread-text'
-          style={{
-            padding: '12px',
-            borderTop: '1px solid #e2e8f0',
-            textAlign: 'center',
-            background: '#f8fafc',
-            color: '#64748b',
-            fontSize: '13px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px'
-          }}>
-          <Lock size={14} /> Thread Locked (Defect Closed)
+        <div style={{ padding: '12px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+          <div
+            className='empty-thread-text'
+            style={{
+              textAlign: 'center',
+              color: '#64748b',
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}>
+            <Lock size={14} /> Thread Locked (Defect Closed)
+          </div>
+
+          {isShoreUser && (
+            <div style={{ marginTop: '20px' }}>
+              {!showReopenCard ? (
+                /* ── Reopen trigger button ── */
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                  border: '1px solid #bae6fd', borderRadius: '12px', padding: '14px 18px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '34px', height: '34px', borderRadius: '50%',
+                      background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: '0 1px 4px rgba(14,165,233,0.2)'
+                    }}>
+                      <RefreshCw size={15} color="#0ea5e9" />
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#0c4a6e' }}>Reopen this defect?</p>
+                      <p style={{ margin: 0, fontSize: '11px', color: '#0369a1', marginTop: '2px' }}>Defect is currently closed</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowReopenCard(true)}
+                    style={{
+                      background: '#0ea5e9', color: 'white', border: 'none',
+                      padding: '8px 16px', borderRadius: '8px', fontSize: '12px',
+                      fontWeight: '600', cursor: 'pointer',
+                      display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      boxShadow: '0 2px 8px rgba(14,165,233,0.35)',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <RefreshCw size={13} /> Reopen
+                  </button>
+                </div>
+              ) : (
+                /* ── Confirmation card ── */
+                <div style={{
+                  background: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  boxShadow: '0 1px 8px rgba(15,23,42,0.07)'
+                }}>
+                  {/* Top section — icon + title, no background */}
+                  <div style={{ padding: '20px 20px 0' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                      {/* Icon badge */}
+                      <div style={{
+                        width: '38px', height: '38px', borderRadius: '10px',
+                        background: '#f0f9ff', border: '1px solid #bae6fd',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0, marginTop: '1px'
+                      }}>
+                        <RefreshCw size={16} color="#0ea5e9" />
+                      </div>
+                      {/* Text */}
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: 0, fontSize: '13.5px', fontWeight: '700', color: '#0f172a' }}>
+                          Reopen this defect?
+                        </p>
+                        <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#64748b', lineHeight: '1.5' }}>
+                          The defect status will return to <strong style={{ color: '#0f172a' }}>Open</strong> and the thread will be unlocked.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Divider */}
+                    <div style={{ height: '1px', background: '#f1f5f9', margin: '16px 0 0' }} />
+                  </div>
+
+
+                  {/* Body */}
+                  <div style={{ padding: '16px 18px' }}>
+                    <label style={{
+                      display: 'block', fontSize: '11px', fontWeight: '600',
+                      color: '#475569', marginBottom: '6px', letterSpacing: '0.05em', textTransform: 'uppercase'
+                    }}>
+                      Reason <span style={{ color: '#94a3b8', fontWeight: '400', textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                    </label>
+                    <textarea
+                      value={reopenReason}
+                      onChange={(e) => setReopenReason(e.target.value)}
+                      placeholder="e.g. Additional evidence required, issue not fully resolved..."
+                      rows={3}
+                      style={{
+                        width: '100%', padding: '10px 12px', fontSize: '12.5px',
+                        border: '1.5px solid #e2e8f0', borderRadius: '8px',
+                        resize: 'none', outline: 'none', boxSizing: 'border-box',
+                        color: '#1e293b', lineHeight: '1.5',
+                        fontFamily: 'inherit', background: '#f8fafc',
+                        transition: 'border-color 0.2s'
+                      }}
+                      onFocus={e => e.target.style.borderColor = '#38bdf8'}
+                      onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+                    />
+                    <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#94a3b8' }}>
+                      The reason will be saved in the audit thread.
+                    </p>
+                  </div>
+
+                  {/* Footer */}
+                  <div style={{
+                    display: 'flex', gap: '8px', justifyContent: 'flex-end',
+                    padding: '12px 18px', borderTop: '1px solid #f1f5f9',
+                    background: '#f8fafc'
+                  }}>
+                    <button
+                      onClick={() => { setShowReopenCard(false); setReopenReason(''); }}
+                      style={{
+                        background: 'white', border: '1.5px solid #e2e8f0', color: '#64748b',
+                        padding: '7px 16px', borderRadius: '8px', fontSize: '12px',
+                        fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => reopenMutation.mutate({ id: defectId, reason: reopenReason.trim() })}
+                      disabled={reopenMutation.isPending}
+                      style={{
+                        background: reopenMutation.isPending
+                          ? 'linear-gradient(135deg, #7dd3fc, #38bdf8)'
+                          : 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                        color: 'white', border: 'none',
+                        padding: '7px 18px', borderRadius: '8px', fontSize: '12px', fontWeight: '700',
+                        cursor: reopenMutation.isPending ? 'not-allowed' : 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        boxShadow: reopenMutation.isPending ? 'none' : '0 2px 8px rgba(14,165,233,0.4)',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {reopenMutation.isPending
+                        ? <><Loader2 size={12} className="spin" /> Reopening…</>
+                        : <><CheckCircle size={12} /> Yes, Reopen</>
+                      }
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
       {confirmModal && (
@@ -3924,7 +4122,10 @@ const ShoreDashboard = () => {
                                       {getStatusIcon(defect.status)}
                                     </div>
                                   ) : (
-                                    isEditMode && !isClosed ? (
+                                    // 🚫 Shore / Admin: status is read-only (like report date).
+                                    // They can only close via "Accept & Close" after vessel
+                                    // submits a PENDING_CLOSURE request.
+                                    isEditMode && !isClosed && !(user?.role?.toUpperCase() === 'SHORE' || user?.role?.toUpperCase() === 'ADMIN') ? (
                                       <FloatingSelectWithIcon
                                         icon={getStatusIcon(defect.status)}
                                         value={defect.status}
@@ -3984,9 +4185,20 @@ const ShoreDashboard = () => {
                                         setTimeout(() => {
                                           scrollRowBelowHeader(defect.id);
                                         }, 50);
+
+                                        // Per-user "seen" marker only — doesn't affect other users' badges.
+                                        queryClient.setQueryData(['defects', 'global-list'], (old) => {
+                                          const list = Array.isArray(old) ? old : old?.items ?? old?.data ?? [];
+                                          if (!Array.isArray(list)) return old;
+                                          return list.map((d) =>
+                                            d.id === defect.id ? { ...d, has_thread_messages: false } : d
+                                          );
+                                        });
+                                        defectApi.markThreadRead(defect.id).catch(() => {});
                                       }
                                     }}
                                     style={{
+                                      position: 'relative',
                                       background: 'transparent',
                                       border: 'none',
                                       cursor: 'pointer',
@@ -3997,6 +4209,21 @@ const ShoreDashboard = () => {
                                       size={20}
                                       color={expandedId === defect.id ? '#ea580c' : '#545454'}
                                     />
+                                    {defect.has_thread_messages && (
+                                      <span
+                                        title="This discussion has messages"
+                                        style={{
+                                          position: 'absolute',
+                                          top: 2,
+                                          right: 2,
+                                          width: 8,
+                                          height: 8,
+                                          borderRadius: '50%',
+                                          background: '#ef4444',
+                                          border: '1.5px solid #fff'
+                                        }}
+                                      />
+                                    )}
                                   </button>
                                 </td>
                               )

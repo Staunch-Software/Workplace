@@ -89,6 +89,16 @@ class DefectCloseRequest(BaseModel):
 class ShoreCloseRequest(BaseModel):
     closure_remarks: str
 
+# ─── Reopen Defect (Shore / Admin only) ───────────────────────────────────────
+class ReopenDefectRequest(BaseModel):
+    """
+    Payload for PATCH /{defect_id}/reopen.
+    Shore/Admin only — vessel users are rejected at the endpoint layer.
+    reason is optional.
+    """
+    reason: str = Field(default="", description="Optional reason for reopening the defect")
+
+
 # ✅ Defect Response Schema
 class DefectResponse(BaseModel):
     id: UUID
@@ -113,6 +123,7 @@ class DefectResponse(BaseModel):
     is_owner: bool = False
     is_flagged: bool = False
     is_dd: bool = False
+    has_thread_messages: bool = False
     defect_number: Optional[str] = None
     # Other fields
     responsibility: Optional[str] = None

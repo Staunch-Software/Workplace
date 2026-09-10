@@ -321,3 +321,44 @@ async def feed_mention(
             "snippet": snippet,
         },
     )
+
+
+# ─── Reopen Defect (Shore / Admin only) ──────────────────────────────────────
+
+async def feed_defect_reopened(
+    db: AsyncSession,
+    control_db: AsyncSession,
+    defect: Defect,
+    reason: Optional[str] = None,
+    actor_id: Optional[uuid.UUID] = None,
+) -> None:
+    """
+    Writes a DEFECT_REOPENED live-feed entry.
+    Called only from the shore reopen endpoint — vessel never triggers this.
+    The reason is truncated to 80 chars in the feed message for readability;
+    the full reason is stored in the system thread body.
+    """
+    vessel_name = await _get_vessel_name(control_db, defect.vessel_imo)
+    actor_name  = await _get_actor_name(control_db, actor_id)
+    actor_role  = await _get_actor_role(control_db, actor_id)
+
+    if reason:
+        reason_snippet = reason[:80] + ("…" if len(reason) > 80 else "")
+        message = f"Defect was reopened by {actor_name}. Reason: {reason_snippet}"
+    else:
+        message = f"Defect was reopened by {actor_name}."
+
+    await _write(
+        db,
+        defect=defect,
+        event_type=FeedEventType.DEFECT_OPENED,
+        title=f"Defect Reopened - {defect.title}",
+        message=message,
+        user_id=actor_id,
+        vessel_name=vessel_name,
+        triggered_by_role=actor_role,
+        extra_meta={
+            "reason": reason,
+            "previous_status": "CLOSED",
+        },
+    )

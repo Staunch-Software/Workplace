@@ -46,6 +46,7 @@ const ThreadSection = ({ defectId, defectStatus }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [mentionList, setMentionList] = useState([]);
   const [showMentions, setShowMentions] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [taggedUsers, setTaggedUsers] = useState([]);
   const [cursorPosition, setCursorPosition] = useState(0);
 
@@ -91,11 +92,31 @@ const ThreadSection = ({ defectId, defectStatus }) => {
           u.name.toLowerCase().includes(searchTerm.toLowerCase())
         );
         setMentionList(filtered);
+        setHighlightedIndex(0);
         setShowMentions(filtered.length > 0);
         return;
       }
     }
     setShowMentions(false);
+  };
+
+  // Keyboard navigation for the @mention dropdown
+  const handleEditorKeyDown = (e) => {
+    if (!showMentions || mentionList.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex(i => (i + 1) % mentionList.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex(i => (i - 1 + mentionList.length) % mentionList.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      selectMention(mentionList[highlightedIndex]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setShowMentions(false);
+    }
   };
 
   // Select a user from mention dropdown — inserts a blue, non-editable @Name chip
@@ -360,7 +381,11 @@ const ThreadSection = ({ defectId, defectStatus }) => {
             contentEditable={!isUploading}
             suppressContentEditableWarning
             onInput={handleEditorInput}
-            onKeyUp={handleEditorInput}
+            onKeyUp={(e) => {
+              if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key) && showMentions) return;
+              handleEditorInput();
+            }}
+            onKeyDown={handleEditorKeyDown}
             onClick={handleEditorInput}
             data-placeholder="Type a reply (use @ to mention)..."
             style={{
@@ -407,23 +432,23 @@ const ThreadSection = ({ defectId, defectStatus }) => {
               zIndex: 1000, 
               minWidth: '200px' 
             }}>
-              {mentionList.map(u => (
+              {mentionList.map((u, index) => (
                 <div
                   key={u.id}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => selectMention(u)}
+                  onMouseEnter={() => setHighlightedIndex(index)}
                   style={{
-                    padding: '10px', 
-                    cursor: 'pointer', 
-                    fontSize: '13px', 
+                    padding: '10px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
                     borderBottom: '1px solid #f1f5f9',
                     transition: 'background 0.2s',
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    background: index === highlightedIndex ? '#f8fafc' : 'white'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                 >
                   <span>{u.name}</span>
                   {u.role === 'shore' && (

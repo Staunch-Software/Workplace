@@ -41,9 +41,9 @@ MONITORED_METRICS = [
     "compression_pressure_bar",
     "scav_air_pressure_kg_cm2",
     "turbocharger_speed_x1000_rpm",
-    "engine_speed_rpm",           # Added
+    # "engine_speed_rpm",         # REMOVED per revised threshold sheet (2026-09) — commented, not deleted
     "sfoc_g_kwh",                 # Added
-    "engine_speed_rpm",           # Added
+    # "engine_speed_rpm",         # REMOVED per revised threshold sheet (2026-09) — commented, not deleted
     "sfoc_g_kwh",                 # Added
     "exh_temp_tc_inlet_c",
     "exh_temp_tc_outlet_c",
@@ -60,26 +60,39 @@ UNIDIRECTIONAL_DETERIORATION_METRICS = [
     "sfoc_g_kwh"
 ]
 
+# REVISED (2026-09): Pmax/Pcomp/Scav Air Pressure now only alert on a DROP —
+# a rise is treated as fully normal. dev_val becomes the drop magnitude (positive
+# number) when the metric has fallen below baseline, else 0.
+UNIDIRECTIONAL_DROP_METRICS = [
+    "max_combustion_pressure_bar",
+    "compression_pressure_bar",
+    "scav_air_pressure_kg_cm2",
+]
+
 ALERT_THRESHOLDS = {
-    # Group A: Strict Percentage (Amber @ 3%, Red @ 5%)
-    "max_combustion_pressure_bar": {"normal": 3.0, "warning": 5.0, "type": "%"},
-    "compression_pressure_bar": {"normal": 3.0, "warning": 5.0, "type": "%"},
-    "engine_speed_rpm": {"normal": 3.0, "warning": 5.0, "type": "%"},
-    
-    # Group B: Standard Percentage (Amber @ 5%, Red @ 10%)
-    "scav_air_pressure_kg_cm2": {"normal": 5.0, "warning": 10.0, "type": "%"},
+    # Group A (REVISED): One-sided drop only — Amber @ -4%, Red @ -7%
+    "max_combustion_pressure_bar": {"normal": 4.0, "warning": 7.0, "type": "%"},
+    "compression_pressure_bar": {"normal": 4.0, "warning": 7.0, "type": "%"},
+
+    # Engine Speed threshold REMOVED per revised threshold sheet (2026-09).
+    # Kept here commented out (not deleted) in case it's needed again later.
+    # "engine_speed_rpm": {"normal": 3.0, "warning": 5.0, "type": "%"},
+
+    # Group B (REVISED): Scav Air Pressure now one-sided drop only — Amber @ -10%, Red @ -15%
+    "scav_air_pressure_kg_cm2": {"normal": 10.0, "warning": 15.0, "type": "%"},
     "sfoc_g_kwh": {"normal": 5.0, "warning": 10.0, "type": "%"},
-    "fuel_inj_pump_index_mm": {"normal": 5.0, "warning": 10.0, "type": "%"},
+    # FIPI (REVISED): Amber @ 5%, Red tightened from 10% to 7%
+    "fuel_inj_pump_index_mm": {"normal": 5.0, "warning": 7.0, "type": "%"},
     "fuel_consumption_total_kg_h": {"normal": 5.0, "warning": 10.0, "type": "%"},
 
-    # Absolute Deviations (Degrees Celsius) - Amber @ 40°C, Red @ 60°C
-    "exh_temp_tc_inlet_c": {"normal": 40.0, "warning": 60.0, "type": "abs"},
-    "exh_temp_tc_outlet_c": {"normal": 40.0, "warning": 60.0, "type": "abs"},
-    "cyl_exhaust_gas_temp_outlet_c": {"normal": 40.0, "warning": 60.0, "type": "abs"},
+    # Absolute Deviations (Degrees Celsius) (REVISED) - Amber @ 50°C, Red @ 90°C
+    "exh_temp_tc_inlet_c": {"normal": 50.0, "warning": 90.0, "type": "abs"},
+    "exh_temp_tc_outlet_c": {"normal": 50.0, "warning": 90.0, "type": "abs"},
+    "cyl_exhaust_gas_temp_outlet_c": {"normal": 50.0, "warning": 90.0, "type": "abs"},
 
-    # Absolute Deviation (RPM) - Amber @ 500 (0.5), Red @ 1000 (1.0)
-    # Backend uses x1000 units, so 0.5 = 500 RPM
-    "turbocharger_speed_x1000_rpm": {"normal": 0.5, "warning": 1.0, "type": "abs"},
+    # Absolute Deviation (RPM) (REVISED) - Amber @ 750 (0.75), Red @ 1250 (1.25)
+    # Backend uses x1000 units, so 0.75 = 750 RPM
+    "turbocharger_speed_x1000_rpm": {"normal": 0.75, "warning": 1.25, "type": "abs"},
 }
 
 PARAMETER_INTERVALS = {
@@ -287,6 +300,9 @@ async def process_me_alerts(db: AsyncSession, report_id: int, baseline_data: Lis
                     # Handle metrics where only an increase is 'bad' (SFOC, Temps, Fuel)
                     if metric in UNIDIRECTIONAL_DETERIORATION_METRICS:
                         dev_val = current_pct if current_pct > 0 else 0.0
+                    # REVISED (2026-09): Pmax/Pcomp/Scav Air Pressure — only a DROP is 'bad'
+                    elif metric in UNIDIRECTIONAL_DROP_METRICS:
+                        dev_val = -current_pct if current_pct < 0 else 0.0
                     else:
                         dev_val = abs(current_pct)
                 else:

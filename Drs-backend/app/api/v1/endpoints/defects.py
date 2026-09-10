@@ -18,6 +18,7 @@
 #   ✅ GET  /{defect_id}              — single defect
 #   ✅ PATCH /{defect_id}             — update defect (status machine via service)
 #   ✅ PATCH /{defect_id}/shore-close — shore direct closure (50 char remarks)
+#   ✅ PATCH /{defect_id}/reopen      — shore reopen closed defect (role-gated, system thread, feed, notify)
 #   ✅ PATCH /{defect_id}/close       — legacy close with evidence
 #   ✅ DELETE /{defect_id}            — soft delete
 #   ✅ POST /threads                  — create thread (is_internal, @mention filter)
@@ -56,7 +57,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from sqlalchemy import insert
+from sqlalchemy import insert, func
 import logging
 import io
 import xlsxwriter
@@ -80,6 +81,7 @@ from app.schemas.defect import (
     AttachmentBase,
     DefectCloseRequest,
     ShoreCloseRequest,
+    ReopenDefectRequest,
     VesselUserResponse,
     PrEntryCreate,
     PrEntryResponse,
@@ -104,6 +106,7 @@ from app.services.notification_service import (
 from app.services.live_feed_service import (
     feed_defect_opened,
     feed_defect_closed,
+    feed_defect_reopened,
     feed_priority_changed,
     feed_image_uploaded,
     feed_pic_mandatory_changed,
@@ -757,12 +760,39 @@ async def get_defects(
     )
     flagged_ids = {row[0] for row in flag_result.all()}
 
+    # Latest real (non-system) message time per defect — compared per-defect
+    # below against this user's own thread_read_state to decide "unread".
+    thread_result = await db.execute(
+        select(Thread.defect_id, func.max(Thread.created_at)).where(
+            Thread.defect_id.in_([d.id for d in defects]),
+            Thread.is_system_message == False,
+        ).group_by(Thread.defect_id)
+    )
+    latest_message_at = {row[0]: row[1] for row in thread_result.all()}
+    current_user_key = str(current_user.id)
+
     for defect in defects:
         # Use __dict__ to avoid mutating the ORM collection (prevents SQLAlchemy
         # from nullifying defect_id on removed items at session flush)
         defect.__dict__['pr_entries'] = [pr for pr in defect.pr_entries if not pr.is_deleted]
         defect.vessel_name = vessel_map.get(defect.vessel_imo, defect.vessel_imo)
         defect.__dict__['is_flagged'] = defect.id in flagged_ids
+
+        last_message_at = latest_message_at.get(defect.id)
+        read_state = defect.thread_read_state or {}
+        # "_baseline" is a one-time backfill marker (not a real user id) meaning
+        # "everyone without their own entry is caught up as of this timestamp" —
+        # set once via SQL when this feature ships, so pre-existing messages
+        # don't all show as unread on day one. A user's own entry overrides it.
+        candidates = [
+            datetime.fromisoformat(raw)
+            for key in (current_user_key, "_baseline")
+            if (raw := read_state.get(key))
+        ]
+        last_read_at = max(candidates) if candidates else None
+        defect.__dict__['has_thread_messages'] = bool(
+            last_message_at and (not last_read_at or last_message_at > last_read_at)
+        )
 
     return defects
 
@@ -2520,6 +2550,76 @@ async def shore_close_defect(
 
 
 # =============================================================================
+# REOPEN DEFECT  (Shore / Admin only)
+# =============================================================================
+@router.patch("/{defect_id}/reopen", response_model=DefectResponse)
+async def reopen_defect(
+    defect_id: UUID,
+    reopen_data: ReopenDefectRequest,
+    db: AsyncSession = Depends(get_db),
+    control_db: AsyncSession = Depends(get_control_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Reopen a CLOSED defect — Shore / Admin only.
+
+    - Vessel users receive HTTP 403.
+    - Defect must be in CLOSED status; any other status returns HTTP 400.
+    - `reason` is mandatory (min 10 chars) and is stored in a SYSTEM thread
+      so the full audit trail (who, when, why) is visible in the defect
+      thread panel on both shore and vessel dashboards.
+    - A DEFECT_REOPENED live-feed entry is written (non-fatal).
+    - Notifications are sent to all vessel + shore users linked to the vessel
+      (excluding the actor who performed the reopen).
+    - NO SyncQueue write — this is a shore-only operation; vessel picks up
+      the status change on next sync.
+    """
+    # ── Role guard: Shore / Admin only ───────────────────────────────────────
+    if current_user.role not in [UserRole.SHORE, UserRole.ADMIN]:
+        raise HTTPException(
+            status_code=403,
+            detail="Only Shore or Admin users can reopen a defect.",
+        )
+
+    try:
+        defect = await DefectService.reopen_defect(
+            db=db,
+            control_db=control_db,
+            defect_id=defect_id,
+            reason=reopen_data.reason,
+            user=current_user,
+        )
+
+        if defect is None:
+            raise HTTPException(status_code=404, detail="Defect not found")
+
+        # Live feed (non-fatal — defect is already reopened at this point)
+        try:
+            await feed_defect_reopened(
+                db=db,
+                control_db=control_db,
+                defect=defect,
+                reason=reopen_data.reason,
+                actor_id=current_user.id,
+            )
+            await db.commit()
+        except Exception as feed_err:
+            logger.error(f"[reopen_defect] Live feed error (non-fatal): {feed_err}")
+
+        return defect
+
+    except HTTPException:
+        raise
+    except ValueError as ve:
+        # Raised by service when status is not CLOSED
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"[reopen_defect] Unexpected error: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
 # CLOSE DEFECT (Legacy endpoint — close with evidence images)
 # =============================================================================
 @router.patch("/{defect_id}/close", response_model=DefectResponse)
@@ -2773,6 +2873,28 @@ async def get_defect_threads(
     except Exception as e:
         logger.error(f"❌ Error fetching threads: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{defect_id}/threads/mark-read")
+async def mark_defect_thread_read(
+    defect_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Record that current_user has viewed this defect's discussion "now".
+    Per-user — does not affect any other user's unread state for this defect.
+    """
+    defect = await db.get(Defect, defect_id)
+    if not defect:
+        raise HTTPException(status_code=404, detail="Defect not found")
+
+    read_state = dict(defect.thread_read_state or {})
+    read_state[str(current_user.id)] = datetime.now(timezone.utc).isoformat()
+    defect.thread_read_state = read_state
+
+    await db.commit()
+    return {"ok": True}
 
 
 # =============================================================================

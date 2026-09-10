@@ -633,10 +633,106 @@ class DefectService:
         return defect
 
     # =========================================================================
-    # 5. CREATE THREAD
+    # 5. REOPEN DEFECT  (Shore / Admin only — vessel never calls this)
+    # =========================================================================
+    @staticmethod
+    async def reopen_defect(
+        db: AsyncSession,
+        control_db: AsyncSession,
+        defect_id: UUID,
+        reason: str,
+        user,
+    ) -> Optional[Defect]:
+        """
+        Reopens a CLOSED defect back to OPEN status.
+
+        Shore/Admin guard:
+            The caller (endpoint) already enforces role == SHORE|ADMIN.
+            This method trusts that check — it does NOT write to SyncQueue
+            because reopening is a shore-only action and the vessel has no
+            concept of initiating a reopen.
+
+        What this does:
+            1. Load defect (404 if missing / soft-deleted)
+            2. Guard: defect must be CLOSED (400 otherwise)
+            3. Set status → OPEN, clear closure fields, bump version
+            4. Insert a SYSTEM thread (is_system_message=True, origin=SHORE)
+               — body contains who reopened + full reason (audit trail)
+            5. Commit atomically
+            6. Send notifications to all vessel+shore users (non-blocking)
+        """
+        defect = await db.get(Defect, defect_id)
+        if not defect or defect.is_deleted:
+            return None
+
+        # Guard: can only reopen a CLOSED defect
+        if defect.status != DefectStatus.CLOSED:
+            raise ValueError(
+                f"Defect is currently '{defect.status.value}' — only CLOSED defects can be reopened."
+            )
+
+        # ── Reopen ───────────────────────────────────────────────────────────
+        defect.status         = DefectStatus.OPEN
+        defect.closed_at      = None
+        defect.closed_by_id   = None
+        defect.closure_remarks = None
+        defect.version        = (defect.version or 0) + 1
+        defect.updated_at     = datetime.now(timezone.utc)
+
+        # ── System thread (audit trail: who, when, why) ───────────────────────
+        reopen_thread = Thread(
+            id=uuid.uuid4(),
+            defect_id=defect.id,
+            user_id=user.id,
+            author_role="SYSTEM",
+            is_system_message=True,
+            origin="SHORE",   # shore-only action — vessel never writes this
+            body=(
+                f"Defect REOPENED by {user.full_name} ({user.role})." +
+                (f" Reason: {reason}" if reason and reason.strip() else "")
+            ),
+            tagged_user_ids=[],
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(reopen_thread)
+
+        # NOTE: No _should_sync() block here — this is a shore-only operation.
+        # Vessel picks up the status change when it syncs from shore next time.
+
+        await db.commit()
+        await db.refresh(defect, attribute_names=["pr_entries"])
+
+        # ── Notifications (non-blocking, separate commit) ─────────────────────
+        try:
+            from sqlalchemy.future import select as sa_select
+            vessel_result = await control_db.execute(
+                sa_select(Vessel).where(Vessel.imo == defect.vessel_imo)
+            )
+            vessel = vessel_result.scalars().first()
+            vessel_name = vessel.name if vessel else defect.vessel_imo
+
+            await notify_vessel_users(
+                db=db,
+                control_db=control_db,
+                vessel_imo=defect.vessel_imo,
+                vessel_name=vessel_name,
+                title="Defect Reopened",
+                message=f"Defect '{defect.title}' was reopened by {user.full_name}. Reason: {reason[:80]}",
+                exclude_user_id=user.id,
+                defect_id=str(defect.id),
+            )
+            await db.commit()
+        except Exception as e:
+            logger.error(f"[DefectService] Reopen notification failed (defect still reopened): {e}")
+
+        return defect
+
+    # =========================================================================
+    # 6. CREATE THREAD
     # =========================================================================
     @staticmethod
     async def create_thread(db: AsyncSession, defect_id: UUID, thread_in, user) -> Thread:
+
         """
         Creates a thread/comment on a defect.
         Sends @mention tasks to tagged users.

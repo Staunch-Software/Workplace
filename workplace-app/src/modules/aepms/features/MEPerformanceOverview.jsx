@@ -84,7 +84,7 @@ const getParamUnit = (paramName) => {
 };
 
 const STANDARD_PARAMS = [
-  { key: "engspeed", label: "Engine Speed" },
+  // { key: "engspeed", label: "Engine Speed" }, // REMOVED per revised threshold sheet (2026-09) — commented, not deleted
   { key: "turbospeed", label: "Turbo Speed" },
   { key: "fipi", label: "Fuel Pump Index" },
   { key: "pmax", label: "Pmax" },
@@ -640,23 +640,24 @@ const getParamStatus = (paramName, deviationPct, absoluteDiff, value) => {
   const absValue = Math.abs(value); // Raw value or pre-calculated deviation
 
   if (p.includes("turbo") || p.includes("turbospeed")) {
-    if (absDelta >= 1000) return "Critical";
-    if (absDelta >= 500) return "Warning";
+    // REVISED (2026-09): Amber @ 750 RPM, Red @ 1250 RPM (was 500 / 1000)
+    if (absDelta >= 1250) return "Critical";
+    if (absDelta >= 750) return "Warning";
     return "Normal";
   }
-  // 1. Power Margin Logic (Red > 5, Amber 0 to 5, Green < 0)
+  // 1. Power Margin Logic (REVISED 2026-09: Red > 10, Amber 5 to 10, Green < 5 — was Red > 5, Amber 0 to 5, Green < 0)
   if (p.includes("propeller") || p.includes("powermargin")) {
-    if (value > 5.0) return "Critical";
-    if (value >= 0.0) return "Warning";
+    if (deviationPct > 10.0) return "Critical";
+    if (deviationPct >= 5.0) return "Warning";
     return "Normal";
   }
 
-  // 2. NEW: Exhaust Temperature Logic (Amber: 40°C, Red: 60°C absolute difference)
+  // 2. Exhaust Temperature Logic (REVISED 2026-09: Amber: 50°C, Red: 90°C absolute difference — was 40°C / 60°C)
   // We check this before the percentage groups to ensure absolute limits take priority
   const exhaustKeys = ["exh", "temp", "cyl", "inlet", "outlet"];
   if (exhaustKeys.some((key) => p.includes(key))) {
-    if (absDelta > 60) return "Critical";
-    if (absDelta >= 40) return "Warning";
+    if (absDelta > 90) return "Critical";
+    if (absDelta >= 50) return "Warning";
     return "Normal";
   }
 
@@ -668,20 +669,46 @@ const getParamStatus = (paramName, deviationPct, absoluteDiff, value) => {
   //     return "Normal";
   // }
 
-  // 4. Group A: 5% Red / 3% Amber (Pressures, Speeds, RPM)
-  const groupA = ["pmax", "pcomp", "engspeed", "rpm"];
+  // 4a. Pmax / Pcomp (REVISED 2026-09): now ONE-SIDED — only a drop below baseline is 'bad'.
+  //     >= -4% is Normal (green, includes any rise), -4% to -7% is Warning, < -7% is Critical.
+  if (p.includes("pmax") || p.includes("pcomp")) {
+    if (deviationPct < -7.0) return "Critical";
+    if (deviationPct < -4.0) return "Warning";
+    return "Normal";
+  }
+
+  // 4b. Remaining Group A (RPM-type params other than Turbo/Pmax/Pcomp): 5% Red / 3% Amber
+  // "engspeed" REMOVED per revised threshold sheet (2026-09) — commented, not deleted, for future use
+  const groupA = [/* "engspeed", */ "rpm"];
   if (groupA.some((key) => p.includes(key))) {
     if (absDev > 5.0) return "Critical";
     if (absDev >= 3.0) return "Warning";
     return "Normal";
   }
 
-  // 5. Group B: 10% Red / 5% Amber (SFOC, FOC, FIPI/Fuel Index, Scavenge Air)
-  // (Note: Exhaust strings removed here as they are handled in the absolute logic above)
-  const groupB = ["sfoc", "foc", "fipi", "fuelindex", "scav", "scavair"];
-  if (groupB.some((key) => p.includes(key))) {
-    if (absDev > 10.0) return "Critical";
+  // 5. FIPI (REVISED 2026-09): Amber @ 5%, Red tightened from 10% to 7%
+  if (p.includes("fipi") || p.includes("fuelindex")) {
+    if (absDev > 7.0) return "Critical";
     if (absDev >= 5.0) return "Warning";
+    return "Normal";
+  }
+
+  // 6. Group B: SFOC / FOC (REVISED 2026-09) — now RISE-ONLY. The revised sheet
+  //    dropped the '+/-' (old: green < +/-5%, amber +/-5 to +/-10%, red > +/-10%),
+  //    so only burning MORE fuel than baseline is a fault. Amber 5% to 10%, red
+  //    > 10%; anything below +5% — including an efficiency improvement — is green.
+  const groupB = ["sfoc", "foc"];
+  if (groupB.some((key) => p.includes(key))) {
+    if (deviationPct > 10.0) return "Critical";
+    if (deviationPct >= 5.0) return "Warning";
+    return "Normal";
+  }
+
+  // 7. Scavenge Air Pressure (REVISED 2026-09): now ONE-SIDED — only a drop below baseline is 'bad'.
+  //    >= -10% is Normal (green, includes any rise), -10% to -15% is Warning, < -15% is Critical.
+  if (p.includes("scav") || p.includes("scavair")) {
+    if (deviationPct < -15.0) return "Critical";
+    if (deviationPct < -10.0) return "Warning";
     return "Normal";
   }
 
@@ -1302,11 +1329,34 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
         const response = await axiosAepms.getMEAlertHistory(imo, 60);
         let reports = response.history || response.data || [];
 
+        // Fetch the live baseline curve and recompute deviations the same way
+        // the Performance Summary / row-level tables do (getInterpolatedBaseline),
+        // instead of trusting the backend's stored historical *_dev fields — those
+        // can go stale relative to the current baseline and disagree with the UI.
+        let dynamicBaseline = {};
+        try {
+          const baselineRes = await axiosAepms.getMEBaselineReference(imo);
+          const rawBaseline = baselineRes.baseline_data || [];
+          STANDARD_PARAMS.forEach((param) => {
+            const key = param.key;
+            const points = rawBaseline
+              .filter((p) => p[key] !== null && p[key] !== undefined)
+              .map((p) => ({
+                load: Number(p.load_percentage),
+                value: Number(p[key]),
+              }))
+              .sort((a, b) => a.load - b.load);
+            if (points.length > 0) dynamicBaseline[key] = points;
+          });
+        } catch (e) {
+          console.warn("Could not fetch baseline for alert history", e);
+        }
+
         const processedReports = reports.map((r) => {
           let counts = { Critical: 0, Warning: 0, Normal: 0 };
 
           const checkMap = [
-            { key: "engspeed", histKey: "engine_rpm" },
+            // { key: "engspeed", histKey: "engine_rpm" }, // REMOVED per revised threshold sheet (2026-09) — commented, not deleted
             { key: "turbospeed", histKey: "turbo_rpm" },
             { key: "fipi", histKey: "fuel_index" },
             { key: "pmax", histKey: "pmax" },
@@ -1320,19 +1370,30 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
             { key: "propeller", histKey: "propeller_margin" },
           ];
 
+          const currentLoad = Number(r.load_percentage);
+
           checkMap.forEach((item) => {
             const actual = r[`${item.histKey}_actual`];
-            const dev = r[`${item.histKey}_dev`];
 
             let s = "Normal";
             if (actual !== null && actual !== undefined) {
-              let baseline = actual - (dev || 0);
-              if (item.key === "propeller") baseline = 100;
-              let devPct = 0;
-              if (baseline !== 0) devPct = (dev / baseline) * 100;
+              const actualNum = Number(actual);
+              const baseline = getInterpolatedBaseline(
+                dynamicBaseline,
+                item.key,
+                currentLoad,
+              );
 
-              // Determine status for this specific parameter
-              s = getParamStatus(item.key, devPct, dev, actual);
+              let diff = 0;
+              let devPct = 0;
+              if (baseline !== null && baseline !== 0) {
+                diff = actualNum - baseline;
+                devPct = (diff / baseline) * 100;
+              }
+
+              // Determine status for this specific parameter — same call
+              // shape as the Performance Summary / detail tables use.
+              s = getParamStatus(item.key, devPct, diff, actualNum);
 
               if (counts[s] !== undefined) counts[s]++;
               else counts["Normal"]++;
@@ -1579,6 +1640,11 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
         // We calculate the display value as 100 + deviation
         const displayActual = 100.0 + actual;
 
+        const propStatus = getParamStatus(param.key, devPct, diff, actual);
+        let propColor = "green";
+        if (propStatus === "Critical") propColor = "red";
+        else if (propStatus === "Warning") propColor = "yellow";
+
         return {
           parameter: param.label,
           unit: getParamUnit(param.label),
@@ -1586,7 +1652,7 @@ export default function MEPerformanceOverview({ embeddedMode = false }) {
           actual: displayActual, // This will now show 100.57
           diff: diff, // This will now show +0.57
           devPct: devPct, // This will now show +0.6%
-          color: actual > 5.0 ? "red" : actual > 0 ? "yellow" : "green",
+          color: propColor,
         };
       }
 

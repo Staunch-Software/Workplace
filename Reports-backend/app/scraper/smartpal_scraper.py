@@ -32,6 +32,44 @@ from app.models.report import Report, ScrapeStatus, VerifyStatus, ReportConfig, 
 
 logger = logging.getLogger("scraper")
 
+# SmartPAL loads the Attachments tab's file list asynchronously after the
+# tab click -- Knockout renders either the real row list or the genuine
+# "No Attachments Found" empty state only once that call resolves. Waiting
+# on this selector (instead of a fixed sleep) means we only ever read the
+# DOM once one of those two states has actually appeared.
+_ATTACHMENT_READY_SELECTOR = (
+    "#Attachments .attachment-grid table tbody tr, "
+    "#Attachments .no-attachment, "
+    "#Attachments .k-grid tbody tr, "
+    "#Attachments table.rgMasterTable tr.rgRow, "
+    "#Attachments .rgMasterTable tr.rgRow"
+)
+
+
+async def _click_attachments_tab_and_wait(page, timeout: int = 15000):
+    """Click the Attachments tab and wait for it to actually finish loading.
+
+    Replaces the old fixed `wait_for_timeout(3000)` pattern, which raced
+    SmartPAL's async attachment-list fetch: on a slow response the scraper
+    would read the DOM before either the file list or the empty state had
+    rendered, silently recording 0 attachments on jobs that genuinely had
+    files attached.
+    """
+    await page.evaluate('''() => {
+        const tab = document.querySelector('a[href="#Attachments"]');
+        if (tab) tab.click();
+        else {
+            const links = Array.from(document.querySelectorAll("a, span, div"));
+            const fallback = links.find(el => el.innerText && (el.innerText.includes("Attachments") || el.innerText.includes("Files") || el.innerText.includes("Documents")));
+            if (fallback) fallback.click();
+        }
+    }''')
+    try:
+        await page.wait_for_selector(_ATTACHMENT_READY_SELECTOR, timeout=timeout)
+    except PlaywrightTimeout:
+        logger.warning(f"Attachments panel did not signal ready within {timeout}ms -- proceeding anyway (may miss attachments).")
+        await page.wait_for_timeout(1500)
+
 
 # ---------------------------------------------------------------------------
 # Main Scraper Entry Point
@@ -658,11 +696,167 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                         next_due_date = pend_details.get("due_date")
                     found_pending = True
                     
-                    # If this pending row exactly matches our target due date, then the cycle is truly still pending. Fast exit.
+                    # If this pending row exactly matches our target due date, then the cycle is truly still pending. Fast exit but FIRST SCRAPE ATTACHMENTS!
                     if target_due_date and row_due_date and row_due_date.date() == target_due_date.date():
-                        logger.info(f"Smart Scrape: Target cycle {target_due_date.date()} is still PENDING. Fast exiting.")
+                        logger.info(f"Smart Scrape: Target cycle {target_due_date.date()} is still PENDING. Extracting pending attachments before exit...")
+                        
+                        # We must click into the pending job (which opens a popup from the main Job Plan grid)
+                        # The pending jobs are NOT in the History tab, they are right here in the Job Plan.
+                        async with context.expect_page() as pending_page_info:
+                            await cells[idx_no].locator("a").click(force=True)
+                        pending_details_page = await pending_page_info.value
+                        
+                        try:
+                            await pending_details_page.wait_for_load_state("domcontentloaded", timeout=30000)
+                        except:
+                            pass
+                        await pending_details_page.wait_for_timeout(3000)
+                        
+                        # Click Attachments tab in pending job
+                        await _click_attachments_tab_and_wait(pending_details_page)
+
+                        # Fallback dump for diagnostics
+                        html_content = await pending_details_page.content()
+                        with open(f"attachments_dump_pending_{vessel_imo}.html", "w", encoding="utf-8") as f:
+                            f.write(html_content)
+                            
+                        # Use same logic to count rows
+                        row_count = await pending_details_page.evaluate('''() => {
+                            const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid, table.rgMasterTable"));
+                            const visibleGrid = grids.find(g => g && g.offsetWidth > 0);
+                            if (!visibleGrid) return 0;
+                            return visibleGrid.querySelectorAll("tbody tr").length;
+                        }''')
+                        
+                        pdf_files = []
+                        seen_urls = set()
+                        
+                        row_names = await pending_details_page.evaluate('''() => {
+                            const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid, table.rgMasterTable"));
+                            const visibleGrid = grids.find(g => g && g.offsetWidth > 0);
+                            if (!visibleGrid) return [];
+                            return Array.from(visibleGrid.querySelectorAll("tbody tr")).map(r => {
+                                const cells = r.querySelectorAll("td");
+                                if (cells.length >= 2) {
+                                    const link = cells[1].querySelector("a");
+                                    if (link) return link.innerText.trim();
+                                    return cells[1].innerText.trim().split("\\n")[0].trim();
+                                }
+                                return r.innerText.trim().split("\\n")[0].trim();
+                            });
+                        }''')
+                        
+                        if row_count > 0:
+                            for row_idx in range(row_count):
+                                captured_url = None
+                                captured_fname = row_names[row_idx] if row_idx < len(row_names) else ""
+                                
+                                async def pending_handle_request(request):
+                                    nonlocal captured_url
+                                    url = request.url
+                                    if any(kw in url for kw in ["GetViewAttachment", "Attachment", "attachment", "GetFile", "Download", "download", "DocumentDownloader"]):
+                                        if url.startswith("http") and url not in seen_urls:
+                                            captured_url = url
+                                
+                                pending_details_page.context.on("request", pending_handle_request)
+                                
+                                try:
+                                    async with pending_details_page.expect_download(timeout=3000) as download_info:
+                                        await pending_details_page.evaluate(f'''(idx) => {{
+                                            const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid, table.rgMasterTable"));
+                                            const visibleGrid = grids.find(g => g && g.offsetWidth > 0);
+                                            if (visibleGrid) {{
+                                                const rows = visibleGrid.querySelectorAll("tbody tr");
+                                                if (rows[idx]) {{
+                                                    const clickables = Array.from(rows[idx].querySelectorAll('a, button'));
+                                                    let dl = clickables.find(a => 
+                                                        (a.innerText && a.innerText.toLowerCase().includes('download')) || 
+                                                        (a.title && a.title.toLowerCase().includes('download')) ||
+                                                        (a.className && typeof a.className === 'string' && a.className.toLowerCase().includes('download')) ||
+                                                        (a.querySelector && a.querySelector('[class*="download"]'))
+                                                    );
+                                                    if (dl) dl.click();
+                                                    else if (clickables.length > 0) clickables[0].click();
+                                                }}
+                                            }}
+                                        }}''', row_idx)
+                                    download = await download_info.value
+                                    if not captured_url: captured_url = download.url
+                                except:
+                                    pass
+                                
+                                await pending_details_page.wait_for_timeout(1500)
+                                pending_details_page.context.remove_listener("request", pending_handle_request)
+                                
+                                try:
+                                    await pending_details_page.evaluate('''() => {
+                                        const closeBtns = document.querySelectorAll(".k-window-action .k-i-close, .ui-dialog-titlebar-close, [aria-label='Close'], button.close");
+                                        closeBtns.forEach(b => { if (b.offsetWidth > 0 || b.offsetHeight > 0) b.click(); });
+                                    }''')
+                                    await pending_details_page.keyboard.press("Escape")
+                                    await pending_details_page.wait_for_timeout(500)
+                                except:
+                                    pass
+                                    
+                                if captured_url and captured_url not in seen_urls:
+                                    seen_urls.add(captured_url)
+                                    fname = captured_fname or f"attachment_{row_idx+1}"
+                                    pdf_files.append({"url": captured_url, "filename": fname})
+                                else:
+                                    iframe_src = await pending_details_page.evaluate('''() => {
+                                        let iframe = document.querySelector('iframe[src*="GetViewAttachment"]')
+                                                  || document.querySelector('iframe[src*="Attachment"]')
+                                                  || document.querySelector('iframe[src*="blob"]')
+                                                  || document.querySelector('iframe[src*="pdf"]');
+                                        if (!iframe) {
+                                            const all = Array.from(document.querySelectorAll("iframe"));
+                                            iframe = all.find(f => f.src && f.src.startsWith("http"));
+                                        }
+                                        return iframe ? iframe.src : null;
+                                    }''')
+                                    if iframe_src and iframe_src not in seen_urls:
+                                        seen_urls.add(iframe_src)
+                                        fname = captured_fname or f"attachment_{row_idx+1}"
+                                        pdf_files.append({"url": iframe_src, "filename": fname})
+                                    else:
+                                        fname = captured_fname or f"attachment_{row_idx+1}"
+                                        pdf_files.append({"url": "MISSING", "filename": fname})
+                                        
+                        # Download attachments logic
+                        attachments = []
+                        if pdf_files:
+                            from urllib.parse import urlparse
+                            parsed_base = urlparse(pending_details_page.url)
+                            base_url = f"{parsed_base.scheme}://{parsed_base.netloc}"
+                            
+                            for index, pdf_data in enumerate(pdf_files):
+                                pdf_url = pdf_data["url"]
+                                pdf_filename = pdf_data["filename"]
+                                if pdf_url == "MISSING":
+                                    attachments.append({"file_name": pdf_filename, "blob_path": f"MISSING:{pdf_filename}"})
+                                    continue
+                                if not pdf_url.startswith("http"):
+                                    pdf_url = base_url + "/" + pdf_url.lstrip('/')
+                                    
+                                try:
+                                    response = await pending_details_page.context.request.get(pdf_url, timeout=300000)
+                                    if response.ok:
+                                        pdf_bytes = await response.body()
+                                        date_str = datetime.utcnow().strftime("%Y-%m-%d")
+                                        safe_fname = re.sub(r'[^a-zA-Z0-9_\-\. ]', '', pdf_filename).strip() or f"attachment_{index+1}"
+                                        blob_name = f"reports/{vessel_imo}/{report_code}/{date_str}_{index}_{safe_fname}"
+                                        upload_pdf_to_blob(pdf_bytes, blob_name)
+                                        attachments.append({"file_name": pdf_filename, "blob_path": blob_name})
+                                    else:
+                                        attachments.append({"file_name": pdf_filename, "blob_path": f"MISSING:{pdf_filename}"})
+                                except:
+                                    attachments.append({"file_name": pdf_filename, "blob_path": f"MISSING:{pdf_filename}"})
+                                    
+                        try: await pending_details_page.close()
+                        except: pass
                         try: await job_order_page.close()
                         except: pass
+                        
                         return {
                             "vessel_imo": vessel_imo, "vessel_name": vessel_name,
                             "report_code": report_code, "report_name": report_name,
@@ -670,7 +864,7 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                             "job_order_no": pend_details.get("job_order_no", f"PEND-{report_code}"),
                             "job_status": "PENDING",
                             "due_date": pend_details.get("due_date"),
-                            "attachments": []
+                            "attachments": attachments
                         }
 
                 if "COMPLETED" in status_text.upper() and not found_completed:
@@ -748,40 +942,35 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
 
         # Step 10: Click Attachments tab and wait for content to render
         logger.info("Clicking 'Attachments' tab...")
-        await job_page.evaluate('''() => {
-            const tab = document.querySelector('a[href="#Attachments"]');
-            if (tab) tab.click();
-            else {
-                const links = Array.from(document.querySelectorAll("a, span, div"));
-                const fallback = links.find(el => el.innerText && el.innerText.includes("Attachments"));
-                if (fallback) fallback.click();
-            }
-        }''')
-        # Wait for the attachment panel to load
-        await job_page.wait_for_timeout(3000)
+        await _click_attachments_tab_and_wait(job_page)
 
         # Step 11: Use NETWORK REQUEST INTERCEPTION to capture all attachment URLs
         # When each row is clicked, SmartPAL fires a GET request to load the file.
         # We listen to these requests directly — no iframe polling needed.
         logger.info("Using network interception to capture attachment URLs...")
 
-        # Get row count first
+        # Dump HTML of completed job attachment page for debugging missing selectors
+        html_content = await job_page.content()
+        with open(f"attachments_dump_completed_{vessel_imo}.html", "w", encoding="utf-8") as f:
+            f.write(html_content)
+
+        # Get row count first - added table.rgMasterTable for older Telerik grids
         row_count = await job_page.evaluate('''() => {
-            const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid"));
+            const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid, table.rgMasterTable, .rgMasterTable"));
             const visibleGrid = grids.find(g => g && g.offsetWidth > 0);
             if (!visibleGrid) return 0;
-            return visibleGrid.querySelectorAll("tbody tr").length;
+            return visibleGrid.querySelectorAll("tbody tr, tr.rgRow, tr.rgAltRow").length;
         }''')
-        
+
         pdf_files = []
         seen_urls = set()
 
         # Also get the filename from each row — use the File Name cell (column index 1)
         row_names = await job_page.evaluate('''() => {
-            const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid"));
+            const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid, table.rgMasterTable, .rgMasterTable"));
             const visibleGrid = grids.find(g => g && g.offsetWidth > 0);
             if (!visibleGrid) return [];
-            return Array.from(visibleGrid.querySelectorAll("tbody tr")).map(r => {
+            return Array.from(visibleGrid.querySelectorAll("tbody tr, tr.rgRow, tr.rgAltRow")).map(r => {
                 const cells = r.querySelectorAll("td");
                 if (cells.length >= 2) {
                     const link = cells[1].querySelector("a");
@@ -814,10 +1003,10 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                 try:
                     async with job_page.expect_download(timeout=3000) as download_info:
                         await job_page.evaluate(f'''(idx) => {{
-                            const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid"));
+                            const grids = Array.from(document.querySelectorAll("#Attachments .k-grid, #Attachments table, .attachment-grid, .k-grid, table.rgMasterTable, .rgMasterTable"));
                             const visibleGrid = grids.find(g => g && g.offsetWidth > 0);
                             if (visibleGrid) {{
-                                const rows = visibleGrid.querySelectorAll("tbody tr");
+                                const rows = visibleGrid.querySelectorAll("tbody tr, tr.rgRow, tr.rgAltRow");
                                 if (rows[idx]) {{
                                     const clickables = Array.from(rows[idx].querySelectorAll('a, button'));
                                     let dl = clickables.find(a => 

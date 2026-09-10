@@ -55,7 +55,11 @@ function normalizeFreq(f) {
 }
 
 function reportDate(r) {
-  const d = r.due_date || r.job_date || r.created_at;
+  // Bucket by when the job actually finished (job_end_date), not by
+  // SmartPAL's own due date -- due_date can drift from the report's real
+  // monthly/weekly cadence. Falls back to due_date/created_at for rows
+  // that haven't completed yet (e.g. PENDING, which has no job_end_date).
+  const d = r.job_end_date || r.job_date || r.due_date || r.created_at;
   return d ? new Date(d) : null;
 }
 
@@ -140,15 +144,24 @@ function buildBuckets(frequency, year, monthIdx, quarterIdx) {
   }];
 }
 
-function findBestMatch(instances, start, end) {
+/* All instances landing inside one bucket, oldest first. A monthly/quarterly
+   bucket can legitimately contain more than one completed job (e.g. an
+   extra out-of-cycle inspection alongside the regular monthly one) -- the
+   caller decides whether to show just the latest or every one of them. */
+function findMatches(instances, start, end) {
   const inRange = instances.filter(r => {
     const d = reportDate(r);
     return d && d >= start && d <= end;
   });
-  if (inRange.length === 0) return null;
+  if (inRange.length === 0) return [];
   const withAttachment = inRange.filter(r => hasValidAttachment(r.attachments));
   const pool = withAttachment.length > 0 ? withAttachment : inRange;
-  return pool.sort((a, b) => (reportDate(b) || 0) - (reportDate(a) || 0))[0];
+  return pool.sort((a, b) => (reportDate(a) || 0) - (reportDate(b) || 0));
+}
+
+function findBestMatch(instances, start, end) {
+  const matches = findMatches(instances, start, end);
+  return matches.length ? matches[matches.length - 1] : null;
 }
 
 /* Earliest date among instances that actually have a valid attachment —
@@ -173,9 +186,13 @@ function earliestAttachmentDate(instances) {
    Only the single latest incomplete bucket is surfaced so the matrix
    stays clean and actionable. */
 function cellStatus(instances, bucket, now, isLatestIncompleteBucket) {
-  const match = findBestMatch(instances, bucket.start, bucket.end);
+  const matches = findMatches(instances, bucket.start, bucket.end);
+  const match = matches.length ? matches[matches.length - 1] : null;
   if (match && hasValidAttachment(match.attachments)) {
-    return { status: 'has', match, date: reportDate(match) };
+    // Surface every completed job with an attachment that landed in this
+    // bucket, not just the latest -- see findMatches() above.
+    const withAttachment = matches.filter(m => hasValidAttachment(m.attachments));
+    return { status: 'has', matches: withAttachment, match, date: reportDate(match) };
   }
   if (!match) {
     return { status: 'blank' };
@@ -296,11 +313,32 @@ function AttachmentPreviewModal({ report, onClose }) {
   );
 }
 
+function AttachmentIcon({ report, bucket, onOpen, viewerRole }) {
+  return (
+    <button
+      type="button"
+      className="ovw-chip ovw-chip-has"
+      title={`${bucket.label}: ${fmtDateShort(reportDate(report))} — View attachment`}
+      onClick={() => onOpen(report)}
+    >
+      <span className="ovw-chip-has-icon">
+        <Paperclip size={13} />
+        {(viewerRole === 'VESSEL' ? report.unread_vessel : report.unread_shore) > 0 && (
+          <span className="ovw-chip-msg-badge" title="New message">
+            <MessageSquare size={8} />
+          </span>
+        )}
+      </span>
+      <span>{fmtDateShort(reportDate(report))}</span>
+    </button>
+  );
+}
+
 function AttachmentCell({ instances, bucket, now, onOpen, viewerRole, buckets }) {
   const latestKey = latestIncompleteBucketKey(instances, buckets);
   const isCurrentBucket = bucket.start <= now && now <= bucket.end;
   const isLatestIncomplete = isCurrentBucket || bucket.key === latestKey;
-  const { status, match, date } = cellStatus(instances, bucket, now, isLatestIncomplete);
+  const { status, matches, date } = cellStatus(instances, bucket, now, isLatestIncomplete);
 
   if (status === 'blank') {
     return <div className="ovw-chip-empty" />;
@@ -316,23 +354,19 @@ function AttachmentCell({ instances, bucket, now, onOpen, viewerRole, buckets })
       </div>
     );
   }
+  // 'has' — one or more completed jobs with attachments landed in this
+  // bucket (e.g. two monthly jobs completing in the same calendar month).
+  // Show one icon+date per job in the same shell instead of collapsing to
+  // just the latest.
+  if (matches.length === 1) {
+    return <AttachmentIcon report={matches[0]} bucket={bucket} onOpen={onOpen} viewerRole={viewerRole} />;
+  }
   return (
-    <button
-      type="button"
-      className="ovw-chip ovw-chip-has"
-      title={`${bucket.label}: ${fmtDateShort(date)} — View attachment`}
-      onClick={() => onOpen(match)}
-    >
-      <span className="ovw-chip-has-icon">
-        <Paperclip size={13} />
-        {(viewerRole === 'VESSEL' ? match.unread_vessel : match.unread_shore) > 0 && (
-          <span className="ovw-chip-msg-badge" title="New message">
-            <MessageSquare size={8} />
-          </span>
-        )}
-      </span>
-      <span>{fmtDateShort(date)}</span>
-    </button>
+    <div className="ovw-chip-multi">
+      {matches.map(m => (
+        <AttachmentIcon key={m.id || m.job_order_no} report={m} bucket={bucket} onOpen={onOpen} viewerRole={viewerRole} />
+      ))}
+    </div>
   );
 }
 
@@ -458,8 +492,9 @@ export default function OverviewPage() {
       vessels.forEach(v => {
         const instances = instanceIndex[name]?.[v.imo] || [];
         buckets.forEach(b => {
-          const match = findBestMatch(instances, b.start, b.end);
-          if (match && hasValidAttachment(match.attachments)) count++;
+          // Count every attachment-bearing job shown in the cell, not just
+          // one per bucket -- matches the multi-icon display in AttachmentCell.
+          count += findMatches(instances, b.start, b.end).filter(m => hasValidAttachment(m.attachments)).length;
         });
       });
     });

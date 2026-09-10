@@ -315,6 +315,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [mentionList, setMentionList] = useState([]);
   const [showMentions, setShowMentions] = useState(false);
+  const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
   const [taggedUsers, setTaggedUsers] = useState([]);
   const [cursorPosition, setCursorPosition] = useState(0);
   const messagesEndRef = useRef(null);
@@ -378,6 +379,29 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
   // <div>, which turns into extra blank lines in innerText. Insert a plain <br>
   // instead so multi-line replies match the old textarea's single-newline behavior.
   const handleEditorKeyDown = (e) => {
+    if (showMentions && mentionList.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setHighlightedMentionIndex(i => (i + 1) % mentionList.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setHighlightedMentionIndex(i => (i - 1 + mentionList.length) % mentionList.length);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        selectMention(mentionList[highlightedMentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowMentions(false);
+        return;
+      }
+    }
+
     if (e.key !== 'Enter') return;
     e.preventDefault();
     document.execCommand('insertLineBreak');
@@ -408,6 +432,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
         u.id !== user?.id
       );
       setMentionList(filtered);
+      setHighlightedMentionIndex(0);
       setShowMentions(filtered.length > 0);
     } else {
       setShowMentions(false);
@@ -502,6 +527,9 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
       setFiles([]);
       setTaggedUsers([]);
       queryClient.invalidateQueries(['threads', defectId]);
+      // So the chat-icon badge picks up this new message on the list's next
+      // fetch (invalidate matches both dashboards' ['defects', ...] keys).
+      queryClient.invalidateQueries(['defects']);
 
     } catch (err) {
       toast("Failed: " + err.message, 'error');
@@ -530,43 +558,18 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
   };
 
 
-  const isMyMessage = (authorRole) => {
-    return authorRole === user?.full_name || authorRole === user?.job_title;
-  };
-
-  // const extractMentions = (text) => {
-  //   const parts = [];
-  //   const mentionRegex = /@([\w][\w\s\-]*[\w]|[\w]+)/g;
-  //   let lastIndex = 0;
-  //   let match;
-
-  //   while ((match = mentionRegex.exec(text)) !== null) {
-  //     if (match.index > lastIndex) {
-  //       parts.push({ type: 'text', content: text.slice(lastIndex, match.index) });
-  //     }
-  //     parts.push({ type: 'mention', content: match[0] });
-  //     lastIndex = match.index + match[0].length;
-  //   }
-
-  //   if (lastIndex < text.length) {
-  //     parts.push({ type: 'text', content: text.slice(lastIndex) });
-  //   }
-
-  //   return parts.length > 0 ? parts : [{ type: 'text', content: text }];
-  // };
+  // ✅ FIXED: Use user_id comparison (same as ShoreDashboard) — reliable alignment
+  const isMyMessage = (thread) => thread.user_id === user?.id;
 
   const extractMentions = (text) => {
     const parts = [];
-    // Build pattern from actual user names
     const names = vesselUsers.map(u =>
       (u.full_name || u.name || '').replace(/[-]/g, '\\-')
-    ).filter(Boolean).sort((a, b) => b.length - a.length); // longest first
+    ).filter(Boolean).sort((a, b) => b.length - a.length);
 
     if (names.length === 0) return [{ type: 'text', content: text }];
 
-    const mentionRegex = new RegExp(
-      `@(${names.join('|')})`, 'g'
-    );
+    const mentionRegex = new RegExp(`@(${names.join('|')})`, 'g');
 
     let lastIndex = 0;
     let match;
@@ -666,7 +669,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
               );
             }
 
-            const isMine = isMyMessage(t.author_role);
+            const isMine = isMyMessage(t);
             const messageParts = extractMentions(t.body);
 
             return (
@@ -684,10 +687,8 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                   alignItems: 'center',
                   gap: '8px'
                 }}>
-                  <span style={{ fontWeight: '600' }}>{t.author_role}</span>
+                  <span style={{ fontWeight: '600' }}>{t.author || t.author_role}</span>
                   <span>{new Date(t.created_at).toLocaleString()}</span>
-                  {/* <SyncStatusBadge status={t.sync_status} /> */}
-
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', maxWidth: '70%' }}>
                   <div style={{
@@ -722,7 +723,6 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                         {t.attachments.map(a => (
                           <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <AttachmentLink attachment={a} />
-                            {/* ✅ ADD THIS: Sync status for the specific file */}
                             <SyncStatusBadge status={a.sync_status} size={9} />
                           </div>
                         ))}
@@ -858,7 +858,10 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
               suppressContentEditableWarning
               onInput={handleEditorInput}
               onKeyDown={handleEditorKeyDown}
-              onKeyUp={handleEditorInput}
+              onKeyUp={(e) => {
+                if (showMentions && ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) return;
+                handleEditorInput();
+              }}
               onClick={handleEditorInput}
               data-placeholder="Type an update (@ to mention)..."
               style={{
@@ -929,10 +932,12 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                   overflowY: 'auto'
                 }}
               >
-                {mentionList.map(u => (
+                {mentionList.map((u, index) => (
                   <div
                     key={u.id}
+                    ref={index === highlightedMentionIndex ? (el) => el?.scrollIntoView({ block: 'nearest' }) : null}
                     onClick={() => selectMention(u)}
+                    onMouseEnter={() => setHighlightedMentionIndex(index)}
                     className='fsize-17'
                     style={{
                       padding: '8px 12px',
@@ -941,10 +946,9 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      fontSize: '13px'
+                      fontSize: '13px',
+                      background: index === highlightedMentionIndex ? '#f8fafc' : 'white'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                   >
                     <UserCircle size={14} /> {u.full_name}
                   </div>
@@ -3559,9 +3563,20 @@ const VesselDashboard = () => {
                                         setTimeout(() => {
                                           scrollRowBelowHeader(defect.id);
                                         }, 50);
+
+                                        // Per-user "seen" marker only — doesn't affect other users' badges.
+                                        queryClient.setQueryData(['defects', vesselImo], (old) => {
+                                          const list = Array.isArray(old) ? old : old?.items ?? old?.data ?? [];
+                                          if (!Array.isArray(list)) return old;
+                                          return list.map((d) =>
+                                            d.id === defect.id ? { ...d, has_thread_messages: false } : d
+                                          );
+                                        });
+                                        defectApi.markThreadRead(defect.id).catch(() => {});
                                       }
                                     }}
                                     style={{
+                                      position: 'relative',
                                       background: 'transparent',
                                       border: 'none',
                                       cursor: 'pointer',
@@ -3572,6 +3587,21 @@ const VesselDashboard = () => {
                                       size={20}
                                       color={expandedId === defect.id ? '#ea580c' : '#545454'}
                                     />
+                                    {defect.has_thread_messages && (
+                                      <span
+                                        title="This discussion has messages"
+                                        style={{
+                                          position: 'absolute',
+                                          top: 2,
+                                          right: 2,
+                                          width: 8,
+                                          height: 8,
+                                          borderRadius: '50%',
+                                          background: '#ef4444',
+                                          border: '1.5px solid #fff'
+                                        }}
+                                      />
+                                    )}
                                   </button>
                                 </td>
                               )

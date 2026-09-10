@@ -223,7 +223,12 @@ export const defectApi = {
   // ✅ After — proper async/await, returns response.data, full logging
   shoreCloseDefect: async (id, data) => {
     const response = await api.patch(`/defects/${id}/shore-close`, data);
-    return response.data; // consistent with all other methods
+    return response.data;
+  },
+
+  reopenDefect: async (id, data) => {
+    const response = await api.patch(`/defects/${id}/reopen`, data);
+    return response.data;
   },
 
   removeDefect: async (defectId) => {
@@ -423,6 +428,11 @@ export const defectApi = {
   // ============================================
   getThreads: async (defectId) => {
     const response = await api.get(`/defects/${defectId}/threads`);
+    return response.data;
+  },
+
+  markThreadRead: async (defectId) => {
+    const response = await api.post(`/defects/${defectId}/threads/mark-read`);
     return response.data;
   },
 

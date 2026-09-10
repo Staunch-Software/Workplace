@@ -808,3 +808,29 @@ class MEDeviationHistory(Base):
     def __repr__(self):
         return f"<MEDeviationHistory(report_id={self.report_id}, imo={self.imo_number}, load={self.load_percentage}%)>"
 
+
+# =====================================================
+# ENGINE_PERFORMANCE MODULE-SCOPED SYNC STATE
+# Mirrors the SyncState pattern used by DRS/Lube oil/Reports so the
+# Vessel Status dashboard reads AEPMS's own sync activity instead of
+# the shared vessels.last_push_at/last_pull_at columns (which every
+# module writes to and therefore cannot be trusted as AEPMS-specific).
+# =====================================================
+
+class SyncState(Base):
+    __tablename__ = "aepms_sync_state"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    vessel_imo = Column(String(20), nullable=False, index=True)
+    sync_scope = Column(String(20), nullable=False, default="ENGINE_PERFORMANCE")
+
+    last_push_at = Column(DateTime(timezone=True), nullable=True)
+    last_pull_at = Column(DateTime(timezone=True), nullable=True)
+
+    active_errors = Column(JSONB, nullable=False, server_default='[]')
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("vessel_imo", "sync_scope", name="uq_aepms_vessel_sync_scope"),
+    )
+
