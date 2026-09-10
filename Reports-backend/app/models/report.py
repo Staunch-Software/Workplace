@@ -47,8 +47,27 @@ class Report(Base):
     job_end_date    = Column(DateTime,    nullable=True)    # Job End Date
     job_date        = Column(DateTime,    nullable=True)    # legacy / general date
 
+    # The actual reporting period, read out of the report FILE itself (its
+    # "Report Month" / "Date" form field, or failing that its filename) --
+    # NOT SmartPAL's completion date. SmartPAL only ever records when a job
+    # was submitted, which regularly lands a month after the period it
+    # covers (July's report is often completed on 1-Aug), so job_end_date/
+    # due_date cannot be trusted to bucket a report under its real month.
+    # Null when no date could be recovered from the file; callers should
+    # fall back to job_end_date/due_date in that case, same as before this
+    # column existed. See app/utils/report_date.py.
+    report_date         = Column(DateTime, nullable=True)
+    report_date_source  = Column(String(255), nullable=True)  # e.g. "form:reportmonth='Jul-26'"
+
     # ── System tracking fields ──
     scrape_status   = Column(SAEnum(ScrapeStatus), nullable=False, default=ScrapeStatus.PENDING)
+    # Human-readable reason the last scrape attempt failed (equipment not
+    # found in the tree, no COMPLETED job yet, attachments tab empty, an
+    # unhandled exception, etc.) -- set whenever scrape_status is FAILED,
+    # left as-is on a later successful scrape. Without this, a FAILED row
+    # told you WHAT failed but never WHY, so every failure needed a manual
+    # re-run against MariApps just to find out.
+    scrape_error    = Column(Text, nullable=True)
     verify_status   = Column(SAEnum(VerifyStatus), nullable=False, default=VerifyStatus.UNVERIFIED)
     verified_by     = Column(String(150), nullable=True)
     verified_at     = Column(DateTime,    nullable=True)

@@ -55,11 +55,14 @@ function normalizeFreq(f) {
 }
 
 function reportDate(r) {
-  // Bucket by when the job actually finished (job_end_date), not by
-  // SmartPAL's own due date -- due_date can drift from the report's real
-  // monthly/weekly cadence. Falls back to due_date/created_at for rows
-  // that haven't completed yet (e.g. PENDING, which has no job_end_date).
-  const d = r.job_end_date || r.job_date || r.due_date || r.created_at;
+  // report_date is read out of the report FILE itself (its "Report Month" /
+  // "Date" field, or its filename) -- see app/utils/report_date.py on the
+  // backend. It reflects the period the report actually covers, unlike
+  // every SmartPAL-side date: a vessel routinely completes July's report on
+  // 1-Aug, so job_end_date/due_date for that job read August even though
+  // the report is July's. Only falls back to the old job-date chain when
+  // no date could be recovered from the file (e.g. an unrecognised format).
+  const d = r.report_date || r.job_end_date || r.job_date || r.due_date || r.created_at;
   return d ? new Date(d) : null;
 }
 

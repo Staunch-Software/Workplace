@@ -46,13 +46,39 @@ async def _find_missing():
     return [r for r in reports if len(r.attachments) == 0]
 
 
-async def _backfill_vessel(context, overview_page, vessel_imo, vessel_name, jobs):
+async def _backfill_vessel(browser, context, overview_page, vessel_imo, vessel_name, jobs):
     """Re-scrape a list of specific job orders for one vessel, one at a
     time, using the SAME logged-in browser session (already positioned on
-    Job Overview)."""
+    Job Overview). Returns (recovered, still_missing, context, overview_page)
+    -- the last two may be a FRESH session if one was forced mid-loop (see
+    SESSION_REFRESH_EVERY), which the caller must carry forward to whatever
+    it does next (the next vessel, or closing up)."""
+    from app.scraper.smartpal_scraper import SESSION_REFRESH_EVERY, _fresh_session
+
     recovered, still_missing = [], []
 
     for idx, r in enumerate(jobs):
+        # Same fix as run_scraper's main loop: a real 38-job run against
+        # these exact two vessels succeeded on every one of the first 15
+        # reports, then failed at the equipment-search step on every one of
+        # the remaining 19 -- a hard session cutover, not intermittent
+        # slowness. This tool is a long single-session loop of exactly the
+        # same shape, so it needs the same periodic refresh.
+        if idx > 0 and idx % SESSION_REFRESH_EVERY == 0:
+            logger.info(f"[{idx}/{len(jobs)}] Refreshing SmartPAL session to avoid "
+                        f"long-run session degradation observed after ~15 reports...")
+            fresh = await _fresh_session(browser)
+            if fresh:
+                old_context = context
+                context, _page, overview_page = fresh
+                try:
+                    await old_context.close()
+                except Exception:
+                    pass
+            else:
+                logger.warning("Session refresh failed -- continuing with the existing "
+                                "(possibly degraded) session; remaining jobs may fail.")
+
         report_code = r.report_code.strip()
         report_name = (r.report_name or report_code).strip()
         department  = (r.department or "").strip()
@@ -96,7 +122,7 @@ async def _backfill_vessel(context, overview_page, vessel_imo, vessel_name, jobs
             logger.error(f"Error backfilling {label}: {e}")
             still_missing.append(label)
 
-    return recovered, still_missing
+    return recovered, still_missing, context, overview_page
 
 
 async def main():
@@ -139,7 +165,11 @@ async def main():
 
         for (imo, name), jobs in by_vessel.items():
             logger.info(f"--- {name} [{imo}]: {len(jobs)} job(s) to backfill ---")
-            recovered, still_missing = await _backfill_vessel(context, overview_page, imo, name, jobs)
+            # context/overview_page may come back as a FRESH session if one
+            # was forced partway through this vessel's jobs -- carry it
+            # forward into the next vessel instead of the stale one.
+            recovered, still_missing, context, overview_page = await _backfill_vessel(
+                browser, context, overview_page, imo, name, jobs)
             all_recovered.extend(recovered)
             all_still_missing.extend(still_missing)
 
