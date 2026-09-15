@@ -33,6 +33,8 @@ def standardize_name(text: str) -> str:
         ("after fine",         "out"),
         ("before servo oil",   "in"),
         ("after servo oil",    "out"),
+        ("before filter",      "in"),
+        ("after filter",       "out"),
     ]
     for old, new in directional:
         s = s.replace(old, new)
@@ -63,6 +65,9 @@ def standardize_name(text: str) -> str:
         ("deck machinery fwd",       "winch fwd"),
         ("deck machinery aft",       "winch aft"),
         ("deck machinery",           "deck"),
+        ("hydraulic tank",           "hyd"),
+        ("m/e",                      "me"),
+        ("servo system",             "hyd"),
     ]
     for old, new in synonyms:
         s = s.replace(old, new)
