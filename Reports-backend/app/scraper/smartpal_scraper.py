@@ -1162,13 +1162,15 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                                         blob_name = f"reports/{vessel_imo}/{report_code}/{date_str}_{index}_{safe_fname}"
                                         upload_pdf_to_blob(pdf_bytes, blob_name)
                                         attachments.append({"file_name": pdf_filename, "blob_path": blob_name})
-                                        if report_date is None:
-                                            try:
-                                                found = await asyncio.to_thread(extract_report_period, pdf_bytes, pdf_filename)
-                                                if found:
-                                                    report_date, report_date_source = found
-                                            except Exception as e:
-                                                logger.warning(f"Report-date extraction failed for '{pdf_filename}': {e}")
+                                        try:
+                                            found = await asyncio.to_thread(extract_report_period, pdf_bytes, pdf_filename)
+                                            if found:
+                                                f_date, f_src = found
+                                                if report_date is None or f_date > report_date:
+                                                    report_date = f_date
+                                                    report_date_source = f_src
+                                        except Exception as e:
+                                            logger.warning(f"Report-date extraction failed for '{pdf_filename}': {e}")
                                     else:
                                         attachments.append({"file_name": pdf_filename, "blob_path": f"MISSING:{pdf_filename}"})
                                 except:
