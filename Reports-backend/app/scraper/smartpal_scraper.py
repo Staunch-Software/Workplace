@@ -21,6 +21,7 @@ import os
 from datetime import datetime
 from uuid import uuid4
 
+from dateutil.relativedelta import relativedelta
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -31,6 +32,37 @@ from app.core.blob_storage import upload_pdf_to_blob
 from app.models.report import Report, ScrapeStatus, VerifyStatus, ReportConfig, ReportAttachment
 
 logger = logging.getLogger("scraper")
+
+# How long after a report's own PERIOD (report_date, read from the file's
+# own content -- see app/utils/report_date.py) the next cycle is expected,
+# per report frequency. Used ALONGSIDE next_due_date (SmartPAL's own
+# planned-cycle date) in the smart-cron "is a new cycle due" check below --
+# whichever of the two fires first triggers a re-scrape. next_due_date can
+# lag the report's true period for the exact same reason report_date exists
+# at all (SmartPAL's own dates are submission dates, not reporting dates),
+# so report_date is often the earlier and more reliable signal that a new
+# cycle should already be checked for, even before SmartPAL's own due date
+# says so. Quarterly/Monthly use calendar-accurate relativedelta (a "month
+# later" is not a fixed number of days) rather than a fixed day count.
+_FREQUENCY_REPORT_DATE_OFFSET = {
+    "weekly":    lambda d: d + relativedelta(days=7),
+    "monthly":   lambda d: d + relativedelta(months=1),
+    "quarterly": lambda d: d + relativedelta(months=3),
+}
+
+
+def _next_cycle_expected_from_report_date(report_date, frequency):
+    """Best-effort: report_date + this report's cadence, or None when either
+    is missing/unrecognised -- callers must treat None as "no opinion", not
+    "not due", so the existing next_due_date check is never weakened by
+    this, only ever supplemented."""
+    if not report_date or not frequency:
+        return None
+    offset_fn = _FREQUENCY_REPORT_DATE_OFFSET.get(frequency.strip().lower())
+    if not offset_fn:
+        return None
+    return offset_fn(report_date.date())
+
 
 # SmartPAL loads the Attachments tab's file list asynchronously after the
 # tab click -- Knockout renders either the real row list or the genuine
@@ -149,22 +181,23 @@ async def run_scraper(db: AsyncSession, target_frequency: str = None, target_rep
 
     if smart_cron:
         from app.models.report import Report
-        
+
         filtered_smart = []
         now_date = datetime.utcnow().date()
-        
+        missing_attachment_count = 0
+
         for c in db_configs:
             stmt_latest = select(Report).where(
                 Report.vessel_imo == c.vessel_imo,
                 Report.report_code == c.report_code
-            ).order_by(Report.created_at.desc())
-            
+            ).order_by(Report.created_at.desc()).options(selectinload(Report.attachments))
+
             res_latest = await db.execute(stmt_latest)
             latest_report = res_latest.scalars().first()
-            
+
             should_scrape = False
             target_job_no = None
-            
+
             target_due_date = None
             if not latest_report:
                 should_scrape = True
@@ -173,22 +206,73 @@ async def run_scraper(db: AsyncSession, target_frequency: str = None, target_rep
                     should_scrape = True
                     target_job_no = latest_report.job_order_no
                     target_due_date = latest_report.due_date
+                elif not latest_report.attachments:
+                    # A COMPLETED job with zero attachments on file is a real
+                    # gap, not a report that genuinely has none -- every
+                    # completed SmartPAL job we scrape carries at least one
+                    # file. This happens when a scrape completed the job
+                    # lookup but the attachment download/upload step failed
+                    # or was skipped that run (a transient blob-upload error,
+                    # the attachments tab not yet populated at scrape time,
+                    # etc). Re-scrape the SAME already-completed job (reusing
+                    # its own job_order_no/due_date, exactly like the PENDING
+                    # branch above re-targets the job it's already tracking)
+                    # to pick up the attachment SmartPAL already has, rather
+                    # than waiting for next_due_date to roll the row over to
+                    # an entirely different cycle and leaving this gap
+                    # unfilled forever.
+                    should_scrape = True
+                    target_job_no = latest_report.job_order_no
+                    target_due_date = latest_report.due_date
+                    missing_attachment_count += 1
+                    logger.info(
+                        f"Smart Cron: {c.vessel_name}/{c.report_code} job "
+                        f"{latest_report.job_order_no} is COMPLETED but has no "
+                        f"attachments on file -- re-scraping to recover them."
+                    )
                 else:
                     if latest_report.next_due_date:
-                        if latest_report.next_due_date.date() <= now_date:
+                        due_reached = latest_report.next_due_date.date() <= now_date
+
+                        # ADDITIVE only -- next_due_date alone still triggers
+                        # exactly as before. This just ALSO checks whether
+                        # report_date + this report's cadence has passed,
+                        # since next_due_date (SmartPAL's own field) can lag
+                        # the report's true period the same way job dates
+                        # always have -- see _next_cycle_expected_from_report_date.
+                        # Whichever of the two is reached first wins; if
+                        # report_date is missing this adds nothing and
+                        # behaviour is identical to before.
+                        early_by_report_date = False
+                        if not due_reached:
+                            expected_next = _next_cycle_expected_from_report_date(
+                                latest_report.report_date, c.frequency
+                            )
+                            if expected_next and expected_next <= now_date:
+                                early_by_report_date = True
+
+                        if due_reached or early_by_report_date:
                             should_scrape = True
                             target_job_no = latest_report.job_order_no
                             target_due_date = latest_report.next_due_date
+                            if early_by_report_date:
+                                logger.info(
+                                    f"Smart Cron: {c.vessel_name}/{c.report_code} next cycle "
+                                    f"checked early -- report_date {latest_report.report_date.date()} "
+                                    f"+ {c.frequency} cadence has passed, even though "
+                                    f"next_due_date ({latest_report.next_due_date.date()}) has not."
+                                )
                     else:
                         should_scrape = True
-            
+
             if should_scrape:
                 c._target_job_no = target_job_no
                 c._target_due_date = target_due_date
                 filtered_smart.append(c)
-                
+
         db_configs = filtered_smart
-        logger.info(f"Smart Cron mode: {len(db_configs)} configs are due for scraping.")
+        logger.info(f"Smart Cron mode: {len(db_configs)} configs are due for scraping "
+                    f"({missing_attachment_count} due to missing attachments on a completed job).")
 
     # Detach into simple dicts to prevent lazy-loading crashes after db.commit() in the loop
     config_entries = [
@@ -1078,13 +1162,15 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                                         blob_name = f"reports/{vessel_imo}/{report_code}/{date_str}_{index}_{safe_fname}"
                                         upload_pdf_to_blob(pdf_bytes, blob_name)
                                         attachments.append({"file_name": pdf_filename, "blob_path": blob_name})
-                                        if report_date is None:
-                                            try:
-                                                found = await asyncio.to_thread(extract_report_period, pdf_bytes, pdf_filename)
-                                                if found:
-                                                    report_date, report_date_source = found
-                                            except Exception as e:
-                                                logger.warning(f"Report-date extraction failed for '{pdf_filename}': {e}")
+                                        try:
+                                            found = await asyncio.to_thread(extract_report_period, pdf_bytes, pdf_filename)
+                                            if found:
+                                                f_date, f_src = found
+                                                if report_date is None or f_date > report_date:
+                                                    report_date = f_date
+                                                    report_date_source = f_src
+                                        except Exception as e:
+                                            logger.warning(f"Report-date extraction failed for '{pdf_filename}': {e}")
                                     else:
                                         attachments.append({"file_name": pdf_filename, "blob_path": f"MISSING:{pdf_filename}"})
                                 except:
@@ -1466,8 +1552,23 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
 
         if not attachments:
             logger.warning(f"No attachments were downloaded for job: {job_order_no} (Saving record with 0 attachments)")
-            
+
+        # Fallbacks when no attachment yielded an extractable date (e.g. image PDF):
+        if report_date is None:
+            from app.utils.report_date import uses_job_end_date_fallback
+            if uses_job_end_date_fallback(report_code, report_name) and job_end_date is not None:
+                # Specific reports (like Boiler) requested to use job_end_date 
+                report_date = job_end_date
+                report_date_source = "job_end_date:fallback"
+                logger.info(f"  No date extracted -- using job_end_date={job_end_date.date()} as fallback for {report_code}.")
+            elif due_date is not None:
+                # General fallback is due_date (period deadline approximation)
+                report_date = due_date
+                report_date_source = "due_date:fallback"
+                logger.info(f"  No date extracted -- using due_date={due_date.date()} as general fallback.")
+
         logger.info(f"Successfully uploaded {len(attachments)} blobs for job {job_order_no}.")
+
 
         await eq_page.close()
         await job_page.close()
