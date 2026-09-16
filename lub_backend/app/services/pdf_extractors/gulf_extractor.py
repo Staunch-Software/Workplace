@@ -179,21 +179,34 @@ _DATE_RE   = re.compile(r'^\d{1,2}-[A-Za-z]{3}-\d{2,4}$')
 _STATUS_RE = re.compile(r'^(Normal|Critical|Caution|Warning)$', re.IGNORECASE)
 
 
+def _block_header_tops(page) -> List[float]:
+    """Vertical positions of every 'Equipment Information' header on the page."""
+    full = page.crop((0, 0, page.width, page.height))
+    ws = sorted(full.extract_words(), key=lambda w: (w['top'], w['x0']))
+    return sorted(
+        a['top'] for a, b in zip(ws, ws[1:])
+        if a['text'] == "Equipment" and b['text'] == "Information"
+        and abs(a['top'] - b['top']) <= 4
+    )
+
+
 def _visible_page(page):
     """
-    Crops a page to its own visible area (0,0)-(width,height).
+    Crops a page to the area occupied by ITS OWN equipment block.
 
-    This PDF format authors each report as one tall canvas per physical
-    page, with the *next* machine's block positioned far outside the visible
-    print area (word 'top' coordinates observed ranging from -5879 to +3728
-    on an 842-tall page) rather than on a separate page object. Reading
-    words/text WITHOUT cropping pulls in every other machine's off-page
-    content too — this is the literal mechanism behind "the PDF visually
-    shows one machine but the text layer returns a different one": the raw
-    text layer contains far more than what's printed on that page. Cropping
-    to the visible bbox first restores 1 page ≈ 1 machine.
+    Full-height cropping is not sufficient: this format also places the NEXT
+    page's block inside the current page's box (observed at top 576 on an
+    842-tall page) and hides it under a white filled rectangle. The text layer
+    ignores that rectangle, so the neighbouring block survives the crop and
+    gets parsed as a second machine on the wrong page. A page's own block
+    header sits near the top (~89); a header appearing lower down belongs to
+    the next page and is cut off here.
     """
-    return page.crop((0, 0, page.width, page.height))
+    bottom = page.height
+    tops = _block_header_tops(page)
+    if len(tops) >= 2 and tops[0] < page.height * 0.25:
+        bottom = tops[1] - 2
+    return page.crop((0, 0, page.width, bottom))
 
 
 def _extract_word_rows(page) -> List[List[Dict]]:
