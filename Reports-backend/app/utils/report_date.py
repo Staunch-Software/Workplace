@@ -549,7 +549,12 @@ def _period_from_xlsx_labelled(file_bytes, filename=""):
                             if header_info is not None:
                                 header_row_idx, header_norm = header_info
                                 if 0 < row_idx - header_row_idx <= COLUMN_HEADER_WINDOW:
-                                    _record(header_norm, (v.year, v.month, v.day), f"xlsx:{ws.title}!{header_norm}={v.date()}(column)")
+                                    has_data = any(
+                                        c.value is not None and str(c.value).strip() != ""
+                                        for idx, c in enumerate(row) if idx != i
+                                    )
+                                    if has_data:
+                                        _record(header_norm, (v.year, v.month, v.day), f"xlsx:{ws.title}!{header_norm}={v.date()}(column)")
 
                         if label_seen_at is not None:
                             # Include the actual label AND the resolved value here --
@@ -589,7 +594,12 @@ def _period_from_xlsx_labelled(file_bytes, filename=""):
                         if 0 < row_idx - header_row_idx <= COLUMN_HEADER_WINDOW:
                             col_period = _to_period(s, day_first=header_norm not in _XLSX_MONTH_FIRST_LABELS)
                             if col_period:
-                                _record(header_norm, col_period, f"xlsx:{ws.title}!{s!r}(column)")
+                                has_data = any(
+                                    c.value is not None and str(c.value).strip() != ""
+                                    for idx, c in enumerate(row) if idx != i
+                                )
+                                if has_data:
+                                    _record(header_norm, col_period, f"xlsx:{ws.title}!{s!r}(column)")
 
                     # Label and value typed together in ONE cell, e.g.
                     # "Report date : 06/09/2026" as a single string -- the
