@@ -515,7 +515,15 @@ def _period_from_xlsx_labelled(file_bytes):
                         continue
                     if isinstance(v, datetime):
                         if label_seen_at is not None:
-                            _record(label_seen_norm, (v.year, v.month, v.day), f"xlsx:{ws.title}!cell")
+                            # Include the actual label AND the resolved value here --
+                            # a bare "xlsx:{ws.title}!cell" was found to read as if the
+                            # SHEET TITLE were the date used (a real "CMP 01.08.2026"
+                            # sheet's own "Report date" cell correctly resolved to
+                            # 2026-09-13, but the source string only ever showed the
+                            # stale sheet title, making a genuinely-correct answer look
+                            # like the sheet-title fallback had fired instead).
+                            _record(label_seen_norm, (v.year, v.month, v.day),
+                                    f"xlsx:{ws.title}!{label_seen_norm}={v.date()}")
                             label_seen_at = None
                         continue
                     s = str(v).strip()
