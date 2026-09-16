@@ -119,13 +119,11 @@ def _to_period(value, day_first=True):
             return year, MONTHS[m.group(2).lower()], day
 
     # Month name + year only, no day present -- e.g. 'Jul-26', 'JUNE  26'.
+    # Per user request: if a report only has a month (jul-2026), do not invent a day (like 1 or 31).
+    # Instead, return None so the system automatically falls back to the job_end_date.
     m = re.search(r"(%s)[a-z]*\s*[-/., ]?\s*(\d{2,4})" % _MONTH_RE, text, re.I)
     if m:
-        year = int(m.group(2))
-        if year < 100:
-            year += 2000
-        if 2000 <= year <= 2100:
-            return year, MONTHS[m.group(1).lower()], 1
+        return None
 
     # ISO-ish: 2026-07-31
     m = re.search(r"(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})", text)
