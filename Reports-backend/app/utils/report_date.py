@@ -379,7 +379,7 @@ def _merged_anchor_map(ws):
     return mapping
 
 
-def _period_from_xlsx_labelled(file_bytes):
+def _period_from_xlsx_labelled(file_bytes, filename=""):
     """Scan every sheet for an EXACT label ('Date', 'Year / Month:', ...)
     and parse the value(s) that follow it in the same row.
 
@@ -523,8 +523,8 @@ def _period_from_xlsx_labelled(file_bytes):
             # Every value found in that column within the window below is tried
             # and the latest wins, same rule as everywhere else in this module.
             column_header_row = {}
-            COLUMN_HEADER_WINDOW = 20
-            for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=60, max_col=200), start=1):
+            COLUMN_HEADER_WINDOW = 200
+            for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=500, max_col=200), start=1):
                 label_seen_at = None
                 label_seen_norm = None
                 for i, cell in enumerate(row):
