@@ -14,6 +14,14 @@ Usage:
     python backfill_report_dates.py            # re-evaluate ALL reports (recommended)
     python backfill_report_dates.py --dry-run  # report what WOULD change, no writes
     python backfill_report_dates.py --null-only  # only process reports with no date yet
+    python backfill_report_dates.py --report=BUNKER      # only reports whose report_code
+                                                           # or report_name contains this
+                                                           # (case-insensitive) -- e.g. to
+                                                           # re-run just one report type
+                                                           # after a targeted extraction fix
+    python backfill_report_dates.py --vessel="GCL SARASWATI"  # only this vessel
+    # Filters combine: --report and --vessel can both be given at once, and
+    # either combines with --dry-run/--null-only too.
 """
 import asyncio
 import logging
@@ -32,18 +40,39 @@ logging.getLogger("azure").setLevel(logging.WARNING)
 logger = logging.getLogger("backfill_report_dates")
 
 
-async def _find_candidates(null_only: bool = False):
+def _arg_value(flag: str):
+    """Pull '--flag=value' out of sys.argv, or None if not given."""
+    prefix = f"{flag}="
+    for a in sys.argv[1:]:
+        if a.startswith(prefix):
+            return a[len(prefix):]
+    return None
+
+
+async def _find_candidates(null_only: bool = False, report_filter: str = None, vessel_filter: str = None):
     """Reports that have at least one real (non-MISSING) attachment.
 
     By default returns ALL such reports so that reports which previously
     received a wrong date (e.g. a template stamp like '2025-05-15') also
     get corrected. Pass null_only=True to only process rows where
     report_date IS NULL (the old behaviour).
+
+    report_filter/vessel_filter narrow this down to a specific report type
+    or vessel -- e.g. to re-run just the Weekly Bunker Report after a fix
+    scoped to that report's extraction logic, without touching every other
+    report's already-correct dates.
     """
     async with SessionLocal() as db:
         stmt = select(Report).options(selectinload(Report.attachments))
         if null_only:
             stmt = stmt.where(Report.report_date.is_(None))
+        if report_filter:
+            needle = f"%{report_filter}%"
+            stmt = stmt.where(
+                Report.report_code.ilike(needle) | Report.report_name.ilike(needle)
+            )
+        if vessel_filter:
+            stmt = stmt.where(Report.vessel_name.ilike(f"%{vessel_filter}%"))
         result = await db.execute(stmt)
         reports = result.scalars().all()
 
@@ -79,13 +108,19 @@ async def _extract_for_report(real_attachments):
 async def main():
     dry_run = "--dry-run" in sys.argv
     null_only = "--null-only" in sys.argv
+    report_filter = _arg_value("--report")
+    vessel_filter = _arg_value("--vessel")
 
     if null_only:
         logger.info("Mode: NULL-ONLY -- only processing reports with no date yet.")
     else:
         logger.info("Mode: ALL -- re-evaluating every report (including those with existing dates).")
+    if report_filter:
+        logger.info(f"Filter: report_code/report_name contains {report_filter!r}")
+    if vessel_filter:
+        logger.info(f"Filter: vessel_name contains {vessel_filter!r}")
 
-    candidates = await _find_candidates(null_only=null_only)
+    candidates = await _find_candidates(null_only=null_only, report_filter=report_filter, vessel_filter=vessel_filter)
     logger.info(f"Found {len(candidates)} report(s) with at least one real attachment.")
     if not candidates:
         return

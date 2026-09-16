@@ -387,21 +387,35 @@ def _period_from_xlsx_labelled(file_bytes):
         return None
 
     # The sheet-title cross-check below is ONLY safe to apply when there is
-    # more than one sheet. A real "Engine Month End Report Review" file (one
-    # sheet, always literally titled "FEB 2026" no matter the actual month)
-    # had a correct, properly-filled "Month - Year" cell reading July 2026 --
-    # exactly matching the filename and every other date on the sheet -- but
-    # the stale one-off tab name would have overridden it to February. This
-    # is the SAME stale-tab-name pattern already found repeatedly this
-    # session (e.g. the Corrosion Maintenance Plan tab that never gets
-    # renamed), and it is the common case for a one-sheet-per-submission
-    # file -- there is no second sheet to cross-check against, so the tab
-    # name here is just an unmaintained label, not independent corroborating
-    # evidence. The cross-check earns its keep only in a multi-sheet
-    # accumulating log (see this function's docstring for the Bunker Report
-    # case it exists for), where a single bad cell could otherwise hijack
-    # the "latest wins" comparison across many genuinely-dated sheets.
-    cross_check_against_title = len(wb.worksheets) > 1
+    # more than one DATE-PARSEABLE sheet title -- not just more than one
+    # sheet. A real "Engine Month End Report Review" file (one sheet, always
+    # literally titled "FEB 2026" no matter the actual month) had a correct,
+    # properly-filled "Month - Year" cell reading July 2026 -- exactly
+    # matching the filename and every other date on the sheet -- but the
+    # stale one-off tab name would have overridden it to February. This is
+    # the SAME stale-tab-name pattern already found repeatedly this session
+    # (e.g. the Corrosion Maintenance Plan tab that never gets renamed), and
+    # it is the common case for a one-sheet-per-submission file -- there is
+    # no second DATED sheet to cross-check against, so the tab name here is
+    # just an unmaintained label, not independent corroborating evidence.
+    #
+    # Counting every sheet (the original version of this check) was still
+    # wrong: EVERY Weekly Bunker Report workbook has the same 3-sheet
+    # skeleton ('ROB', 'Bunker ROB Experience', and one dated sheet like
+    # 'ROB DATE 05-07-2026') even when only ONE cycle has ever been
+    # submitted -- 3 sheets, but only 1 actually carries a date. A real GCL
+    # SARASWATI file hit exactly this: its single dated sheet's own 'Date'
+    # cell correctly read 06.09.2026 (matching the filename), but because
+    # the file technically had "more than one sheet" the cross-check fired
+    # anyway and overrode it with the stale tab name '05-07-2026' -- the
+    # exact same failure this check exists to prevent, just from the
+    # opposite direction. The cross-check only earns its keep when there are
+    # multiple DATED sheets to disambiguate between (a genuine accumulating
+    # log, like the 52-sheet Bunker ROB workbook or 43-sheet Boiler Water
+    # log this function's docstring describes), never merely multiple
+    # sheets.
+    dated_sheet_count = sum(1 for ws in wb.worksheets if _to_period(ws.title))
+    cross_check_against_title = dated_sheet_count > 1
 
     day_hit = None    # (period, source, resolved_datetime) from a day-bearing label
     month_hit = None  # (period, source, resolved_datetime) from a month/period-only label
