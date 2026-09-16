@@ -291,7 +291,7 @@ def _period_from_form(pdf_bytes):
 # priority already used for PDF form fields in _period_from_form.
 _XLSX_DAY_LABELS = {
     "date", "report date", "reportdate", "date of report",
-    "sample date",
+    "sample date", "test carried out on date",
 }
 _XLSX_MONTH_ONLY_LABELS = {
     "month", "report month", "reporting month", "reportmonth",
@@ -316,7 +316,7 @@ _XLSX_MONTH_FIRST_LABELS = {"sample date"}
 # Labels that appear as TABLE COLUMN headers rather than same-row
 # "label: value" pairs. A real "Cooling Test" log has 'DATE' at A2 with
 # its actual values in A3, A7... below it, nothing to its right.
-_XLSX_COLUMN_HEADER_LABELS = {"sample date", "date", "date of report"}
+_XLSX_COLUMN_HEADER_LABELS = {"sample date", "date", "date of report", "test carried out on date"}
 
 
 def _normalize_label(s):
@@ -517,6 +517,12 @@ def _period_from_xlsx_labelled(file_bytes):
                     if v is None:
                         continue
                     if isinstance(v, datetime):
+                        header_info = column_header_row.get(coord[1])
+                        if header_info is not None:
+                            header_row_idx, header_norm = header_info
+                            if 0 < row_idx - header_row_idx <= COLUMN_HEADER_WINDOW:
+                                _record(header_norm, (v.year, v.month, v.day), f"xlsx:{ws.title}!{header_norm}={v.date()}(column)")
+
                         if label_seen_at is not None:
                             # Include the actual label AND the resolved value here --
                             # a bare "xlsx:{ws.title}!cell" was found to read as if the
