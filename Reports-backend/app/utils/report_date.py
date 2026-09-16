@@ -731,20 +731,16 @@ def _find_period_in_flat_text(flat):
             # safe to rely on in general.
             line_end = flat.find("\n", m.end())
             window = flat[m.end():line_end if line_end != -1 else len(flat)]
-            # For range-bearing labels (e.g. 'report for') the window may
-            # contain just 'Aug 2026' while the full range '8/1/2026 - 8/31/2026'
-            # sits on the NEXT line (Waterproof/Boiler report layout). We check
-            # both the current line AND the next line, preferring the end of the
-            # range when one is found, so the report resolves to 31 Aug not 01 Aug.
+            # For range-bearing labels (e.g. 'report for') the PDF may show a
+            # date range like '8/1/2026 - 8/31/2026'. When a range is detected
+            # return None so the caller can use job_end_date (scraped from
+            # SmartPAL) as the report date instead of guessing from the range.
             if label.lower() in _PDF_RANGE_LABELS:
-                # Build a two-line window: current line + next line
                 next_line_end = flat.find("\n", line_end + 1) if line_end != -1 else -1
                 two_line_window = flat[m.end():next_line_end if next_line_end != -1 else len(flat)]
                 range_m = re.search(r"(\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4})\s*[-\u2013]\s*(\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4})", two_line_window)
                 if range_m:
-                    end_period = _to_period(range_m.group(2), day_first=False)
-                    if end_period:
-                        return end_period, label, two_line_window.strip()[:40]
+                    return None  # signal caller to use job_end_date
 
             period = _to_period(window)
             if period:
