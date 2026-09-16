@@ -222,7 +222,7 @@ def _find_field(lowered, group):
     return None
 
 
-def _period_from_form(pdf_bytes):
+def _period_from_form(pdf_bytes, filename=""):
     try:
         fields = read_pdf_form_fields(pdf_bytes)
     except Exception as e:
@@ -261,6 +261,13 @@ def _period_from_form(pdf_bytes):
             # Both fields agree on the period -- 'date' additionally gives
             # the exact day the vessel typed, so use it.
             return (m_year, m_month, d_day), f"form:{m_key}={m_val!r},{d_key}={d_val!r}"
+            
+        # Specific override for TECH-07 (ME Performance Sheet): The user
+        # explicitly requested that the exact typed Date be prioritized over
+        # Report Month when they disagree, even if it shifts the report's month.
+        if "TECH-07" in filename.upper() or "TECH - 07" in filename.upper():
+            return (d_year, d_month, d_day), f"form:{d_key}={d_val!r} (overrode {m_key}={m_val!r} for TECH-07)"
+
         # They disagree on the MONTH, not just the day -- this is the same
         # completion-lag pattern as SmartPAL's own dates (the crew signs the
         # form a few days into the next month), just showing up inside the
@@ -1003,7 +1010,7 @@ def extract_report_period(file_bytes, file_name=""):
         return None
 
     if file_bytes[:4] == b"%PDF":
-        found = _period_from_form(file_bytes)
+        found = _period_from_form(file_bytes, filename=file_name)
         if found:
             (year, month, day), source = found
             return _safe_date(year, month, day), source
