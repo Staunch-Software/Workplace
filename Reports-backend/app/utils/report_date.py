@@ -548,7 +548,8 @@ def _period_from_xlsx_labelled(file_bytes, filename=""):
                             if header_info is not None:
                                 header_row_idx, header_norm = header_info
                                 if 0 < row_idx - header_row_idx <= COLUMN_HEADER_WINDOW:
-                                    has_data = any(
+                                    is_tech_57 = "TECH-57" in filename.upper() or "TECH - 57" in filename.upper()
+                                    has_data = is_tech_57 or any(
                                         c.value is not None and str(c.value).strip() != ""
                                         for idx, c in enumerate(row) if idx != i
                                     )
@@ -593,7 +594,8 @@ def _period_from_xlsx_labelled(file_bytes, filename=""):
                         if 0 < row_idx - header_row_idx <= COLUMN_HEADER_WINDOW:
                             col_period = _to_period(s, day_first=header_norm not in _XLSX_MONTH_FIRST_LABELS)
                             if col_period:
-                                has_data = any(
+                                is_tech_57 = "TECH-57" in filename.upper() or "TECH - 57" in filename.upper()
+                                has_data = is_tech_57 or any(
                                     c.value is not None and str(c.value).strip() != ""
                                     for idx, c in enumerate(row) if idx != i
                                 )
