@@ -67,9 +67,18 @@ async def _find_candidates(null_only: bool = False, report_filter: str = None, v
         if null_only:
             stmt = stmt.where(Report.report_date.is_(None))
         if report_filter:
-            needle = f"%{report_filter}%"
+            # Normalize: 'TECH-57' must also match 'TECH_-_57_-_ONBOARD...' in the DB.
+            # The DB stores codes with underscores where the user types hyphens.
+            # Replace any run of hyphens/underscores/spaces in the search term with a
+            # SQL wildcard '%' so the match is flexible.
+            import re as _re
+            needle_flexible = "%" + _re.sub(r"[-_\s]+", "%", report_filter) + "%"
+            needle_original = f"%{report_filter}%"
             stmt = stmt.where(
-                Report.report_code.ilike(needle) | Report.report_name.ilike(needle)
+                Report.report_code.ilike(needle_flexible)
+                | Report.report_code.ilike(needle_original)
+                | Report.report_name.ilike(needle_flexible)
+                | Report.report_name.ilike(needle_original)
             )
         if vessel_filter:
             stmt = stmt.where(Report.vessel_name.ilike(f"%{vessel_filter}%"))
