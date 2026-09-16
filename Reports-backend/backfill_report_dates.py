@@ -11,8 +11,9 @@ report's already-downloaded attachment(s) straight out of Azure Blob and
 runs the same extract_report_period() over them.
 
 Usage:
-    python backfill_report_dates.py            # apply changes
+    python backfill_report_dates.py            # re-evaluate ALL reports (recommended)
     python backfill_report_dates.py --dry-run  # report what WOULD change, no writes
+    python backfill_report_dates.py --null-only  # only process reports with no date yet
 """
 import asyncio
 import logging
@@ -31,15 +32,18 @@ logging.getLogger("azure").setLevel(logging.WARNING)
 logger = logging.getLogger("backfill_report_dates")
 
 
-async def _find_candidates():
-    """Reports with report_date still NULL that have at least one real
-    (non-MISSING) attachment to read a date out of."""
+async def _find_candidates(null_only: bool = False):
+    """Reports that have at least one real (non-MISSING) attachment.
+
+    By default returns ALL such reports so that reports which previously
+    received a wrong date (e.g. a template stamp like '2025-05-15') also
+    get corrected. Pass null_only=True to only process rows where
+    report_date IS NULL (the old behaviour).
+    """
     async with SessionLocal() as db:
-        stmt = (
-            select(Report)
-            .options(selectinload(Report.attachments))
-            .where(Report.report_date.is_(None))
-        )
+        stmt = select(Report).options(selectinload(Report.attachments))
+        if null_only:
+            stmt = stmt.where(Report.report_date.is_(None))
         result = await db.execute(stmt)
         reports = result.scalars().all()
 
@@ -74,13 +78,19 @@ async def _extract_for_report(real_attachments):
 
 async def main():
     dry_run = "--dry-run" in sys.argv
+    null_only = "--null-only" in sys.argv
 
-    candidates = await _find_candidates()
-    logger.info(f"Found {len(candidates)} report(s) with report_date=NULL and at least one real attachment.")
+    if null_only:
+        logger.info("Mode: NULL-ONLY -- only processing reports with no date yet.")
+    else:
+        logger.info("Mode: ALL -- re-evaluating every report (including those with existing dates).")
+
+    candidates = await _find_candidates(null_only=null_only)
+    logger.info(f"Found {len(candidates)} report(s) with at least one real attachment.")
     if not candidates:
         return
 
-    updated, unresolved, failed = 0, 0, 0
+    updated, skipped_same, unresolved, failed = 0, 0, 0, 0
 
     for idx, (r, real_attachments) in enumerate(candidates):
         label = f"{r.vessel_name}/{r.report_code}/{r.job_order_no}"
@@ -94,12 +104,19 @@ async def main():
             continue
 
         if not found:
-            logger.info(f"  No recoverable date in any attachment for {label} -- leaving as-is (falls back to due_date/job_date).")
+            logger.info(f"  No recoverable date in any attachment for {label} -- leaving as-is.")
             unresolved += 1
             continue
 
         report_date, report_date_source = found
-        logger.info(f"  -> report_date={report_date.date()} (source: {report_date_source})")
+
+        # Skip write if date is already correct
+        if r.report_date == report_date:
+            logger.info(f"  -> Already correct: {report_date.date()} -- skipping.")
+            skipped_same += 1
+            continue
+
+        logger.info(f"  -> report_date: {r.report_date} => {report_date.date()} (source: {report_date_source})")
 
         if dry_run:
             updated += 1
@@ -116,7 +133,11 @@ async def main():
         updated += 1
 
     logger.info("=" * 70)
-    logger.info(f"{'[DRY RUN] ' if dry_run else ''}Done. Updated: {updated}, unresolved: {unresolved}, failed: {failed}, total: {len(candidates)}")
+    logger.info(
+        f"{'[DRY RUN] ' if dry_run else ''}Done. "
+        f"Updated: {updated}, already-correct: {skipped_same}, "
+        f"unresolved: {unresolved}, failed: {failed}, total: {len(candidates)}"
+    )
 
 
 if __name__ == "__main__":

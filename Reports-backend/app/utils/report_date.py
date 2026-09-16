@@ -77,7 +77,7 @@ IGNORE_FIELDS = ("revdate", "revisiondate", "lastdeflectiontakendate",
                  "testcarriedoutdate", "duedate", "nextduedate", "printdate")
 
 
-def _to_period(value):
+def _to_period(value, day_first=True):
     """Parse a human-typed date into (year, month, day). None if unparseable.
 
     Returns the EXACT day the vessel typed whenever the value has one --
@@ -88,6 +88,13 @@ def _to_period(value):
     Handles everything the vessels actually type: 'Jul-26', 'JULY-26',
     'JULY -26', 'JUNE  26', '31-Aug-26', '25 Jul 2026', '31/07/2026',
     '2026-07-31'.
+
+    `day_first=False` swaps which number wins for the ambiguous
+    numeric-slash pattern at the bottom (ties like '8/16/2026'). Only ever
+    pass False for a field CONFIRMED to come from a US-format source --
+    see _XLSX_MONTH_FIRST_LABELS -- everything else defaults to day-first
+    because that is how every vessel-typed form and SmartPAL date in this
+    system is written.
     """
     if not value:
         return None
@@ -128,10 +135,12 @@ def _to_period(value):
             return int(m.group(1)), month, day
 
     # Day-first: 31/07/2026 or 31-07-26. Day-first (not month-first) because
-    # SmartPAL and these forms are all DD-MMM-YYYY / DD/MM/YYYY throughout.
+    # SmartPAL and these forms are all DD-MMM-YYYY / DD/MM/YYYY throughout --
+    # unless `day_first=False`, for the one confirmed US-format exception.
     m = re.search(r"(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})", text)
     if m:
-        day, month = int(m.group(1)), int(m.group(2))
+        a, b = int(m.group(1)), int(m.group(2))
+        day, month = (a, b) if day_first else (b, a)
         year = int(m.group(3))
         if year < 100:
             year += 2000
@@ -282,6 +291,7 @@ def _period_from_form(pdf_bytes):
 # priority already used for PDF form fields in _period_from_form.
 _XLSX_DAY_LABELS = {
     "date", "report date", "reportdate", "date of report",
+    "sample date",
 }
 _XLSX_MONTH_ONLY_LABELS = {
     "month", "report month", "reporting month", "reportmonth",
@@ -291,6 +301,17 @@ _XLSX_MONTH_ONLY_LABELS = {
 _XLSX_PERIOD_LABELS = _XLSX_DAY_LABELS | _XLSX_MONTH_ONLY_LABELS
 _XLSX_IGNORE_LABELS_STARTSWITH = ("rev",)
 _XLSX_IGNORE_LABELS_CONTAINS = ("revision", "form no")
+
+# Labels whose values are confirmed to come from a US-format (month-first)
+# source rather than a vessel-typed form. A real "Boiler & Cooling Water
+# Test" log carries a "Sample date" column of plain text like '8/16/2026'
+# and '8/13/2026' -- both invalid under this module's usual day-first
+# reading (there is no 16th or 13th month), which is exactly what proves
+# the column is M/D/YYYY, not D/M/YYYY. This is a per-label exception, not
+# a change to the default: every other date in this module (SmartPAL,
+# vessel-typed forms) stays day-first, because that is how those are
+# actually written.
+_XLSX_MONTH_FIRST_LABELS = {"sample date"}
 
 
 def _normalize_label(s):
@@ -344,6 +365,17 @@ def _period_from_xlsx_labelled(file_bytes):
     label (e.g. 'Report date : 06/09/2026') found LATER in the sheet can
     still win over a month-only label (e.g. 'Month: Sep-26') found earlier
     -- see _XLSX_DAY_LABELS/_XLSX_MONTH_ONLY_LABELS.
+
+    Across sheets, the LATEST resolved date wins, not the first one found --
+    a real "Boiler & Cooling Water Test Weekly Report" workbook was found
+    with 43 tabs (WEEK 41 2025 ... WEEK 31 2026, one appended per week, none
+    ever overwritten), each carrying its own "DATE" cell. First-hit-wins
+    picked WEEK 41's Oct-2025 date out of a file that was actually just
+    submitted for the Aug-2026 week -- the same accumulating-log pattern
+    already handled for sheet TITLES in _period_from_xlsx_sheet_titles, just
+    showing up here in a labelled CELL instead. A one-sheet-per-submission
+    file (the common case) only ever has one candidate, so this is a strict
+    improvement there too.
     """
     try:
         from openpyxl import load_workbook
@@ -354,22 +386,102 @@ def _period_from_xlsx_labelled(file_bytes):
     except Exception:
         return None
 
-    day_hit = None    # (period, source) from a day-bearing label
-    month_hit = None  # (period, source) from a month/period-only label
+    # The sheet-title cross-check below is ONLY safe to apply when there is
+    # more than one sheet. A real "Engine Month End Report Review" file (one
+    # sheet, always literally titled "FEB 2026" no matter the actual month)
+    # had a correct, properly-filled "Month - Year" cell reading July 2026 --
+    # exactly matching the filename and every other date on the sheet -- but
+    # the stale one-off tab name would have overridden it to February. This
+    # is the SAME stale-tab-name pattern already found repeatedly this
+    # session (e.g. the Corrosion Maintenance Plan tab that never gets
+    # renamed), and it is the common case for a one-sheet-per-submission
+    # file -- there is no second sheet to cross-check against, so the tab
+    # name here is just an unmaintained label, not independent corroborating
+    # evidence. The cross-check earns its keep only in a multi-sheet
+    # accumulating log (see this function's docstring for the Bunker Report
+    # case it exists for), where a single bad cell could otherwise hijack
+    # the "latest wins" comparison across many genuinely-dated sheets.
+    cross_check_against_title = len(wb.worksheets) > 1
+
+    day_hit = None    # (period, source, resolved_datetime) from a day-bearing label
+    month_hit = None  # (period, source, resolved_datetime) from a month/period-only label
+    current_sheet_title_period = None  # this sheet's own tab name, parsed (or None)
 
     def _record(label_norm, period, source):
         nonlocal day_hit, month_hit
+        if cross_check_against_title and current_sheet_title_period is not None:
+            # Cross-check against the sheet's OWN tab name -- e.g. a real
+            # "Bunker Tank Sounding Report" workbook had a sheet literally
+            # titled "ROB DATE 04-01-2026" whose own 'Date' cell nonetheless
+            # held '04.12.2026' (a data-entry slip -- December picked
+            # instead of January). Scanning every sheet for the LATEST hit
+            # (needed for accumulating logs, see this function's docstring)
+            # means one erroneous cell like that can otherwise outrank every
+            # genuinely correct sheet in the file just by being numerically
+            # later. Same "two signals disagree, trust the more deliberate
+            # one" pattern already used for PDF form reportmonth-vs-date and
+            # xlsx day-label-vs-month-label -- the sheet's own name is the
+            # more deliberate signal, so a cell that disagrees with it on
+            # the MONTH is corrected to the sheet title's date instead of
+            # being trusted as-is.
+            st_year, st_month, _ = current_sheet_title_period
+            p_year, p_month, p_day = period
+            if (st_year, st_month) != (p_year, p_month):
+                logger.warning(
+                    f"xlsx sheet {label_norm!r} cell disagrees with its own "
+                    f"sheet title on period ({source}) -- using the sheet "
+                    f"title's date instead."
+                )
+                period = current_sheet_title_period
+                source = f"{source} (overridden by sheet title, disagreed on month)"
+        dt = _safe_date(*period)
         if label_norm in _XLSX_DAY_LABELS:
-            if day_hit is None:
-                day_hit = (period, source)
-        elif month_hit is None:
-            month_hit = (period, source)
+            if day_hit is None or dt > day_hit[2]:
+                day_hit = (period, source, dt)
+        else:
+            if month_hit is None or dt > month_hit[2]:
+                month_hit = (period, source, dt)
 
     try:
         for ws in wb.worksheets:
+            current_sheet_title_period = _to_period(ws.title)
             merged_map = _merged_anchor_map(ws)
             anchor_values = {}
-            for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=60, max_col=25), start=1):
+            # Column -> row index of the last "Rev"/"Tech Form No" label seen
+            # in that column. These report templates print a fixed header
+            # stamp block at the top of the sheet:
+            #     Tech Form No : OTH - 02
+            #     Rev : 2.0
+            #     Date : JUNE 2025
+            # -- a real "Battery Log" file was found where that "Date" is
+            # the TEMPLATE's own stamp (same value on every copy, sometimes
+            # a whole year stale) while the file's actual reporting date sat
+            # several rows further down as its own labelled "Date" field. A
+            # "Weekly Bunker Report" workbook had the identical trap: EVERY
+            # vessel's EVERY week carried the exact same
+            # "Date : 15.MAY.2025" stamp in its log sheet, so this one stray
+            # cell alone made every bunker report in the system resolve to
+            # the same wrong date. Same failure mode as the revdate PDF-form
+            # field and the "rev no"/"edition" guard in _period_from_pdf_text
+            # -- just showing up here as a positional pattern instead of a
+            # field name or nearby words, because the label here is a bare
+            # "Date" that would otherwise pass every other check. A "Date"
+            # label within a few rows of such a stamp, in the same column,
+            # is skipped (not recorded) so scanning can continue to the
+            # sheet's real, unrelated date field instead of locking onto it.
+            header_stamp_row = {}
+            HEADER_STAMP_WINDOW = 3
+            # Column -> row index of a _XLSX_MONTH_FIRST_LABELS header (e.g.
+            # "Sample date"). Unlike every other recognised label, this one
+            # is a TABLE COLUMN header, not a same-row "label: value" pair
+            # -- a real "Boiler & Cooling Water Test" log has 'Sample date'
+            # at A14 with its actual values in A15, A16, A17... below it,
+            # nothing to its right. Every value found in that column within
+            # the window below is tried and the latest wins, same rule as
+            # everywhere else in this module a table keeps accumulating rows.
+            month_first_col_header_row = {}
+            MONTH_FIRST_COLUMN_WINDOW = 20
+            for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=60, max_col=200), start=1):
                 label_seen_at = None
                 label_seen_norm = None
                 for i, cell in enumerate(row):
@@ -398,8 +510,26 @@ def _period_from_xlsx_labelled(file_bytes):
                     norm = _normalize_label(s)
                     if norm.startswith(_XLSX_IGNORE_LABELS_STARTSWITH) or \
                        any(w in norm for w in _XLSX_IGNORE_LABELS_CONTAINS):
+                        header_stamp_row[coord[1]] = row_idx
                         label_seen_at = None
                         continue
+
+                    near_header_stamp = (
+                        coord[1] in header_stamp_row and
+                        row_idx - header_stamp_row[coord[1]] <= HEADER_STAMP_WINDOW
+                    )
+
+                    # A data row sitting below a "Sample date"-style COLUMN
+                    # header (see month_first_col_header_row above) -- tried
+                    # unconditionally alongside the normal label logic below,
+                    # since a bare '8/16/2026' string wouldn't match any of
+                    # that logic (it isn't itself a label, and it isn't in
+                    # the same row as one).
+                    header_row = month_first_col_header_row.get(coord[1])
+                    if header_row is not None and 0 < row_idx - header_row <= MONTH_FIRST_COLUMN_WINDOW:
+                        col_period = _to_period(s, day_first=False)
+                        if col_period:
+                            _record("sample date", col_period, f"xlsx:{ws.title}!{s!r}(column)")
 
                     # Label and value typed together in ONE cell, e.g.
                     # "Report date : 06/09/2026" as a single string -- the
@@ -411,19 +541,23 @@ def _period_from_xlsx_labelled(file_bytes):
                         r"^(%s)\s*[:\-]\s*(.+)$" % "|".join(re.escape(l) for l in _XLSX_PERIOD_LABELS),
                         s.strip(), re.I
                     )
-                    if same_cell_match:
+                    if same_cell_match and not near_header_stamp:
                         label_part = _normalize_label(same_cell_match.group(1))
                         value_part = same_cell_match.group(2).strip()
-                        period = _to_period(value_part)
+                        period = _to_period(value_part, day_first=label_part not in _XLSX_MONTH_FIRST_LABELS)
                         if period:
                             _record(label_part, period, f"xlsx:{ws.title}!same_cell:{s!r}")
 
                     if norm in _XLSX_PERIOD_LABELS:
+                        if near_header_stamp:
+                            continue
+                        if norm in _XLSX_MONTH_FIRST_LABELS:
+                            month_first_col_header_row[coord[1]] = row_idx
                         label_seen_at = i
                         label_seen_norm = norm
                         continue
                     if label_seen_at is not None:
-                        period = _to_period(s)
+                        period = _to_period(s, day_first=label_seen_norm not in _XLSX_MONTH_FIRST_LABELS)
                         if period:
                             _record(label_seen_norm, period, f"xlsx:{ws.title}!{s!r}")
                             label_seen_at = None
@@ -444,14 +578,13 @@ def _period_from_xlsx_labelled(file_bytes):
                         rest.append(v.strftime("%Y-%m-%d") if isinstance(v, datetime) else str(v).strip())
                     if rest:
                         joined = " ".join(rest)
-                        period = _to_period(joined)
+                        period = _to_period(joined, day_first=label_seen_norm not in _XLSX_MONTH_FIRST_LABELS)
                         if period:
                             _record(label_seen_norm, period, f"xlsx:{ws.title}!{joined!r}")
 
-            # A day-bearing hit is as good as this scan gets -- no need to
-            # keep walking further sheets once both kinds have been seen.
-            if day_hit and month_hit:
-                break
+            # No early exit here: an accumulating-log workbook (see
+            # docstring) can have EVERY sheet carry its own day_hit, and
+            # only scanning to the end guarantees the latest one was seen.
     finally:
         try:
             wb.close()
@@ -459,8 +592,8 @@ def _period_from_xlsx_labelled(file_bytes):
             pass
 
     if day_hit and month_hit:
-        (d_year, d_month, d_day), d_src = day_hit
-        (m_year, m_month, _), m_src = month_hit
+        (d_year, d_month, d_day), d_src, _ = day_hit
+        (m_year, m_month, _), m_src, _ = month_hit
         if (d_year, d_month) == (m_year, m_month):
             return (d_year, d_month, d_day), d_src
         # Disagree on month -- same completion-lag pattern already handled
@@ -473,9 +606,11 @@ def _period_from_xlsx_labelled(file_bytes):
         )
         return (m_year, m_month, 1), m_src
     if day_hit:
-        return day_hit
+        period, source, _ = day_hit
+        return period, source
     if month_hit:
-        return month_hit
+        period, source, _ = month_hit
+        return period, source
     return None
 
 
@@ -502,7 +637,7 @@ def _period_from_xlsx_latest_date(file_bytes):
     latest = None  # (datetime, cell_repr)
     try:
         for ws in wb.worksheets:
-            for row in ws.iter_rows(min_row=1, max_row=60, max_col=25):
+            for row in ws.iter_rows(min_row=1, max_row=60, max_col=200):
                 for cell in row:
                     v = cell.value
                     if isinstance(v, datetime) and now_year - 3 <= v.year <= now_year + 1:
@@ -527,35 +662,25 @@ def _period_from_xlsx_latest_date(file_bytes):
 # the weekly work-done reports print a clean "DATE : 31 AUG 2026" line, but
 # a BWMS log's text extracts as "StartTime 2026-07-0603:33:56" with no
 # space and no colon between the label and its value at all.
-_PDF_TEXT_LABELS = ("report month", "reporting month", "operation date", "start time", "date")
+#
+# "report for" covers a different, system-generated "Waterproof Report" PDF
+# (a boiler/cooling-water test export, not a vessel-filled form) whose page
+# reads "AM TARANG - IMO 9832913 Report for Aug 2026" -- month name + year,
+# unambiguous, no day-first/month-first guessing needed. Deliberately NOT
+# using this PDF's "Waterproof report 8/1/2026 - 8/31/2026" range instead:
+# that's numeric M/D/YYYY (US format, like _XLSX_MONTH_FIRST_LABELS) and
+# reading it under this module's usual day-first rule would misread it. The
+# same page also prints "Report created 8/8/2026" -- a print/export
+# timestamp, not the period -- but "report for" is specific enough wording
+# that it can't accidentally match "report created", so no extra guard
+# (unlike the rev/edition trap below) is needed here.
+_PDF_TEXT_LABELS = ("report month", "reporting month", "operation date", "start time", "report for", "date")
 
 
-def _period_from_pdf_text(pdf_bytes, page_index=0):
-    """Flat (non-form) PDFs carry their date as plain page text instead of
-    a form field -- e.g. the WEEKLY DAILY WORK DONE bundles (one page per
-    day, each headed 'DATE : <that day>') or a BWMS log's 'StartTime
-    <timestamp>'. Only `page_index` (default the first page) is read: a
-    multi-page weekly bundle spans a date range with one page per day, and
-    the report is filed under the START of the period it covers, per the
-    same convention as MariApps' own job_start_date -- confirmed against
-    real files where the first page's date matches job_start_date and the
-    last page's matches job_end_date.
-    """
-    try:
-        import pdfplumber
-    except ImportError:
-        return None
-    try:
-        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            if page_index >= len(pdf.pages):
-                return None
-            text = pdf.pages[page_index].extract_text() or ""
-    except Exception:
-        return None
-    if not text:
-        return None
-
-    flat = re.sub(r"[ \t]+", " ", text)
+def _find_period_in_flat_text(flat):
+    """Search already-flattened page text for a labelled period. Shared by
+    the normal path and the garbled-font recovery path below -- both end up
+    with a flat string, just decoded differently."""
     for label in _PDF_TEXT_LABELS:
         pattern = re.escape(label).replace(r"\ ", r"\s*")
         for m in re.finditer(pattern, flat, re.I):
@@ -583,8 +708,148 @@ def _period_from_pdf_text(pdf_bytes, page_index=0):
             window = flat[m.end():line_end if line_end != -1 else len(flat)]
             period = _to_period(window)
             if period:
-                return period, f"pdf_text:page{page_index + 1}:{label}={window.strip()[:24]!r}"
+                return period, label, window.strip()[:24]
     return None
+
+
+# Words expected to appear literally on these report pages -- used only to
+# SCORE candidate decodings of a garbled font (see _degarble_text), never to
+# search real (correctly-decoded) text. Needs at least 2 distinct hits
+# before a shift is trusted, so a coincidental one-word match on a still-wrong
+# shift can't win.
+_PDF_SANITY_WORDS = ("date", "vessel", "report", "name", "category", "week", "month", "deck", "engine")
+
+
+def _degarble_text(text):
+    """Recover readable text from a PDF whose font's glyph-to-Unicode
+    mapping is broken -- e.g. a real "Deck Weekly Workdone Report" PDF
+    (10TH-16TH AUG 2026, MV AM UMANG) where pdfplumber's extract_text()
+    returns "'$7(<control-chars>7+<control-chars>$8*<control-chars>",
+    control characters and all -- not empty, not an exception, just every
+    character consistently offset from its real codepoint (confirmed against
+    both pdfplumber and PyMuPDF, which decode it identically wrong, so this
+    is the PDF's own broken/missing ToUnicode CMap, not a library bug).
+    Manually reversing the offset on that real file recovered
+    "DATE = 10TH AUG 2026" -- the exact same label this module already
+    searches for -- at a shift of +29.
+
+    The correct shift is a property of that file's specific broken font, not
+    a constant to hardcode: a different broken PDF could need a different
+    offset. So instead of guessing one number, every plausible shift is
+    tried and scored by how many distinct expected words (_PDF_SANITY_WORDS)
+    it reveals -- the same brute-force-then-validate approach used nowhere
+    else in this module because nowhere else is the alphabet itself in
+    question, only the value.
+
+    Returns the best-scoring decoded text, or None if nothing scored highly
+    enough to trust (avoids "decoding" already-fine text, or text that is
+    genuinely unrecoverable, into a confident-looking wrong answer).
+    """
+    # A normal extraction has essentially no C0 control characters outside
+    # \n\t\r. A meaningful density of them is the actual signal that this
+    # text is glyph codes, not characters -- cheap to check before paying
+    # for ~120 shift-and-score attempts on every ordinary PDF.
+    control = sum(1 for c in text if ord(c) < 32 and c not in "\n\t\r")
+    printable = sum(1 for c in text if c not in "\n\t\r")
+    if printable == 0 or control / printable < 0.05:
+        return None
+
+    best_text, best_score = None, 0
+    for shift in range(-60, 61):
+        if shift == 0:
+            continue
+        try:
+            candidate = "".join(
+                chr(ord(c) + shift) if ord(c) + shift >= 0 else c
+                for c in text
+            )
+        except ValueError:
+            continue
+        low = candidate.lower()
+        score = sum(1 for w in _PDF_SANITY_WORDS if w in low)
+        if score > best_score:
+            best_score, best_text = score, candidate
+    if best_score >= 2:
+        return best_text
+    return None
+
+
+def _period_from_pdf_text(pdf_bytes, page_index=0):
+    """Flat (non-form) PDFs carry their date as plain page text instead of
+    a form field -- e.g. the WEEKLY DAILY WORK DONE bundles (one page per
+    day, each headed 'DATE : <that day>') or a BWMS log's 'StartTime
+    <timestamp>'. Only `page_index` (default the first page) is read: a
+    multi-page weekly bundle spans a date range with one page per day, and
+    the report is filed under the START of the period it covers, per the
+    same convention as MariApps' own job_start_date -- confirmed against
+    real files where the first page's date matches job_start_date and the
+    last page's matches job_end_date.
+
+    Landscape / rotated PDFs (e.g. TECH-08A Scavenge Port Inspection
+    Template submitted as a flattened/compressed PDF) can confuse
+    pdfplumber's extract_text() -- the spatial ordering of glyphs is
+    disrupted by the page rotation so the label 'Date:' and its value end
+    up in different lines or are interleaved with unrelated columns.  When
+    the standard pass finds nothing, a second pass reconstructs the text by
+    sorting the page's individual words by their Y-coordinate (row) and
+    then X-coordinate (column), which is independent of any page-rotation
+    metadata and always produces a reading-order stream.
+    """
+    try:
+        import pdfplumber
+    except ImportError:
+        return None
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            if page_index >= len(pdf.pages):
+                return None
+            page = pdf.pages[page_index]
+            text = page.extract_text() or ""
+
+            flat = re.sub(r"[ \t]+", " ", text)
+            found = _find_period_in_flat_text(flat)
+            if not found:
+                degarbled = _degarble_text(text)
+                if degarbled:
+                    found = _find_period_in_flat_text(re.sub(r"[ \t]+", " ", degarbled))
+                    if found:
+                        period, label, snippet = found
+                        return period, f"pdf_text:page{page_index + 1}:degarbled:{label}={snippet!r}"
+
+            if not found:
+                # Fallback: reconstruct text from individual word positions.
+                # This is robust to landscape/rotated pages where extract_text()
+                # loses reading order -- sorting by (top, x0) gives a correct
+                # left-to-right, top-to-bottom stream regardless of rotation.
+                try:
+                    words = page.extract_words(keep_blank_chars=False)
+                    if words:
+                        # Group words into lines by rounding Y to nearest 10pt bucket
+                        lines: dict[int, list] = {}
+                        for w in words:
+                            bucket = round(w["top"] / 10) * 10
+                            lines.setdefault(bucket, []).append(w)
+                        reconstructed_lines = []
+                        for bucket in sorted(lines):
+                            row_words = sorted(lines[bucket], key=lambda w: w["x0"])
+                            reconstructed_lines.append(" ".join(w["text"] for w in row_words))
+                        spatial_text = "\n".join(reconstructed_lines)
+                        flat2 = re.sub(r"[ \t]+", " ", spatial_text)
+                        found = _find_period_in_flat_text(flat2)
+                        if found:
+                            period, label, snippet = found
+                            return period, f"pdf_text:page{page_index + 1}:spatial:{label}={snippet!r}"
+                except Exception:
+                    pass
+
+            if not found:
+                return None
+
+            period, label, snippet = found
+            return period, f"pdf_text:page{page_index + 1}:{label}={snippet!r}"
+    except Exception:
+        return None
+
 
 
 def _period_from_xlsx_sheet_titles(file_bytes):
@@ -592,7 +857,16 @@ def _period_from_xlsx_sheet_titles(file_bytes):
     WORKSHEET'S OWN TAB NAME rather than any cell -- observed on "3. Hyd
     Corrosion Maintenance Plan...xlsx", whose real content sheet is
     literally titled "CMP 01.08.2026" (its own "Guideline" sheet instructs
-    users to encode the date there). Tried per-sheet, first match wins.
+    users to encode the date there).
+
+    Every dated sheet is tried and the LATEST one wins, not the first --
+    a real "Deck Corrosion Maintenance Plan" workbook was found where the
+    vessel appends a new dated sheet every week instead of overwriting the
+    old one (CMP 04.01.2026, CMP 11.01.2026, ... CMP 16.08.2026, all in one
+    file, oldest first). First-match-wins picked January out of a workbook
+    that was actually just submitted for the 16-Aug week, off by over 7
+    months. A one-sheet-per-submission file (the common case) still only
+    has one candidate to pick from, so this is a strict improvement there.
     """
     try:
         from openpyxl import load_workbook
@@ -603,10 +877,17 @@ def _period_from_xlsx_sheet_titles(file_bytes):
     except Exception:
         return None
     try:
+        latest = None  # (datetime, period, title)
         for ws in wb.worksheets:
             period = _to_period(ws.title)
-            if period:
-                return period, f"xlsx:sheet_title:{ws.title!r}"
+            if not period:
+                continue
+            dt = _safe_date(*period)
+            if latest is None or dt > latest[0]:
+                latest = (dt, period, ws.title)
+        if latest:
+            _, period, title = latest
+            return period, f"xlsx:sheet_title:{title!r}"
         return None
     finally:
         try:
@@ -642,7 +923,13 @@ def extract_report_period(file_bytes, file_name=""):
             (year, month, day), source = found
             return _safe_date(year, month, day), source
 
-        found = _period_from_pdf_text(file_bytes)
+        found = None
+        for _page_idx in range(3):  # try cover + next 2 pages; some PDFs have
+            # a blank/image-only cover (e.g. Vessel Condition Report-Engine
+            # whose page 1 is a photo cover and page 2 carries the DATE field)
+            found = _period_from_pdf_text(file_bytes, _page_idx)
+            if found:
+                break
         if found:
             (year, month, day), source = found
             return _safe_date(year, month, day), source
