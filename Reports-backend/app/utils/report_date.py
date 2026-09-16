@@ -241,18 +241,19 @@ def _period_from_form(pdf_bytes, filename=""):
     # the top (e.g. Aug-26), but the crew adds new dates to the bottom of the
     # table each week (e.g. testcarriedoutdate#34 = '23-Aug-26'). The latest
     # date in the actual data table always wins over stale header fields.
-    accumulating_dates = []
-    for k, v in lowered.items():
-        if k.startswith("testcarriedoutdate"):
-            period = _to_period(v[1])
-            if period:
-                dt = _safe_date(*period)
-                accumulating_dates.append((dt, period, v[0], v[1]))
-    
-    if accumulating_dates:
-        accumulating_dates.sort(key=lambda x: x[0], reverse=True)
-        _, best_period, best_k, best_v = accumulating_dates[0]
-        return best_period, f"form:{best_k}={best_v!r}"
+    if "TECH-57" in filename.upper() or "TECH - 57" in filename.upper():
+        accumulating_dates = []
+        for k, v in lowered.items():
+            if k.startswith("testcarriedoutdate"):
+                period = _to_period(v[1])
+                if period:
+                    dt = _safe_date(*period)
+                    accumulating_dates.append((dt, period, v[0], v[1]))
+        
+        if accumulating_dates:
+            accumulating_dates.sort(key=lambda x: x[0], reverse=True)
+            _, best_period, best_k, best_v = accumulating_dates[0]
+            return best_period, f"form:{best_k}={best_v!r}"
 
     if month_hit and date_hit:
         m_key, m_val, (m_year, m_month, _) = month_hit
@@ -542,11 +543,13 @@ def _period_from_xlsx_labelled(file_bytes):
                     if v is None:
                         continue
                     if isinstance(v, datetime):
-                        header_info = column_header_row.get(coord[1])
-                        if header_info is not None:
-                            header_row_idx, header_norm = header_info
-                            if 0 < row_idx - header_row_idx <= COLUMN_HEADER_WINDOW:
-                                _record(header_norm, (v.year, v.month, v.day), f"xlsx:{ws.title}!{header_norm}={v.date()}(column)")
+                        is_tech_57_or_06 = "TECH-57" in filename.upper() or "TECH-06" in filename.upper() or "TECH - 57" in filename.upper() or "TECH - 06" in filename.upper()
+                        if is_tech_57_or_06:
+                            header_info = column_header_row.get(coord[1])
+                            if header_info is not None:
+                                header_row_idx, header_norm = header_info
+                                if 0 < row_idx - header_row_idx <= COLUMN_HEADER_WINDOW:
+                                    _record(header_norm, (v.year, v.month, v.day), f"xlsx:{ws.title}!{header_norm}={v.date()}(column)")
 
                         if label_seen_at is not None:
                             # Include the actual label AND the resolved value here --
@@ -1027,7 +1030,7 @@ def extract_report_period(file_bytes, file_name=""):
             return _safe_date(year, month, day), source
 
     elif file_bytes[:2] == b"PK":
-        found = _period_from_xlsx_labelled(file_bytes)
+        found = _period_from_xlsx_labelled(file_bytes, filename=file_name)
         if found:
             (year, month, day), source = found
             return _safe_date(year, month, day), source

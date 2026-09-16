@@ -84,9 +84,16 @@ async def _find_candidates(null_only: bool = False, report_filter: str = None, v
     return candidates
 
 
-async def _extract_for_report(real_attachments):
-    """First attachment to yield a date wins -- same priority as the live
-    scraper (see smartpal_scraper.py's own comment on this)."""
+async def _extract_for_report(real_attachments, report_code=""):
+    """Evaluate ALL attachments and pick the LATEST date found ONLY for
+    accumulating logs (TECH-57, TECH-06). This ensures that if an un-updated
+    PDF form is attached alongside an accumulating Excel log that was genuinely
+    updated, the newer actual date wins over the stale PDF field.
+    For all other reports, the first attachment to yield a date wins."""
+    best_date = None
+    best_source = None
+    is_accumulating_log = "TECH-57" in report_code or "TECH-06" in report_code or "TECH_-_57" in report_code or "TECH_-_06" in report_code
+    
     for att in real_attachments:
         try:
             pdf_bytes = await asyncio.to_thread(download_blob_bytes, att.blob_path)
@@ -101,7 +108,15 @@ async def _extract_for_report(real_attachments):
             logger.warning(f"  extract_report_period failed for '{att.file_name}': {e}")
             continue
         if found:
-            return found
+            f_date, f_src = found
+            if not is_accumulating_log:
+                return found
+            if best_date is None or f_date > best_date:
+                best_date = f_date
+                best_source = f_src
+                
+    if best_date:
+        return (best_date, best_source)
     return None
 
 
@@ -132,7 +147,7 @@ async def main():
         logger.info(f"[{idx+1}/{len(candidates)}] {label}: reading {len(real_attachments)} attachment(s)...")
 
         try:
-            found = await _extract_for_report(real_attachments)
+            found = await _extract_for_report(real_attachments, str(r.report_code))
         except Exception as e:
             logger.error(f"  Error processing {label}: {e}")
             failed += 1
