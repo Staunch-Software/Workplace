@@ -236,6 +236,24 @@ def _period_from_form(pdf_bytes):
     month_hit = _find_field(lowered, PERIOD_FIELDS)  # e.g. reportmonth = 'Aug-26'
     date_hit = _find_field(lowered, DATE_FIELDS)      # e.g. date = '31-Aug-26'
 
+    # Check for accumulating log rows (e.g. 'testcarriedoutdate#34').
+    # A real TECH-57 PDF form has stale 'reportmonth' and 'date' fields at
+    # the top (e.g. Aug-26), but the crew adds new dates to the bottom of the
+    # table each week (e.g. testcarriedoutdate#34 = '23-Aug-26'). The latest
+    # date in the actual data table always wins over stale header fields.
+    accumulating_dates = []
+    for k, v in lowered.items():
+        if k.startswith("testcarriedoutdate"):
+            period = _to_period(v[1])
+            if period:
+                dt = _safe_date(*period)
+                accumulating_dates.append((dt, period, v[0], v[1]))
+    
+    if accumulating_dates:
+        accumulating_dates.sort(key=lambda x: x[0], reverse=True)
+        _, best_period, best_k, best_v = accumulating_dates[0]
+        return best_period, f"form:{best_k}={best_v!r}"
+
     if month_hit and date_hit:
         m_key, m_val, (m_year, m_month, _) = month_hit
         d_key, d_val, (d_year, d_month, d_day) = date_hit
