@@ -1551,13 +1551,19 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
         if not attachments:
             logger.warning(f"No attachments were downloaded for job: {job_order_no} (Saving record with 0 attachments)")
 
-        # If no attachment yielded an extractable date (e.g. image PDF, range-
-        # based report, unsupported format), fall back to job_end_date which
-        # SmartPAL records as the end of the job period for the report.
-        if report_date is None and job_end_date is not None:
-            report_date = job_end_date
-            report_date_source = "job_end_date:fallback"
-            logger.info(f"  No date extracted from any attachment -- using job_end_date={job_end_date.date()} as fallback.")
+        # Fallbacks when no attachment yielded an extractable date (e.g. image PDF):
+        if report_date is None:
+            from app.utils.report_date import uses_job_end_date_fallback
+            if uses_job_end_date_fallback(report_code, report_name) and job_end_date is not None:
+                # Specific reports (like Boiler) requested to use job_end_date 
+                report_date = job_end_date
+                report_date_source = "job_end_date:fallback"
+                logger.info(f"  No date extracted -- using job_end_date={job_end_date.date()} as fallback for {report_code}.")
+            elif due_date is not None:
+                # General fallback is due_date (period deadline approximation)
+                report_date = due_date
+                report_date_source = "due_date:fallback"
+                logger.info(f"  No date extracted -- using due_date={due_date.date()} as general fallback.")
 
         logger.info(f"Successfully uploaded {len(attachments)} blobs for job {job_order_no}.")
 

@@ -696,6 +696,27 @@ def _period_from_xlsx_latest_date(file_bytes):
 # timestamp, not the period -- but "report for" is specific enough wording
 # that it can't accidentally match "report created", so no extra guard
 # (unlike the rev/edition trap below) is needed here.
+
+# ---------------------------------------------------------------------------
+# Per-report fallback rules
+# ---------------------------------------------------------------------------
+# Reports whose PDFs show a DATE RANGE (start - end) and whose report_date
+# should therefore come from job_end_date (scraped from SmartPAL) rather than
+# being parsed out of the PDF.  Add a report here when the user explicitly
+# requests this behaviour for a specific report type.
+# Match is case-insensitive substring against EITHER report_code OR report_name.
+_JOB_END_DATE_FALLBACK_REPORTS: tuple = (
+    "BOILER",       # WEEKLY-06-BOILER AND COOLER WATER REPORT / WATERPROOF REPORT
+)
+
+
+def uses_job_end_date_fallback(report_code: str, report_name: str) -> bool:
+    """Return True if this report type should use job_end_date when PDF
+    extraction returns None (e.g. range-based PDFs like Boiler/Waterproof)."""
+    haystack = f"{report_code or ''} {report_name or ''}".upper()
+    return any(p.upper() in haystack for p in _JOB_END_DATE_FALLBACK_REPORTS)
+
+
 # Labels that introduce a DATE RANGE (start - end) rather than a single date.
 # For these we want the END of the range (the last day covered), not the start.
 _PDF_RANGE_LABELS = {"report for", "report period", "reporting period"}

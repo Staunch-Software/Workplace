@@ -139,14 +139,15 @@ async def main():
             continue
 
         if not found:
-            # Attachment is unreadable or shows a date range (image PDF, docx,
-            # range-based Waterproof report etc.). Fall back to job_end_date
-            # which SmartPAL records as the end of the job period.
-            if r.job_end_date:
+            from app.utils.report_date import uses_job_end_date_fallback
+            if uses_job_end_date_fallback(r.report_code, r.report_name) and r.job_end_date:
                 found = (r.job_end_date, "job_end_date:fallback")
-                logger.info(f"  No date in attachment -- falling back to job_end_date={r.job_end_date.date()}")
+                logger.info(f"  No date in attachment -- falling back to job_end_date={r.job_end_date.date()} for {r.report_code}")
+            elif r.due_date:
+                found = (r.due_date, "due_date:fallback")
+                logger.info(f"  No date in attachment -- falling back to due_date={r.due_date.date()} as general fallback")
             else:
-                logger.info(f"  No recoverable date and no job_end_date for {label} -- leaving as-is.")
+                logger.info(f"  No recoverable date and no fallback date for {label} -- leaving as-is.")
                 unresolved += 1
                 continue
 
