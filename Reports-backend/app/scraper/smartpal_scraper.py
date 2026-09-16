@@ -1163,7 +1163,7 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                                         upload_pdf_to_blob(pdf_bytes, blob_name)
                                         attachments.append({"file_name": pdf_filename, "blob_path": blob_name})
                                         should_extract = True
-                                        is_accumulating_log = "TECH-57" in report_code or "TECH-06" in report_code or "TECH_-_57" in report_code or "TECH_-_06" in report_code
+                                        is_accumulating_log = any(code in report_code for code in ["TECH-57", "TECH_-_57", "TECH-06", "TECH_-_06", "TECH-48", "TECH_-_48", "TECH-49", "TECH_-_49", "TECH-04", "TECH_-_04"])
                                         if report_date is not None and not is_accumulating_log:
                                             should_extract = False
                                             

@@ -239,7 +239,8 @@ def _period_from_form(pdf_bytes, filename=""):
     # the top (e.g. Aug-26), but the crew adds new dates to the bottom of the
     # table each week (e.g. testcarriedoutdate#34 = '23-Aug-26'). The latest
     # date in the actual data table always wins over stale header fields.
-    if "TECH-57" in filename.upper() or "TECH - 57" in filename.upper():
+    is_accumulating_log = any(code in filename.upper() for code in ["TECH-57", "TECH - 57", "TECH-06", "TECH - 06", "TECH-48", "TECH - 48", "TECH-49", "TECH - 49", "TECH-04", "TECH - 04"])
+    if is_accumulating_log:
         accumulating_dates = []
         for k, v in lowered.items():
             if k.startswith("testcarriedoutdate"):
@@ -319,7 +320,7 @@ _XLSX_DAY_LABELS = {
 }
 _XLSX_MONTH_ONLY_LABELS = {
     "month", "report month", "reporting month", "reportmonth",
-    "period", "year month", "month year",
+    "period", "year month", "month year", "logging month",
     "report week", "week", "reporting period",
 }
 _XLSX_PERIOD_LABELS = _XLSX_DAY_LABELS | _XLSX_MONTH_ONLY_LABELS
@@ -541,7 +542,7 @@ def _period_from_xlsx_labelled(file_bytes, filename=""):
                     if v is None:
                         continue
                     if isinstance(v, datetime):
-                        is_tech_57_or_06 = "TECH-57" in filename.upper() or "TECH-06" in filename.upper() or "TECH - 57" in filename.upper() or "TECH - 06" in filename.upper()
+                        is_tech_57_or_06 = any(code in filename.upper() for code in ["TECH-57", "TECH - 57", "TECH-06", "TECH - 06", "TECH-48", "TECH - 48", "TECH-49", "TECH - 49", "TECH-04", "TECH - 04"])
                         if is_tech_57_or_06:
                             header_info = column_header_row.get(coord[1])
                             if header_info is not None:
@@ -661,7 +662,7 @@ def _period_from_xlsx_labelled(file_bytes, filename=""):
 
     if day_hit and month_hit:
         (d_year, d_month, d_day), d_src, _ = day_hit
-        (m_year, m_month, _), m_src, _ = month_hit
+        (m_year, m_month, m_day), m_src, _ = month_hit
         if (d_year, d_month) == (m_year, m_month):
             return (d_year, d_month, d_day), d_src
         # Disagree on month -- same completion-lag pattern already handled
@@ -672,7 +673,8 @@ def _period_from_xlsx_labelled(file_bytes, filename=""):
             f"xlsx labelled fields disagree on period: {d_src} vs {m_src} -- "
             f"using the month field and discarding the date field's day."
         )
-        return (m_year, m_month, 1), m_src
+        # Preserve the day from the month field if it has one, otherwise it defaults to 1 (which now falls back anyway)
+        return (m_year, m_month, m_day), m_src
     if day_hit:
         period, source, _ = day_hit
         return period, source

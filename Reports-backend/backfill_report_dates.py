@@ -92,7 +92,7 @@ async def _extract_for_report(real_attachments, report_code=""):
     For all other reports, the first attachment to yield a date wins."""
     best_date = None
     best_source = None
-    is_accumulating_log = "TECH-57" in report_code or "TECH-06" in report_code or "TECH_-_57" in report_code or "TECH_-_06" in report_code
+    is_accumulating_log = any(code in report_code for code in ["TECH-57", "TECH_-_57", "TECH-06", "TECH_-_06", "TECH-48", "TECH_-_48", "TECH-49", "TECH_-_49", "TECH-04", "TECH_-_04"])
     
     for att in real_attachments:
         try:
