@@ -696,7 +696,10 @@ def _period_from_xlsx_latest_date(file_bytes):
 # timestamp, not the period -- but "report for" is specific enough wording
 # that it can't accidentally match "report created", so no extra guard
 # (unlike the rev/edition trap below) is needed here.
-_PDF_TEXT_LABELS = ("report month", "reporting month", "operation date", "start time", "report for", "date")
+# Labels that introduce a DATE RANGE (start - end) rather than a single date.
+# For these we want the END of the range (the last day covered), not the start.
+_PDF_RANGE_LABELS = {"report for", "report period", "reporting period"}
+_PDF_TEXT_LABELS = ("report month", "reporting month", "operation date", "start time", "report period", "report for", "date")
 
 
 def _find_period_in_flat_text(flat):
@@ -728,6 +731,21 @@ def _find_period_in_flat_text(flat):
             # safe to rely on in general.
             line_end = flat.find("\n", m.end())
             window = flat[m.end():line_end if line_end != -1 else len(flat)]
+            # For range-bearing labels (e.g. 'report for') the window may
+            # contain just 'Aug 2026' while the full range '8/1/2026 - 8/31/2026'
+            # sits on the NEXT line (Waterproof/Boiler report layout). We check
+            # both the current line AND the next line, preferring the end of the
+            # range when one is found, so the report resolves to 31 Aug not 01 Aug.
+            if label.lower() in _PDF_RANGE_LABELS:
+                # Build a two-line window: current line + next line
+                next_line_end = flat.find("\n", line_end + 1) if line_end != -1 else -1
+                two_line_window = flat[m.end():next_line_end if next_line_end != -1 else len(flat)]
+                range_m = re.search(r"(\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4})\s*[-\u2013]\s*(\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4})", two_line_window)
+                if range_m:
+                    end_period = _to_period(range_m.group(2), day_first=False)
+                    if end_period:
+                        return end_period, label, two_line_window.strip()[:40]
+
             period = _to_period(window)
             if period:
                 return period, label, window.strip()[:24]

@@ -139,9 +139,17 @@ async def main():
             continue
 
         if not found:
-            logger.info(f"  No recoverable date in any attachment for {label} -- leaving as-is.")
-            unresolved += 1
-            continue
+            # Attachment is unreadable (image PDF, docx, etc.). Fall back to
+            # due_date which SmartPAL sets to the period deadline and is the
+            # best available approximation of the report period when the file
+            # itself yields no extractable date.
+            if r.due_date:
+                found = (r.due_date, "due_date:fallback")
+                logger.info(f"  No date in attachment -- falling back to due_date={r.due_date.date()}")
+            else:
+                logger.info(f"  No recoverable date in any attachment for {label} and no due_date -- leaving as-is.")
+                unresolved += 1
+                continue
 
         report_date, report_date_source = found
 
