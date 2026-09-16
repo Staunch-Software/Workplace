@@ -523,8 +523,8 @@ def _period_from_xlsx_labelled(file_bytes, filename=""):
             # Every value found in that column within the window below is tried
             # and the latest wins, same rule as everywhere else in this module.
             column_header_row = {}
-            COLUMN_HEADER_WINDOW = 200
-            for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=500, max_col=200), start=1):
+            COLUMN_HEADER_WINDOW = float('inf')
+            for row_idx, row in enumerate(ws.iter_rows(min_row=1), start=1):
                 label_seen_at = None
                 label_seen_norm = None
                 for i, cell in enumerate(row):
