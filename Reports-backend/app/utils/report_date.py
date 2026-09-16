@@ -313,6 +313,11 @@ _XLSX_IGNORE_LABELS_CONTAINS = ("revision", "form no")
 # actually written.
 _XLSX_MONTH_FIRST_LABELS = {"sample date"}
 
+# Labels that appear as TABLE COLUMN headers rather than same-row
+# "label: value" pairs. A real "Cooling Test" log has 'DATE' at A2 with
+# its actual values in A3, A7... below it, nothing to its right.
+_XLSX_COLUMN_HEADER_LABELS = {"sample date", "date", "date of report"}
+
 
 def _normalize_label(s):
     s = re.sub(r"[/\-]", " ", s)
@@ -485,16 +490,14 @@ def _period_from_xlsx_labelled(file_bytes):
             # sheet's real, unrelated date field instead of locking onto it.
             header_stamp_row = {}
             HEADER_STAMP_WINDOW = 3
-            # Column -> row index of a _XLSX_MONTH_FIRST_LABELS header (e.g.
-            # "Sample date"). Unlike every other recognised label, this one
-            # is a TABLE COLUMN header, not a same-row "label: value" pair
-            # -- a real "Boiler & Cooling Water Test" log has 'Sample date'
-            # at A14 with its actual values in A15, A16, A17... below it,
-            # nothing to its right. Every value found in that column within
-            # the window below is tried and the latest wins, same rule as
-            # everywhere else in this module a table keeps accumulating rows.
-            month_first_col_header_row = {}
-            MONTH_FIRST_COLUMN_WINDOW = 20
+            # Column -> (row index, label_norm) of a _XLSX_COLUMN_HEADER_LABELS header
+            # (e.g. "Sample date", "Date"). This is a TABLE COLUMN header, not a
+            # same-row "label: value" pair -- a real "Boiler & Cooling Water Test"
+            # log has 'DATE' at A2 with its actual values in A3, A7... below it.
+            # Every value found in that column within the window below is tried
+            # and the latest wins, same rule as everywhere else in this module.
+            column_header_row = {}
+            COLUMN_HEADER_WINDOW = 20
             for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=60, max_col=200), start=1):
                 label_seen_at = None
                 label_seen_norm = None
@@ -541,17 +544,18 @@ def _period_from_xlsx_labelled(file_bytes):
                         row_idx - header_stamp_row[coord[1]] <= HEADER_STAMP_WINDOW
                     )
 
-                    # A data row sitting below a "Sample date"-style COLUMN
-                    # header (see month_first_col_header_row above) -- tried
-                    # unconditionally alongside the normal label logic below,
+                    # A data row sitting below a COLUMN header (see column_header_row)
+                    # -- tried unconditionally alongside the normal label logic below,
                     # since a bare '8/16/2026' string wouldn't match any of
                     # that logic (it isn't itself a label, and it isn't in
                     # the same row as one).
-                    header_row = month_first_col_header_row.get(coord[1])
-                    if header_row is not None and 0 < row_idx - header_row <= MONTH_FIRST_COLUMN_WINDOW:
-                        col_period = _to_period(s, day_first=False)
-                        if col_period:
-                            _record("sample date", col_period, f"xlsx:{ws.title}!{s!r}(column)")
+                    header_info = column_header_row.get(coord[1])
+                    if header_info is not None:
+                        header_row_idx, header_norm = header_info
+                        if 0 < row_idx - header_row_idx <= COLUMN_HEADER_WINDOW:
+                            col_period = _to_period(s, day_first=header_norm not in _XLSX_MONTH_FIRST_LABELS)
+                            if col_period:
+                                _record(header_norm, col_period, f"xlsx:{ws.title}!{s!r}(column)")
 
                     # Label and value typed together in ONE cell, e.g.
                     # "Report date : 06/09/2026" as a single string -- the
@@ -573,8 +577,8 @@ def _period_from_xlsx_labelled(file_bytes):
                     if norm in _XLSX_PERIOD_LABELS:
                         if near_header_stamp:
                             continue
-                        if norm in _XLSX_MONTH_FIRST_LABELS:
-                            month_first_col_header_row[coord[1]] = row_idx
+                        if norm in _XLSX_COLUMN_HEADER_LABELS:
+                            column_header_row[coord[1]] = (row_idx, norm)
                         label_seen_at = i
                         label_seen_norm = norm
                         continue
