@@ -1547,12 +1547,20 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
             # The report's real period lives inside the file, not in any
             # SmartPAL date -- see app/utils/report_date.py. First
             # attachment to yield one wins; later ones (e.g. a scanned
-            # signature page) rarely carry a cleaner answer.
-            if report_date is None:
+            # signature page) rarely carry a cleaner answer -- EXCEPT for
+            # accumulating logs (TECH-57, TECH-06, ...), where the crew
+            # re-uploads the same cumulative file with one more row filled
+            # in each week, so a later attachment's date is never stale --
+            # it can only be equal or newer. Mirrors the PENDING loop above
+            # and backfill_report_dates.py, which already do this.
+            is_accumulating_log = any(code in pdf_filename.upper() for code in ["TECH-57", "TECH - 57", "TECH-06", "TECH - 06", "TECH-48", "TECH - 48", "TECH-49", "TECH - 49", "TECH-04", "TECH - 04"])
+            if report_date is None or is_accumulating_log:
                 try:
                     found = await asyncio.to_thread(extract_report_period, pdf_bytes, pdf_filename)
                     if found:
-                        report_date, report_date_source = found
+                        f_date, f_src = found
+                        if report_date is None or (is_accumulating_log and f_date > report_date):
+                            report_date, report_date_source = f_date, f_src
                 except Exception as e:
                     logger.warning(f"Report-date extraction failed for '{pdf_filename}': {e}")
 
