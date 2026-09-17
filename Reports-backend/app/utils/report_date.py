@@ -234,25 +234,36 @@ def _period_from_form(pdf_bytes, filename=""):
     month_hit = _find_field(lowered, PERIOD_FIELDS)  # e.g. reportmonth = 'Aug-26'
     date_hit = _find_field(lowered, DATE_FIELDS)      # e.g. date = '31-Aug-26'
 
-    # Check for accumulating log rows (e.g. 'testcarriedoutdate#34').
+    # Check for accumulating log rows (e.g. 'testcarriedoutdate#34'). This
+    # field name is a dedicated, repeating-row marker used by ONLY this
+    # family of weekly log templates (TECH-57, TECH-06, ...) -- it is
+    # globally reserved and excluded from generic date matching (see
+    # IGNORE_FIELDS above), so its mere presence on the form is itself
+    # sufficient signal, with no need to also match the report against a
+    # filename. Matching by filename was tried first and found unreliable:
+    # the template's OWN printed naming instructions say to name the file
+    # "TE-57 Onboard Weekly LO Analysis_Month_Year_1" (missing the "CH"),
+    # and real crew uploads follow that literally (e.g. "7. TE-57 Onboard
+    # Weekly LO Analysis- WEEK 35.pdf") -- a "TECH-57" substring check never
+    # matches those, silently falling through to the stale header 'date'
+    # field instead of the true latest row.
+    #
     # A real TECH-57 PDF form has stale 'reportmonth' and 'date' fields at
     # the top (e.g. Aug-26), but the crew adds new dates to the bottom of the
     # table each week (e.g. testcarriedoutdate#34 = '23-Aug-26'). The latest
     # date in the actual data table always wins over stale header fields.
-    is_accumulating_log = any(code in filename.upper() for code in ["TECH-57", "TECH - 57", "TECH-06", "TECH - 06", "TECH-48", "TECH - 48", "TECH-49", "TECH - 49", "TECH-04", "TECH - 04"])
-    if is_accumulating_log:
-        accumulating_dates = []
-        for k, v in lowered.items():
-            if k.startswith("testcarriedoutdate"):
-                period = _to_period(v[1])
-                if period:
-                    dt = _safe_date(*period)
-                    accumulating_dates.append((dt, period, v[0], v[1]))
-        
-        if accumulating_dates:
-            accumulating_dates.sort(key=lambda x: x[0], reverse=True)
-            _, best_period, best_k, best_v = accumulating_dates[0]
-            return best_period, f"form:{best_k}={best_v!r}"
+    accumulating_dates = []
+    for k, v in lowered.items():
+        if k.startswith("testcarriedoutdate"):
+            period = _to_period(v[1])
+            if period:
+                dt = _safe_date(*period)
+                accumulating_dates.append((dt, period, v[0], v[1]))
+
+    if accumulating_dates:
+        accumulating_dates.sort(key=lambda x: x[0], reverse=True)
+        _, best_period, best_k, best_v = accumulating_dates[0]
+        return best_period, f"form:{best_k}={best_v!r}"
 
     if month_hit and date_hit:
         m_key, m_val, (m_year, m_month, _) = month_hit
@@ -542,13 +553,17 @@ def _period_from_xlsx_labelled(file_bytes, filename=""):
                     if v is None:
                         continue
                     if isinstance(v, datetime):
-                        is_tech_57_or_06 = any(code in filename.upper() for code in ["TECH-57", "TECH - 57", "TECH-06", "TECH - 06", "TECH-48", "TECH - 48", "TECH-49", "TECH - 49", "TECH-04", "TECH - 04"])
+                        # NOTE: the template's own printed naming instructions say
+                        # "TE-57" (missing "CH"), and real crew uploads follow that
+                        # literally -- "TECH-57"/"TECH - 57" alone would silently
+                        # never match those files, so both forms are checked here.
+                        is_tech_57_or_06 = any(code in filename.upper() for code in ["TECH-57", "TECH - 57", "TE-57", "TE - 57", "TECH-06", "TECH - 06", "TECH-48", "TECH - 48", "TECH-49", "TECH - 49", "TECH-04", "TECH - 04"])
                         if is_tech_57_or_06:
                             header_info = column_header_row.get(coord[1])
                             if header_info is not None:
                                 header_row_idx, header_norm = header_info
                                 if 0 < row_idx - header_row_idx <= COLUMN_HEADER_WINDOW:
-                                    is_tech_57 = "TECH-57" in filename.upper() or "TECH - 57" in filename.upper()
+                                    is_tech_57 = any(code in filename.upper() for code in ["TECH-57", "TECH - 57", "TE-57", "TE - 57"])
                                     has_data = is_tech_57 or any(
                                         c.value is not None and str(c.value).strip() != ""
                                         for idx, c in enumerate(row) if idx != i
@@ -594,7 +609,7 @@ def _period_from_xlsx_labelled(file_bytes, filename=""):
                         if 0 < row_idx - header_row_idx <= COLUMN_HEADER_WINDOW:
                             col_period = _to_period(s, day_first=header_norm not in _XLSX_MONTH_FIRST_LABELS)
                             if col_period:
-                                is_tech_57 = "TECH-57" in filename.upper() or "TECH - 57" in filename.upper()
+                                is_tech_57 = any(code in filename.upper() for code in ["TECH-57", "TECH - 57", "TE-57", "TE - 57"])
                                 has_data = is_tech_57 or any(
                                     c.value is not None and str(c.value).strip() != ""
                                     for idx, c in enumerate(row) if idx != i

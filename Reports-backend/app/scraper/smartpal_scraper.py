@@ -1553,7 +1553,12 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
             # in each week, so a later attachment's date is never stale --
             # it can only be equal or newer. Mirrors the PENDING loop above
             # and backfill_report_dates.py, which already do this.
-            is_accumulating_log = any(code in pdf_filename.upper() for code in ["TECH-57", "TECH - 57", "TECH-06", "TECH - 06", "TECH-48", "TECH - 48", "TECH-49", "TECH - 49", "TECH-04", "TECH - 04"])
+            # Gated on report_code (a stable internal identifier), NOT the
+            # crew-typed filename -- the official template's own naming
+            # instructions say "TE-57" (missing "CH"), so real attachments
+            # are often named "7. TE-57 Onboard Weekly LO Analysis...pdf"
+            # and a "TECH-57" filename check would silently never match.
+            is_accumulating_log = any(code in report_code for code in ["TECH-57", "TECH_-_57", "TECH-06", "TECH_-_06", "TECH-48", "TECH_-_48", "TECH-49", "TECH_-_49", "TECH-04", "TECH_-_04"])
             if report_date is None or is_accumulating_log:
                 try:
                     found = await asyncio.to_thread(extract_report_period, pdf_bytes, pdf_filename)
