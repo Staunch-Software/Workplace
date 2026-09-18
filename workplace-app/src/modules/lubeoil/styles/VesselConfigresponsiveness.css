@@ -257,6 +257,34 @@
     font-size: 0.88rem !important;
   }
 
+  /* FIX: "Configure Equipment" was previously only forced onto its own
+     row at <=480px (see .vessel-card .action-btn further down), leaving
+     481-767px as a dead zone where the button squeezed/overflowed next
+     to the vessel info block. flex-basis (not just width) guarantees an
+     actual line break here, matching the section-header fix above. */
+  .vessel-card .action-btn {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    justify-content: center !important;
+  }
+  /* Let the info block (icon + name/IMO/badges) actually give up space
+     to make room for the button's own line, instead of only its text
+     squeezing/wrapping internally while staying alongside the button. */
+  .vessel-card > div:first-child {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+  }
+  .vessel-card > div:first-child > div:last-child {
+    min-width: 0 !important;
+  }
+  /* The IMO / Active-badge / equipment-count line is itself an unwrapped
+     flex row (gap:8px) that can be wider than the card on narrow phones —
+     let it wrap instead of forcing horizontal overflow. */
+  .vessel-card div[style*="margin-top: 3px"] {
+    flex-wrap: wrap !important;
+    row-gap: 4px !important;
+  }
+
   /* ── Equipment category accordion ── */
 
   /* Horizontal scroll wrapper for category tables */
@@ -467,5 +495,315 @@
   .lub-mapping-table-wrap table,
   .lub-equip-category-table-wrap table {
     min-width: unset !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ADDITIONAL RESPONSIVE FIXES — targeting the ACTUAL rendered markup.
+   NOTE: VesselConfig.jsx's outer layout elements (topbar, sidebar,
+   content panel, section header, modals, table wrappers) do not carry
+   any of the `.lub-*` className hooks the blocks above expect — they are
+   plain inline-styled <div>s. Per the additive-only / no-JSX-edit
+   constraint, these new blocks use the real classNames that ARE present
+   (.vessel-card, .nav-item, .eq-row, .action-btn, .toggle-pill) plus
+   attribute selectors on unique inline-style fragments (px landmarks,
+   which render verbatim, unlike colors which browsers renormalize) to
+   reach the unclassed structural wrappers. All existing blocks above are
+   left untouched; nothing here removes or rewrites a prior rule.
+═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Fixed layout landmarks used below ──────────────────────────────────
+   Topbar   : height:56px + z-index:300 (position:fixed, top:0)
+   Sidebar  : top:56px (only the sidebar sits at that offset)
+   Content  : margin-left:300px (offset by sidebar width)
+   Section header : margin-top:-16px (sticky header negative-margin trick)
+   Equip category card : margin-bottom:12px + border-radius:12px
+   Mapping table wrap   : border-radius:0 0 12px 12px
+   Mapping header bar   : border-radius:12px 12px 0 0
+   Equip modal card     : width:480px
+   Toast                : z-index:99999
+───────────────────────────────────────────────────────────────────────── */
+
+/* ═══════════════════════════════════════════════════════════════
+   TABLET  (768px – 1024px): narrow the sidebar, keep labels
+═══════════════════════════════════════════════════════════════ */
+@media (max-width: 1024px) and (min-width: 768px) {
+  div[style*="top: 56px"][style*="position: fixed"] {
+    width: 220px !important;
+  }
+  div[style*="margin-left: 300px"] {
+    margin-left: 220px !important;
+    padding-left: 18px !important;
+    padding-right: 18px !important;
+  }
+  div[style*="margin: -16px -24px 20px"] {
+    padding-left: 18px !important;
+    padding-right: 18px !important;
+    margin-left: -18px !important;
+    margin-right: -18px !important;
+    flex-wrap: wrap !important;
+    row-gap: 10px !important;
+  }
+  input[style*="width: 220px"] {
+    width: 100% !important;
+    max-width: 260px !important;
+  }
+  .vessel-card {
+    flex-wrap: wrap !important;
+    row-gap: 12px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE (landscape + portrait, <= 767px): collapse sidebar to an
+   icon-only rail so content gets the width it needs.
+═══════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  /* Sidebar → icon rail */
+  div[style*="top: 56px"][style*="position: fixed"] {
+    width: 64px !important;
+    padding: 16px 6px !important;
+  }
+  /* Hide the "Navigation" caption */
+  div[style*="top: 56px"][style*="position: fixed"] > div[style*="letter-spacing: 1px"] {
+    display: none !important;
+  }
+  /* Hide the label/description text block inside each nav item, keep icon */
+  .nav-item > div[style*="flex: 1"] {
+    display: none !important;
+  }
+  .nav-item {
+    justify-content: center !important;
+    padding: 12px 4px !important;
+    min-height: 44px !important;
+  }
+  /* Hide the count badge in the rail (keeps the highlight dot) */
+  .nav-item > span[style*="border-radius: 10px"] {
+    display: none !important;
+  }
+  /* Sidebar footer summary is text-heavy; hide in rail mode */
+  div[style*="top: 56px"][style*="position: fixed"] div[style*="margin-top: auto"] {
+    display: none !important;
+  }
+
+  /* Content panel shifts to match the icon rail */
+  div[style*="margin-left: 300px"] {
+    margin-left: 64px !important;
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+
+  /* Topbar: tighten padding, shrink title, hide subtitle line */
+  div[style*="height: 56px"][style*="z-index: 300"] {
+    padding: 0 14px !important;
+  }
+  div[style*="height: 56px"][style*="z-index: 300"] div[style*="margin-top: 1px"] {
+    display: none !important;
+  }
+  div[style*="height: 56px"][style*="z-index: 300"] div[style*="width: 1px"] {
+    display: none !important;
+  }
+
+  /* Section header: stack search below title.
+     NOTE: flex-wrap + flex-basis:100% on the action child (tried
+     previously) was unreliable here — with flex-basis:auto items whose
+     content can itself wrap (the title/subtitle text), browsers can
+     resolve the line-breaking decision by shrinking+wrapping the FIRST
+     item's text internally instead of pushing the second item to a new
+     line, so the search box kept rendering beside a squeezed title
+     instead of below it. flex-direction:column is unambiguous — it
+     always stacks the two children top-to-bottom, full width, with no
+     dependency on either child's content-based sizing. */
+  div[style*="margin: -16px -24px 20px"] {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+    margin-left: -14px !important;
+    margin-right: -14px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    row-gap: 10px !important;
+  }
+  div[style*="margin: -16px -24px 20px"] > div:last-child {
+    width: 100% !important;
+    margin-left: 0 !important;
+  }
+  input[style*="width: 220px"],
+  input[style*="width: 200px"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* FIX: the Equipment tab's action slot has a search box AND an "Add
+     Equipment" button side by side (unlike the Configured/Unconfigured
+     tabs, which only have a lone search box there). Forcing the search
+     input to width:100% (rule above) with no wrap on this row squeezes
+     or overflows the button in the 481-767px range. Give this specific
+     row wrap + let each child take a full line so search stacks above
+     the button instead of colliding with it. Additive — does not change
+     the general input-width rule above, which is still correct for the
+     other two tabs' lone search boxes. */
+  div[style*="margin: -16px -24px 20px"] > div:last-child > div[style*="gap: 10px"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+  }
+
+  /* Equipment category table: allow horizontal scroll instead of crushing columns */
+  div[style*="margin-bottom: 12px"][style*="border-radius: 12px"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  div[style*="margin-bottom: 12px"][style*="border-radius: 12px"] table {
+    min-width: 520px !important;
+  }
+
+  /* Mapping grid: scrollable table + wrapping header bar */
+  div[style*="border-radius: 12px 12px 0 0"] {
+    flex-wrap: wrap !important;
+    row-gap: 8px !important;
+  }
+  div[style*="border-radius: 0 0 12px 12px"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  div[style*="border-radius: 0 0 12px 12px"] table {
+    min-width: 640px !important;
+  }
+
+  /* Vessel-mapping back/title row wraps instead of clipping */
+  div[style*="gap: 12px"][style*="margin-bottom: 20px"] {
+    flex-wrap: wrap !important;
+    row-gap: 8px !important;
+  }
+
+  /* Equipment modal: comfortable padding + guard against tall content */
+  div[style*="width: 480px"] {
+    padding: 20px !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+  }
+
+  /* Toast: full width with side margins */
+  div[style*="z-index: 99999"] {
+    left: 12px !important;
+    right: 12px !important;
+    bottom: 16px !important;
+    max-width: unset !important;
+  }
+
+  /* Comfortable tap targets for action buttons */
+  .action-btn {
+    min-height: 36px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE PORTRAIT (<= 480px): maximum compression
+═══════════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  div[style*="top: 56px"][style*="position: fixed"] {
+    width: 56px !important;
+  }
+  div[style*="margin-left: 300px"] {
+    margin-left: 56px !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+  div[style*="height: 56px"][style*="z-index: 300"] {
+    padding: 0 10px !important;
+    gap: 10px !important;
+  }
+  div[style*="margin: -16px -24px 20px"] {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    margin-left: -10px !important;
+    margin-right: -10px !important;
+    /* Re-assert column stacking at this breakpoint too (belt-and-
+       suspenders alongside the ≤767px rule, since this block's
+       cascade position is later and any gap here would silently
+       win over it, as happened with the equipment-row fix above). */
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  div[style*="margin: -16px -24px 20px"] > div:last-child {
+    width: 100% !important;
+    margin-left: 0 !important;
+  }
+  div[style*="margin: -16px -24px 20px"] h2 {
+    font-size: 0.95rem !important;
+  }
+  div[style*="margin: -16px -24px 20px"] p {
+    font-size: 0.72rem !important;
+  }
+  /* Equipment section: search + add-button stack full width.
+     NOTE: this ≤480px block comes AFTER the ≤767px block in the
+     cascade, so its flex-wrap here was silently overriding the more
+     reliable flex-direction:column fix set at ≤767px for the exact
+     same selector — closing that regression by matching it here too. */
+  div[style*="margin: -16px -24px 20px"] > div:last-child > div[style*="gap: 10px"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+  }
+  .action-btn[style*="padding: 8px 16px"] {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+  .vessel-card {
+    padding: 10px !important;
+    row-gap: 8px !important;
+  }
+  .vessel-card .action-btn {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+  div[style*="width: 480px"] {
+    padding: 16px !important;
+    border-radius: 12px !important;
+  }
+  div[style*="z-index: 99999"] {
+    font-size: 0.78rem !important;
+    padding: 10px 14px !important;
+  }
+  div[style*="margin-bottom: 12px"][style*="border-radius: 12px"] table {
+    min-width: 460px !important;
+  }
+  div[style*="border-radius: 0 0 12px 12px"] table {
+    min-width: 560px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LARGE DESKTOP (> 1920px): scale sidebar, spacing and type up so
+   the layout doesn't look sparse on big/4K monitors. Mirrors the
+   min-width:2000px convention used in luboil-responsive.css.
+═══════════════════════════════════════════════════════════════ */
+@media (min-width: 1920px) {
+  div[style*="top: 56px"][style*="position: fixed"] {
+    width: 340px !important;
+  }
+  div[style*="margin-left: 300px"] {
+    margin-left: 340px !important;
+    padding-left: 32px !important;
+    padding-right: 32px !important;
+    max-width: 1800px !important;
+  }
+  div[style*="margin: -16px -24px 20px"] {
+    padding-left: 32px !important;
+    padding-right: 32px !important;
+    margin-left: -32px !important;
+    margin-right: -32px !important;
+  }
+  div[style*="margin: -16px -24px 20px"] h2 {
+    font-size: 1.35rem !important;
+  }
+  div[style*="margin: -16px -24px 20px"] p {
+    font-size: 0.92rem !important;
+  }
+  .vessel-card {
+    padding: 22px 26px !important;
+  }
+  .nav-item {
+    padding: 12px 14px !important;
   }
 }

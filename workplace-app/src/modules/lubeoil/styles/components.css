@@ -404,3 +404,255 @@
     width: 60px; /* Reduce the size on smaller screens */
   }
 }
+
+/* ============================================================
+   RESPONSIVE ADDITIONS (ADDITIVE ONLY — no existing rule above
+   is modified). Covers AppHeader's mobile-nav-toggle / user-menu
+   elements (previously unstyled) plus scaling for the shared
+   Button/Card/Input/Select/Badge UI primitives across:
+   large desktop (>1920px), standard desktop/laptop (1024-1920px),
+   tablet (768-1024px), mobile landscape (481-768px) and
+   mobile portrait (<=480px).
+   ============================================================ */
+
+/* --- Desktop/laptop & tablet (>=769px): hamburger hidden, full nav shown --- */
+@media (min-width: 769px) {
+  .mobile-nav-toggle {
+    display: none;
+  }
+  .header-nav {
+    position: static;
+    display: flex;
+    flex-direction: row;
+  }
+}
+
+/* --- Tablet (769px - 1024px) --- */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .header-container {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .header-nav {
+    gap: 4px;
+  }
+  .nav-link {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  .user-menu-trigger {
+    padding: 6px 10px;
+  }
+  .user-menu-name {
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+  }
+  .user-dropdown-menu {
+    min-width: 220px;
+  }
+}
+
+/* --- Mobile landscape & portrait (<=768px): collapse nav into hamburger --- */
+@media (max-width: 768px) {
+  .header-container {
+    padding: 10px 12px;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .header-brand {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .brand-title {
+    font-size: 0.85rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 60vw;
+  }
+
+  .mobile-nav-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 20px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--foreground);
+    margin-left: auto;
+  }
+
+  .header-nav {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 12px;
+    left: 12px;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    background: var(--background, #fff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    padding: 6px;
+    gap: 2px;
+    z-index: 100000;
+  }
+
+  .header-nav.open {
+    display: flex;
+  }
+
+  .nav-link {
+    width: 100%;
+    padding: 12px 14px;
+    min-height: 44px;
+    box-sizing: border-box;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  .user-menu-trigger {
+    padding: 8px 10px;
+    min-height: 44px;
+  }
+
+  .user-menu-name {
+    display: none;
+  }
+
+  .user-dropdown-menu {
+    position: absolute;
+    right: 0;
+    left: auto;
+    min-width: 220px;
+    max-width: calc(100vw - 24px);
+  }
+
+  .user-dropdown-btn {
+    min-height: 44px;
+  }
+
+  .btn {
+    font-size: 13px;
+  }
+
+  .card-header {
+    padding: 16px 16px 0 16px;
+  }
+
+  .card-content {
+    padding: 16px;
+    padding-top: 12px;
+  }
+}
+
+/* --- Small mobile portrait (<=480px) --- */
+@media (max-width: 480px) {
+  .header-container {
+    padding: 8px 10px;
+  }
+
+  .brand-title {
+    font-size: 0.78rem;
+    max-width: 45vw;
+  }
+
+  .user-dropdown-menu {
+    min-width: 100%;
+    max-width: calc(100vw - 16px);
+    right: 0;
+  }
+
+  .btn-default {
+    height: 36px;
+    padding: 0 12px;
+  }
+
+  .btn-sm {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .card-header {
+    padding: 12px 12px 0 12px;
+  }
+
+  .card-content {
+    padding: 12px;
+    padding-top: 10px;
+  }
+
+  .card-title {
+    font-size: 14px;
+  }
+
+  .select {
+    width: 100%;
+  }
+}
+
+/* --- Ultra-wide / large desktop (>=2000px), matching this module's
+       existing big-screen convention --- */
+@media (min-width: 2000px) {
+  .header-container {
+    padding: 18px 40px;
+    gap: 24px;
+  }
+
+  .brand-title {
+    font-size: 1.3rem;
+  }
+
+  .nav-link {
+    font-size: 1rem;
+    padding: 12px 20px;
+  }
+
+  .user-menu-trigger {
+    padding: 12px 18px;
+  }
+
+  .user-menu-name {
+    font-size: 1rem;
+  }
+
+  .user-dropdown-menu {
+    min-width: 300px;
+  }
+
+  .btn-default {
+    height: 50px;
+    padding: 0 22px;
+    font-size: 1.05rem;
+  }
+
+  .btn-sm {
+    height: 40px;
+    font-size: 0.95rem;
+  }
+
+  .card-header {
+    padding: 32px 32px 0 32px;
+  }
+
+  .card-content {
+    padding: 32px;
+    padding-top: 20px;
+  }
+
+  .card-title {
+    font-size: 20px;
+  }
+}

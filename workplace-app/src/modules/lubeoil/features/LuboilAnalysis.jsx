@@ -32,6 +32,7 @@ import {
   Eye,
   SendHorizontal,
   X,
+  Paperclip,
 } from "lucide-react";
 import {
   LineChart,
@@ -720,6 +721,12 @@ const LuboilAnalysis = () => {
     sources: [],       // unique sources found e.g. ['SHELL', 'TRIBOCARE']
     activeSource: null, // currently selected source tab
     title: "",
+  });
+  // Holds the "Previous Reports" list shown alongside the trend graph
+  // when opened from the matrix cell's Report icon.
+  const [trendReportsContext, setTrendReportsContext] = useState({
+    history: [],
+    onSampleClick: null,
   });
   // const [hiddenNotifIds, setHiddenNotifIds] = useState(() => {
   //   const saved = localStorage.getItem("hidden_notifications");
@@ -3463,27 +3470,6 @@ const LuboilAnalysis = () => {
     daysOverdue = 0,
     openUpward,
   }) => {
-    // --- STATE FOR DROPDOWN ---
-    const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
-    const dropdownRef = useRef(null);
-
-    // Close dropdown when clicking outside
-    useEffect(() => {
-      const handleClickOutside = (event) => {
-        if (
-          dropdownRef.current &&
-          !dropdownRef.current.contains(event.target)
-        ) {
-          setShowHistoryDropdown(false);
-        }
-      };
-      if (showHistoryDropdown) {
-        document.addEventListener("mousedown", handleClickOutside);
-      }
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
-    }, [showHistoryDropdown]);
-
     const safeHistory = history && Array.isArray(history) ? history : [];
 
     // 1. Sort history: Newest -> Oldest
@@ -3575,69 +3561,10 @@ const LuboilAnalysis = () => {
                   if (onChartClick) onChartClick();
                 }}
                 className="lub-status-action-btn"
-                title="View Trend Graph"
+                title="View Reports & Trend Graph"
               >
-                <TrendingUp size={14} />
+                <FileText size={14} />
               </button>
-
-              <div ref={dropdownRef} style={{ position: "relative" }}>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowHistoryDropdown(!showHistoryDropdown);
-                  }}
-                  className={`lub-status-action-btn ${showHistoryDropdown ? "btn-active" : ""}`}
-                  title="View Historical Report List"
-                >
-                  <FileText size={14} />
-                </button>
-
-                {showHistoryDropdown && (
-                  <div
-                    className={`lub-status-history-popover ${openUpward ? "pop-up" : "pop-down"}`}
-                  >
-                    <div className="popover-header">AVAILABLE REPORTS</div>
-                    {sortedHistory
-                      .filter((h) => (h.date || h.sample_date) !== latestDate)
-                      .map((h, i) => (
-                        <div
-                          key={h.sample_id || i}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowHistoryDropdown(false);
-                            onSampleClick(h);
-                          }}
-                          className="popover-item"
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.backgroundColor = "#f1f5f9")
-                          }
-                          onMouseLeave={(e) =>
-                            (e.currentTarget.style.backgroundColor = "white")
-                          }
-                        >
-                          <ShellStatusIcon status={h.status} size={16} />
-                          <span className="popover-date-text">
-                            {new Date(
-                              h.date || h.sample_date,
-                            ).toLocaleDateString("en-GB", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            })}
-                          </span>
-                        </div>
-                      ))}
-
-                    {sortedHistory.filter(
-                      (h) => (h.date || h.sample_date) !== latestDate,
-                    ).length === 0 && (
-                        <div className="lub-status-history-empty">
-                          No previous reports found
-                        </div>
-                      )}
-                  </div>
-                )}
-              </div>
             </div>
           )}
         </div>
@@ -4517,10 +4444,15 @@ const LuboilAnalysis = () => {
                     <table
                       className="vessel-table-enhanced"
                       style={{
-                        width:
-                          ownerFilteredVessels.length > 5
-                            ? `calc(220px + (${ownerFilteredVessels.length} * ((100% - 220px) / 5)))`
-                            : "100%",
+                        // Always 100%: with table-layout:fixed, a column that has
+                        // no explicit width (the vessel <th> below) automatically
+                        // gets an equal share of whatever space remains after the
+                        // sticky machinery column — no need to precompute a total
+                        // table width in JS. If there are enough vessels that even
+                        // each column's CSS min-width can't fit, the table naturally
+                        // grows past 100% and the wrapper's overflow-x:auto scrolls —
+                        // exactly "flexible until it can't fit the minimum, then scroll".
+                        width: "100%",
                         borderCollapse: "separate", // Necessary for sticky headers to not flicker
                         borderSpacing: 0,
                         tableLayout: "fixed", // ðŸ”¥ Ensures all columns respect the defined width
@@ -4542,7 +4474,14 @@ const LuboilAnalysis = () => {
                               textAlign: "left",
                             }}
                           >
-                            MACHINERY / EQUIPMENT
+                            <div className="matrix-corner-header-lines">
+                              <span className="matrix-corner-header-title">
+                                MACHINERY / EQUIPMENT
+                              </span>
+                              <span className="matrix-corner-header-subtitle">
+                                NEXT SAMPLE DUE
+                              </span>
+                            </div>
                           </th>
 
                           {/* TOP STICKY VESSEL HEADERS (Restored Click Logic) */}
@@ -4550,23 +4489,65 @@ const LuboilAnalysis = () => {
                             const vesselImo =
                               matrixData?.data?.[vesselName]?.imo;
 
-                            // 1. Logic to find the Lab Name from the machinery data
-                            // Searches all machineries for this vessel and picks the first 'lab_name' found.
                             const vesselData = matrixData?.data?.[vesselName];
 
-                            const uniqueSources = [
-                              ...new Set(
-                                Object.values(vesselData?.machineries || {})
-                                  .flatMap((m) => Object.keys(m.by_source || {}))
-                              ),
-                            ];
+                            // Vessel-level "next report due" countdown:
+                            // Reuses the exact same per-equipment due-date calculation
+                            // (sampling interval + last sample date) used everywhere else
+                            // in this matrix - it just scans across all applicable
+                            // equipment for this vessel and keeps the earliest due date.
+                            const todayForDueCountdown = new Date();
+                            let nearestDueDate = null;
 
-                            const displayedSources = uniqueSources;
+                            Object.values(vesselData?.machineries || {}).forEach(
+                              (m) => {
+                                if (
+                                  !m.is_configured ||
+                                  !m.has_report ||
+                                  !m.last_sample ||
+                                  isExcludedFromOverdue(m.code)
+                                )
+                                  return;
 
-                            const labNameDisplay =
-                              displayedSources.length > 0
-                                ? displayedSources.join(" / ").toUpperCase()
-                                : "Unknown Source";
+                                const intervalMonths =
+                                  typeof m.interval === "number" &&
+                                    m.interval > 0
+                                    ? m.interval
+                                    : 3;
+                                const sampleDate = new Date(m.last_sample);
+                                const dueDate = new Date(sampleDate);
+                                dueDate.setMonth(
+                                  dueDate.getMonth() + intervalMonths,
+                                );
+
+                                if (!nearestDueDate || dueDate < nearestDueDate) {
+                                  nearestDueDate = dueDate;
+                                }
+                              },
+                            );
+
+                            let daysRemaining = null;
+                            if (nearestDueDate) {
+                              daysRemaining = Math.ceil(
+                                (nearestDueDate - todayForDueCountdown) /
+                                (1000 * 60 * 60 * 24),
+                              );
+                            }
+
+                            let dueCountdownDisplay = "No due date";
+                            let dueCountdownColor = "#94a3b8"; // neutral gray when no data
+                            if (daysRemaining !== null) {
+                              if (daysRemaining < 0) {
+                                dueCountdownDisplay = `Overdue by ${Math.abs(daysRemaining)}d`;
+                                dueCountdownColor = "#dc2626"; // red
+                              } else if (daysRemaining <= 15) {
+                                dueCountdownDisplay = `Due in ${daysRemaining}d`;
+                                dueCountdownColor = "#d97706"; // amber
+                              } else {
+                                dueCountdownDisplay = `Due in ${daysRemaining}d`;
+                                dueCountdownColor = "#16a34a"; // green
+                              }
+                            }
 
                             return (
                               <th
@@ -4577,8 +4558,17 @@ const LuboilAnalysis = () => {
                                   position: "sticky",
                                   top: 0,
                                   zIndex: 50,
-                                  width: "calc((100% - 220px) / 5)",
-                                  minWidth: "150px", // Strict minimum width to prevent squishing on < 700px screens
+                                  // No explicit width: with table-layout:fixed, columns
+                                  // with no width split whatever space remains equally
+                                  // (after the sticky machinery column) — this is what
+                                  // gives flexible, equal-width vessel columns that use
+                                  // the full available width regardless of vessel count,
+                                  // without any JS math to keep in sync with the
+                                  // machinery column's own (breakpoint-dependent) width.
+                                  // minWidth (set via CSS on .vessel-header-cell, which
+                                  // scales up at larger breakpoints) is the floor that
+                                  // forces horizontal scroll once there are too many
+                                  // vessels to keep each column at a generous width.
                                   fontSize: "0.8rem",
                                   textAlign: "center",
                                   padding: "10px 4px", // Adjusted padding for better vertical fit
@@ -4610,19 +4600,26 @@ const LuboilAnalysis = () => {
                                     {vesselName}
                                   </span>
 
-                                  {/* Lab Source Name */}
-                                  <span 
-                                    className="vessel-lab-txt"
-                                    onMouseEnter={(e) => {
-                                      if (e.target.scrollWidth > e.target.clientWidth) {
-                                        e.target.title = labNameDisplay;
-                                      } else {
-                                        e.target.removeAttribute('title');
-                                      }
+                                  {/* Vessel-level countdown to the nearest upcoming report due date */}
+                                  <span
+                                    className="vessel-due-countdown-txt"
+                                    title={
+                                      nearestDueDate
+                                        ? `Nearest due date: ${nearestDueDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`
+                                        : undefined
+                                    }
+                                    style={{
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      width: "100%",
+                                      display: "block",
+                                      fontSize: "0.7rem",
+                                      fontWeight: 700,
+                                      color: dueCountdownColor,
                                     }}
-                                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%", display: "block" }}
                                   >
-                                    {labNameDisplay}
+                                    {dueCountdownDisplay}
                                   </span>
                                 </div>
                               </th>
@@ -4794,14 +4791,6 @@ const LuboilAnalysis = () => {
                                       //   }}
                                       className={`lub-data-cell data-available ${isNormal ? "" : "hover-cell"}`}
                                     >
-                                      {daysOverdue > 0 && (
-                                        <div
-                                          title={`Overdue by ${daysOverdue} days`}
-                                          className="overdue-indicator critical"
-                                        >
-                                          <Clock size={12} color="white" className="indicator-icon" />
-                                        </div>
-                                      )}
                                       {showVerifiedTick && (
                                         <div
                                           className="verified-tick-dogear"
@@ -4835,6 +4824,15 @@ const LuboilAnalysis = () => {
                                               cell.code,
                                               cell.description,
                                             );
+                                            setTrendReportsContext({
+                                              history: cell.history || [],
+                                              onSampleClick: (sample) =>
+                                                handleSelectSample(
+                                                  vesselName,
+                                                  cell,
+                                                  sample,
+                                                ),
+                                            });
                                           }}
                                           onSampleClick={(sample) =>
                                             handleSelectSample(
@@ -6328,7 +6326,124 @@ const LuboilAnalysis = () => {
               }}
             >
               {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-            PANEL 1 â€” DIAGNOSIS  (flex: 1)
+            PANEL 1 â€” PDF REPORT  (flex: 1.8)
+        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+              <div
+                className={`lub-pdf-panel ${isReportCollapsed ? "collapsed" : ""}`}
+              >
+                {/* Panel Header */}
+                <div
+                  className="lub-pdf-header"
+                  // onClick={() => setIsReportCollapsed(!isReportCollapsed)}
+                  onClick={() => tryCollapsePanel(isReportCollapsed, setIsReportCollapsed, [isDiagCollapsed, isCommCollapsed], [setIsDiagCollapsed, setIsCommCollapsed])}
+                >
+                  <div className="lub-header-left">
+                    <FileText
+                      size={16}
+                      color="#2563eb"
+                      className="lub-header-icon"
+                    />
+                    {!isReportCollapsed && (
+                      <span className="lub-header-title">Analysis Report</span>
+                    )}
+                  </div>
+                  {isReportCollapsed ? (
+                    <ChevronDown
+                      size={16}
+                      color="#64748b"
+                      className="lub-arrow-icon"
+                    />
+                  ) : (
+                    <ChevronUp
+                      size={16}
+                      color="#64748b"
+                      className="lub-arrow-icon"
+                    />
+                  )}
+                </div>
+
+                {/* Panel Body */}
+                {!isReportCollapsed && (
+                  <div className="lub-pdf-body">
+                    {/* RESAMPLING VIEW (takes over PDF panel when active) */}
+                    {rightPanelMode === "resampling_view" ? (
+                      <div className="lub-pdf-split-container">
+                        {/* Left: The report originally opened in the modal (September in your example) */}
+                        <div className="lub-pdf-sub-panel">
+                          <div className="lub-pdf-sub-header header-blue">
+                            <span className="date-label">
+                              OPENED:{" "}
+                              {selectedCell.data.date ||
+                                selectedCell.data.sample_date}
+                            </span>
+                            <span className="type-label">Extracted Page</span>
+                          </div>
+                          <iframe
+                            src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                            // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                            style={{ width: "100%", flex: 1, border: "none" }}
+                            title="Opened View"
+                          />
+                        </div>
+
+                        {/* Right: The future resampling report selected from the list (November in your example) */}
+                        {(() => {
+                          const targetId = compareIds.find(
+                            (id) => id !== selectedCell.data.sample_id,
+                          );
+                          // Find the specific date for the targetId from the history array
+                          const targetSample = selectedCell.data.history?.find(
+                            (h) => h.sample_id === targetId,
+                          );
+                          const targetDate =
+                            targetSample?.date || "Newer Report";
+
+                          return (
+                            <div className="lub-pdf-sub-panel">
+                              <div className="lub-pdf-sub-header header-gray">
+                                <span className="date-label">
+                                  SUBSEQUENT: {targetDate}
+                                </span>
+                                <span className="type-label">
+                                  Extracted Page
+                                </span>
+                              </div>
+                              <iframe
+                                src={`/lub/api/luboil/view-specific-page/${targetId}`}
+                                //  src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
+                                style={{
+                                  width: "100%",
+                                  flex: 1,
+                                  border: "none",
+                                }}
+                                title="Future View"
+                              />
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ) : selectedCell.data.report_url ? (
+                      <iframe
+                         src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                        // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                        style={{ width: "100%", flex: 1, border: "none" }}
+                        title="Original Report"
+                      />
+                    ) : (
+                      <div className="lub-pdf-empty">
+                        <FileText size={40} className="empty-icon" />
+                        <p className="empty-text">
+                          No PDF report available for this sample.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                )}
+              </div>
+
+              {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+            PANEL 2 â€” DIAGNOSIS  (flex: 1)
             - Fully scrollable body
             - Reduced font sizes throughout
             - Upload + View Evidence on one row
@@ -6507,63 +6622,6 @@ const LuboilAnalysis = () => {
                               selectedCell.data.is_image_required;
                             const isResamplingRequired =
                               selectedCell.data.is_resampling_required; // New Flag
-                            const isLocked = selectedCell.data.is_resolved;
-
-                            if (isShore) {
-                              return (
-                                <div className="lub-mandatory-group">
-                                  {/* --- EXISTING IMAGE BUTTON (UNCHANGED) --- */}
-                                  <button
-                                    onClick={handleRequestImageAction}
-                                    disabled={isLocked}
-                                    className={`lub-mandatory-btn ${isImageRequired ? "active-red" : "inactive-dashed"}`}
-                                  >
-                                    {isImageRequired ? (
-                                      <>
-                                        <AlertTriangle
-                                          size={12}
-                                          className="lub-mandatory-icon animate-pulse"
-                                        />{" "}
-                                        IMAGE MANDATORY
-                                      </>
-                                    ) : (
-                                      <>
-                                        <ImageIcon
-                                          size={12}
-                                          className="lub-mandatory-icon"
-                                        />{" "}
-                                        IMAGE MANDATORY
-                                      </>
-                                    )}
-                                  </button>
-
-                                  {/* --- NEW RESAMPLING BUTTON (MATCHING STYLE) --- */}
-                                  <button
-                                    onClick={handleRequestResamplingAction}
-                                    disabled={isLocked}
-                                    className={`lub-mandatory-btn ${isResamplingRequired ? "active-red" : "inactive-dashed"}`}
-                                  >
-                                    {isResamplingRequired ? (
-                                      <>
-                                        <History
-                                          size={12}
-                                          className="lub-mandatory-icon animate-pulse"
-                                        />{" "}
-                                        RESAMPLING MANDATORY
-                                      </>
-                                    ) : (
-                                      <>
-                                        <History
-                                          size={12}
-                                          className="lub-mandatory-icon"
-                                        />{" "}
-                                        RESAMPLING MANDATORY
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                              );
-                            }
 
                             if (
                               !isShore &&
@@ -6598,49 +6656,6 @@ const LuboilAnalysis = () => {
                             return null;
                           })()}
 
-                          {/* UPLOAD + VIEW EVIDENCE â€” side by side on one row */}
-                          <div className="lub-evidence-action-row">
-                            {/* Upload */}
-                            <input
-                              type="file"
-                              id="lub-sidebar-upload"
-                              hidden
-                              accept="*"
-                              onChange={(e) =>
-                                handleSidebarUpload(e.target.files[0])
-                              }
-                            />
-                            {!selectedCell.data.is_resolved && (
-                              <button
-                                onClick={() =>
-                                  document
-                                    .getElementById("lub-sidebar-upload")
-                                    .click()
-                                }
-                                className="lub-action-btn btn-primary"
-                              >
-                                <Upload
-                                  size={11}
-                                  className="lub-btn-icon"
-                                />{" "}
-                                Upload
-                              </button>
-                            )}
-
-                            {/* View Evidence */}
-                            <button
-                              onClick={() => setIsEvidenceModalOpen(true)}
-                              className="lub-action-btn btn-secondary"
-                            >
-                              <Eye size={11} className="lub-btn-icon" /> View (
-                              {selectedCell.data.conversation?.filter(
-                                (m) =>
-                                  m.message?.includes("ATTACHED_IMAGE:") ||
-                                  m.message?.includes("ATTACHED_PDF:"),
-                              ).length || 0}
-                              )
-                            </button>
-                          </div>
                         </div>
                       )}
                     </div>
@@ -7036,123 +7051,6 @@ const LuboilAnalysis = () => {
                   </div>
                 </div>
                 {/* )} */}
-              </div>
-
-              {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-            PANEL 2 â€” PDF REPORT  (flex: 1.8)
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-              <div
-                className={`lub-pdf-panel ${isReportCollapsed ? "collapsed" : ""}`}
-              >
-                {/* Panel Header */}
-                <div
-                  className="lub-pdf-header"
-                  // onClick={() => setIsReportCollapsed(!isReportCollapsed)}
-                  onClick={() => tryCollapsePanel(isReportCollapsed, setIsReportCollapsed, [isDiagCollapsed, isCommCollapsed], [setIsDiagCollapsed, setIsCommCollapsed])}
-                >
-                  <div className="lub-header-left">
-                    <FileText
-                      size={16}
-                      color="#2563eb"
-                      className="lub-header-icon"
-                    />
-                    {!isReportCollapsed && (
-                      <span className="lub-header-title">Analysis Report</span>
-                    )}
-                  </div>
-                  {isReportCollapsed ? (
-                    <ChevronDown
-                      size={16}
-                      color="#64748b"
-                      className="lub-arrow-icon"
-                    />
-                  ) : (
-                    <ChevronUp
-                      size={16}
-                      color="#64748b"
-                      className="lub-arrow-icon"
-                    />
-                  )}
-                </div>
-
-                {/* Panel Body */}
-                {!isReportCollapsed && (
-                  <div className="lub-pdf-body">
-                    {/* RESAMPLING VIEW (takes over PDF panel when active) */}
-                    {rightPanelMode === "resampling_view" ? (
-                      <div className="lub-pdf-split-container">
-                        {/* Left: The report originally opened in the modal (September in your example) */}
-                        <div className="lub-pdf-sub-panel">
-                          <div className="lub-pdf-sub-header header-blue">
-                            <span className="date-label">
-                              OPENED:{" "}
-                              {selectedCell.data.date ||
-                                selectedCell.data.sample_date}
-                            </span>
-                            <span className="type-label">Extracted Page</span>
-                          </div>
-                          <iframe
-                            src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
-                            // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
-                            style={{ width: "100%", flex: 1, border: "none" }}
-                            title="Opened View"
-                          />
-                        </div>
-
-                        {/* Right: The future resampling report selected from the list (November in your example) */}
-                        {(() => {
-                          const targetId = compareIds.find(
-                            (id) => id !== selectedCell.data.sample_id,
-                          );
-                          // Find the specific date for the targetId from the history array
-                          const targetSample = selectedCell.data.history?.find(
-                            (h) => h.sample_id === targetId,
-                          );
-                          const targetDate =
-                            targetSample?.date || "Newer Report";
-
-                          return (
-                            <div className="lub-pdf-sub-panel">
-                              <div className="lub-pdf-sub-header header-gray">
-                                <span className="date-label">
-                                  SUBSEQUENT: {targetDate}
-                                </span>
-                                <span className="type-label">
-                                  Extracted Page
-                                </span>
-                              </div>
-                              <iframe
-                                src={`/lub/api/luboil/view-specific-page/${targetId}`}
-                                // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
-                                style={{
-                                  width: "100%",
-                                  flex: 1,
-                                  border: "none",
-                                }}
-                                title="Future View"
-                              />
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    ) : selectedCell.data.report_url ? (
-                      <iframe
-                        src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
-                        // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
-                        style={{ width: "100%", flex: 1, border: "none" }}
-                        title="Original Report"
-                      />
-                    ) : (
-                      <div className="lub-pdf-empty">
-                        <FileText size={40} className="empty-icon" />
-                        <p className="empty-text">
-                          No PDF report available for this sample.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                )}
               </div>
 
               {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -7596,10 +7494,126 @@ const LuboilAnalysis = () => {
                                 </div>
                               )}
 
+                              {/* --- MANDATORY PILLS (moved here from Evidence section) --- */}
+                              {amIShore && (
+                                <div className="lub-mandatory-group lub-mandatory-pills-row">
+                                  <button
+                                    type="button"
+                                    disabled={selectedCell.data.is_resolved}
+                                    onClick={() => {
+                                      handleRequestImageAction();
+                                      const presetText = "Image Mandatory";
+                                      if (chatMode === "internal") {
+                                        setInternalDraft(presetText);
+                                      } else if (amIShore) {
+                                        setRemarksData((prev) => ({
+                                          ...prev,
+                                          office: presetText,
+                                        }));
+                                      } else {
+                                        setRemarksData((prev) => ({
+                                          ...prev,
+                                          officer: presetText,
+                                        }));
+                                      }
+                                      setTimeout(
+                                        () => chatInputRef.current?.focus(),
+                                        0,
+                                      );
+                                    }}
+                                    className={`lub-mandatory-btn ${selectedCell.data.is_image_required ? "active-red" : "inactive-dashed"}`}
+                                  >
+                                    {selectedCell.data.is_image_required ? (
+                                      <>
+                                        <AlertTriangle
+                                          size={12}
+                                          className="lub-mandatory-icon animate-pulse"
+                                        />{" "}
+                                        IMAGE MANDATORY
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ImageIcon
+                                          size={12}
+                                          className="lub-mandatory-icon"
+                                        />{" "}
+                                        IMAGE MANDATORY
+                                      </>
+                                    )}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    disabled={selectedCell.data.is_resolved}
+                                    onClick={() => {
+                                      handleRequestResamplingAction();
+                                      const presetText = "Resampling Mandatory";
+                                      if (chatMode === "internal") {
+                                        setInternalDraft(presetText);
+                                      } else if (amIShore) {
+                                        setRemarksData((prev) => ({
+                                          ...prev,
+                                          office: presetText,
+                                        }));
+                                      } else {
+                                        setRemarksData((prev) => ({
+                                          ...prev,
+                                          officer: presetText,
+                                        }));
+                                      }
+                                      setTimeout(
+                                        () => chatInputRef.current?.focus(),
+                                        0,
+                                      );
+                                    }}
+                                    className={`lub-mandatory-btn ${selectedCell.data.is_resampling_required ? "active-red" : "inactive-dashed"}`}
+                                  >
+                                    {selectedCell.data.is_resampling_required ? (
+                                      <>
+                                        <History
+                                          size={12}
+                                          className="lub-mandatory-icon animate-pulse"
+                                        />{" "}
+                                        RESAMPLING MANDATORY
+                                      </>
+                                    ) : (
+                                      <>
+                                        <History
+                                          size={12}
+                                          className="lub-mandatory-icon"
+                                        />{" "}
+                                        RESAMPLING MANDATORY
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              )}
+
                               {/* Input row - Original preserved */}
                               <div
                                 className={`lub-chat-input-box ${chatMode === "internal" ? "box-internal" : ""}`}
                               >
+                                <input
+                                  type="file"
+                                  id="lub-chat-attachment-upload"
+                                  hidden
+                                  accept="*"
+                                  onChange={(e) =>
+                                    handleSidebarUpload(e.target.files[0])
+                                  }
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    document
+                                      .getElementById("lub-chat-attachment-upload")
+                                      .click()
+                                  }
+                                  className="lub-chat-attach-btn"
+                                  title="Attach file"
+                                >
+                                  <Paperclip size={18} color="#64748b" />
+                                </button>
                                 <textarea
                                   ref={chatInputRef}
                                   style={{ scrollbarWidth: 'thin' }}
@@ -7914,9 +7928,64 @@ const LuboilAnalysis = () => {
                 flex: 1,
                 backgroundColor: "#fff",
                 display: "flex",
-                flexDirection: "column",
+                flexDirection: "row",
+                overflow: "hidden",
+                gap: "14px",
               }}
             >
+              {/* LEFT: Previous Reports */}
+              <div className="lub-trend-reports-panel">
+                <div className="lub-trend-reports-header">
+                  PREVIOUS REPORTS
+                </div>
+                <div className="lub-trend-reports-list">
+                  {[...(trendReportsContext.history || [])]
+                    .sort((a, b) => {
+                      const dateA = new Date(a.date || a.sample_date);
+                      const dateB = new Date(b.date || b.sample_date);
+                      return dateB - dateA;
+                    })
+                    .map((h, i) => (
+                      <div
+                        key={h.sample_id || i}
+                        onClick={() =>
+                          trendReportsContext.onSampleClick &&
+                          trendReportsContext.onSampleClick(h)
+                        }
+                        className="lub-trend-reports-item"
+                      >
+                        <ShellStatusIcon status={h.status} size={16} />
+                        <span className="lub-trend-reports-date">
+                          {new Date(
+                            h.date || h.sample_date,
+                          ).toLocaleDateString("en-GB", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </span>
+                      </div>
+                    ))}
+
+                  {(!trendReportsContext.history ||
+                    trendReportsContext.history.length === 0) && (
+                    <div className="lub-status-history-empty">
+                      No previous reports found
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* RIGHT: Existing Trend Graph (unchanged) */}
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "auto",
+                  minWidth: 0,
+                }}
+              >
               {loadingTrend ? (
                 <div
                   style={{
@@ -8298,6 +8367,7 @@ const LuboilAnalysis = () => {
                   <p>No historical analysis data found.</p>
                 </div>
               )}
+              </div>
             </div>
           </div>
         </div>

@@ -137,3 +137,142 @@
 .nine-dot-btn:hover .nine-dot-label {
   display: flex;
 }
+
+/* ============================================================
+   RESPONSIVE ADDITIONS: OZELLAR HEADER (fixed top bar)
+   OzellarHeader.jsx renders its <header> and most children with
+   inline styles and no className, so plain class selectors can't
+   target them. These rules use attribute selectors that match a
+   substring of the rendered inline `style` attribute (kebab-case,
+   as the DOM serializes it) plus structural child combinators —
+   the same technique already used elsewhere in this module (see
+   luboil-responsive.css's `[style*="..."]` selectors). `!important`
+   is required to win over the element's own inline style at these
+   breakpoints. This is additive only: no existing rule is touched,
+   and no JSX/className changes are made.
+   The header is uniquely identified by its inline `z-index: 9000`.
+   ============================================================ */
+
+/* --- Tablet & small laptop (max-width: 1024px) --- */
+@media (max-width: 1024px) {
+  header[style*="z-index: 9000"] {
+    padding: 0 14px !important;
+  }
+  header[style*="z-index: 9000"] > div:first-child,
+  header[style*="z-index: 9000"] > div:last-child {
+    min-width: 0 !important;
+  }
+}
+
+/* --- Mobile landscape (max-width: 768px) --- */
+@media (max-width: 768px) {
+  header[style*="z-index: 9000"] {
+    padding: 0 10px !important;
+    gap: 6px !important;
+  }
+
+  header[style*="z-index: 9000"] > nav {
+    gap: 2px !important;
+  }
+
+  header[style*="z-index: 9000"] > nav button {
+    padding: 7px 10px !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Hide the "Shore HQ" subtitle to save space; keep the main brand title */
+  header[style*="z-index: 9000"] > div:first-child > div:last-child > div:last-child {
+    display: none !important;
+  }
+
+  /* Truncate the user name/role block so it can't push the nav off-screen */
+  header[style*="z-index: 9000"] > div:last-child > div:nth-child(2) button > div:nth-child(2) {
+    max-width: 90px !important;
+    overflow: hidden !important;
+  }
+
+  header[style*="z-index: 9000"] > div:last-child > div:nth-child(2) button > div:nth-child(2) div {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  /* Notification dropdown must not overflow the viewport */
+  header[style*="z-index: 9000"] div[style*="width: 320px"] {
+    width: calc(100vw - 24px) !important;
+    max-width: 320px !important;
+    right: -50px !important;
+  }
+}
+
+/* --- Small screens (max-width: 600px) ---
+   NOTE: this was originally max-width:480px, but measuring the actual
+   content widths showed the *lighter* ≤768px shrink above only fits
+   down to ~560-600px — between 481-600px it wasn't enough (title text
+   wrapped to 2 lines and visually collided with the nav buttons). The
+   full-collapse rules below comfortably fit even much narrower than
+   600px, so raising this cutover to 600px closes that dead zone with
+   margin to spare, while 601-768px keeps using the lighter shrink
+   above (which is already proven to fit at 640px+). */
+@media (max-width: 600px) {
+  header[style*="z-index: 9000"] {
+    padding: 0 8px !important;
+  }
+
+  header[style*="z-index: 9000"] > nav {
+    gap: 0 !important;
+  }
+
+  header[style*="z-index: 9000"] > nav button {
+    padding: 8px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+  }
+
+  /* Hide the brand text block on small screens; keep the logo mark */
+  header[style*="z-index: 9000"] > div:first-child > div:last-child {
+    display: none !important;
+  }
+
+  /* Hide user name/role text in the avatar trigger, keep avatar + chevron */
+  header[style*="z-index: 9000"] > div:last-child > div:nth-child(2) button > div:nth-child(2) {
+    display: none !important;
+  }
+
+  header[style*="z-index: 9000"] div[style*="width: 320px"] {
+    width: calc(100vw - 16px) !important;
+    right: -60px !important;
+  }
+
+  /* Ensure a minimum 44px tap target for the icon-only header buttons */
+  header[style*="z-index: 9000"] button {
+    min-height: 40px;
+  }
+}
+
+/* --- Small screens, extra: collapse nav labels to icon-only ---
+   At <=600px the logo (icon+9dot-btn) + "Dashboard"/"My Feed" text
+   buttons + bell + avatar together are wider than the viewport,
+   which forces the whole header into horizontal scroll. The nav
+   button text is a bare text node (no span/className to hide via
+   display:none), so font-size:0 is used to collapse it while the
+   icon's own explicit width/height attributes keep it visible. */
+@media (max-width: 600px) {
+  header[style*="z-index: 9000"] > nav {
+    gap: 4px !important;
+  }
+
+  header[style*="z-index: 9000"] > nav button {
+    font-size: 0 !important;
+    gap: 0 !important;
+    padding: 10px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    justify-content: center !important;
+  }
+
+  header[style*="z-index: 9000"] .nine-dot-btn {
+    padding: 6px !important;
+    margin-right: 0 !important;
+  }
+}
