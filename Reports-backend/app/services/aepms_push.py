@@ -13,6 +13,7 @@
 # attachment) -- that's the integrity check below, replacing what the
 # AEPMS frontend's manual "wrong vessel" alert does for human uploads.
 
+import asyncio
 import logging
 from datetime import datetime
 from time import time
@@ -117,16 +118,34 @@ async def push_pending_reports(db) -> None:
             Report.aepms_push_status.is_distinct_from("UNSUPPORTED_FORMAT"),
         )
     )
-    reports = (await db.execute(stmt)).scalars().all()
+    # Oldest first, and capped. Order matters once there is a cap: without it
+    # the DB may hand back an arbitrary subset each run and the same reports
+    # could keep getting deferred. Oldest-first drains the backlog in the order
+    # it built up. NULLs last so a report with no parsed date never blocks the
+    # queue. Whatever exceeds the cap is left PENDING/FAILED and picked up next
+    # run -- the same mechanism that already retries FAILED reports.
+    stmt = stmt.order_by(Report.report_date.asc().nullslast(), Report.id.asc())
+    max_per_run = max(1, int(settings.AEPMS_PUSH_MAX_PER_RUN))
+    reports = (await db.execute(stmt.limit(max_per_run))).scalars().all()
     if not reports:
         logger.info("[AEPMS PUSH] No pending reports to push.")
         return
 
-    logger.info(f"[AEPMS PUSH] {len(reports)} report(s) pending push to AEPMS.")
+    logger.info(
+        f"[AEPMS PUSH] {len(reports)} report(s) to push this run "
+        f"(cap {max_per_run}); any remainder goes on the next run."
+    )
+
+    delay = max(0.0, float(settings.AEPMS_PUSH_DELAY_SECONDS))
 
     async with httpx.AsyncClient(verify=settings.AEPMS_VERIFY_SSL) as client:
-        for report in reports:
+        for index, report in enumerate(reports):
             await _push_one(db, client, report)
+            # Breathe between uploads so AEPMS can finish parsing one PDF
+            # before the next arrives. Skipped after the final report so the
+            # cron run does not idle for no reason.
+            if delay and index < len(reports) - 1:
+                await asyncio.sleep(delay)
 
 
 async def _push_one(db, client: httpx.AsyncClient, report: Report) -> None:

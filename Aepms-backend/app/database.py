@@ -353,6 +353,48 @@ async def run_startup_migrations():
             except Exception as e_user5:
                 logger.info(f"Migration notice (user last_login): {e_user5}")
 
+            # updated_at is declared on AEDeviationHistory and
+            # GeneratorMonthlyReportDetailsJsonb (app/generator_models.py)
+            # but was never migrated onto the live tables -- caused a hard
+            # 500 (UndefinedColumnError) on AE deviation history reads and
+            # on every AE monthly report upload.
+            try:
+                await conn.execute(text(
+                    "ALTER TABLE ae_deviation_history "
+                    "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP "
+                    "DEFAULT CURRENT_TIMESTAMP NOT NULL"
+                ))
+                logger.info("✅ Migration applied: added updated_at column to ae_deviation_history")
+            except Exception as e_ae1:
+                logger.info(f"Migration notice (ae_deviation_history updated_at): {e_ae1}")
+
+            try:
+                await conn.execute(text(
+                    "ALTER TABLE generator_monthly_report_details_jsonb "
+                    "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP "
+                    "DEFAULT CURRENT_TIMESTAMP NOT NULL"
+                ))
+                logger.info("✅ Migration applied: added updated_at column to generator_monthly_report_details_jsonb")
+            except Exception as e_ae2:
+                logger.info(f"Migration notice (generator_monthly_report_details_jsonb updated_at): {e_ae2}")
+
+            # Same gap on the AE alert tables (ae_normal_status,
+            # ae_warning_alert, ae_critical_alert, ae_alert_summary) --
+            # all four were added together and share the missing column.
+            for ae_alert_table in (
+                "ae_normal_status", "ae_warning_alert",
+                "ae_critical_alert", "ae_alert_summary",
+            ):
+                try:
+                    await conn.execute(text(
+                        f"ALTER TABLE {ae_alert_table} "
+                        "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP "
+                        "DEFAULT CURRENT_TIMESTAMP NOT NULL"
+                    ))
+                    logger.info(f"✅ Migration applied: added updated_at column to {ae_alert_table}")
+                except Exception as e_ae_alert:
+                    logger.info(f"Migration notice ({ae_alert_table} updated_at): {e_ae_alert}")
+
     except Exception as e:
         logger.error(f"Startup migrations failed: {e}")
         return False
