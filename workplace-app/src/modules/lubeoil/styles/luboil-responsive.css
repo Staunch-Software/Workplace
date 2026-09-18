@@ -10398,3 +10398,94 @@ div.section-header-enhanced {
 }
 
 
+/* ============================================================
+   FIX: MATRIX TABLE HEADER/DATA COLUMN OVERLAP
+
+   Root cause: this file accumulated many separate, uncoordinated
+   width/min-width declarations for the matrix table's columns —
+   .machinery-sticky-cell / .matrix-corner-header / .lub-matrix-footer-label
+   (the sticky left column, repeated in the header/body/footer rows)
+   and .vessel-header-cell / .lub-data-cell / .lub-matrix-footer-cell
+   (the repeating vessel columns, same idea) each had DIFFERENT pixel
+   widths at the same breakpoint depending on which of several
+   duplicate rule blocks happened to be added later in the file. With
+   table-layout:fixed, the header row and body rows must agree on a
+   column's width or the grid drifts out of alignment — worse, some
+   of those duplicates only shrank the body/data cells and not the
+   header cells (or vice versa) at a given breakpoint, so the two
+   edges of the same column literally disagreed on how wide it was.
+   That drift is what showed up as cells overlapping.
+
+   Also, .vessel-table-enhanced had its overall width forced to
+   arbitrary calc(180%/220% - Npx) values at <=1200px/<=900px,
+   unrelated to how many vessel columns actually exist — fighting
+   the table's own inline width:100% and making the drift above worse
+   exactly at those breakpoints.
+
+   Fix: give the sticky column and the vessel columns ONE width each,
+   shared identically by every row (header/body/footer), with no
+   shrinking at smaller sizes — .matrix-scroll-container already has
+   overflow:auto (line ~652), so when columns don't fit the viewport
+   the table scrolls horizontally instead of shrinking columns until
+   they overlap. This works for any number of vessels: more vessel
+   columns just means more horizontal scroll, not narrower columns.
+   Only >=2000px keeps a deliberate (matching, non-conflicting) bump
+   for large-screen readability, consistent with the rest of the file.
+
+   Placed last so it wins the cascade over every earlier conflicting
+   declaration for these same selectors (same specificity, same
+   !important — last rule in the file applies), without editing or
+   removing any of those earlier blocks' other properties (font-size,
+   padding, colors, etc. are untouched).
+   ============================================================ */
+
+/* Let the table's own width:100% (inline, LuboilAnalysis.jsx) govern
+   things — no more arbitrary calc() stretch unrelated to column count. */
+.vessel-table-enhanced {
+  width: 100% !important;
+}
+
+/* Sticky left column (corner header + machinery cell + footer label)
+   — one width, shared by all three, at every size below 2000px. */
+.matrix-corner-header,
+.machinery-sticky-cell,
+.lub-matrix-footer-label {
+  width: 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
+}
+
+/* Vessel columns (header cell + data cell + footer select-cell)
+   — one width, shared by all three, at every size below 2000px.
+   Using width (not just min-width) on all three removes any
+   ambiguity about which row's declaration a fixed-layout table uses
+   to size the column. */
+.vessel-header-cell,
+.lub-data-cell,
+.lub-matrix-footer-cell {
+  width: 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
+}
+
+/* Big screens: grow both column groups together, still matching
+   width-for-width across header/body/footer, so nothing drifts. */
+@media (min-width: 2000px) {
+  .matrix-corner-header,
+  .machinery-sticky-cell,
+  .lub-matrix-footer-label {
+    width: 380px !important;
+    min-width: 380px !important;
+    max-width: 380px !important;
+  }
+
+  .vessel-header-cell,
+  .lub-data-cell,
+  .lub-matrix-footer-cell {
+    width: 420px !important;
+    min-width: 420px !important;
+    max-width: 420px !important;
+  }
+}
+
+

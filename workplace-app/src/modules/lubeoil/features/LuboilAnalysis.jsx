@@ -4791,18 +4791,7 @@ const LuboilAnalysis = () => {
                                       //   }}
                                       className={`lub-data-cell data-available ${isNormal ? "" : "hover-cell"}`}
                                     >
-                                      {showVerifiedTick && (
-                                        <div
-                                          className="verified-tick-dogear"
-                                          title="Resolution Documented & Verified"
-                                        >
-                                          <CheckCircle
-                                            size={12}
-                                            color="white"
-                                            className="indicator-icon"
-                                          />
-                                        </div>
-                                      )}
+                                     
                                       <div className="cell-content-wrapper">
                                         <StatusDots
                                           history={cell.history}
