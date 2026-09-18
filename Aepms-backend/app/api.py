@@ -111,6 +111,23 @@ def _is_pdf_stale(generated_report_url: str | None) -> bool:
     if not generated_report_url:
         return False
     return f"-{PDF_RULESET_VERSION}." not in generated_report_url
+
+
+def _is_pdf_missing(generated_report_url: str | None) -> bool:
+    """True when a report has NO stored analytical PDF at all.
+
+    This is the normal state for a report that arrived via the Reports-backend
+    auto-push: that path only calls /upload-monthly-report/ (and the AE
+    equivalent), which parses and stores the report data plus the RAW PDF. The
+    analytical PDF is rendered by jsPDF in the browser, so a server-side push
+    cannot produce one and generated_report_url stays NULL forever.
+
+    Kept separate from _is_pdf_stale() on purpose. Both lead to the same action
+    (the UI builds a PDF when the report is next viewed), but they mean
+    different things when debugging: 'missing' points at the auto-push path,
+    'stale' points at a threshold/rule revision.
+    """
+    return not generated_report_url
 from app.blob_storage import generate_sas_url
 from sqlalchemy import case, literal
 from app.load_excel_data import load_excel_to_database
@@ -1314,10 +1331,12 @@ async def get_performance_history(
                     "report_month": report.report_month,
                     "report_date": report.report_date.isoformat() if report.report_date else None,
                     # Stored analytical PDF: present, and produced by the current
-                    # rule set? The UI uses pdf_stale to decide whether to silently
-                    # regenerate this report's PDF when it is viewed.
+                    # rule set? The UI builds a PDF when pdf_stale OR pdf_missing
+                    # is true. pdf_missing covers auto-pushed reports, which never
+                    # get an analytical PDF because that needs a browser.
                     "generated_report_url": report.generated_report_url,
                     "pdf_stale": _is_pdf_stale(report.generated_report_url),
+                    "pdf_missing": _is_pdf_missing(report.generated_report_url),
                     "cylinder_readings": report.cylinder_readings, 
                     "shaft_power_kw": float(report.shaft_power_kw) if report.shaft_power_kw is not None else None,
                     "effective_power_kw": float(report.effective_power_kw) if report.effective_power_kw is not None else None,
@@ -1464,9 +1483,10 @@ async def get_ae_performance_history(
                     "generator_id": generator_id,
                     "report_month": report.report_month,
                     "report_date": report.report_date.isoformat() if report.report_date else None,
-                    # Same stale-PDF signal as the ME list — see PDF_RULESET_VERSION.
+                    # Same signals as the ME list — see PDF_RULESET_VERSION.
                     "generated_report_url": report.generated_report_url,
                     "pdf_stale": _is_pdf_stale(report.generated_report_url),
+                    "pdf_missing": _is_pdf_missing(report.generated_report_url),
                     "load_percentage": float(perf_data.load_percentage) if perf_data.load_percentage else None,
                     "cylinder_readings": report.cylinder_readings,
                     "load_kw": float(perf_data.load_kw) if perf_data.load_kw else None,
