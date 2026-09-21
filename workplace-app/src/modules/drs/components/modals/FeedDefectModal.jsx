@@ -455,9 +455,9 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                   <BeforeAfterImageUpload
                     defectId={defect.id}
                     type="after"
-                    isMandatory={defect.after_image_required}
+                    isMandatory={true}
                     defectStatus={defect.status}
-                    onToggleRequired={() => updateField('after_image_required', !defect.after_image_required)}
+                    onToggleRequired={null}
                   />
                 </div>
               </div>

@@ -6,10 +6,12 @@ import AttachmentsPanel from '../../components/AttachmentsPanel';
 import ThreadPanel from '../../components/ThreadPanel';
 import ReportViewerModal from '../../components/ReportViewerModal';
 import BulkDownloadModal from '../../components/BulkDownloadModal';
+import ManualUploadModal from '../../components/ManualUploadModal';
+import '../../styles/ManualUploadModal.css';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import {
-  Ship, Filter, Search, ChevronDown, ChevronRight, X, CheckCircle2, Clock, AlertCircle, Paperclip, AlertTriangle, CalendarClock, MessageSquare, Download
+  Ship, Filter, Search, ChevronDown, ChevronRight, X, CheckCircle2, Clock, AlertCircle, Paperclip, AlertTriangle, CalendarClock, MessageSquare, Download, Upload
 } from 'lucide-react';
 import '../../styles/Reports.css';
 import { compareReportNames } from '../../reportOrder';
@@ -59,6 +61,7 @@ export default function ShoreReportsPage() {
   const [isVesselDropdownOpen, setIsVesselDropdownOpen] = useState(false);
   const [tooltipData, setTooltipData] = useState({ visible: false, text: '', x: 0, y: 0 });
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const handleTooltipEnter = useCallback((e, text) => {
@@ -322,6 +325,11 @@ export default function ShoreReportsPage() {
         </div>
 
         <div className="rt-control-right">
+          <button className="mu-trigger-btn" onClick={() => setUploadModalOpen(true)}>
+            <Upload size={14} />
+            Upload Report
+          </button>
+
           <button className="bdl-trigger-btn" onClick={() => setDownloadModalOpen(true)}>
             <Download size={14} />
             Download Reports
@@ -549,6 +557,15 @@ export default function ShoreReportsPage() {
           vessels={vessels}
           reports={reports}
           onClose={() => setDownloadModalOpen(false)}
+        />
+      )}
+
+      {uploadModalOpen && (
+        <ManualUploadModal
+          vessels={vessels}
+          configs={configs}
+          defaultVesselImo={activeVesselImo}
+          onClose={() => setUploadModalOpen(false)}
         />
       )}
     </div>

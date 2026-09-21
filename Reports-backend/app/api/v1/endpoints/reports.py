@@ -13,7 +13,9 @@ from typing import List, Optional
 from uuid import UUID, uuid4
 from datetime import datetime, date
 import enum
-from fastapi import APIRouter, Depends, HTTPException, Query
+import os
+import re
+from fastapi import APIRouter, Depends, HTTPException, Query, Form, File, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -24,9 +26,10 @@ from app.core.database import get_db
 from app.core.config import settings
 from app.models.sync import SyncQueue
 from app.api.deps import require_shore, require_any
-from app.models.report import Report, ReportThread, ReportConfig, ReportEvent, VerifyStatus
+from app.models.report import Report, ReportThread, ReportConfig, ReportEvent, ReportAttachment, ScrapeStatus, VerifyStatus
 from app.schemas.report import ReportOut, ReportListOut, SasUrlOut, VerifyRequest
-from app.core.blob_storage import generate_read_sas_url, verify_blob_exists, download_blob_bytes
+from app.core.blob_storage import generate_read_sas_url, verify_blob_exists, download_blob_bytes, upload_pdf_to_blob
+from app.utils.report_date import extract_report_period
 import mimetypes
 import io
 from fastapi.responses import StreamingResponse
@@ -137,6 +140,116 @@ async def list_reports(
     reports = result.scalars().all()
     return reports
 
+
+
+MANUAL_UPLOAD_EXTS = {".pdf", ".xls", ".xlsx", ".xlsm", ".csv", ".doc", ".docx"}
+MANUAL_UPLOAD_MAX_BYTES = 50 * 1024 * 1024
+
+
+@router.post("/manual-upload", response_model=ReportListOut)
+async def manual_upload_report(
+    vessel_imo: str = Form(...),
+    report_code: str = Form(...),
+    report_date: Optional[date] = Form(None),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_shore),
+):
+    """
+    Shore/Admin uploads a report file directly (e.g. one not obtainable from
+    SmartPAL). Creates a normal SCRAPED Report + attachment for the chosen
+    vessel/report type, so it shows up on the Dashboard and Overview exactly
+    like a scraped one. report_date drives which period Overview files it under.
+    If report_date is omitted, it is read out of the file with the same logic
+    the scraper uses (extract_report_period); 422 if the file has no readable date.
+    """
+    cfg = (await db.execute(
+        select(ReportConfig).where(
+            ReportConfig.vessel_imo == vessel_imo,
+            ReportConfig.report_code == report_code,
+        )
+    )).scalars().first()
+    if not cfg:
+        raise HTTPException(status_code=404, detail="This report type is not configured for the selected vessel")
+
+    file_name = (file.filename or "").strip()
+    ext = os.path.splitext(file_name)[1].lower()
+    if ext not in MANUAL_UPLOAD_EXTS:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type '{ext}'")
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="File is empty")
+    if len(data) > MANUAL_UPLOAD_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="File is larger than 50 MB")
+
+    uploader = getattr(current_user, "full_name", None) or getattr(current_user, "email", None) or "Shore"
+    if report_date is not None:
+        dated = datetime.combine(report_date, datetime.min.time())
+        date_source = f"manual upload by {uploader}"
+    else:
+        try:
+            found = await run_in_threadpool(extract_report_period, data, file_name)
+        except Exception as e:
+            logger.warning(f"Report-date extraction failed for '{file_name}': {e}")
+            found = None
+        if not found:
+            raise HTTPException(
+                status_code=422,
+                detail="Could not read a report date from this file. Please select the report date.",
+            )
+        dated, found_src = found
+        date_source = f"{found_src} (manual upload by {uploader})"
+
+    safe_fname = re.sub(r'[^a-zA-Z0-9_\-\. ]', '', file_name).strip() or f"report{ext}"
+    stamp = datetime.utcnow().strftime("%Y-%m-%d")
+    blob_name = f"reports/{vessel_imo}/{report_code}/{stamp}_manual_{uuid4().hex[:8]}_{safe_fname}"
+    try:
+        await run_in_threadpool(upload_pdf_to_blob, data, blob_name)
+    except Exception as e:
+        logger.error(f"Manual upload to blob failed for '{blob_name}': {e}")
+        raise HTTPException(status_code=502, detail="Could not store the file, please retry")
+
+    now = datetime.utcnow()
+    report = Report(
+        id=uuid4(),
+        vessel_imo=cfg.vessel_imo,
+        vessel_name=cfg.vessel_name,
+        job_order_no=f"MANUAL-{uuid4().hex[:8].upper()}",
+        report_code=cfg.report_code,
+        report_name=cfg.report_name,
+        department=cfg.department,
+        frequency=cfg.frequency,
+        job_status="COMPLETED",
+        job_type="Manual Upload",
+        approved_by=uploader,
+        job_end_date=dated,
+        job_date=dated,
+        report_date=dated,
+        report_date_source=date_source,
+        scrape_status=ScrapeStatus.SCRAPED,
+        verify_status=VerifyStatus.UNVERIFIED,
+        created_at=now,
+        updated_at=now,
+    )
+    report.attachments.append(ReportAttachment(id=uuid4(), file_name=file_name, blob_path=blob_name))
+    db.add(report)
+    db.add(ReportEvent(
+        id=uuid4(),
+        vessel_imo=cfg.vessel_imo,
+        vessel_name=cfg.vessel_name,
+        report_id=report.id,
+        event_type="NEW_REPORT",
+        description=f"{cfg.report_name} was uploaded manually by {uploader}",
+        source="SHORE",
+        author_name=uploader,
+        created_at=now,
+    ))
+    await db.commit()
+
+    result = await db.execute(
+        select(Report).where(Report.id == report.id).options(selectinload(Report.attachments))
+    )
+    return result.scalars().first()
 
 
 @router.get("/{report_id}", response_model=ReportOut)

@@ -1362,23 +1362,40 @@ export const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStat
           )}
         </h4>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-          {canEdit && onToggleRequired && (
+          {type === 'after' ? (
             <div
-              onClick={(e) => { e.stopPropagation(); onToggleRequired(); }}
               className='closed-thread'
               style={{
-                cursor: 'pointer', padding: '4px 8px', borderRadius: '12px',
-                border: isMandatory ? '1px solid #dc2626' : '1px solid #3b82f6',
-                background: isMandatory ? '#fee2e2' : '#dbeafe',
+                padding: '4px 10px', borderRadius: '12px',
+                border: '1px solid #dc2626',
+                background: '#fee2e2',
                 fontSize: '10px', fontWeight: '700',
-                color: isMandatory ? '#dc2626' : '#1e40af',
+                color: '#dc2626',
                 display: 'flex', alignItems: 'center', gap: '4px',
-                transition: 'all 0.2s ease', userSelect: 'none'
+                userSelect: 'none'
               }}
             >
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', border: isMandatory ? '2px solid #dc2626' : '2px solid #3b82f6', background: 'white' }} />
-              {isMandatory ? '⚠️ MANDATORY' : '📸 IMAGE REQUIRED'}
+              ⚠️ ALWAYS MANDATORY
             </div>
+          ) : (
+            canEdit && onToggleRequired && (
+              <div
+                onClick={(e) => { e.stopPropagation(); onToggleRequired(); }}
+                className='closed-thread'
+                style={{
+                  cursor: 'pointer', padding: '4px 8px', borderRadius: '12px',
+                  border: isMandatory ? '1px solid #dc2626' : '1px solid #3b82f6',
+                  background: isMandatory ? '#fee2e2' : '#dbeafe',
+                  fontSize: '10px', fontWeight: '700',
+                  color: isMandatory ? '#dc2626' : '#1e40af',
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  transition: 'all 0.2s ease', userSelect: 'none'
+                }}
+              >
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', border: isMandatory ? '2px solid #dc2626' : '2px solid #3b82f6', background: 'white' }} />
+                {isMandatory ? '⚠️ MANDATORY' : '📸 IMAGE REQUIRED'}
+              </div>
+            )
           )}
           {totalCount > 0 && (
             <button
@@ -4434,9 +4451,9 @@ const ShoreDashboard = () => {
                                     <BeforeAfterImageUpload
                                       defectId={defect.id}
                                       type="after"
-                                      isMandatory={defect.after_image_required}
+                                      isMandatory={true}
                                       defectStatus={defect.status}
-                                      onToggleRequired={() => handleInlineUpdate(defect.id, 'after_image_required', !defect.after_image_required)}
+                                      onToggleRequired={null}
                                     />
                                   </div>
 

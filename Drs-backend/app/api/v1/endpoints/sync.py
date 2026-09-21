@@ -389,5 +389,4 @@ async def get_changes(
             serialized_items.append(item_data)
 
         results[key] = serialized_items
-
     return results

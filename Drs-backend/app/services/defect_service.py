@@ -285,13 +285,13 @@ class DefectService:
                             if not r.scalars().all():
                                 missing_images.append("Before")
 
-                        if defect.after_image_required:
-                            r = await db.execute(select(DefectImage).where(
-                                DefectImage.defect_id == defect_id,
-                                DefectImage.image_type == 'after',
-                            ))
-                            if not r.scalars().all():
-                                missing_images.append("After")
+                        # After image is ALWAYS mandatory for closure request
+                        r = await db.execute(select(DefectImage).where(
+                            DefectImage.defect_id == defect_id,
+                            DefectImage.image_type == 'after',
+                        ))
+                        if not r.scalars().all():
+                            missing_images.append("After")
 
                         if missing_images:
                             raise ValueError(
@@ -561,13 +561,13 @@ class DefectService:
             if not r.scalars().all():
                 missing_images.append("Before")
 
-        if defect.after_image_required:
-            r = await db.execute(select(DefectImage).where(
-                DefectImage.defect_id == defect_id,
-                DefectImage.image_type == 'after',
-            ))
-            if not r.scalars().all():
-                missing_images.append("After")
+        # After image is ALWAYS mandatory for closure
+        r = await db.execute(select(DefectImage).where(
+            DefectImage.defect_id == defect_id,
+            DefectImage.image_type == 'after',
+        ))
+        if not r.scalars().all():
+            missing_images.append("After")
 
         if missing_images:
             raise ValueError(

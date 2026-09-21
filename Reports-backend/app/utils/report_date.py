@@ -273,11 +273,12 @@ def _period_from_form(pdf_bytes, filename=""):
             # the exact day the vessel typed, so use it.
             return (m_year, m_month, d_day), f"form:{m_key}={m_val!r},{d_key}={d_val!r}"
             
-        # Specific override for TECH-07 (ME Performance Sheet): The user
-        # explicitly requested that the exact typed Date be prioritized over
-        # Report Month when they disagree, even if it shifts the report's month.
-        if "TECH-07" in filename.upper() or "TECH - 07" in filename.upper():
-            return (d_year, d_month, d_day), f"form:{d_key}={d_val!r} (overrode {m_key}={m_val!r} for TECH-07)"
+        # Specific override for TECH-07 (ME Performance Sheet) and TECH-15
+        # (ME Crankweb Deflection Report): The user explicitly requested
+        # that the exact typed Date be prioritized over Report Month when
+        # they disagree, even if it shifts the report's month.
+        if any(code in filename.upper() for code in ["TECH-07", "TECH - 07", "TE-07", "TE - 07", "TECH-15", "TECH - 15", "TE-15", "TE - 15"]):
+            return (d_year, d_month, d_day), f"form:{d_key}={d_val!r} (overrode {m_key}={m_val!r} for TECH-07/TECH-15)"
 
         # They disagree on the MONTH, not just the day -- this is the same
         # completion-lag pattern as SmartPAL's own dates (the crew signs the

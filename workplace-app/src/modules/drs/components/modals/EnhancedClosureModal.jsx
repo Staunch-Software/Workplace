@@ -50,18 +50,18 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
   const { data: afterImages = [], refetch: refetchAfter } = useQuery({
     queryKey: ['defect-images', defect.id, 'after'],
     queryFn: () => defectApi.getDefectImages(defect.id, 'after'),
-    enabled: !!defect.after_image_required
+    enabled: true  // After image is ALWAYS mandatory
   });
 
   // Check if all requirements are met
   const remarksValid = remarks.trim().length >= 50;
   const beforeImagesOk = !defect.before_image_required || beforeImages.length > 0;
-  const afterImagesOk = !defect.after_image_required || afterImages.length > 0;
+  const afterImagesOk = afterImages.length > 0;   // After image ALWAYS mandatory
   const canProceed = remarksValid && beforeImagesOk && afterImagesOk && !uploading;
 
   // Determine if we need to show image upload sections
   const needsBeforeImages = defect.before_image_required && beforeImages.length === 0;
-  const needsAfterImages = defect.after_image_required && afterImages.length === 0;
+  const needsAfterImages = afterImages.length === 0;   // After image ALWAYS mandatory
   const showImageSection = needsBeforeImages || needsAfterImages;
 
   // Handle image upload
@@ -463,8 +463,8 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
             </div>
           )}
 
-          {/* Success message if all images are already uploaded */}
-          {!showImageSection && (defect.before_image_required || defect.after_image_required) && (
+          {/* Success message if all images already uploaded */}
+          {!showImageSection && (
             <div className='closure-fsize-16' style={{
               padding: '12px',
               background: '#f0fdf4',
@@ -484,20 +484,7 @@ const EnhancedClosureModal = ({ defect, validation, onClose, onSuccess }) => {
             </div>
           )}
 
-          {/* No images required at all */}
-          {!defect.before_image_required && !defect.after_image_required && (
-            <div className='closure-fsize-16' style={{
-              padding: '10px',
-              background: '#f1f5f9',
-              border: '1px solid #cbd5e1',
-              borderRadius: '6px',
-              fontSize: '12px',
-              color: '#64748b',
-              marginBottom: '16px'
-            }}>
-              ℹ️ No before/after images required for this defect
-            </div>
-          )}
+          {/* After image is always mandatory — remove 'no images required' message */}
         </div>
 
         {/* Footer */}

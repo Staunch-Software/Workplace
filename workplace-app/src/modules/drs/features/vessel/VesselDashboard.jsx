@@ -1297,15 +1297,33 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus }) =
             </span>
           )}
         </h4>
-        {existingImagesMapped.length > 0 && (
-          <button
-            onClick={() => setShowSidebar(true)}
-            className='fsize-15'
-            style={{ background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
-          >
-            View
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          {type === 'after' && (
+            <div
+              className='fsize-14'
+              style={{
+                padding: '4px 10px', borderRadius: '12px',
+                border: '1px solid #dc2626',
+                background: '#fee2e2',
+                fontSize: '10px', fontWeight: '700',
+                color: '#dc2626',
+                display: 'flex', alignItems: 'center', gap: '4px',
+                userSelect: 'none'
+              }}
+            >
+              ⚠️ ALWAYS MANDATORY
+            </div>
+          )}
+          {existingImagesMapped.length > 0 && (
+            <button
+              onClick={() => setShowSidebar(true)}
+              className='fsize-15'
+              style={{ background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+            >
+              View
+            </button>
+          )}
+        </div>
       </div>
 
       {!isClosed && (
@@ -1383,11 +1401,7 @@ const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus }) =
         </>
       )}
 
-      {isMandatory && existingImagesMapped.length === 0 && (
-        <div className='fsize-14' style={{ marginTop: '8px', background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '4px', padding: '6px', fontSize: '10px', color: '#92400e', fontWeight: '600', textAlign: 'center' }}>
-          ⚠️ MANDATORY
-        </div>
-      )}
+
 
       {showSidebar && (
         <ImageSidebar
@@ -3781,7 +3795,7 @@ const VesselDashboard = () => {
                                     <BeforeAfterImageUpload
                                       defectId={defect.id}
                                       type="after"
-                                      isMandatory={defect.after_image_required}
+                                      isMandatory={true}
                                       defectStatus={defect.status}
                                     />
                                   </div>

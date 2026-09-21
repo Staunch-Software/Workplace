@@ -78,6 +78,16 @@ export const reportsApi = {
       headers: { "x-ms-blob-type": "BlockBlob", "Content-Type": file.type || "application/octet-stream" }
     });
   },
+  manualUpload: ({ vessel_imo, report_code, report_date, file }) => {
+    const form = new FormData();
+    form.append('vessel_imo', vessel_imo);
+    form.append('report_code', report_code);
+    if (report_date) form.append('report_date', report_date);
+    form.append('file', file);
+    return shoreClient
+      .post("/reports/manual-upload", form, { headers: { 'Content-Type': 'multipart/form-data' } })
+      .then((r) => r.data);
+  },
   // Config endpoints
   listConfigs: () =>
     shoreClient.get("/reports/config").then((r) => r.data),
