@@ -150,6 +150,7 @@ class LuboilSample(Base):
     summary_error = Column(String(500), nullable=True, comment="Short technical summary of the warning (e.g., 'Lead (Pb) ppm is 15')")
     is_image_required = Column(Boolean, default=False)
     is_resampling_required = Column(Boolean, default=False)
+    is_action_required = Column(Boolean, default=False, comment="True when shore has flagged this sample as needing vessel action (independent of image/resample mandates); drives the orange/green underline on the matrix")
     is_approval_pending = Column(Boolean, default=False, comment="True if vessel requested close but shore hasn't accepted")
     attachment_url = Column(String, nullable=True)
     pdf_page_index = Column(Integer, nullable=True, comment="The 0-based index of the page in the PDF")

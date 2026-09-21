@@ -163,7 +163,7 @@ div.section-header-enhanced {
 
 /* --- 1. BASE SETTINGS (Standard Desktop & Tablet: 4 Columns) --- */
 .lub-stats-grid-container {
-  grid-template-columns: repeat(4, 1fr) !important;
+  grid-template-columns: repeat(3, 1fr) !important;
   gap: 12px !important;
 }
 
@@ -10489,3 +10489,307 @@ div.section-header-enhanced {
 }
 
 
+
+
+/* ============================================================
+   DASHBOARD HEADER: Title/Subtitle | Summary cards | Owner | Upload
+   The three summary cards (Configured, Pending / Unresolved, Overdue)
+   now live inside .section-header-enhanced between the title block and
+   the actions block. This is one compact row that wraps gracefully, so
+   the Latest Report Matrix sits directly under it with no large gap.
+   Additive only, placed last so it wins the cascade over the earlier
+   per-breakpoint header margin/padding rules.
+   ============================================================ */
+
+/* --- Compact spacing at every size (replaces the 24px/40px bottom
+       margins and 14-20px paddings the big-screen blocks applied) --- */
+div.section-header-enhanced {
+  margin-bottom: 10px !important;
+  padding: 0 !important;
+  gap: 16px !important;
+}
+
+div.section-header-enhanced .lub-stats-grid-container {
+  margin-bottom: 0 !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  max-width: 720px !important;
+  gap: 12px !important;
+}
+
+div.section-header-enhanced .stat-card {
+  min-width: 0 !important;
+}
+
+div.section-header-enhanced .lub-stat-label {
+  overflow-wrap: anywhere;
+}
+
+/* Title block keeps its natural width, actions never shrink */
+div.section-header-enhanced > div:first-child {
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+}
+
+div.section-header-enhanced > div:last-child {
+  flex: 0 0 auto !important;
+}
+
+/* --- Big screens (2000px+) --- */
+@media (min-width: 2000px) {
+  div.section-header-enhanced {
+    gap: 32px !important;
+    margin-bottom: 20px !important;
+  }
+
+  div.section-header-enhanced .lub-stats-grid-container {
+    max-width: 1300px !important;
+    gap: 24px !important;
+  }
+}
+
+/* --- Tablets / small laptops (601px - 1099px): title + actions on the
+       first line, the three cards full-width on the second line --- */
+@media (min-width: 601px) and (max-width: 1099px) {
+  div.section-header-enhanced {
+    flex-wrap: wrap !important;
+    row-gap: 10px !important;
+  }
+
+  div.section-header-enhanced > div:first-child {
+    order: 1;
+    flex: 1 1 auto !important;
+  }
+
+  div.section-header-enhanced > div:last-child {
+    order: 2;
+  }
+
+  div.section-header-enhanced .lub-stats-grid-container {
+    order: 3;
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* --- Phones (600px and below): everything stacks in the requested
+       order (title, cards, owner, upload); the three cards stay on a
+       single row as compact stacked tiles --- */
+@media (max-width: 600px) {
+  div.section-header-enhanced {
+    gap: 10px !important;
+    align-items: stretch !important;
+  }
+
+  div.section-header-enhanced > div:first-child,
+  div.section-header-enhanced .lub-stats-grid-container,
+  div.section-header-enhanced > div:last-child {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 auto !important;
+  }
+
+  div.section-header-enhanced .lub-stats-grid-container {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  div.section-header-enhanced .stat-card {
+    flex-direction: column !important;
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 8px 4px !important;
+    gap: 4px !important;
+  }
+
+  div.section-header-enhanced .stat-icon-wrapper {
+    padding: 4px !important;
+  }
+
+  div.section-header-enhanced .lub-stat-label {
+    font-size: 0.62rem !important;
+  }
+
+  h1.section-title-main {
+    white-space: normal !important;
+  }
+}
+
+/* The generic .enhanced-card rule (dashboard.css) adds margin-top: 2rem,
+   which left a large empty band between the header and the Latest Report
+   Matrix at every screen size. The header's own bottom margin now sets the
+   spacing, so drop it for the matrix card only. */
+div.dashboard-container-enhanced .lub-matrix-card.enhanced-card {
+  margin-top: 0 !important;
+}
+
+/* ============================================================
+   CHAT PANEL PILLS: IMAGE MANDATORY -> RESAMPLING MANDATORY -> CLOSE
+   The three pills sit on ONE line. The row is a size container, so the
+   pill text/padding scale with the actual chat-panel width (not the
+   screen width) and the pills stay on one line down to ~300px; icons
+   drop out on very narrow panels. Only if the panel is narrower still
+   do the pills wrap instead of overlapping. Layout/styling only.
+   Placed last to win the cascade.
+   ============================================================ */
+.lub-mandatory-pills-row {
+  container-type: inline-size;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+}
+
+.lub-mandatory-pills-row > .lub-mandatory-btn {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  font-size: clamp(0.5rem, 2.5cqw, 0.65rem) !important;
+  padding: 7px clamp(4px, 2cqw, 8px) !important;
+  gap: clamp(3px, 1.2cqw, 6px) !important;
+}
+
+/* Close is the shortest label: keep it compact, let the two
+   mandatory pills take the extra room */
+.lub-mandatory-pills-row > .lub-close-pill {
+  flex: 0 0 auto !important;
+  border: none !important;
+  color: #fff !important;
+}
+
+.lub-mandatory-pills-row > .lub-close-pill:disabled {
+  cursor: not-allowed;
+}
+
+/* Uniform pill height that scales with the panel (overrides the fixed
+   40px/65px heights other breakpoints apply to .lub-mandatory-btn) */
+@media (max-width: 1999px) {
+  .lub-mandatory-pills-row > .lub-mandatory-btn {
+    height: clamp(26px, 8cqw, 36px) !important;
+    border-radius: 999px !important;
+  }
+}
+
+/* Narrow chat panel: drop the icons so the text keeps fitting */
+@container (max-width: 380px) {
+  .lub-mandatory-pills-row > .lub-mandatory-btn:not(.lub-close-pill) .lub-mandatory-icon {
+    display: none !important;
+  }
+}
+
+/* Extremely narrow panel (very small phones / heavily split windows):
+   a single line can no longer hold three readable pills, so each pill
+   takes its own full-width row instead of being clipped */
+@container (max-width: 299px) {
+  .lub-mandatory-pills-row > .lub-mandatory-btn {
+    flex: 1 1 100% !important;
+    height: 30px !important;
+    font-size: 0.6rem !important;
+  }
+}
+
+/* Big screens (2000px+): larger pills, but still scaled by the chat
+   panel's own width (the panel is only ~700px wide at 2560) so all
+   three stay on one line instead of Close wrapping */
+@media (min-width: 2000px) {
+  .lub-mandatory-pills-row > .lub-mandatory-btn {
+    font-size: clamp(0.6rem, 2.2cqw, 1rem) !important;
+    padding: 7px clamp(6px, 2cqw, 14px) !important;
+    gap: clamp(4px, 1.4cqw, 10px) !important;
+    height: clamp(30px, 6.5cqw, 48px) !important;
+    border-radius: 999px !important;
+  }
+}
+
+/* Feed toolbar: "Mark all as read" sits next to Refresh and shares its
+   sizing/responsive rules (same .lub-feed-refresh-btn class). Only the
+   disabled look and a no-wrap label are added here. */
+.lub-feed-markall-btn {
+  white-space: nowrap !important;
+}
+
+.lub-feed-markall-btn:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+/* ============================================================
+   FIX: STAT CARD ICON WRAPPERS — FORCE EQUAL SIZE ACROSS ALL 3
+   CARDS. Previously .stat-icon-wrapper had no fixed width/height —
+   it was sized only by padding + whatever icon size happened to be
+   rendered inside, so at some viewport widths the "Overdue" wrapper
+   (icon-bg-red, Clock icon) ended up rendering at a different
+   computed size (e.g. 48x48) than "Configured" (icon-bg-slate,
+   Activity icon) even though both pass size={20} to their icon.
+   Giving every .stat-icon-wrapper one explicit, fixed box — with
+   flex-shrink:0 so it can never be squeezed by its sibling text
+   column — removes that dependency entirely. Placed last so it wins
+   the cascade over every earlier breakpoint's svg-only sizing rules
+   for this same class (same selector specificity + !important —
+   last rule in the file applies), without editing any of those
+   earlier blocks' other properties.
+   ============================================================ */
+
+.stat-icon-wrapper {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  flex-shrink: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.stat-icon-wrapper svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+/* Mobile: shrink all three equally instead of just some */
+@media (max-width: 600px) {
+  .stat-icon-wrapper {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+  }
+
+  .stat-icon-wrapper svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+}
+
+/* Compact laptop/tablet modes: shrink all three equally */
+@media (max-width: 1200px) {
+  .stat-icon-wrapper {
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
+    min-height: 30px !important;
+  }
+
+  .stat-icon-wrapper svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+}
+
+/* Big screens: grow all three equally */
+@media (min-width: 2000px) {
+  .stat-icon-wrapper {
+    width: 56px !important;
+    height: 56px !important;
+    min-width: 56px !important;
+    min-height: 56px !important;
+  }
+
+  .stat-icon-wrapper svg {
+    width: 32px !important;
+    height: 32px !important;
+  }
+}

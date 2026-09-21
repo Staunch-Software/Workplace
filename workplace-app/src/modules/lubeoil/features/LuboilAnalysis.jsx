@@ -33,6 +33,8 @@ import {
   SendHorizontal,
   X,
   Paperclip,
+  CheckCheck,
+  Mail,
 } from "lucide-react";
 import {
   LineChart,
@@ -433,8 +435,15 @@ const OverdueVesselRow = ({
         <div className="lub-list-expanded-content">
           <p className="lub-list-detail-label">Equipment Detail:</p>
           <div className="lub-list-equip-stack">
-            {v.overdueItems.map((item, i) => (
-              <div key={i} className="lub-list-equip-card">
+                        {v.overdueItems.map((item, i) => (
+              <div
+                key={i}
+                className="lub-list-equip-card"
+                onClick={
+                  !isConfiguredView ? () => onViewClick(v.name, item) : undefined
+                }
+                style={{ cursor: !isConfiguredView ? "pointer" : "default" }}
+              >
                 {/* Text Content Area */}
                 <div className="lub-list-equip-info">
                   <span className="lub-list-equip-name">
@@ -459,30 +468,19 @@ const OverdueVesselRow = ({
                 </div>
 
                 {/* Right Side Action/Status Area */}
+                                {/* Right Side Action/Status Area */}
                 <div className="lub-list-equip-actions">
                   {isConfiguredView ? (
                     /* ðŸ”¥ REVERTED LOOK FOR CONFIGURED: JUST THE ORIGINAL LABEL */
                     <span className="lub-list-shortcode">{item.shortCode}</span>
                   ) : (
-                    /* ðŸ”¥ NEW LOOK FOR OVERDUE/UNRESOLVED: ICON + VIEW BUTTON */
-                    <>
-                      <div
-                        title={`Status: ${item.status || "N/A"}`}
-                        className="lub-list-status-icon-wrapper"
-                      >
-                        <ShellStatusIcon status={item.status} size={22} />
-                      </div>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onViewClick(v.name, item);
-                        }}
-                        className="lub-list-view-btn"
-                      >
-                        <Eye size={14} /> VIEW
-                      </button>
-                    </>
+                    /* ðŸ”¥ NEW LOOK FOR OVERDUE/UNRESOLVED: ICON ONLY */
+                    <div
+                      title={`Status: ${item.status || "N/A"}`}
+                      className="lub-list-status-icon-wrapper"
+                    >
+                      <ShellStatusIcon status={item.status} size={22} />
+                    </div>
                   )}
                 </div>
               </div>
@@ -738,7 +736,7 @@ const LuboilAnalysis = () => {
   const [isReportCollapsed, setIsReportCollapsed] = useState(false);
   const [isCommCollapsed, setIsCommCollapsed] = useState(false);
   const [tableColumns, setTableColumns] = useState([]);
-  const [feedReadFilter, setFeedReadFilter] = useState("ALL"); // ALL, READ, UNREAD
+  const [feedReadFilter, setFeedReadFilter] = useState("UNREAD"); // ALL, READ, UNREAD (default: UNREAD, same as DRS feed)
 
   // 🔥 CHANGED: Feed filters are now arrays (empty array [] means "ALL selected")
   const [feedVesselFilter, setFeedVesselFilter] = useState([]);
@@ -772,13 +770,17 @@ const LuboilAnalysis = () => {
   const [isTableOpen, setIsTableOpen] = useState(true);
   const [selectedCell, setSelectedCell] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDiagExpanded, setIsDiagExpanded] = useState(false);
+  const [activeFeedEventId, setActiveFeedEventId] = useState(null);
+  const [markedUnreadDone, setMarkedUnreadDone] = useState(false);
+  const [feedNavIds, setFeedNavIds] = useState(null);
+  const [feedNavIndex, setFeedNavIndex] = useState(null);
+  const [isDiagExpanded, setIsDiagExpanded] = useState(true);
   const [selectedGalleryItems, setSelectedGalleryItems] = useState([]);
   const [isDownloading, setIsDownloading] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [viewMode, setViewMode] = useState("matrix");
-  const [feedMode, setFeedMode] = useState("FLEET");
+  const [feedMode, setFeedMode] = useState("MY_FEED"); // default: MY FEED, same as DRS feed
   const [feedData, setFeedData] = useState([]);
   const [feedLoading, setFeedLoading] = useState(false);
   const [footerReportVessel, setFooterReportVessel] = useState(null);
@@ -830,6 +832,7 @@ const LuboilAnalysis = () => {
 
   // NEW: Owner filtering state
   const [selectedOwner, setSelectedOwner] = useState("ALL");
+  const [focusedVessel, setFocusedVessel] = useState(null);
   
   const getOwner = (name) => {
     if (!name) return "";
@@ -937,6 +940,15 @@ const LuboilAnalysis = () => {
       fetchFeed();
     }
   }, [feedMode, viewMode]);
+
+  // Whenever the user leaves the feed, restore the default feed view
+  // (MY FEED + UNREAD) so it is what they see the next time it is opened.
+  useEffect(() => {
+    if (viewMode !== "liveFeed") {
+      setFeedMode("MY_FEED");
+      setFeedReadFilter("UNREAD");
+    }
+  }, [viewMode]);
 
   const handleMarkAllRead = async () => {
     try {
@@ -1354,7 +1366,7 @@ const LuboilAnalysis = () => {
     // 3. Sort all groups newest first (Chronological)
     const sortByTime = (a, b) =>
       new Date(b.created_at) - new Date(a.created_at);
-    groups.today.sort(sortByTime);
+        groups.today.sort(sortByTime);
     groups.earlier.sort(sortByTime);
     groups.read.sort(sortByTime);
 
@@ -1370,6 +1382,17 @@ const LuboilAnalysis = () => {
     feedMode,
     selectedOwner,
   ]);
+
+  // Flattened, ordered list of feed item ids matching exactly what's
+  // rendered on screen (Today -> Earlier -> Read). This snapshot is what
+  // the modal's prev/next arrows walk through.
+  const flatFeedOrder = useMemo(() => {
+    return [
+      ...groupedFeed.today,
+      ...groupedFeed.earlier,
+      ...groupedFeed.read,
+    ].map((i) => i.id);
+  }, [groupedFeed]);
   const handleResolutionSubmit = async () => {
     // 1. Basic Validation
     if (closeRemarksText.length < 50) {
@@ -1507,13 +1530,52 @@ const LuboilAnalysis = () => {
     }
   };
 
-  const handleMarkSingleRead = async (eventId) => {
+    const handleMarkSingleRead = async (eventId) => {
     try {
       await axiosLub.patch(`/api/luboil/live-feed/${eventId}/read`);
       fetchFeed(); // Refresh the list to show it as read
     } catch (err) {
       console.error("Failed to mark as read", err);
     }
+  };
+
+    const handleMarkAsUnread = async () => {
+  if (!activeFeedEventId) return;
+
+  // Optimistic update: flip it in the list immediately
+  setFeedData((prev) =>
+    prev.map((i) =>
+      i.id === activeFeedEventId ? { ...i, is_read: false } : i,
+    ),
+  );
+
+  try {
+        await axiosLub.patch(`/api/luboil/live-feed/${activeFeedEventId}/unread`);
+    setMarkedUnreadDone(true);
+    await fetchFeed(); // sync with the server
+  } catch (err) {
+    console.error("Failed to mark as unread", err);
+    alert("Failed to mark as unread.");
+    fetchFeed(); // roll back the optimistic change
+  }
+};
+
+  // Walks the frozen id snapshot (feedNavIds) forward/back and re-runs the
+  // exact same resolution used for a direct card click, so the modal
+  // content updates identically to clicking a different card — matching
+  // the DRS feed's prev/next behavior, including marking the target item
+  // as read the same way a click would.
+  const navigateFeedModal = (direction) => {
+    if (!feedNavIds || feedNavIndex === null) return;
+    const newIndex = feedNavIndex + direction;
+    if (newIndex < 0 || newIndex >= feedNavIds.length) return;
+
+    const nextEvent = feedData.find((i) => i.id === feedNavIds[newIndex]);
+    if (!nextEvent) return;
+
+    if (!nextEvent.is_read) handleMarkSingleRead(nextEvent.id);
+    setFeedNavIndex(newIndex);
+    handleFeedItemClick(nextEvent);
   };
   // const [hiddenNotifIds, setHiddenNotifIds] = useState([]);
 
@@ -1605,9 +1667,37 @@ const LuboilAnalysis = () => {
     }
   };
   // Deep navigation handler
-  const handleFeedItemClick = async (event) => {
+    // Deep navigation handler
+  const handleFeedItemClick = async (event, orderedIds = null) => {
+    if (orderedIds) {
+      setFeedNavIds(orderedIds);
+      setFeedNavIndex(orderedIds.indexOf(event.id));
+    }
+
     // Handle vessel-wide overdue events (no specific equipment_code)
-    if (!event.equipment_code || event.machinery_name === "Vessel-Wide") {
+        let equipmentCode = event.equipment_code;
+    let targetSampleId = event.sample_id;
+
+    // Old NEW_REPORT events (no equipment_code) -> open this vessel's latest sample
+    if (!equipmentCode && event.event_type === "NEW_REPORT") {
+      let best = null;
+      Object.values(normalizedTable.rows).forEach((machs) => {
+        Object.entries(machs).forEach(([code, cell]) => {
+                    if (String(cell?.imo) !== String(event.imo) || !cell.has_report || !cell.history?.[0]?.sample_id) return;
+          const d = new Date(cell.history[0].date);
+          if (!best || d > best.d) {
+            best = { code, d, sampleId: cell.history[0].sample_id };
+          }
+        });
+      });
+      if (best) {
+        equipmentCode = best.code;
+        targetSampleId = best.sampleId;
+      }
+    }
+
+    // Handle vessel-wide overdue events (no specific equipment_code)
+    if (!equipmentCode || event.machinery_name === "Vessel-Wide") {
       // Just open the overdue modal for this vessel instead
       if (matrixData?.data) {
         const vesselEntry = Object.entries(matrixData.data).find(
@@ -1620,19 +1710,21 @@ const LuboilAnalysis = () => {
       return;
     }
 
-    const vesselName = Object.keys(normalizedTable.rows).find(
+        const vesselName = Object.keys(normalizedTable.rows).find(
       (name) =>
-        String(normalizedTable.rows[name][event.equipment_code]?.imo) ===
+        String(normalizedTable.rows[name][equipmentCode]?.imo) ===
         String(event.imo),
     );
 
-    if (vesselName) {
-      const cell = normalizedTable.rows[vesselName][event.equipment_code];
+        if (vesselName && normalizedTable.rows[vesselName][equipmentCode]?.history?.[0]?.sample_id) {
+      const cell = normalizedTable.rows[vesselName][equipmentCode];
       const specificSample =
-        cell.history.find((h) => h.sample_id === event.sample_id) ||
+        cell.history.find((h) => h.sample_id === targetSampleId) ||
         cell.history[0];
 
-      handleSelectSample(vesselName, cell, specificSample);
+      setActiveFeedEventId(event.id);
+      setMarkedUnreadDone(false);
+      handleSelectSample(vesselName, cell, specificSample, true); // 🔥 feed-originated
       if (
         event.event_type === "MENTION" ||
         event.event_type === "COMMUNICATION"
@@ -1642,7 +1734,16 @@ const LuboilAnalysis = () => {
       }
     }
   };
-  const handleSelectSample = (vesselName, cellData, specificSample) => {
+  const handleSelectSample = (vesselName, cellData, specificSample, fromFeedNav = false) => {
+    // 🔥 FIX: Only keep Feed prev/next state when this call originates from
+    // the Feed flow. Every other entry point (matrix dot, trend/history,
+    // notifications, overdue/pending lists) must clear stale Feed nav state
+    // so the arrows don't leak into normal report views.
+    if (!fromFeedNav) {
+      setFeedNavIds(null);
+      setFeedNavIndex(null);
+    }
+
     // 1. Reset Chat Modes & Drafts (Preserving your existing logic)
     setChatMode("external");
     setInternalDraft("");
@@ -2204,7 +2305,10 @@ const LuboilAnalysis = () => {
       setIsDownloading(false);
     }
   };
-  // 1. Shore Requesting Image
+    // 1. Shore Requesting Image
+  // 🔒 COMMENTED OUT — IMAGE MANDATORY replaced by ACTION REQUIRED in the Communication panel.
+  // Kept intact (not deleted) so it can be restored later if needed.
+  /*
   const handleRequestImageAction = async () => {
     const isShore =
       user?.role === "SHORE" ||
@@ -2278,6 +2382,95 @@ const LuboilAnalysis = () => {
     } catch (err) {
       console.error("Request failed:", err);
       alert("Failed to update requirement.");
+    }
+  };
+  */
+
+  // 🔥 NEW: Shore toggles ACTION REQUIRED for this specific sample.
+  // Mirrors handleRequestImageAction's shape/pattern exactly, but writes
+  // is_action_required instead. The matrix underline (orange/green) reads
+  // this field directly off the per-sample history entry returned by the
+  // backend, so it survives refresh and stays tied to the correct sample.
+  const handleRequestActionRequiredAction = async () => {
+    const isShore =
+      user?.role === "SHORE" ||
+      user?.role === "ADMIN" ||
+      user?.role === "SUPERUSER";
+    if (!isShore) return;
+
+    const isCurrentlyRequired = selectedCell.data.is_action_required;
+    const targetState = !isCurrentlyRequired;
+
+    const now = new Date();
+    const timestamp = `${now.toLocaleDateString("en-GB", { timeZone: "UTC" })} ${now.toLocaleTimeString("en-GB", { timeZone: "UTC", hour: "2-digit", minute: "2-digit" })}`;
+
+    const systemMsg = targetState
+      ? `[${timestamp}]  <b>${user.full_name}</b> Flagged this report as ACTION REQUIRED.`
+      : `[${timestamp}]  <b>${user.full_name}</b> Cleared the ACTION REQUIRED flag.`;
+
+    try {
+      const payload = {
+        vessel_name: selectedCell.vessel,
+        sample_id: selectedCell.data.sample_id,
+        machinery_name: selectedCell.machinery,
+        sample_date: selectedCell.data.last_sample,
+        sample_number: selectedCell.data.sample_number,
+        status_change_msg: systemMsg,
+        is_action_required: targetState,
+      };
+
+      const response = (
+        await axiosLub.post("/api/luboil/remarks/update", payload)
+      ).data;
+
+      // Update Modal UI state immediately
+      setSelectedCell((prev) => ({
+        ...prev,
+        data: {
+          ...prev.data,
+          is_action_required: targetState,
+          conversation: response.updated_conversation || prev.data.conversation,
+        },
+      }));
+
+      // Surgical update to background matrix, including the matching
+      // history entry so the underline flips instantly without waiting
+      // for the full loadData() refresh below.
+      setNormalizedTable((prev) => {
+        const updatedRows = { ...prev.rows };
+        const vesselName = selectedCell.vessel;
+        const machineryCode = selectedCell.data.code;
+        const targetCell = updatedRows[vesselName]?.[machineryCode];
+
+        if (targetCell) {
+          const updatedHistory = (targetCell.history || []).map((h) =>
+            h.sample_id === selectedCell.data.sample_id
+              ? { ...h, is_action_required: targetState }
+              : h,
+          );
+
+          updatedRows[vesselName][machineryCode] = {
+            ...targetCell,
+            is_action_required:
+              targetCell.sample_id === selectedCell.data.sample_id
+                ? targetState
+                : targetCell.is_action_required,
+            history: updatedHistory,
+            conversation:
+              response.updated_conversation || targetCell.conversation,
+          };
+        }
+        return { ...prev, rows: updatedRows };
+      });
+
+      setRightPanelMode("history");
+      setShowHistory(true);
+
+      // Final sync with server
+      loadData();
+    } catch (err) {
+      console.error("Request failed:", err);
+      alert("Failed to update ACTION REQUIRED flag.");
     }
   };
 
@@ -2538,7 +2731,15 @@ const LuboilAnalysis = () => {
   }, [selectedVesselsFilter, selectedOwner]);
 
   // 3. Selection Handlers
+  useEffect(() => {
+    if (focusedVessel && !ownerFilteredVessels.includes(focusedVessel)) {
+      setFocusedVessel(null);
+    }
+  }, [ownerFilteredVessels, focusedVessel]);
+
+  // 3. Selection Handlers
   const handleVesselToggle = (vesselName) => {
+    setFocusedVessel(null); // going back to a manual selection resets the focus
     setSelectedVesselsFilter((prev) => {
       if (prev.includes(vesselName)) {
         return prev.filter((v) => v !== vesselName);
@@ -2549,6 +2750,7 @@ const LuboilAnalysis = () => {
   };
 
   const handleSelectAllVessels = () => {
+    setFocusedVessel(null);
     // Use .every() to check if everything is already selected
     const allSelected = availableVessels.every((v) =>
       selectedVesselsFilter.includes(v.vessel_name),
@@ -3139,13 +3341,14 @@ const LuboilAnalysis = () => {
           vesselIsOverdueOver30 = true;
           if (
             statusType === "CriticalOver30" ||
-            statusType === "WarningUnder30"
+            statusType === "WarningUnder30" ||
+            statusType === "Overdue"
           ) {
             vesselMatchedOverdueItems.push(itemData);
           }
         } else if (daysOverdue > 0) {
           vesselIsOverdueUnder30 = true;
-          if (statusType === "WarningUnder30") {
+          if (statusType === "WarningUnder30" || statusType === "Overdue") {
             vesselMatchedOverdueItems.push(itemData);
           }
         }
@@ -3170,8 +3373,17 @@ const LuboilAnalysis = () => {
             overdueItems: vesselMatchedOverdueItems,
           });
         } else if (
+          statusType === "Overdue" &&
+          (vesselIsOverdueUnder30 || vesselIsOverdueOver30)
+        ) {
+          matchingVessels.push({
+            name: vesselName,
+            imo: vesselData.imo || "N/A",
+            overdueItems: vesselMatchedOverdueItems,
+          });
+        } else if (
           vesselWorstHealthStatus === statusType &&
-          !["WarningUnder30", "CriticalOver30"].includes(statusType)
+          !["WarningUnder30", "CriticalOver30", "Overdue"].includes(statusType)
         ) {
           matchingVessels.push({
             name: vesselName,
@@ -3526,6 +3738,18 @@ const LuboilAnalysis = () => {
                       dotTooltip += `\n - Status changed from: ${sample.previous_status || previousStatus}`;
                   }
 
+                                    // 🔥 NEW: ACTION REQUIRED underline — orange while open,
+                  // green once this specific sample is resolved. Purely
+                  // additive: reads is_action_required / is_resolved off
+                  // this sample object, which the backend now returns per
+                  // history entry, so it stays tied to the correct report
+                  // and survives a full page reload.
+                  const actionUnderlineColor = sample.is_action_required
+                    ? sample.is_resolved
+                      ? "#22c55e"
+                      : "#f59e0b"
+                    : null;
+
                   return (
                     <div
                       key={`${sample.sample_id || latestDate}-${sampleIdx}`}
@@ -3535,6 +3759,7 @@ const LuboilAnalysis = () => {
                         if (onSampleClick) onSampleClick(sample);
                       }}
                       className="lub-dot-item"
+                      style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
                       onMouseEnter={(e) =>
                         (e.currentTarget.style.transform = "scale(1.15)")
                       }
@@ -3544,6 +3769,17 @@ const LuboilAnalysis = () => {
                     >
                       {/* ðŸ”¥ INCREASED SIZE TO 24 */}
                       <ShellStatusIcon status={sample?.status} size={22} />
+                      {actionUnderlineColor && (
+                        <span
+                          className="lub-action-required-underline"
+                          title={
+                            sample.is_resolved
+                              ? "Action required — resolved"
+                              : "Action required — open"
+                          }
+                          style={{ backgroundColor: actionUnderlineColor }}
+                        />
+                      )}
                     </div>
                   );
                 })
@@ -3635,13 +3871,15 @@ const LuboilAnalysis = () => {
   );
 
   // BUG FIX: Check if image exists in gallery (attachment_url) OR newly selected in modal
-  const evidenceExistsInGallery =
-    selectedCell?.data?.attachment_url &&
-    selectedCell.data.attachment_url.trim().length > 0;
-  const imageRequirementMet =
-    !selectedCell?.data?.is_image_required ||
-    evidenceExistsInGallery ||
-    selectedCloseFile;
+    // Image-mandatory check disabled (feature removed)
+  // const evidenceExistsInGallery =
+  //   selectedCell?.data?.attachment_url &&
+  //   selectedCell.data.attachment_url.trim().length > 0;
+  // const imageRequirementMet =
+  //   !selectedCell?.data?.is_image_required ||
+  //   evidenceExistsInGallery ||
+  //   selectedCloseFile;
+  const imageRequirementMet = true;
 
   // RESAMPLING CHECK: Scans equipment history for a report date newer than the current one
   const hasNewerReport = selectedCell?.data?.history?.some(
@@ -3712,6 +3950,73 @@ const LuboilAnalysis = () => {
             >
               Fleet-wide lubrication health & sampling schedule
             </p>
+          </div>
+
+          {/* MIDDLE: Summary cards (Configured, Pending / Unresolved, Overdue) */}
+          <div
+            className="lub-stats-grid-container"
+            style={{
+              display: "grid",
+              flexShrink: 0,
+            }}
+          >
+            {/* Card 1: Configured Vessels */}
+            <div
+              className="stat-card stat-card-configured"
+              onClick={() => handleCardClick("Configured")}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.transform = "translateY(-2px)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.transform = "translateY(0)")
+              }
+            >
+              <div className="stat-icon-wrapper icon-bg-slate">
+                <Activity size={20} /> {/* Reduced from 24 */}
+              </div>
+              <div className="stat-text-column">
+                <div className="lub-stat-value">{overdueStats.configured}</div>
+                <div className="lub-stat-label">Configured Vessels</div>
+              </div>
+            </div>
+
+            {/* NEW Card 2: Pending / Unresolved Cases */}
+            <div
+              className="stat-card stat-card-unresolved"
+              onClick={() => handleCardClick("PendingUnresolved")}
+            >
+              <div className="stat-icon-wrapper icon-bg-red">
+                <AlertCircle size={20} />
+              </div>
+              <div className="stat-text-column">
+                <div className="lub-stat-value">
+                  {overdueStats.pendingUnresolved || 0}
+                </div>
+                <div className="lub-stat-label">Pending / Unresolved</div>
+              </div>
+            </div>
+
+            {/* Card 3: Overdue (all vessels overdue, any duration) */}
+            <div
+              className="stat-card stat-card-critical"
+              onClick={() => handleCardClick("Overdue")}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.transform = "translateY(-2px)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.transform = "translateY(0)")
+              }
+            >
+              <div className="stat-icon-wrapper icon-bg-red">
+                <Clock size={20} />
+              </div>
+              <div className="stat-text-column">
+                <div className="lub-stat-value">
+                  {overdueStats.overdueUnder30 + overdueStats.overdueOver30}
+                </div>
+                <div className="lub-stat-label">Overdue</div>
+              </div>
+            </div>
           </div>
 
           {/* RIGHT SIDE: Grouped Actions (Bell, Feed, Upload) */}
@@ -4225,96 +4530,6 @@ const LuboilAnalysis = () => {
       {/* ----------------- NEW OVERDUE STATS ROW ----------------- */}
       {viewMode === "matrix" ? (
         <>
-          <div
-            className="lub-stats-grid-container"
-            style={{
-              display: "grid",
-              marginBottom: "8px",
-              flexShrink: 0,
-            }}
-          >
-            {/* Card 1: Configured Vessels */}
-            <div
-              className="stat-card stat-card-configured"
-              onClick={() => handleCardClick("Configured")}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.transform = "translateY(-2px)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.transform = "translateY(0)")
-              }
-            >
-              <div className="stat-icon-wrapper icon-bg-slate">
-                <Activity size={20} /> {/* Reduced from 24 */}
-              </div>
-              <div className="stat-text-column">
-                <div className="lub-stat-value">{overdueStats.configured}</div>
-                <div className="lub-stat-label">Configured Vessels</div>
-              </div>
-            </div>
-
-            {/* NEW Card 2: Pending / Unresolved Cases */}
-            <div
-              className="stat-card stat-card-unresolved"
-              onClick={() => handleCardClick("PendingUnresolved")}
-            >
-              <div className="stat-icon-wrapper icon-bg-red">
-                <AlertCircle size={20} />
-              </div>
-              <div className="stat-text-column">
-                <div className="lub-stat-value">
-                  {overdueStats.pendingUnresolved || 0}
-                </div>
-                <div className="lub-stat-label">Pending / Unresolved</div>
-              </div>
-            </div>
-
-            {/* Card 2: Warning Overdue > 30 Days */}
-            <div
-              className="stat-card stat-card-critical"
-              onClick={() => handleCardClick("WarningUnder30")}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.transform = "translateY(-2px)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.transform = "translateY(0)")
-              }
-            >
-              <div className="stat-icon-wrapper icon-bg-red">
-                <Clock size={20} />
-              </div>
-              <div className="stat-text-column">
-                <div className="lub-stat-value">
-                  {overdueStats.overdueUnder30}
-                </div>
-                <div className="lub-stat-label">Overdue &lt; 30 Days</div>
-              </div>
-            </div>
-
-            {/* Card 3: Critical Overdue > 60 Days */}
-            <div
-              className="stat-card stat-card-critical"
-              onClick={() => handleCardClick("CriticalOver30")}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.transform = "translateY(-2px)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.transform = "translateY(0)")
-              }
-            >
-              <div className="stat-icon-wrapper icon-bg-red">
-                <AlertOctagon size={20} />
-              </div>
-              <div className="stat-text-column">
-                <div className="lub-stat-value">
-                  {overdueStats.overdueOver30}
-                </div>
-                <div className="lub-stat-label">
-                  Overdue &gt; 30 Days With Concern
-                </div>
-              </div>
-            </div>
-          </div>
           <Card className="lub-matrix-card enhanced-card">
             {/* NEW HEADER FOR TABLE */}
             <CardHeader
@@ -4430,7 +4645,28 @@ const LuboilAnalysis = () => {
 
             {/* CONDITIONALLY RENDER CONTENT */}
             {isTableOpen && (
-              <CardContent style={{ padding: "0" }}>
+                            <CardContent style={{ padding: "0" }}>
+                {!loading &&
+                  focusedVessel &&
+                  ownerFilteredVessels.includes(focusedVessel) && (
+                    <div className="lub-focus-bar">
+                      <span className="lub-focus-bar-text">
+                        Focused on{" "}
+                        <strong>{focusedVessel.toUpperCase()}</strong>
+                        <span className="lub-focus-bar-sub">
+                          {" "}
+                          · showing only its applicable equipment
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        className="lub-focus-bar-btn"
+                        onClick={() => setFocusedVessel(null)}
+                      >
+                        <X size={14} /> Show all vessels
+                      </button>
+                    </div>
+                  )}
                 {loading ? (
                   <div className="loading-state-enhanced">
                     <div className="loading-spinner"></div>
@@ -4498,6 +4734,8 @@ const LuboilAnalysis = () => {
                             // equipment for this vessel and keeps the earliest due date.
                             const todayForDueCountdown = new Date();
                             let nearestDueDate = null;
+                            // Equipment that owns the earliest due date (display only)
+                            let nearestDueItem = null;
 
                             Object.values(vesselData?.machineries || {}).forEach(
                               (m) => {
@@ -4522,6 +4760,7 @@ const LuboilAnalysis = () => {
 
                                 if (!nearestDueDate || dueDate < nearestDueDate) {
                                   nearestDueDate = dueDate;
+                                  nearestDueItem = m;
                                 }
                               },
                             );
@@ -4552,8 +4791,23 @@ const LuboilAnalysis = () => {
                             return (
                               <th
                                 key={vesselName}
-                                // onClick={() => handleVesselClick(vesselName, vesselImo)}
-                                className="vessel-header-cell"
+                                onClick={() =>
+                                  setFocusedVessel((prev) =>
+                                    prev === vesselName ? null : vesselName,
+                                  )
+                                }
+                                title={
+                                  focusedVessel === vesselName
+                                    ? "Click to show all vessels"
+                                    : "Click to focus on this vessel"
+                                }
+                                className={`vessel-header-cell vessel-header-clickable ${
+                                  focusedVessel
+                                    ? vesselName === focusedVessel
+                                      ? "vessel-col-focused"
+                                      : "vessel-col-dimmed"
+                                    : ""
+                                }`}
                                 style={{
                                   position: "sticky",
                                   top: 0,
@@ -4575,7 +4829,7 @@ const LuboilAnalysis = () => {
                                   backgroundColor: "#f8fafc",
                                   borderBottom: "2px solid #cbd5e1",
                                   borderRight: "1px solid #e2e8f0",
-                                  // cursor: "pointer",
+                                  cursor: "pointer",
                                   color: "#1e293b",
                                   transition: "background 0.2s",
                                   overflow: "hidden", // Prevent contents from spilling out
@@ -4605,7 +4859,7 @@ const LuboilAnalysis = () => {
                                     className="vessel-due-countdown-txt"
                                     title={
                                       nearestDueDate
-                                        ? `Nearest due date: ${nearestDueDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`
+                                        ? `Equipment: ${columnLabels[nearestDueItem?.code] || nearestDueItem?.code || "-"}\nNearest due date: ${nearestDueDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`
                                         : undefined
                                     }
                                     style={{
@@ -4631,11 +4885,19 @@ const LuboilAnalysis = () => {
                         {/* ROW ITERATION (Machinery) */}
                         {(() => {
                           // 1. DYNAMIC FILTER: Determine which equipment rows actually have data in the current view
+                                                    // Focused view: only the clicked vessel decides which rows are shown.
+                          // Otherwise: all selected vessels (normal behaviour).
+                          const rowSourceVessels =
+                            focusedVessel &&
+                            ownerFilteredVessels.includes(focusedVessel)
+                              ? [focusedVessel]
+                              : ownerFilteredVessels;
+
                           const visibleColumns = tableColumns.filter(
                             (colCode) => {
                               // Return true if ANY of the selected vessels has a report for this equipment
                               // AND (if source is filtered) that cell's source matches
-                              return ownerFilteredVessels.some(
+                              return rowSourceVessels.some(
                                 (vesselName) => {
                                   const cell =
                                     normalizedTable.rows[vesselName]?.[colCode];
@@ -4649,7 +4911,7 @@ const LuboilAnalysis = () => {
                           // 2. MAP ONLY THE VISIBLE ROWS (Hiding universal Missing/NA rows)
                           return visibleColumns.map((colCode, rowIndex) => {
                             // ðŸ”¥ NEW: Find the full description for this machinery code to show on hover
-                            const vesselWithInfo = ownerFilteredVessels.find(
+                                                        const vesselWithInfo = rowSourceVessels.find(
                               (vName) =>
                                 normalizedTable.rows[vName]?.[colCode]
                                   ?.description,
@@ -4699,7 +4961,13 @@ const LuboilAnalysis = () => {
                                     isResolved && isLatestReport;
                                   const vesselImo =
                                     matrixData?.data?.[vesselName]?.imo;
-                                  const today = new Date();
+                                                                    const today = new Date();
+
+                                  const colFocusClass = focusedVessel
+                                    ? vesselName === focusedVessel
+                                      ? "vessel-col-focused"
+                                      : "vessel-col-dimmed"
+                                    : "";
 
                                   const cellBaseStyle = {
                                     width: "calc((100% - 220px) / 5)",
@@ -4719,7 +4987,7 @@ const LuboilAnalysis = () => {
                                     return (
                                       <td
                                         key={vesselName}
-                                        className="lub-data-cell empty-cell"
+                                                                                className={`lub-data-cell empty-cell ${colFocusClass}`}
                                       >
                                         <span className="na-text">N/A</span>
                                       </td>
@@ -4732,7 +5000,7 @@ const LuboilAnalysis = () => {
                                     return (
                                       <td
                                         key={vesselName}
-                                        className="lub-data-cell missing-cell"
+                                                                                className={`lub-data-cell missing-cell ${colFocusClass}`}
                                       >
                                         <div className="missing-label">
                                           MISSING
@@ -4789,7 +5057,7 @@ const LuboilAnalysis = () => {
                                       //       : "pointer",
                                       //     transition: "background 0.2s",
                                       //   }}
-                                      className={`lub-data-cell data-available ${isNormal ? "" : "hover-cell"}`}
+                                                                            className={`lub-data-cell data-available ${isNormal ? "" : "hover-cell"} ${colFocusClass}`}
                                     >
                                      
                                       <div className="cell-content-wrapper">
@@ -4866,9 +5134,13 @@ const LuboilAnalysis = () => {
                             const isOpen = footerReportVessel === vesselName;
 
                             return (
-                              <td
+                                                            <td
                                 key={`foot-${vesselName}`}
-                                className="lub-matrix-footer-cell"
+                                className={`lub-matrix-footer-cell ${
+                                  focusedVessel === vesselName
+                                    ? "vessel-col-focused-footer"
+                                    : ""
+                                }`}
                               >
                                 <div
                                   ref={
@@ -5201,6 +5473,26 @@ const LuboilAnalysis = () => {
                       ))}
                     </div>
 
+                    {/* MARK ALL AS READ (uses existing handleMarkAllRead) */}
+                    <Button
+                      onClick={handleMarkAllRead}
+                      disabled={
+                        !Array.isArray(feedData) ||
+                        !feedData.some((item) => item.is_read === false)
+                      }
+                      className="lub-feed-refresh-btn lub-feed-markall-btn"
+                      style={{
+                        background: "white",
+                        color: "#0f172a",
+                        border: "1px solid #cbd5e1",
+                        display: "flex",
+                        alignItems: "center",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <CheckCheck size={14} style={{ marginRight: "5px" }} /> Mark all as read
+                    </Button>
+
                     <Button
                       onClick={fetchFeed}
                       className="lub-feed-refresh-btn"
@@ -5476,15 +5768,19 @@ const LuboilAnalysis = () => {
                   {/* Helper Internal Function to keep existing styling exactly as it was */}
                   {(() => {
                     const renderFeedItem = (item) => (
-                      <div
+                                                                 <div
                         key={item.id}
                         className={`lub-feed-item-card ${item.is_read ? "read" : "unread"}`}
+                                                onClick={() => {
+                          if (!item.is_read) handleMarkSingleRead(item.id);
+                          handleFeedItemClick(item, flatFeedOrder);
+                        }}
                         style={{
                           display: "flex",
                           alignItems: "center",
                           borderRadius: "8px",
                           border: "1px solid #e2e8f0",
-                          cursor: "default",
+                          cursor: "pointer",
                           transition: "all 0.2s",
                           /* Logic-based colors remain inline */
                           backgroundColor: item.is_read ? "#ffffff" : "#f0f9ff",
@@ -5614,29 +5910,9 @@ const LuboilAnalysis = () => {
                           </div>
 
                           <div className="lub-feed-item-btns">
-                            {!item.is_read && (
-                              <button
-                                className="lub-feed-mark-read-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleMarkSingleRead(item.id);
-                                }}
-                              >
-                                <CheckCircle size={12} className="feed-btn-icon" strokeWidth={2.5} /> MARK AS READ
-                              </button>
-                            )}
+                            
 
-                            {item.event_type !== "NEW_REPORT" && (
-                              <button
-                                className="lub-feed-view-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleFeedItemClick(item);
-                                }}
-                              >
-                                <Eye size={14} className="feed-btn-icon" strokeWidth={2.5} /> VIEW
-                              </button>
-                            )}
+                            
                           </div>
                         </div>
                       </div>
@@ -6237,8 +6513,60 @@ const LuboilAnalysis = () => {
         </Card>
       )}
       {/* ----------------- MODAL START ----------------- */}
+            {/* ----------------- MODAL START ----------------- */}
       {isModalOpen && selectedCell && (
         <div className="lub-modal-overlay">
+          {feedNavIds && feedNavIndex !== null && feedNavIndex > 0 && (
+            <button
+              onClick={() => navigateFeedModal(-1)}
+              title="Previous"
+              style={{
+                position: "fixed",
+                left: "24px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                zIndex: 100020,
+                background: "white",
+                border: "none",
+                borderRadius: "50%",
+                width: "44px",
+                height: "44px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+                cursor: "pointer",
+              }}
+            >
+              <ChevronDown size={22} style={{ transform: "rotate(90deg)" }} />
+            </button>
+          )}
+          {feedNavIds && feedNavIndex !== null && feedNavIndex < feedNavIds.length - 1 && (
+            <button
+              onClick={() => navigateFeedModal(1)}
+              title="Next"
+              style={{
+                position: "fixed",
+                right: "24px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                zIndex: 100020,
+                background: "white",
+                border: "none",
+                borderRadius: "50%",
+                width: "44px",
+                height: "44px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+                cursor: "pointer",
+              }}
+            >
+              <ChevronDown size={22} style={{ transform: "rotate(-90deg)" }} />
+            </button>
+          )}
+
           {/* â”€â”€ OUTER MODAL SHELL â”€â”€ */}
           <div className="lub-modal-shell">
             {/* â”€â”€ MODAL TOP BAR (vessel name + close) â”€â”€ */}
@@ -6289,19 +6617,51 @@ const LuboilAnalysis = () => {
           </span> */}
               </div>
 
-              <button
-                onClick={() => {
-                  setIsModalOpen(false);
-                  setRightPanelMode("report");
-                  setIsResamplingActive(false);
-                  setCompareIds([]);
-                  setIsLinkGenerated(false);
-                  setIsDiagExpanded(false);
-                }}
-                className="modal-close-btn"
-              >
-                <X size={24} className="modal-close-icon" />
-              </button>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {activeFeedEventId && (
+                                    <button
+                    onClick={handleMarkAsUnread}
+                    className="modal-markunread-btn"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      background: markedUnreadDone ? "#cbd5e1" : "#f1f5f9",
+                      border: markedUnreadDone
+                        ? "1px solid #94a3b8"
+                        : "1px solid #cbd5e1",
+                      borderRadius: "20px",
+                      padding: "6px 14px",
+                      fontSize: "0.8rem",
+                      fontWeight: "700",
+                      color: "#1e293b",
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    <Mail size={14} />
+                    Mark as unread
+                  </button>
+                )}
+
+                                <button
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setRightPanelMode("report");
+                    setIsResamplingActive(false);
+                    setCompareIds([]);
+                    setIsLinkGenerated(false);
+                    setIsDiagExpanded(true);
+                    setActiveFeedEventId(null);
+                    setMarkedUnreadDone(false);
+                    setFeedNavIds(null);   // 🔥 clear Feed nav state on close
+                    setFeedNavIndex(null); // 🔥 so it can't leak into the next report
+                  }}
+                  className="modal-close-btn"
+                >
+                  <X size={24} className="modal-close-icon" />
+                </button>
+              </div>
             </div>
 
             {/* â”€â”€ THREE-PANEL ROW â”€â”€ */}
@@ -6459,13 +6819,35 @@ const LuboilAnalysis = () => {
                       </span>
                     )}
                   </div>
-                  <div className="lub-header-right">
+                                    <div className="lub-header-right">
                     {!isDiagCollapsed && (
-                      <div className="lub-status-icon-wrapper">
+                      <div
+                        className="lub-status-icon-wrapper"
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                        }}
+                      >
                         <ShellStatusIcon
                           status={selectedCell.data.status}
                           size={18}
                         />
+                        {selectedCell.data.is_action_required && (
+                          <span
+                            className="lub-action-required-underline"
+                            title={
+                              selectedCell.data.is_resolved
+                                ? "Action required — resolved"
+                                : "Action required — open"
+                            }
+                            style={{
+                              backgroundColor: selectedCell.data.is_resolved
+                                ? "#22c55e"
+                                : "#f59e0b",
+                            }}
+                          />
+                        )}
                       </div>
                     )}
                     {isDiagCollapsed ? (
@@ -6562,9 +6944,9 @@ const LuboilAnalysis = () => {
                       </div>
                     )}
 
-                    {/* 3 â”€â”€ ACTIONS (collapsible section) */}
+                    {/* 3 - EVIDENCE section - COMMENTED OUT (removed from Lab Diagnosis & Evidence)
                     <div className="lub-evidence-section">
-                      {/* Actions header â€” click to collapse/expand */}
+                      [ Actions header â€” click to collapse/expand ]
                       <div
                         onClick={() =>
                           setIsActionsCollapsed(!isActionsCollapsed)
@@ -6587,10 +6969,10 @@ const LuboilAnalysis = () => {
                         )}
                       </div>
 
-                      {/* Actions body */}
+                      [ Actions body ]
                       {!isActionsCollapsed && (
                         <div className="lub-evidence-body">
-                          {/* ROLE-BASED IMAGE REQUIREMENT TOGGLE */}
+                          [ ROLE-BASED IMAGE REQUIREMENT TOGGLE ]
                           {(() => {
                             const _userData = user?.user || user;
                             const _userAccess = (
@@ -6618,7 +7000,7 @@ const LuboilAnalysis = () => {
                             ) {
                               return (
                                 <div className="lub-mandatory-group">
-                                  {/* --- EXISTING IMAGE BANNER (UNCHANGED) --- */}
+                                  [ --- EXISTING IMAGE BANNER (UNCHANGED) --- ]
                                   {isImageRequired && (
                                     <div className="lub-mandatory-banner">
                                       <AlertTriangle
@@ -6629,7 +7011,7 @@ const LuboilAnalysis = () => {
                                     </div>
                                   )}
 
-                                  {/* --- NEW RESAMPLING BANNER (MATCHING STYLE) --- */}
+                                  [ --- NEW RESAMPLING BANNER (MATCHING STYLE) --- ]
                                   {isResamplingRequired && (
                                     <div className="lub-mandatory-banner">
                                       <History
@@ -6648,8 +7030,9 @@ const LuboilAnalysis = () => {
                         </div>
                       )}
                     </div>
+                    */}
 
-                    {/* 4 â”€â”€ RESAMPLING WITH LINK (shore-only) */}
+                    {/* 4 - RESAMPLING WITH LINK (shore-only) - COMMENTED OUT (feature removed from Lab Diagnosis & Evidence)
                     {amIShore && (
                       <div style={{ flexShrink: 0 }}>
                         <button
@@ -6966,65 +7349,13 @@ const LuboilAnalysis = () => {
                         )}
                       </div>
                     )}
+                    */}
                   </div>
                 )}
                 {/* {selectedCell.data.status?.toLowerCase() !== "normal" && ( */}
+                {selectedCell.data.is_resolved && amIShore && (
                 <div className="lub-diag-footer">
                   <div className="lub-footer-flex">
-                    {/* --- BUTTON 1: STATUS BUTTON (CLOSE / PENDING / CLOSED) --- */}
-                    <button
-                      // 1. Disable if resolved, awaiting approval, or submitting
-                      disabled={
-                        selectedCell.data.is_resolved ||
-                        selectedCell.data.is_approval_pending ||
-                        isSubmittingClose
-                      }
-                      // 2. Only allow opening the modal if it's not already resolved or pending
-                      onClick={() => {
-                        if (
-                          !selectedCell.data.is_resolved &&
-                          !selectedCell.data.is_approval_pending
-                        ) {
-                          setIsCloseModalOpen(true);
-                        }
-                      }}
-                      className="lub-main-status-btn"
-                      style={{
-                        backgroundColor: selectedCell.data.is_resolved
-                          ? "#94a3b8"
-                          : selectedCell.data.is_approval_pending
-                            ? "#f59e0b"
-                            : "#059669",
-                        cursor:
-                          selectedCell.data.is_resolved ||
-                            selectedCell.data.is_approval_pending
-                            ? "not-allowed"
-                            : "pointer",
-                        opacity:
-                          selectedCell.data.is_resolved ||
-                            selectedCell.data.is_approval_pending
-                            ? 0.8
-                            : 1,
-                      }}
-                    >
-                      {/* 6. Dynamic Icon & Text Logic (Preserved) */}
-                      {selectedCell.data.is_resolved ? (
-                        <>
-                          <CheckCircle size={16} className="lub-footer-icon" />
-                          CLOSED
-                        </>
-                      ) : selectedCell.data.is_approval_pending ? (
-                        <>
-                          <Clock size={16} className="lub-footer-icon" />
-                          PENDING APPROVAL
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle size={16} className="lub-footer-icon" />
-                          CLOSE
-                        </>
-                      )}
-                    </button>
 
                     {/* --- BUTTON 2: REOPEN BUTTON (ONLY FOR SHORE WHEN CLOSED) --- */}
                     {selectedCell.data.is_resolved && amIShore && (
@@ -7039,6 +7370,7 @@ const LuboilAnalysis = () => {
                     )}
                   </div>
                 </div>
+                )}
                 {/* )} */}
               </div>
 
@@ -7484,8 +7816,12 @@ const LuboilAnalysis = () => {
                               )}
 
                               {/* --- MANDATORY PILLS (moved here from Evidence section) --- */}
-                              {amIShore && (
-                                <div className="lub-mandatory-group lub-mandatory-pills-row">
+                                                                <div className="lub-mandatory-group lub-mandatory-pills-row">
+                                {amIShore && (
+                                  <>
+                                  {/* 🔒 IMAGE MANDATORY button — commented out, kept for restore.
+                                      Replaced in this same slot by ACTION REQUIRED below. */}
+                                  {/*
                                   <button
                                     type="button"
                                     disabled={selectedCell.data.is_resolved}
@@ -7527,6 +7863,52 @@ const LuboilAnalysis = () => {
                                           className="lub-mandatory-icon"
                                         />{" "}
                                         IMAGE MANDATORY
+                                      </>
+                                    )}
+                                  </button>
+                                  */}
+
+                                  <button
+                                    type="button"
+                                    disabled={selectedCell.data.is_resolved}
+                                    onClick={() => {
+                                      handleRequestActionRequiredAction();
+                                      const presetText = "Action Required";
+                                      if (chatMode === "internal") {
+                                        setInternalDraft(presetText);
+                                      } else if (amIShore) {
+                                        setRemarksData((prev) => ({
+                                          ...prev,
+                                          office: presetText,
+                                        }));
+                                      } else {
+                                        setRemarksData((prev) => ({
+                                          ...prev,
+                                          officer: presetText,
+                                        }));
+                                      }
+                                      setTimeout(
+                                        () => chatInputRef.current?.focus(),
+                                        0,
+                                      );
+                                    }}
+                                    className={`lub-mandatory-btn ${selectedCell.data.is_action_required ? "active-red" : "inactive-dashed"}`}
+                                  >
+                                    {selectedCell.data.is_action_required ? (
+                                      <>
+                                        <AlertTriangle
+                                          size={12}
+                                          className="lub-mandatory-icon animate-pulse"
+                                        />{" "}
+                                        ACTION REQUIRED
+                                      </>
+                                    ) : (
+                                      <>
+                                        <AlertCircle
+                                          size={12}
+                                          className="lub-mandatory-icon"
+                                        />{" "}
+                                        ACTION REQUIRED
                                       </>
                                     )}
                                   </button>
@@ -7575,8 +7957,63 @@ const LuboilAnalysis = () => {
                                       </>
                                     )}
                                   </button>
+                                  </>
+                                )}
+                                {/* CLOSE pill (moved from Lab Diagnosis footer; behavior unchanged) */}
+                    <button
+                      // 1. Disable if resolved, awaiting approval, or submitting
+                      disabled={
+                        selectedCell.data.is_resolved ||
+                        selectedCell.data.is_approval_pending ||
+                        isSubmittingClose
+                      }
+                      // 2. Only allow opening the modal if it's not already resolved or pending
+                      onClick={() => {
+                        if (
+                          !selectedCell.data.is_resolved &&
+                          !selectedCell.data.is_approval_pending
+                        ) {
+                          setIsCloseModalOpen(true);
+                        }
+                      }}
+                      className="lub-mandatory-btn lub-close-pill"
+                      style={{
+                        backgroundColor: selectedCell.data.is_resolved
+                          ? "#94a3b8"
+                          : selectedCell.data.is_approval_pending
+                            ? "#f59e0b"
+                            : "#059669",
+                        cursor:
+                          selectedCell.data.is_resolved ||
+                            selectedCell.data.is_approval_pending
+                            ? "not-allowed"
+                            : "pointer",
+                        opacity:
+                          selectedCell.data.is_resolved ||
+                            selectedCell.data.is_approval_pending
+                            ? 0.8
+                            : 1,
+                      }}
+                    >
+                      {/* 6. Dynamic Icon & Text Logic (Preserved) */}
+                      {selectedCell.data.is_resolved ? (
+                        <>
+                          <CheckCircle size={12} className="lub-mandatory-icon" />
+                          CLOSED
+                        </>
+                      ) : selectedCell.data.is_approval_pending ? (
+                        <>
+                          <Clock size={12} className="lub-mandatory-icon" />
+                          PENDING APPROVAL
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle size={12} className="lub-mandatory-icon" />
+                          CLOSE
+                        </>
+                      )}
+                    </button>
                                 </div>
-                              )}
 
                               {/* Input row - Original preserved */}
                               <div
@@ -7773,6 +8210,7 @@ const LuboilAnalysis = () => {
                     canAddJustification={canAddJustification}
                     onVesselAction={handleVesselOverdueAction}
                     isOverdueModal={
+                      listModal.type === "Overdue" ||
                       listModal.type === "Overdue < 30 Days" ||
                       listModal.type === "Overdue > 30 Days"
                     } // 🔥 ADD THIS
@@ -8386,13 +8824,15 @@ const LuboilAnalysis = () => {
             );
 
             // 1. Image Check: Satisfied if not required OR file chosen now OR file already in gallery
-            const evidenceExistsInGallery =
-              selectedCell?.data?.attachment_url &&
-              selectedCell.data.attachment_url.trim().length > 0;
-            const imageRequirementMet =
-              !selectedCell?.data?.is_image_required ||
-              evidenceExistsInGallery ||
-              selectedCloseFile;
+                        // 1. Image Check disabled (feature removed)
+            // const evidenceExistsInGallery =
+            //   selectedCell?.data?.attachment_url &&
+            //   selectedCell.data.attachment_url.trim().length > 0;
+            // const imageRequirementMet =
+            //   !selectedCell?.data?.is_image_required ||
+            //   evidenceExistsInGallery ||
+            //   selectedCloseFile;
+            const imageRequirementMet = true;
 
             // 2. Resampling Check: Satisfied if not required OR a report in history is newer than this sample
             const hasNewerReport = selectedCell?.data?.history?.some(
@@ -8511,6 +8951,7 @@ const LuboilAnalysis = () => {
                   </div>
 
                   {/* --- IMAGE MANDATORY STATUS BANNER (BUG FIX: Checks gallery) --- */}
+                                    {/* --- IMAGE MANDATORY STATUS BANNER (disabled: feature removed)
                   <div
                     className={`lub-res-banner ${imageRequirementMet ? "banner-success" : "banner-danger"}`}
                   >
@@ -8550,6 +8991,7 @@ const LuboilAnalysis = () => {
                       </p>
                     </div>
                   </div>
+                  */}
 
                   {/* --- NEW: RESAMPLING MANDATORY STATUS BANNER --- */}
                   {selectedCell.data.is_resampling_required && (
@@ -8635,11 +9077,9 @@ const LuboilAnalysis = () => {
                           : "pointer",
                       }}
                     >
-                      {isVesselUser && !resamplingRequirementMet
+                                            {isVesselUser && !resamplingRequirementMet
                         ? "WAITING FOR NEW REPORT"
-                        : isVesselUser && !imageRequirementMet
-                          ? "ATTACH FILE TO CLOSE"
-                          : "CLOSE REPORT"}
+                        : "CLOSE REPORT"}
                     </button>
                   </div>
                 </div>

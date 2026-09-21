@@ -502,10 +502,25 @@ async def upload_luboil_report(
                 line_3 = f"Report Date: {report_date} | Health Summary: {alert_summary}"
                 full_structured_message = f"{line_1}\n{line_2}\n{line_3}"
 
+                # Pick the sample the feed card should open (worst status first)
+                focus_sample = None
+                try:
+                    sample_res = await db.execute(
+                        sa_select(LuboilSample).where(LuboilSample.report_id == report_id)
+                    )
+                    rank = {"critical": 0, "action": 1, "warning": 2, "attention": 2, "normal": 3}
+                    candidates = [s for s in sample_res.scalars().all() if s.equipment_code]
+                    candidates.sort(key=lambda s: rank.get((s.status or "").lower(), 4))
+                    focus_sample = candidates[0] if candidates else None
+                except Exception as pick_err:
+                    logger.error(f"Could not pick focus sample for feed: {pick_err}")
+
                 new_event = LuboilEvent(
                     vessel_name=vessel_name,
                     imo=str(imo_val),
                     machinery_name="Multiple",
+                    equipment_code=focus_sample.equipment_code if focus_sample else None,
+                    sample_id=focus_sample.sample_id if focus_sample else None,
                     event_type="NEW_REPORT",
                     priority="SUCCESS",
                     message=full_structured_message,
@@ -555,6 +570,7 @@ class LuboilRemarksRequest(BaseModel):
     status_change_msg: Optional[str] = None 
     is_image_required: Optional[bool] = None
     is_resampling_required: Optional[bool] = None
+    is_action_required: Optional[bool] = None
     user_name: Optional[str] = None # Added based on your frontend payload
     attachment_url: Optional[str] = None
     is_resolved: Optional[bool] = None
@@ -669,6 +685,9 @@ async def update_luboil_remarks(
         if request.is_resampling_required is not None:
             sample.is_resampling_required = request.is_resampling_required
 
+        if request.is_action_required is not None:
+            sample.is_action_required = request.is_action_required
+
         if request.attachment_url is not None:
             sample.attachment_url = request.attachment_url
 
@@ -683,9 +702,10 @@ async def update_luboil_remarks(
         # CASE A: Vessel User is submitting a close request
         if not is_shore_user and request.is_resolved is True:
             # Restrictions check (Safety layer)
-            evidence_exists = sample.attachment_url and len(sample.attachment_url.strip()) > 0
-            if sample.is_image_required and not evidence_exists:
-                raise HTTPException(status_code=400, detail="Cannot request closure: Mandatory image missing.")
+            # Image-mandatory check disabled (feature removed)
+            # evidence_exists = sample.attachment_url and len(sample.attachment_url.strip()) > 0
+            # if sample.is_image_required and not evidence_exists:
+            #     raise HTTPException(status_code=400, detail="Cannot request closure: Mandatory image missing.")
             
             sample.is_resolved = False # Block direct closure
             if hasattr(sample, 'is_approval_pending'):
@@ -765,6 +785,7 @@ async def update_luboil_remarks(
             feed_event_type = "STATUS_CHANGE"
 
         # CASE E: Shore User is REOPENING a previously closed issue
+                # CASE E: Shore User is REOPENING a previously closed issue
         elif is_shore_user and request.is_resolved is False and sample.is_resolved is True:
             sample.is_resolved = False
             if hasattr(sample, 'is_approval_pending'):
@@ -787,13 +808,13 @@ async def update_luboil_remarks(
             feed_priority = "INFO" # Blue color in feed
             feed_event_type = "STATUS_CHANGE"
 
-        if request.is_image_required is not None or request.is_resampling_required is not None:
+        if request.is_image_required is not None or request.is_resampling_required is not None or request.is_action_required is not None:
             # If this was a fresh toggle (not part of a close/open)
             if not feed_msg:
                 try:
                     line_1 = f"REQUIREMENT UPDATED - {vessel.name}"
                     line_2 = f"Requirements updated for {request.machinery_name}."
-                    line_3 = f"Image: {'Required' if sample.is_image_required else 'Optional'} | Resample: {'Required' if sample.is_resampling_required else 'Optional'}"
+                    line_3 = f"Image: {'Required' if sample.is_image_required else 'Optional'} | Resample: {'Required' if sample.is_resampling_required else 'Optional'} | Action: {'Required' if sample.is_action_required else 'Not required'}"
                     feed_msg = f"{line_1}\n{line_2}\n{line_3}"
                     feed_priority = "WARNING"
                     feed_event_type = "MANDATORY"
@@ -1122,6 +1143,7 @@ async def get_luboil_fleet_overview(
                 LuboilSample.attachment_url,
                 LuboilSample.is_image_required,
                 LuboilSample.is_resampling_required,
+                LuboilSample.is_action_required,
                 LuboilSample.is_resolved,
                 LuboilSample.resolution_remarks,
                 LuboilSample.is_approval_pending,
@@ -1379,6 +1401,7 @@ async def get_luboil_fleet_overview(
                             "is_resolved": h.is_resolved,
                             "is_approval_pending": h.is_approval_pending,
                             "is_resampling_required": h.is_resampling_required,
+                            "is_action_required": h.is_action_required,
                             "summary_error": h.summary_error,
                             "pdf_page_index": h.pdf_page_index,
                             "viscosity": float(h.viscosity_100c) if h.viscosity_100c else None,
@@ -1442,6 +1465,7 @@ async def get_luboil_fleet_overview(
                         "history": processed_history,
                         "is_image_required": latest_sample.is_image_required,
                         "is_resampling_required": latest_sample.is_resampling_required,
+                        "is_action_required": latest_sample.is_action_required,
                         "is_resolved": latest_sample.is_resolved,
                         "resolution_remarks": latest_sample.resolution_remarks,
                         "is_approval_pending": latest_sample.is_approval_pending,
@@ -2140,6 +2164,82 @@ async def mark_event_read(
 
     await db.commit()
     return {"status": "success"}
+
+@app.patch("/api/luboil/live-feed/{event_id}/unread")
+async def mark_event_unread(
+    event_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
+):
+    # ROBUST USER ID EXTRACTION (same as mark_event_read)
+    user_id = None
+    if isinstance(current_user, dict):
+        user_id = current_user.get('id') or current_user.get('sub') or current_user.get('user_id')
+    elif hasattr(current_user, 'id'):
+        user_id = current_user.id
+
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="User session invalid")
+
+    user_id = str(user_id)
+
+    res = await db.execute(
+        sa_select(LuboilEventReadState)
+        .where(LuboilEventReadState.event_id == event_id)
+        .where(LuboilEventReadState.user_id == user_id)
+    )
+    read_state = res.scalars().first()
+
+    if read_state:
+        read_state.is_read = False
+        await db.commit()
+    # If no row exists, the event is already "unread" (the feed query
+    # treats a missing read-state as is_read = False), so nothing to do.
+
+    return {"status": "success"}
+
+
+@app.post("/api/luboil/live-feed/read-all")
+async def mark_all_events_read(
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
+):
+    user_id = None
+    if isinstance(current_user, dict):
+        user_id = current_user.get('id') or current_user.get('sub') or current_user.get('user_id')
+    elif hasattr(current_user, 'id'):
+        user_id = current_user.id
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="User session invalid")
+    user_id = str(user_id)
+
+    allowed_imos, _ = get_allowed_vessel_imos(db, current_user)
+
+    # Events this user can see: fleet events + their own MY FEED events
+    ev_res = await db.execute(
+        sa_select(LuboilEvent.event_id)
+        .where(LuboilEvent.imo.in_([str(i) for i in allowed_imos]))
+        .where((LuboilEvent.recipient_id == None) | (LuboilEvent.recipient_id == user_id))
+    )
+    event_ids = [r[0] for r in ev_res.all()]
+
+    if event_ids:
+        rs_res = await db.execute(
+            sa_select(LuboilEventReadState)
+            .where(LuboilEventReadState.user_id == user_id)
+            .where(LuboilEventReadState.event_id.in_(event_ids))
+        )
+        existing = {rs.event_id: rs for rs in rs_res.scalars().all()}
+        now = datetime.utcnow()
+        for eid in event_ids:
+            if eid in existing:
+                existing[eid].is_read = True
+                existing[eid].read_at = now
+            else:
+                db.add(LuboilEventReadState(event_id=eid, user_id=user_id, is_read=True, read_at=now))
+        await db.commit()
+
+    return {"status": "success", "marked": len(event_ids)}        
 
 @app.patch("/api/notifications/{notif_id}/hide", tags=["Notifications"])
 async def hide_notification(notif_id: int, db: AsyncSession = Depends(get_db)):
