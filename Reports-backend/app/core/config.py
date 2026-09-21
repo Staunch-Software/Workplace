@@ -61,6 +61,15 @@ class Settings(BaseSettings):
     # Never disable this if AEPMS_BASE_URL is reachable over the public
     # internet -- that would accept a certificate from anyone.
     AEPMS_VERIFY_SSL: bool = True
+    # Pacing for the push loop. Each upload makes AEPMS parse a PDF, which is
+    # expensive (pdfplumber/OCR) and competes with the UI for the same workers.
+    # An uncapped backlog used to go out as one unbroken burst and overwhelm
+    # AEPMS, failing raw uploads that then queued up for the next run and made
+    # the following burst bigger. Cap the batch and pause between uploads so a
+    # backlog drains gradually instead; anything left over is simply picked up
+    # on the next run, exactly as a FAILED report already is.
+    AEPMS_PUSH_MAX_PER_RUN: int = 12
+    AEPMS_PUSH_DELAY_SECONDS: float = 3.0
 
     # Path to Excel file containing vessel/report mapping (used only to
     # regenerate DEFAULT_REPORTS_JSON_PATH offline, not read on every request)

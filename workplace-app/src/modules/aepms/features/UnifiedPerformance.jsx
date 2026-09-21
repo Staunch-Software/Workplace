@@ -3191,6 +3191,10 @@ const confirmDelete = async () => {
             // Stored analytical PDF was produced by an older rule set — the
             // effect below silently regenerates it when this report is viewed.
             pdf_stale: report.pdf_stale === true,
+            // No analytical PDF at all — the normal state for a report that
+            // arrived via the Reports-backend auto-push, which cannot render
+            // one because that needs a browser.
+            pdf_missing: report.pdf_missing === true,
             color: getMonthColor(report.report_month),
             displayName: getMonthDisplayName(report.report_month),
             value: report.report_id,
@@ -3835,7 +3839,10 @@ const confirmDelete = async () => {
 
     const report = allMonthlyReports[0];
     const reportId = report?.report_id;
-    if (!reportId || !report.pdf_stale) return;
+    // Two reasons to build one, same action:
+    //   pdf_stale   — a PDF exists but predates the current threshold rules
+    //   pdf_missing — no PDF was ever made (auto-pushed report)
+    if (!reportId || !(report.pdf_stale || report.pdf_missing)) return;
     if (staleRefreshDoneRef.current.has(reportId)) return; // already handled this session
 
     staleRefreshInFlightRef.current = true;
@@ -3844,7 +3851,10 @@ const confirmDelete = async () => {
     // Same 1.5s the upload path waits — Recharts animates in, and html2canvas
     // would otherwise capture half-drawn charts.
     const timer = setTimeout(() => {
-      console.log(`♻️ Refreshing stale analytical PDF for report ${reportId}…`);
+      const reason = report.pdf_missing ? "missing (auto-pushed)" : "stale rules";
+      console.log(
+        `♻️ Building analytical PDF for report ${reportId} — reason: ${reason}…`,
+      );
       downloadPDF("cloud", { silent: true });
     }, 1500);
 

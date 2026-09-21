@@ -45,6 +45,22 @@ div.section-header-enhanced {
     width: 28px !important;
     height: 28px !important;
   }
+
+  /* "All Owners" dropdown (PremiumOwnerDropdown) sits right next to the
+     Upload Report button above but had no big-screen scaling at all —
+     it's a plain inline-styled div (no className), so it's targeted via
+     the same attribute-selector technique used elsewhere in this file.
+     Root wrapper is uniquely identified by its hardcoded 300px width. */
+  div[style*="width: 300px; flex-shrink: 0"] {
+    width: 420px !important;
+  }
+
+  div[style*="width: 300px; flex-shrink: 0"] > div:first-child {
+    height: 60px !important;
+    padding: 0 22px !important;
+    font-size: 1.25rem !important;
+    border-radius: 12px !important;
+  }
 }
 
 /* --- TABLETS & LAPTOPS (1024px - 1440px) --- */
@@ -90,6 +106,53 @@ div.section-header-enhanced {
   /* Hide the icon on mobile to save space so row doesn't break */
   button.nav-pill-btn.active-nav-btn svg {
     display: none !important;
+  }
+}
+
+/* ============================================================
+   FIX: the "FORCE ROW LAYOUT FOR ALL SCREENS" rule at the top of
+   this file (div.section-header-enhanced { flex-wrap: nowrap !important })
+   never lets the title + Owner-dropdown + Upload-button toolbar
+   wrap, so on narrow phones it overflows horizontally instead of
+   stacking. These rules come later in the cascade and only apply
+   at <=600px, so they override the nowrap rule at small sizes only
+   (desktop/tablet keep the original single-row layout untouched).
+   Additive only — no existing rule above is modified or removed.
+   ============================================================ */
+@media (max-width: 600px) {
+  div.section-header-enhanced {
+    flex-wrap: wrap !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  /* RIGHT SIDE actions wrapper (unclassed div, last child) */
+  div.section-header-enhanced > div:last-child {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+
+  /* The amIShore inner wrapper holding the Owner dropdown + Upload button */
+  div.section-header-enhanced > div:last-child > div {
+    width: 100% !important;
+    flex-wrap: wrap !important;
+  }
+
+  /* Its direct children (Owner-dropdown root + Upload-button wrapper)
+     each take a full row so they stack instead of overflowing */
+  div.section-header-enhanced > div:last-child > div > * {
+    flex: 1 1 100% !important;
+  }
+
+  /* PremiumOwnerDropdown root has a hardcoded inline width: 300px */
+  div.section-header-enhanced div[style*="width: 300px; flex-shrink: 0"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  button.nav-pill-btn.active-nav-btn {
+    width: 100% !important;
   }
 }
 
@@ -302,55 +365,60 @@ div.section-header-enhanced {
     /* View more rows on big screen */
   }
 
-  /* Scale Sticky Machinery Column */
-  .machinery-header-cell,
-  .machinery-name-cell,
-  .footer-label-cell {
+  /* Scale Sticky Machinery Column
+     NOTE: these selectors originally targeted classNames that don't
+     exist in the table markup (.machinery-header-cell/.machinery-name-cell/
+     .footer-label-cell/.m-code/.m-desc/.matrix-data-cell/.vessel-name-bold/
+     .vessel-lab-small) — the real classNames used by LuboilAnalysis.jsx's
+     matrix table are .machinery-sticky-cell, .m-code-label, .m-desc-label,
+     .lub-data-cell, .vessel-name-txt and .vessel-due-countdown-txt.
+     Corrected below so this rule actually reaches the table. */
+  .machinery-sticky-cell {
     width: 360px !important;
     /* Wider for 4K */
     min-width: 360px !important;
     padding: 20px !important;
   }
 
-  .m-code {
+  .m-code-label {
     font-size: 1.1rem !important;
     font-weight: 800 !important;
   }
 
-  .m-desc {
+  .m-desc-label {
     font-size: 0.9rem !important;
     margin-top: 5px !important;
   }
 
   /* Scale Vessel Columns */
   .vessel-header-cell,
-  .matrix-data-cell {
+  .lub-data-cell {
     height: 120px !important;
     /* Taller cells for visibility */
   }
 
-  .vessel-name-bold {
+  .vessel-name-txt {
     font-size: 1.5rem !important;
   }
 
-  .vessel-lab-small {
+  .vessel-due-countdown-txt {
     font-size: 1rem !important;
   }
 
   /* Scale content inside cells (Status Icons & Due Date) */
-  .matrix-data-cell {
+  .lub-data-cell {
     font-size: 1rem !important;
   }
 
   /* Target the Due: Date Badge */
-  .matrix-data-cell span[style*="Due:"] {
+  .lub-data-cell span[style*="Due:"] {
     font-size: 1rem !important;
     padding: 4px 15px !important;
     margin-top: 12px !important;
   }
 
   /* Make status icons 40% larger */
-  .matrix-data-cell svg {
+  .lub-data-cell svg {
     transform: scale(1.4) !important;
   }
 }
@@ -405,6 +473,27 @@ div.section-header-enhanced {
   z-index: 1000 !important;
 }
 
+/* Two-line heading: "MACHINERY / EQUIPMENT" + "NEXT SAMPLE DUE" */
+.matrix-corner-header-lines {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.matrix-corner-header-title {
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  color: inherit !important;
+}
+
+.matrix-corner-header-subtitle {
+  font-size: 0.62rem !important;
+  font-weight: 700 !important;
+  color: #94a3b8 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.4px !important;
+}
+
 /* --- 2. ULTRA-WIDE / BIG SCREEN (2560px+) --- */
 @media (min-width: 2000px) {
   .matrix-corner-header {
@@ -420,6 +509,11 @@ div.section-header-enhanced {
     white-space: nowrap !important;
     letter-spacing: 0.5px !important;
   }
+
+  .matrix-corner-header-subtitle {
+    font-size: 0.95rem !important;
+    margin-top: 4px !important;
+  }
 }
 
 /* --- 3. TABLETS & SMALL SCREENS (Under 1024px) --- */
@@ -430,6 +524,10 @@ div.section-header-enhanced {
     font-size: 0.59rem !important;
     padding: 10px 8px !important;
   }
+
+  .matrix-corner-header-subtitle {
+    font-size: 0.52rem !important;
+  }
 }
 
 /* --- 4. MOBILE PHONES (Under 480px) --- */
@@ -439,8 +537,12 @@ div.section-header-enhanced {
     min-width: 110px !important;
     font-size: 0.6rem !important;
     padding: 8px 5px !important;
-    /* Optional: shorten text for mobile if needed via pseudo-element 
+    /* Optional: shorten text for mobile if needed via pseudo-element
        or just let it wrap */
+  }
+
+  .matrix-corner-header-subtitle {
+    font-size: 0.48rem !important;
   }
 }
 
@@ -450,7 +552,12 @@ div.section-header-enhanced {
 
 /* --- 1. BASE SETTINGS (Standard Desktop) --- */
 .vessel-header-cell {
-  /* Instead of a complex calc, we use a reliable min-width for scrolling */
+  /* Generous minimum so columns stay readable — this is the floor that
+     forces the table past 100% (and the wrapper's overflow-x:auto to
+     kick in) once there are too many vessels to give each one this much
+     room. Below it, columns are flexible/equal-width (see the width:
+     "100%" table + no-explicit-width vessel <th> in LuboilAnalysis.jsx). */
+  min-width: 180px !important;
   padding: 10px 4px !important;
 }
 
@@ -481,12 +588,19 @@ div.section-header-enhanced {
 @media (min-width: 2000px) {
   .vessel-header-cell {
     /* Significantly wider for 4K */
+    min-width: 380px !important;
     padding: 20px 10px !important;
   }
 
+  /* FIX: this was width: calc(180% - 294px) !important — a clearly
+     broken value (180% of the container is nearly double its own
+     width) that forced the table into a huge, unnecessary horizontal
+     scroll at every large screen regardless of how many vessel columns
+     were actually present. The table's own inline style already
+     handles width:"100%" correctly (see LuboilAnalysis.jsx); this rule
+     only needs to not fight it. */
   .vessel-table-enhanced {
-    width: calc(180% - 294px) !important;
-
+    width: 100% !important;
   }
 
   /* Large, bold Vessel names for the big screen */
@@ -504,6 +618,9 @@ div.section-header-enhanced {
 
 /* --- 3. TABLETS (Under 1024px) --- */
 @media (max-width: 1024px) {
+  .vessel-header-cell {
+    min-width: 130px !important;
+  }
 
   .vessel-name-txt {
     font-size: 0.75rem !important;
@@ -513,6 +630,7 @@ div.section-header-enhanced {
 /* --- 4. MOBILE PHONES (Under 480px) --- */
 @media (max-width: 480px) {
   .vessel-header-cell {
+    min-width: 100px !important;
     padding: 6px 2px !important;
   }
 
@@ -1143,9 +1261,20 @@ div.section-header-enhanced {
     width: 100% !important;
     border-top: 1px dashed #e2e8f0 !important;
     padding-top: 12px !important;
-    flex-direction: row !important;
-    justify-content: space-between !important;
-    align-items: center !important;
+    /* Stack timestamp above the button row instead of squeezing both
+       onto one row — "MARK AS READ" + "VIEW" plus the timestamp don't
+       fit side by side on a phone-width card, which pushed VIEW off
+       the edge. Buttons go on their own full-width row below so the
+       flex:1 on .lub-feed-mark-read-btn/.lub-feed-view-btn (set in
+       the "LIVE FEED: NEW ACTION BUTTONS" mobile block) has a full-
+       width parent to actually split 50/50 within. */
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  .lub-feed-item-btns {
+    width: 100% !important;
   }
 
   /* Buttons grow back to "Touch Size" for mobile fingers */
@@ -1210,6 +1339,35 @@ div.section-header-enhanced {
   overflow-y: auto !important;
   /* Removes fixed height to allow 'flex: 1' from the card container to work */
   height: calc(100% - 100px) !important;
+}
+
+/* ============================================================
+   FIX: on mobile, the filter/toggle header above the feed list
+   stacks into many rows (owner dropdown, Fleet/My Feed toggle,
+   All/Unread/Read toggle, search, vessel/date filters, Refresh
+   button) and can easily reach 300-400px tall. The card is fixed
+   at height:calc(100vh - 110px) with overflow:hidden, and this
+   file's "height: calc(100% - 100px)" rule above additionally
+   caps the content area — so on a short mobile viewport, after the
+   tall header takes its share, the feed list gets squeezed down to
+   a sliver just a few px tall (confirmed via DevTools: computed
+   height was ~20px), making feed items technically present in the
+   DOM but practically invisible and unscrollable.
+   Fix: make the whole card scroll as one unit on mobile instead of
+   clipping — the header stays visible while scrolling reveals the
+   feed items below it. Desktop/tablet's fixed no-page-scroll layout
+   is untouched (only ≤600px is affected). */
+@media (max-width: 600px) {
+  .lub-feed-container {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+  .lub-feed-content {
+    flex: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow-y: visible !important;
+  }
 }
 
 /* ============================================================
@@ -1683,6 +1841,79 @@ div.section-header-enhanced {
   width: 100% !important;
   min-height: 0 !important;
   /* Prevents overflow bugs */
+}
+
+/* Previous Reports panel inside the combined Reports & Trend modal */
+.lub-trend-reports-panel {
+  width: 220px !important;
+  flex-shrink: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  background-color: #ffffff !important;
+}
+
+.lub-trend-reports-header {
+  padding: 10px 12px !important;
+  font-size: 0.65rem !important;
+  font-weight: 800 !important;
+  color: #94a3b8 !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  background-color: #f8fafc !important;
+  letter-spacing: 0.03em !important;
+}
+
+.lub-trend-reports-list {
+  flex: 1 !important;
+  overflow-y: auto !important;
+}
+
+.lub-trend-reports-item {
+  padding: 10px 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  cursor: pointer !important;
+  border-bottom: 1px solid #f8fafc !important;
+  transition: background-color 0.15s ease !important;
+}
+
+.lub-trend-reports-item:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.lub-trend-reports-date {
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+}
+
+@media (min-width: 2000px) {
+  .lub-trend-reports-panel {
+    width: 300px !important;
+  }
+
+  .lub-trend-reports-header {
+    font-size: 1rem !important;
+    padding: 15px !important;
+  }
+
+  .lub-trend-reports-item {
+    padding: 15px 20px !important;
+    gap: 15px !important;
+  }
+
+  .lub-trend-reports-date {
+    font-size: 1.1rem !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .lub-trend-reports-panel {
+    width: 160px !important;
+  }
 }
 
 
@@ -3144,6 +3375,13 @@ div.section-header-enhanced {
     min-width: 100px !important;
     width: 100% !important;
   }
+
+  /* ADDED: Enlarge tap target for the icon-only config file button */
+  .lub-list-file-btn {
+    padding: 8px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+  }
 }
 
 /* ============================================================
@@ -3636,6 +3874,13 @@ div.section-header-enhanced {
   .lub-matrix-collapse-icon {
     display: none !important;
     /* Hide collapse chevron on mobile to save space */
+  }
+
+  /* ADDED: Ensure each vessel-filter dropdown row has a comfortable tap target */
+  .vessel-menu-item {
+    min-height: 40px !important;
+    display: flex !important;
+    align-items: center !important;
   }
 }
 
@@ -4686,7 +4931,7 @@ div.section-header-enhanced {
   display: flex !important;
   align-items: center;
   justify-content: center;
-  z-index: 9999 !important;
+  z-index: 100000 !important;
   padding: 20px;
 }
 
@@ -5258,6 +5503,31 @@ div.section-header-enhanced {
 }
 
 /* ============================================================
+   "LINK WITH RESAMPLING" BUTTON (Lab Diagnosis panel)
+   This is a plain inline-styled <button> with no className, so it never
+   received any responsive treatment — it stayed at its small base size
+   (0.65rem font, 8px padding) even as everything around it in this
+   modal scales up for big screens, making it look like a thin,
+   disproportionate sliver next to the much larger scaled-up panels at
+   2560px+. Targeted via its unique structural position (the one
+   flex-shrink:0 wrapper that's a direct child of .lub-diag-body).
+   ============================================================ */
+@media (min-width: 2000px) {
+  .lub-diag-body > div[style*="flex-shrink: 0"] > button {
+    height: 56px !important;
+    padding: 0 20px !important;
+    font-size: 1.05rem !important;
+    border-radius: 10px !important;
+    gap: 10px !important;
+  }
+
+  .lub-diag-body > div[style*="flex-shrink: 0"] > button svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+}
+
+/* ============================================================
    DIAGNOSIS PANEL: HEADER ICONS SCALING
    ============================================================ */
 
@@ -5326,7 +5596,7 @@ div.section-header-enhanced {
   display: flex !important;
   align-items: center;
   justify-content: center;
-  z-index: 9999 !important;
+  z-index: 100000 !important;
   padding: 10px;
 }
 
@@ -7381,6 +7651,28 @@ div.section-header-enhanced {
   justify-content: center !important;
 }
 
+.lub-chat-attach-btn {
+  background: transparent !important;
+  border: none !important;
+  padding: 4px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+.lub-mandatory-pills-row {
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  margin-bottom: 8px !important;
+}
+
+.lub-mandatory-pills-row .lub-mandatory-btn {
+  width: auto !important;
+  border-radius: 999px !important;
+}
+
 .lub-chat-meta {
   margin-top: 6px !important;
   display: flex !important;
@@ -7759,6 +8051,15 @@ div.section-header-enhanced {
     align-items: stretch;
   }
 
+  /* NOTE: the JSX className is actually "lub-feed-toggles" (no "-group"
+     suffix), so the rule above never matches — added here so the
+     wrap-to-column behavior actually applies. Additive, does not
+     touch the (harmless but non-matching) rule above. */
+  .lub-feed-toggles {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .lub-feed-toggle-switch, .lub-feed-read-toggle-switch {
     width: 100%;
   }
@@ -7830,6 +8131,11 @@ div.section-header-enhanced {
 
   /* Increase spacing between toggle groups and buttons on 4K */
   .lub-feed-toggles-group {
+    gap: 20px !important;
+  }
+
+  /* Real JSX className (see note near the max-width:600px block above) */
+  .lub-feed-toggles {
     gap: 20px !important;
   }
 
@@ -9947,10 +10253,21 @@ div.section-header-enhanced {
   .lub-feed-mark-read-btn,
   .lub-feed-view-btn {
     height: 40px !important;         /* Taller for fat fingers */
-    font-size: 0.8rem !important;
+    font-size: 0.75rem !important;   /* Slightly smaller: 0.8rem + 15px
+                                         padding made "MARK AS READ" +
+                                         "VIEW" together wider than a
+                                         320px card, pushing VIEW half
+                                         off the right edge */
     flex: 1 !important;              /* Take up 50/50 space */
     justify-content: center !important;
-    padding: 0 15px !important;
+    padding: 0 8px !important;
+    gap: 4px !important;
+  }
+  /* Safety net: if a button's own min-content (icon + nowrap text +
+     padding) still can't fit its 50% share on an even narrower phone,
+     wrap to its own row instead of overflowing the card. */
+  .lub-feed-item-btns {
+    flex-wrap: wrap !important;
   }
 }
 
@@ -10048,5 +10365,127 @@ div.section-header-enhanced {
   width: 100% !important;
 }
 /* End @media (min-width: 1600px) and (max-width: 2000px) */
+
+/* ============================================================
+   MATRIX TABLE: viewport-relative max-height (replaces the static
+   px caps scattered earlier in this file — 900px, 1100px, 500px,
+   etc.). Those were sized against typical laptop screen HEIGHTS at
+   the time they were written, but they're keyed to screen WIDTH
+   breakpoints, so on a very tall/large monitor (e.g. 2560x1994) the
+   table stays frozen at ~1100px regardless of how much vertical room
+   is actually available — leaving blank page space below the card
+   while ALSO forcing an internal scroll for rows that would
+   otherwise fit on screen. Tying it to 100vh instead means it grows
+   with the actual monitor, using the space that's really there.
+   Placed at the end of the file so it wins over the earlier static
+   values (same selector, same !important — last one in the cascade
+   applies). Left untouched below 1024px: mobile viewport heights
+   vary too unpredictably (browser chrome, on-screen keyboards) for
+   a vh-based subtraction to be reliable there, and the existing
+   mobile caps were never the source of this issue anyway.
+   ============================================================ */
+@media (min-width: 1024px) {
+  .matrix-scroll-container {
+    /* FIX: a flat calc(100vh - 420px) grew nicely on a tall 1994px-high
+       screen, but on a normal-height window (e.g. a standard 900-1000px
+       viewport) the same subtraction left far LESS room than the old
+       static caps ever did — collapsing to a single visible row plus
+       the footer. max() keeps this from ever shrinking below what the
+       card used to guarantee (900px), while still growing past that on
+       genuinely tall screens where 100vh - 420px exceeds it. */
+    max-height: max(900px, calc(100vh - 420px)) !important;
+  }
+}
+
+
+/* ============================================================
+   FIX: MATRIX TABLE HEADER/DATA COLUMN OVERLAP
+
+   Root cause: this file accumulated many separate, uncoordinated
+   width/min-width declarations for the matrix table's columns —
+   .machinery-sticky-cell / .matrix-corner-header / .lub-matrix-footer-label
+   (the sticky left column, repeated in the header/body/footer rows)
+   and .vessel-header-cell / .lub-data-cell / .lub-matrix-footer-cell
+   (the repeating vessel columns, same idea) each had DIFFERENT pixel
+   widths at the same breakpoint depending on which of several
+   duplicate rule blocks happened to be added later in the file. With
+   table-layout:fixed, the header row and body rows must agree on a
+   column's width or the grid drifts out of alignment — worse, some
+   of those duplicates only shrank the body/data cells and not the
+   header cells (or vice versa) at a given breakpoint, so the two
+   edges of the same column literally disagreed on how wide it was.
+   That drift is what showed up as cells overlapping.
+
+   Also, .vessel-table-enhanced had its overall width forced to
+   arbitrary calc(180%/220% - Npx) values at <=1200px/<=900px,
+   unrelated to how many vessel columns actually exist — fighting
+   the table's own inline width:100% and making the drift above worse
+   exactly at those breakpoints.
+
+   Fix: give the sticky column and the vessel columns ONE width each,
+   shared identically by every row (header/body/footer), with no
+   shrinking at smaller sizes — .matrix-scroll-container already has
+   overflow:auto (line ~652), so when columns don't fit the viewport
+   the table scrolls horizontally instead of shrinking columns until
+   they overlap. This works for any number of vessels: more vessel
+   columns just means more horizontal scroll, not narrower columns.
+   Only >=2000px keeps a deliberate (matching, non-conflicting) bump
+   for large-screen readability, consistent with the rest of the file.
+
+   Placed last so it wins the cascade over every earlier conflicting
+   declaration for these same selectors (same specificity, same
+   !important — last rule in the file applies), without editing or
+   removing any of those earlier blocks' other properties (font-size,
+   padding, colors, etc. are untouched).
+   ============================================================ */
+
+/* Let the table's own width:100% (inline, LuboilAnalysis.jsx) govern
+   things — no more arbitrary calc() stretch unrelated to column count. */
+.vessel-table-enhanced {
+  width: 100% !important;
+}
+
+/* Sticky left column (corner header + machinery cell + footer label)
+   — one width, shared by all three, at every size below 2000px. */
+.matrix-corner-header,
+.machinery-sticky-cell,
+.lub-matrix-footer-label {
+  width: 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
+}
+
+/* Vessel columns (header cell + data cell + footer select-cell)
+   — one width, shared by all three, at every size below 2000px.
+   Using width (not just min-width) on all three removes any
+   ambiguity about which row's declaration a fixed-layout table uses
+   to size the column. */
+.vessel-header-cell,
+.lub-data-cell,
+.lub-matrix-footer-cell {
+  width: 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
+}
+
+/* Big screens: grow both column groups together, still matching
+   width-for-width across header/body/footer, so nothing drifts. */
+@media (min-width: 2000px) {
+  .matrix-corner-header,
+  .machinery-sticky-cell,
+  .lub-matrix-footer-label {
+    width: 380px !important;
+    min-width: 380px !important;
+    max-width: 380px !important;
+  }
+
+  .vessel-header-cell,
+  .lub-data-cell,
+  .lub-matrix-footer-cell {
+    width: 420px !important;
+    min-width: 420px !important;
+    max-width: 420px !important;
+  }
+}
 
 
