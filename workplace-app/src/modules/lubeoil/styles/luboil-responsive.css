@@ -10456,16 +10456,22 @@ div.section-header-enhanced {
 }
 
 /* Vessel columns (header cell + data cell + footer select-cell)
-   — one width, shared by all three, at every size below 2000px.
-   Using width (not just min-width) on all three removes any
-   ambiguity about which row's declaration a fixed-layout table uses
-   to size the column. */
+   — one floor, shared by all three, at every size below 2000px.
+   Only min-width is set (no width/max-width): with table-layout:fixed,
+   a column with no explicit "width" on any row's cell still gets one
+   consistent computed width shared by every row (that's the spec, not
+   a per-block convention), so header/body/footer can't drift apart —
+   the earlier "one width on all three" duplication isn't needed to
+   keep them aligned. Leaving out "width" lets that computed width
+   equal-share the table's available space and shrink toward this
+   floor instead of always being exactly 220px, so a fleet with many
+   vessel columns actually fits a normal monitor (e.g. 1920px) without
+   forcing horizontal scroll; overflow:auto on .matrix-scroll-container
+   (line ~652) still kicks in once even the floor can't fit everyone. */
 .vessel-header-cell,
 .lub-data-cell,
 .lub-matrix-footer-cell {
-  width: 220px !important;
-  min-width: 220px !important;
-  max-width: 220px !important;
+  min-width: 110px !important;
 }
 
 /* Big screens: grow both column groups together, still matching
