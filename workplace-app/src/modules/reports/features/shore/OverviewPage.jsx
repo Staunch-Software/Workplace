@@ -411,8 +411,10 @@ export default function OverviewPage() {
   );
 
   const assignedImos = useMemo(() => {
-    if (user?.role !== 'VESSEL') return null;
+    // ADMIN and SUPERUSER see the full fleet; VESSEL and SHORE are restricted to their assigned vessels
+    if (user?.role === 'ADMIN' || user?.role === 'SUPERUSER') return null;
     const list = Array.isArray(user?.assigned_vessels) ? user.assigned_vessels : [];
+    if (list.length === 0) return new Set();
     return new Set(list.map(v => (typeof v === 'string' ? v : v?.imo)).filter(Boolean));
   }, [user]);
 

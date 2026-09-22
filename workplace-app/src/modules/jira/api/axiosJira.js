@@ -1,9 +1,9 @@
 import axios from 'axios';
 import { handleExpiredSession } from '../../../utils/authGuard';
 
+const isDev = import.meta.env.DEV;
 const axiosJira = axios.create({
-  // baseURL: 'http://localhost:8004',
-  baseURL: '/jira/api',
+  baseURL: isDev ? 'http://localhost:8004' : '/jira/api',
 });
 
 axiosJira.interceptors.request.use((config) => {

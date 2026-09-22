@@ -46,7 +46,7 @@ function StatusBadge({ scrape_status }) {
 }
 
 export default function ShoreReportsPage() {
-  useAuth();
+  const { user } = useAuth();
 
   const [selectedImo, setSelectedImo] = useState('');
   const [expandedFreqs, setExpandedFreqs] = useState(['WEEKLY', 'MONTHLY']);
@@ -133,6 +133,14 @@ export default function ShoreReportsPage() {
   });
   const configs = useMemo(() => (Array.isArray(rawConfigs) ? rawConfigs : []), [rawConfigs]);
 
+  // Build assigned-vessel IMO set for non-ADMIN Shore users
+  const assignedImos = useMemo(() => {
+    if (user?.role === 'ADMIN' || user?.role === 'SUPERUSER') return null; // ADMIN sees all
+    const list = Array.isArray(user?.assigned_vessels) ? user.assigned_vessels : [];
+    if (list.length === 0) return new Set();
+    return new Set(list.map(v => (typeof v === 'string' ? v : v?.imo)).filter(Boolean));
+  }, [user]);
+
   // Build vessel list
   const vessels = useMemo(() => {
     const stats = {};
@@ -143,19 +151,24 @@ export default function ShoreReportsPage() {
       if (r.scrape_status === 'SCRAPED') stats[r.vessel_imo].scraped++;
     });
 
+    let list;
     if (coreVessels.length === 0) {
       const map = {};
       reports.forEach(r => {
         if (!map[r.vessel_imo]) map[r.vessel_imo] = { name: r.vessel_name, ...stats[r.vessel_imo] };
       });
-      return Object.entries(map).map(([imo, d]) => ({ imo, ...d })).sort((a, b) => a.name.localeCompare(b.name));
+      list = Object.entries(map).map(([imo, d]) => ({ imo, ...d }));
+    } else {
+      list = coreVessels.map(v => ({
+        imo: v.imo,
+        name: v.name,
+        ...stats[v.imo] || { total: 0, pending: 0, scraped: 0 }
+      }));
     }
-    return coreVessels.map(v => ({
-      imo: v.imo,
-      name: v.name,
-      ...stats[v.imo] || { total: 0, pending: 0, scraped: 0 }
-    })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [coreVessels, reports]);
+    // Restrict Shore users to their assigned vessels only
+    if (assignedImos) list = list.filter(v => assignedImos.has(v.imo));
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+  }, [coreVessels, reports, assignedImos]);
 
   const activeVesselImo = selectedImo || vessels[0]?.imo || '';
   const activeVessel = vessels.find(v => v.imo === activeVesselImo);

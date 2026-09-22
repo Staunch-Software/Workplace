@@ -1,9 +1,9 @@
 import axios from 'axios';
 import { handleExpiredSession } from '../../../utils/authGuard';
 
+const isDev = import.meta.env.DEV;
 const axiosLub = axios.create({
-  // baseURL: 'http://localhost:8002',
-     baseURL: "/lub",
+  baseURL: isDev ? 'http://localhost:8002' : '/lub',
   headers: { 'Content-Type': 'application/json' },
 });
 

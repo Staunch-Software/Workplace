@@ -72,10 +72,51 @@ export default function ReportFeedPage() {
     onSuccess: () => queryClient.invalidateQueries(['report-notifications']),
   });
 
+  const { data: coreVessels = [] } = useQuery({
+    queryKey: ['core-vessels'],
+    queryFn: () => reportsApi.getVessels(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const assignedImos = useMemo(() => {
+    if (user?.role === 'ADMIN' || user?.role === 'SUPERUSER') return null; // ADMIN sees all
+    const list = Array.isArray(user?.assigned_vessels) ? user.assigned_vessels : [];
+    if (list.length === 0) return new Set();
+    return new Set(list.map(v => (typeof v === 'string' ? v : v?.imo)).filter(Boolean));
+  }, [user]);
+
+  const assignedVesselNames = useMemo(() => {
+    if (!assignedImos) return null;
+    const names = new Set();
+    coreVessels.forEach(v => {
+      if (assignedImos.has(v.imo)) {
+        names.add(v.name);
+      }
+    });
+    return names;
+  }, [coreVessels, assignedImos]);
+
+  const assignedNotifs = useMemo(() => {
+    if (!assignedVesselNames) return notifications; // ADMIN sees all
+
+    return notifications.filter(n => {
+      // Try parsing with both em-dash and regular hyphen
+      const titleParts = n.title?.split('—') || [];
+      const fallbackParts = n.title?.split('-') || [];
+      const parts = titleParts.length > 1 ? titleParts : fallbackParts;
+      const vesselName = parts.length > 1 ? parts[1].trim() : null;
+      
+      if (vesselName) {
+        return assignedVesselNames.has(vesselName);
+      }
+      return false;
+    });
+  }, [notifications, assignedVesselNames]);
+
   const filteredNotifs = useMemo(() => {
-    if (filter === 'UNREAD') return notifications.filter(n => !n.is_read);
-    return notifications;
-  }, [notifications, filter]);
+    if (filter === 'UNREAD') return assignedNotifs.filter(n => !n.is_read);
+    return assignedNotifs;
+  }, [assignedNotifs, filter]);
 
   const handleMarkDone = (id) => {
     markReadMutation.mutate(id);
@@ -93,14 +134,14 @@ export default function ReportFeedPage() {
 
   return (
     <div className="live-feed-root" style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
-      <ReportsNavbar totalUnread={notifications.filter(n => !n.is_read).length} />
+      <ReportsNavbar totalUnread={assignedNotifs.filter(n => !n.is_read).length} />
       
       {/* Header */}
       <div className="feed-header" style={{ padding: '20px 24px', background: '#fff', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div className="feed-header-left">
           <h2>Notifications Feed</h2>
           <div className="feed-count-badge">
-            {notifications.filter(n => !n.is_read).length} unread
+            {assignedNotifs.filter(n => !n.is_read).length} unread
           </div>
         </div>
         <div className="feed-header-right">
@@ -122,7 +163,7 @@ export default function ReportFeedPage() {
           <button 
             className="action-btn" 
             onClick={() => markAllReadMutation.mutate()}
-            disabled={markAllReadMutation.isPending || notifications.filter(n => !n.is_read).length === 0}
+            disabled={markAllReadMutation.isPending || assignedNotifs.filter(n => !n.is_read).length === 0}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', fontSize: '0.8rem', fontWeight: 600, color: '#64748b', cursor: 'pointer' }}
           >
             <CheckCheck size={14} /> Mark All Read

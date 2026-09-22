@@ -109,22 +109,39 @@ export default function ActivityFeedPage() {
 
   const events = Array.isArray(data) ? data : [];
 
+  /* ── Assigned vessel IMO set for Shore users ── */
+  const assignedImos = useMemo(() => {
+    if (user?.role === 'ADMIN' || user?.role === 'SUPERUSER') return null;
+    const list = Array.isArray(user?.assigned_vessels) ? user.assigned_vessels : [];
+    if (list.length === 0) return new Set();
+    return new Set(list.map(v => (typeof v === 'string' ? v : v?.imo)).filter(Boolean));
+  }, [user]);
+
+  /* ── Filter raw events to only assigned vessels (Shore users) ── */
+  const assignedEvents = useMemo(() => {
+    if (!assignedImos) return events; // ADMIN/SUPERUSER see all
+    return events.filter(e => {
+      const imo = String(e.vessel_imo || '');
+      return imo && assignedImos.has(imo);
+    });
+  }, [events, assignedImos]);
+
   /* ── Counts per type ── */
   const typeCounts = useMemo(() => {
     const m = {};
-    events.forEach(e => { m[e.event_type] = (m[e.event_type] || 0) + 1; });
+    assignedEvents.forEach(e => { m[e.event_type] = (m[e.event_type] || 0) + 1; });
     return m;
-  }, [events]);
+  }, [assignedEvents]);
 
   /* ── Stats ── */
   const stats = useMemo(() => ({
-    total:   events.length,
+    total:   assignedEvents.length,
     pending: (typeCounts['MISSING_REPORT'] || 0) + (typeCounts['PENDING_REPORT'] || 0),
     mention: (typeCounts['MENTION'] || 0),
-  }), [events, typeCounts]);
+  }), [assignedEvents, typeCounts]);
 
   /* ── Filtered & grouped ── */
-  const filteredEvents = useMemo(() => events.filter(e => {
+  const filteredEvents = useMemo(() => assignedEvents.filter(e => {
     if (filterVessel !== 'All' && e.vessel_name !== filterVessel) return false;
     if (filterType   !== 'All' && e.event_type   !== filterType)   return false;
     if (search) {
@@ -132,7 +149,7 @@ export default function ActivityFeedPage() {
       if (!e.description?.toLowerCase().includes(lo) && !e.vessel_name?.toLowerCase().includes(lo)) return false;
     }
     return true;
-  }), [events, filterVessel, filterType, search]);
+  }), [assignedEvents, filterVessel, filterType, search]);
 
   const groupedEvents = useMemo(() => {
     const groups = {};
@@ -144,8 +161,8 @@ export default function ActivityFeedPage() {
     return groups;
   }, [filteredEvents]);
 
-  const uniqueVessels  = useMemo(() => [...new Set(events.map(e => e.vessel_name))], [events]);
-  const uniqueTypes    = useMemo(() => [...new Set(events.map(e => e.event_type))],   [events]);
+  const uniqueVessels  = useMemo(() => [...new Set(assignedEvents.map(e => e.vessel_name))], [assignedEvents]);
+  const uniqueTypes    = useMemo(() => [...new Set(assignedEvents.map(e => e.event_type))],   [assignedEvents]);
 
   const openReport = (id) => {
     if (!id) return;
@@ -220,7 +237,7 @@ export default function ActivityFeedPage() {
 
         {/* Type pills */}
         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-          <TypePill type="All" active={filterType==='All'} count={events.length} onClick={() => setFilterType('All')} />
+          <TypePill type="All" active={filterType==='All'} count={assignedEvents.length} onClick={() => setFilterType('All')} />
           {uniqueTypes.map(t => (
             <TypePill key={t} type={t} active={filterType===t} count={typeCounts[t]||0} onClick={() => setFilterType(t)} />
           ))}

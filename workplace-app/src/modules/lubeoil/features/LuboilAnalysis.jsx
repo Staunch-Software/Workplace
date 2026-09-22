@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   Card,
   CardHeader,
@@ -679,6 +679,14 @@ const LuboilAnalysis = () => {
     userRole === "ADMIN" ||
     userRole === "SUPERUSER" ||
     userRole === "SHORE";
+
+  // Shore users (non-ADMIN) are restricted to their assigned vessels only
+  const assignedImos = useMemo(() => {
+    if (userRole === 'ADMIN' || userRole === 'SUPERUSER') return null; // full fleet
+    const list = Array.isArray(userData?.assigned_vessels) ? userData.assigned_vessels : [];
+    if (list.length === 0) return new Set();
+    return new Set(list.map(v => (typeof v === 'string' ? v : v?.imo)).filter(Boolean).map(String));
+  }, [userData, userRole]);
   const [matrixData, setMatrixData] = useState(null);
   const [normalizedTable, setNormalizedTable] = useState({
     headers: [],
@@ -857,12 +865,6 @@ const LuboilAnalysis = () => {
     const owners = new Set(Object.keys(matrixData.data).map(name => getOwner(name)));
     return Array.from(owners).sort();
   }, [matrixData]);
-
-  const feedOwners = useMemo(() => {
-    if (!feedData || !Array.isArray(feedData)) return [];
-    const owners = new Set(feedData.map(item => getOwner(item.vessel_name)));
-    return Array.from(owners).sort();
-  }, [feedData]);
 
   const rawJobTitle = (user?.job_title || user?.user?.job_title || "")
     .toLowerCase()
@@ -1123,7 +1125,14 @@ const LuboilAnalysis = () => {
       .filter((name) => {
         // Only return vessels where at least one machinery has an actual report
         const machineries = normalizedTable.rows[name];
-        return Object.values(machineries).some((m) => m.has_report === true);
+        const hasReport = Object.values(machineries).some((m) => m.has_report === true);
+        if (!hasReport) return false;
+        // Restrict non-ADMIN Shore users to their assigned vessels
+        if (assignedImos) {
+          const imo = String(matrixData?.data?.[name]?.imo || '');
+          return imo && assignedImos.has(imo);
+        }
+        return true;
       })
       .map((name) => ({
         vessel_name: name,
@@ -1137,7 +1146,15 @@ const LuboilAnalysis = () => {
         ],
       }))
       .sort((a, b) => a.vessel_name.localeCompare(b.vessel_name));
-  }, [normalizedTable.rows, matrixData]);
+  }, [normalizedTable.rows, matrixData, assignedImos]);
+
+  const feedOwners = useMemo(() => {
+    // Derive owner list from availableVessels (already filtered by assignedImos)
+    // so the owner pills in the Feed view only show owners relevant to this user.
+    if (!availableVessels || availableVessels.length === 0) return [];
+    const owners = new Set(availableVessels.map(v => getOwner(v.vessel_name)));
+    return Array.from(owners).sort();
+  }, [availableVessels]);
 
   // Derive unique lab sources from ALL machinery across ALL vessels (no "ALL" option)
   const availableSources = useMemo(() => {
@@ -1281,6 +1298,13 @@ const LuboilAnalysis = () => {
   const groupedFeed = useMemo(() => {
     // 1. Apply your existing filters + Updated Tab Filtering
     const filtered = (feedData || []).filter((item) => {
+      // --- ASSIGNED VESSEL FILTER (Shore users only see their assigned vessels) ---
+      if (assignedImos) {
+        // Cross-reference vessel_name -> IMO via matrixData
+        const imo = String(matrixData?.data?.[item.vessel_name]?.imo || "");
+        if (!imo || !assignedImos.has(imo)) return false;
+      }
+
       // --- NEW: OWNER FILTERING ---
       if (selectedOwner !== "ALL" && getOwner(item.vessel_name) !== selectedOwner) return false;
 
@@ -1381,6 +1405,8 @@ const LuboilAnalysis = () => {
     feedToDate,
     feedMode,
     selectedOwner,
+    assignedImos,
+    matrixData,
   ]);
 
   // Flattened, ordered list of feed item ids matching exactly what's
@@ -2053,8 +2079,16 @@ const LuboilAnalysis = () => {
   const fetchNotifs = async () => {
     try {
       const data = (await axiosLub.get("/api/notifications")).data;
-      setNotifications(data.notifications || []);
-      setUnreadCount(data.unread_count || 0);
+      let notifs = data.notifications || [];
+      // Restrict Shore users to notifications from their assigned vessels only
+      if (assignedImos) {
+        notifs = notifs.filter((n) => {
+          const imo = String(n.imo || "");
+          return imo && assignedImos.has(imo);
+        });
+      }
+      setNotifications(notifs);
+      setUnreadCount(notifs.filter(n => !n.is_read).length);
     } catch (err) {
       console.error("Notif fetch failed", err);
     }
@@ -2885,6 +2919,11 @@ const LuboilAnalysis = () => {
 
     Object.entries(data.data).forEach(([vesselName, vessel]) => {
       if (selectedOwner !== "ALL" && getOwner(vesselName) !== selectedOwner) return;
+      // Restrict non-ADMIN Shore users to their assigned vessels only
+      if (assignedImos) {
+        const imo = String(vessel.imo || "");
+        if (!imo || !assignedImos.has(imo)) return;
+      }
       let vesselHasReport = false;
       let vesselWorstStatus = "Normal";
       let vesselIsOverdueUnder30 = false;
@@ -3219,6 +3258,11 @@ const LuboilAnalysis = () => {
 
     Object.entries(matrixData.data).forEach(([vesselName, vesselData]) => {
       if (selectedOwner !== "ALL" && getOwner(vesselName) !== selectedOwner) return;
+      // Restrict non-ADMIN Shore users to their assigned vessels only
+      if (assignedImos) {
+        const imo = String(vesselData.imo || "");
+        if (!imo || !assignedImos.has(imo)) return;
+      }
       // Get the machineries (unified view)
       const sourceFilteredMachineries = Object.values(vesselData.machineries || {});
 
@@ -3455,7 +3499,7 @@ const LuboilAnalysis = () => {
     if (matrixData) {
       calculateMachineryStats(matrixData);
     }
-  }, [matrixData, selectedOwner]);
+  }, [matrixData, selectedOwner, assignedImos]);
 
   const handleFileUpload = async (e) => {
     // 1. Convert FileList to an Array
