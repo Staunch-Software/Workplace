@@ -48,44 +48,198 @@ def _match_file_to_config(file_name: str, configs: list) -> ReportConfig | None:
     # Step 0: keyword-based priority matching using verified SmartPAL attachment patterns.
     # Each entry is (list_of_required_keywords, partial_report_code_fragment).
     # ALL keywords in the list must appear in the filename (case-insensitive).
-    # This fires BEFORE the tech-code extractor so common generic filenames
-    # (e.g. "Deck Weekly Report", "Weekly Bunker Report") are matched correctly.
+    # Ordered from most-specific to least-specific so the first match wins.
     KEYWORD_RULES = [
-        # WEEKLY - 01 - DECK WEEKLY WORKDONE REPORT
+
+        # ── WEEKLY REPORTS ──────────────────────────────────────────────────────
+
+        # WEEKLY-01: DECK WEEKLY WORKDONE REPORT
+        (['deck', 'weekly', 'work'],                      'DECK_WEEKLY_WORK'),
+        (['deck', 'weekly', 'done'],                      'DECK_WEEKLY_WORK'),
         (['deck', 'weekly'],                              'DECK_WEEKLY_WORK'),
         (['deck', 'week'],                                'DECK_WEEKLY_WORK'),
-        # WEEKLY - 02 - ENG WEEKLY WORKDONE REPORT
+        (['deck', 'daily', 'work'],                       'DECK_WEEKLY_WORK'),
+        (['deck', 'daily'],                               'DECK_WEEKLY_WORK'),
+
+        # WEEKLY-02: ENG WEEKLY WORKDONE REPORT
+        (['engine', 'weekly', 'work'],                    'ENG_WEEKLY_WORKD'),
+        (['engine', 'weekly', 'done'],                    'ENG_WEEKLY_WORKD'),
         (['engine', 'weekly'],                            'ENG_WEEKLY_WORKD'),
         (['engine', 'week'],                              'ENG_WEEKLY_WORKD'),
         (['eng', 'weekly'],                               'ENG_WEEKLY_WORKD'),
-        # WEEKLY - 03 - ELECTRICAL WEEKLY WORKDONE REPORT
+        (['engine', 'daily', 'work'],                     'ENG_WEEKLY_WORKD'),
+        (['engine', 'daily'],                             'ENG_WEEKLY_WORKD'),
+        (['eng', 'daily'],                                'ENG_WEEKLY_WORKD'),
+
+        # WEEKLY-03: ELECTRICAL WEEKLY WORKDONE REPORT
         (['electrical', 'weekly'],                        'ELECTRICAL__WEEK'),
         (['electrical', 'week'],                          'ELECTRICAL__WEEK'),
-        # WEEKLY - 04 - DECK CORROSION MAINTENANCE PLAN
+
+        # WEEKLY-04: DECK CORROSION MAINTENANCE PLAN
         (['corrosion', 'maintenance'],                    'DECK_CORROSION'),
         (['corrosion', 'plan'],                           'DECK_CORROSION'),
-        # WEEKLY - 05 - WEEKLY BUNKER REPORT
+
+        # WEEKLY-05: WEEKLY BUNKER REPORT
         (['bunker', 'report'],                            'WEEKLY_BUNKER_RE'),
         (['bunker', 'sounding'],                          'WEEKLY_BUNKER_RE'),
-        # WEEKLY - 06 - BOILER AND COOLER WATER REPORT
+        (['bunker', 'tank'],                              'WEEKLY_BUNKER_RE'),
+
+        # WEEKLY-06: BOILER AND COOLER WATER REPORT
         (['waterproof'],                                  'BOILER_AND_COOLE'),
         (['boiler', 'cooling'],                           'BOILER_AND_COOLE'),
         (['boiler', 'cooler'],                            'BOILER_AND_COOLE'),
+        (['boiler', 'water'],                             'BOILER_AND_COOLE'),
         (['cooling', 'water', 'test'],                    'BOILER_AND_COOLE'),
-        # TECH-57 - ONBOARD LO WEEKLY ANALYSIS
+        (['cooling', 'test'],                             'BOILER_AND_COOLE'),
+
+        # WEEKLY-08: TECH-57 ONBOARD LO WEEKLY ANALYSIS REPORT
         (['tech', '57'],                                  'TECH_-_57'),
         (['te-57'],                                       'TECH_-_57'),
-        # TECH-02 PMS
+        (['te', '57', 'lo'],                              'TECH_-_57'),
+
+        # WEEKLY-09: TECH-02 PMS (ONLY FOR TUFMAX)
+        (['tech-02', 'pms'],                              'TECH_-_02_-_WEEKLY'),
+        (['tech', '02', 'pms'],                           'TECH_-_02_-_WEEKLY'),
+
+        # ── MONTHLY REPORTS ─────────────────────────────────────────────────────
+
+        # MO-01: TECH-07 ME PERFORMANCE SHEET
+        (['tech', '07', 'performance'],                   'TECH-07_ME_PERFOR'),
+        (['tech', '07', 'me'],                            'TECH-07_ME_PERFOR'),
+        (['me', 'performance', 'sheet'],                  'TECH-07_ME_PERFOR'),
+        (['main', 'engine', 'performance', 'sheet'],      'TECH-07_ME_PERFOR'),
+
+        # MO-02: TECH-06 ENGINE PERFORMANCE TREND
+        (['tech', '06', 'performance'],                   'TECH-06_ENGINE_PE'),
+        (['engine', 'performance', 'trend'],              'TECH-06_ENGINE_PE'),
+
+        # MO-03: TECH-12 AE-1 PERFORMANCE SHEET
+        (['tech', '12', 'ae', '1'],                       'TECH-12_AE-1_PERF'),
+        (['ae', '1', 'performance', 'sheet'],             'TECH-12_AE-1_PERF'),
+        (['ae1', 'performance'],                          'TECH-12_AE-1_PERF'),
+        (['ae-1', 'performance'],                         'TECH-12_AE-1_PERF'),
+        (['ae #1', 'performance'],                        'TECH-12_AE-1_PERF'),
+
+        # MO-04: TECH-12 AE-2 PERFORMANCE SHEET
+        (['tech', '12', 'ae', '2'],                       'TECH-12_AE-2_PERF'),
+        (['ae', '2', 'performance', 'sheet'],             'TECH-12_AE-2_PERF'),
+        (['ae2', 'performance'],                          'TECH-12_AE-2_PERF'),
+        (['ae-2', 'performance'],                         'TECH-12_AE-2_PERF'),
+        (['ae #2', 'performance'],                        'TECH-12_AE-2_PERF'),
+
+        # MO-05: TECH-12 AE-3 PERFORMANCE SHEET
+        (['tech', '12', 'ae', '3'],                       'TECH-12_AE-3_PERF'),
+        (['ae', '3', 'performance', 'sheet'],             'TECH-12_AE-3_PERF'),
+        (['ae3', 'performance'],                          'TECH-12_AE-3_PERF'),
+        (['ae-3', 'performance'],                         'TECH-12_AE-3_PERF'),
+        (['ae #3', 'performance'],                        'TECH-12_AE-3_PERF'),
+
+        # MO-06: TECH-08A SCAVENGE PORT INSPECTION
+        (['scavenge', 'port'],                            'TECH-08A_SCAVENGE'),
+        (['tech', '08a'],                                 'TECH-08A_SCAVENGE'),
+        (['te', '08', 'scavenge'],                        'TECH-08A_SCAVENGE'),
+
+        # MO-07: TECH-55 SCRAPE DOWN ANALYSIS
+        (['scrape', 'down'],                              'TECH-55_SCRAPE_DO'),
+        (['tech', '55'],                                  'TECH-55_SCRAPE_DO'),
+
+        # MO-08: TECH-13 AUXILIARY ENGINE PERFORMANCE TREND
+        (['auxiliary', 'engine', 'performance'],          'TECH-13_AUXILIARY'),
+        (['tech', '13', 'auxiliary'],                     'TECH-13_AUXILIARY'),
+        (['tech', '13', 'performance'],                   'TECH-13_AUXILIARY'),
+
+        # MO-09: TECH-56 MONTHLY LO CONSUMPTION REPORT
+        (['tech', '56', 'lo'],                            'TECH-56_MONTHLY_L'),
+        (['tech', '56', 'consumption'],                   'TECH-56_MONTHLY_L'),
+        (['lo', 'consumption', 'report'],                 'TECH-56_MONTHLY_L'),
+        (['lub', 'oil', 'consumption'],                   'TECH-56_MONTHLY_L'),
+        (['monthy', 'lo', 'consumption'],                 'TECH-56_MONTHLY_L'),
+        (['monthly', 'lo', 'consumption'],                'TECH-56_MONTHLY_L'),
+
+        # MO-10: TECH-11 CHEMICAL CONSUMPTION RECORD
+        (['tech', '11', 'chemical'],                      'TECH-11_CHEMICAL_'),
+        (['chemical', 'consumption', 'record'],           'TECH-11_CHEMICAL_'),
+
+        # MO-11: WATERPROOF REPORT - BOILER AND COOLING WATER TEST (Monthly)
+        (['waterproof', 'report'],                        'WATERPROOF_REPORT'),
+
+        # MO-12: MONTHLY - 05 LIST OF PRECISION TOOLS
+        (['precision', 'tools'],                          'LIST_OF_PRECISION'),
+        (['precision', 'instruments'],                    'LIST_OF_PRECISION'),
+
+        # MO-13: TECH-10 VIBRATION ANALYSIS REPORT
+        (['vibration', 'analysis'],                       'TECH-10_VIBRATION'),
+        (['tech', '10', 'vibration'],                     'TECH-10_VIBRATION'),
+
+        # MO-14: MONTHLY - 04 MONTHLY PARAMETERS
+        (['monthly', 'parameters'],                       'MONTHLY_PARAMETER'),
+        (['monthly', 'engine', 'abstract'],               'MONTHLY_PARAMETER'),
+
+        # MO-15: MONTHLY - 03 ENGINE MONTH END REPORT REVIEW
+        (['month', 'end', 'report'],                      'ENGINE_MONTH_E'),
+        (['month', 'end', 'review'],                      'ENGINE_MONTH_E'),
+        (['oth', '10', 'month', 'end'],                   'ENGINE_MONTH_E'),
+        (['oth-10', 'month'],                             'ENGINE_MONTH_E'),
+        (['engine', 'room', 'month', 'end'],              'ENGINE_MONTH_E'),
+
+        # MO-16: OPR-06 MONTHLY PAINT CONSUMPTION REPORT
+        (['paint', 'consumption'],                        'OPR-06_MONTHLY_PA'),
+        (['paint', 'stock'],                              'OPR-06_MONTHLY_PA'),
+        (['opr', '06', 'paint'],                          'OPR-06_MONTHLY_PA'),
+
+        # MO-17: TECH-01 CORROSION MAINTENANCE TOOL
+        (['oth', '01', 'corrosion'],                      'TECH-01_CORROSION'),
+        (['oth-01', 'corrosion'],                         'TECH-01_CORROSION'),
+        (['tech', '01', 'corrosion'],                     'TECH-01_CORROSION'),
+        (['corrosion', 'maintenance', 'tool'],            'TECH-01_CORROSION'),
+
+        # MO-18: TECH-48 ICCP LOG
+        (['iccp', 'log'],                                 'TECH-48_ICCP_LOG'),
+        (['tech', '48', 'iccp'],                          'TECH-48_ICCP_LOG'),
+        (['te', '48', 'iccp'],                            'TECH-48_ICCP_LOG'),
+
+        # MO-19: TECH-49 MGPS LOG
+        (['mgps', 'log'],                                 'TECH-49_MGPS_LOG'),
+        (['tech', '49', 'mgps'],                          'TECH-49_MGPS_LOG'),
+        (['te', '49', 'mgps'],                            'TECH-49_MGPS_LOG'),
+
+        # MO-20: MONTHLY - 06 BATTERY LOG
+        (['battery', 'log'],                              'BATTERY_LOG'),
+        (['oth', '02', 'battery'],                        'BATTERY_LOG'),
+        (['oth-02', 'battery'],                           'BATTERY_LOG'),
+
+        # MO-21: TECH-02 MONTHLY PMS (non-Tufmax)
         (['tech', '02', 'pms'],                           'TECH_-_02'),
-        (['tech-02'],                                     'TECH_-_02'),
+        (['tech-02', 'pms'],                              'TECH_-_02'),
+
+        # MO: MONTHLY LO CONSUMPTION (alt code)
+        (['monthly', 'lube', 'oil'],                      'TECH-56_MONTHLY_L'),
+
+        # MO: BWTS OPERATIONAL DATA DUMP RECORD
+        (['bwts'],                                        'BWTS_OPERATIONA'),
+        (['ballast', 'water', 'treatment'],               'BWTS_OPERATIONA'),
+
+        # ── QUARTERLY REPORTS ───────────────────────────────────────────────────
+
+        # QT: TECH-15 ME CRANKWEB DEFLECTION REPORT
+        (['crankweb', 'deflection', 'me'],                'TECH-15_ME_CRANK'),
+        (['crankweb', 'deflection'],                      'TECH-15_ME_CRANK'),
+        (['te', '15', 'crankweb'],                        'TECH-15_ME_CRANK'),
+        (['tech', '15', 'crankweb'],                      'TECH-15_ME_CRANK'),
+
+        # QT: TECH-16 MAIN ENGINE BEARING CLEARANCES
+        (['bearing', 'clearances'],                       'TECH_-16_MAIN_ENG'),
+        (['tech', '16', 'bearing'],                       'TECH_-16_MAIN_ENG'),
+        (['te', '16', 'bearing'],                         'TECH_-16_MAIN_ENG'),
+        (['main', 'engine', 'bearing'],                   'TECH_-16_MAIN_ENG'),
     ]
 
     for keywords, code_fragment in KEYWORD_RULES:
         if all(kw in fname_lower for kw in keywords):
-            # Find matching config by code fragment
             matched = [c for c in configs if code_fragment.upper() in c.report_code.upper()]
             if matched:
                 return matched[0]
+
 
 
 
@@ -173,7 +327,7 @@ def _match_file_to_config(file_name: str, configs: list) -> ReportConfig | None:
             best_score = score
             best_cfg = cfg
 
-    if best_score >= 0.55:
+    if best_score >= 0.65:
         return best_cfg
 
     return None
