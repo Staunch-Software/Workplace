@@ -36,11 +36,58 @@ def _normalize(text: str) -> str:
 def _match_file_to_config(file_name: str, configs: list) -> ReportConfig | None:
     """
     Match a SharePoint filename to the closest ReportConfig entry using:
+    0. Keyword-based priority matching using verified attachment patterns.
     1. Exact tech-code extraction (e.g. TECH-07, OPR-06) + sub-variant (AE-1/AE-2/AE-3)
     2. Fuzzy name similarity fallback.
     Returns the best matching ReportConfig, or None if nothing scores above threshold.
     """
     import difflib
+
+    fname_lower = file_name.lower()
+
+    # Step 0: keyword-based priority matching using verified SmartPAL attachment patterns.
+    # Each entry is (list_of_required_keywords, partial_report_code_fragment).
+    # ALL keywords in the list must appear in the filename (case-insensitive).
+    # This fires BEFORE the tech-code extractor so common generic filenames
+    # (e.g. "Deck Weekly Report", "Weekly Bunker Report") are matched correctly.
+    KEYWORD_RULES = [
+        # WEEKLY - 01 - DECK WEEKLY WORKDONE REPORT
+        (['deck', 'weekly'],                              'DECK_WEEKLY_WORK'),
+        (['deck', 'week'],                                'DECK_WEEKLY_WORK'),
+        # WEEKLY - 02 - ENG WEEKLY WORKDONE REPORT
+        (['engine', 'weekly'],                            'ENG_WEEKLY_WORKD'),
+        (['engine', 'week'],                              'ENG_WEEKLY_WORKD'),
+        (['eng', 'weekly'],                               'ENG_WEEKLY_WORKD'),
+        # WEEKLY - 03 - ELECTRICAL WEEKLY WORKDONE REPORT
+        (['electrical', 'weekly'],                        'ELECTRICAL__WEEK'),
+        (['electrical', 'week'],                          'ELECTRICAL__WEEK'),
+        # WEEKLY - 04 - DECK CORROSION MAINTENANCE PLAN
+        (['corrosion', 'maintenance'],                    'DECK_CORROSION'),
+        (['corrosion', 'plan'],                           'DECK_CORROSION'),
+        # WEEKLY - 05 - WEEKLY BUNKER REPORT
+        (['bunker', 'report'],                            'WEEKLY_BUNKER_RE'),
+        (['bunker', 'sounding'],                          'WEEKLY_BUNKER_RE'),
+        # WEEKLY - 06 - BOILER AND COOLER WATER REPORT
+        (['waterproof'],                                  'BOILER_AND_COOLE'),
+        (['boiler', 'cooling'],                           'BOILER_AND_COOLE'),
+        (['boiler', 'cooler'],                            'BOILER_AND_COOLE'),
+        (['cooling', 'water', 'test'],                    'BOILER_AND_COOLE'),
+        # TECH-57 - ONBOARD LO WEEKLY ANALYSIS
+        (['tech', '57'],                                  'TECH_-_57'),
+        (['te-57'],                                       'TECH_-_57'),
+        # TECH-02 PMS
+        (['tech', '02', 'pms'],                           'TECH_-_02'),
+        (['tech-02'],                                     'TECH_-_02'),
+    ]
+
+    for keywords, code_fragment in KEYWORD_RULES:
+        if all(kw in fname_lower for kw in keywords):
+            # Find matching config by code fragment
+            matched = [c for c in configs if code_fragment.upper() in c.report_code.upper()]
+            if matched:
+                return matched[0]
+
+
 
     # Step 1: extract report code pattern from filename (e.g. "TECH-07", "OPR-06", "OTH-10")
     code_match = re.search(
