@@ -85,6 +85,7 @@ def _match_file_to_config(file_name: str, configs: list) -> ReportConfig | None:
                   'amns', 'tufmax', 'fos', 'gcl', 'narmada', 'yamuna', 'tarang',
                   'mv', 'mvanmns',
                   'defect', 'pms', 'checklist', 'list',
+                  'oth', 'daily', 'work', 'done', 'review', 'deck', 'engine',
                   '01', '02', '03', '04', '05', '06', '07', '08', '09', '10',
                   '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
                   '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31']:
@@ -94,19 +95,38 @@ def _match_file_to_config(file_name: str, configs: list) -> ReportConfig | None:
     if len(norm_file.strip()) < 4:
         return None
 
+    # Detect frequency keywords present in filename for mismatch guard
+    raw_lower = file_name.lower()
+    file_is_weekly    = any(w in raw_lower for w in ['weekly', 'wk', 'week'])
+    file_is_monthly   = any(w in raw_lower for w in ['monthly', 'month end', 'month-end'])
+    file_is_quarterly = any(w in raw_lower for w in ['quarterly', 'quarter'])
+    file_is_daily     = 'daily' in raw_lower
+
     best_cfg = None
     best_score = 0.0
     for cfg in configs:
+        cfg_freq = (cfg.frequency or '').lower()  # e.g. 'weekly', 'monthly', 'quarterly'
+
+        # Frequency mismatch guard: reject cross-frequency matches
+        if file_is_weekly and cfg_freq in ('monthly', 'quarterly'):
+            continue
+        if file_is_monthly and cfg_freq in ('weekly', 'quarterly'):
+            continue
+        if file_is_quarterly and cfg_freq in ('weekly', 'monthly'):
+            continue
+        if file_is_daily and cfg_freq in ('weekly', 'monthly', 'quarterly'):
+            continue
+
         norm_name = _normalize(cfg.report_name)
         for noise in ['weekly', 'monthly', 'quarterly', 'report', 'sheet', 'log', 'record',
-                      'workdone', 'work', 'done', 'analysis']:
+                      'workdone', 'work', 'done', 'analysis', 'deck', 'engine']:
             norm_name = norm_name.replace(noise, '')
         score = difflib.SequenceMatcher(None, norm_file, norm_name).ratio()
         if score > best_score:
             best_score = score
             best_cfg = cfg
 
-    if best_score >= 0.45:
+    if best_score >= 0.55:
         return best_cfg
 
     return None
