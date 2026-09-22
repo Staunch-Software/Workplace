@@ -113,6 +113,9 @@ async def list_reports(
             return []
 
     # ── FILTERS ──
+    # Always hide the SmartPAL "failed" placeholders from the UI
+    stmt = stmt.where(Report.job_order_no != "N/A")
+
     if vessel_imo:
         stmt = stmt.where(Report.vessel_imo == vessel_imo)
     if department:
