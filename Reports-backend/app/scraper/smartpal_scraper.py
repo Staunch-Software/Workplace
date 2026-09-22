@@ -362,6 +362,33 @@ async def run_scraper(db: AsyncSession, target_frequency: str = None, target_rep
                 )
                 if result:
                     result["is_smart_scrape"] = smart_cron
+
+                    # --- SharePoint pre-check: if report is PENDING, look in SP first ---
+                    if result.get("job_status") == "PENDING":
+                        try:
+                            from app.scraper.sharepoint_graph_fetcher import check_and_fetch_from_sharepoint
+                            due_dt = result.get("due_date")
+                            if due_dt:
+                                logger.info(
+                                    f"[SP-CHECK] Report is PENDING — checking SharePoint for "
+                                    f"{vessel_name}/{report_code} due {due_dt}"
+                                )
+                                found = await check_and_fetch_from_sharepoint(
+                                    db=db,
+                                    vessel_name=vessel_name,
+                                    report_code=report_code,
+                                    due_date=due_dt,
+                                    frequency=frequency,
+                                )
+                                if found:
+                                    logger.info(
+                                        f"[SP-CHECK] ✅ Found in SharePoint — skipping PENDING for "
+                                        f"{vessel_name}/{report_code}"
+                                    )
+                                    continue  # SP fetcher already saved it as COMPLETED
+                        except Exception as sp_err:
+                            logger.warning(f"[SP-CHECK] SP pre-check failed (non-fatal): {sp_err}")
+
                     await _save_report(db, result)
                 else:
                     # _scrape_report returning None used to mean this config
