@@ -3,7 +3,10 @@ import { handleExpiredSession } from '../utils/authGuard';
 
 const isDev = import.meta.env.DEV;
 const api = axios.create({
-  baseURL: isDev ? 'http://localhost:8000/api/v1' : '/api/v1',
+  // baseURL: 'http://localhost:8003/api/v1',
+    //  baseURL: 'http://localhost:8000/api/v1',
+  // baseURL: 'http://52.172.91.85:8003/api/v1',
+     baseURL: "/api/v1",
   headers: { 'Content-Type': 'application/json' },
 });
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+﻿import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   Card,
   CardHeader,
@@ -53,7 +53,15 @@ import "../styles/luboil-fix.css"
 
 // Equipment excluded from overdue/sampling-interval calculations only.
 // It still displays normally everywhere else (data, history, config, etc.).
-const OVERDUE_EXCLUDED_EQUIPMENT_CODES = ["ME OIL SETTLING"];
+const OVERDUE_EXCLUDED_EQUIPMENT_CODES = [
+  "ME OIL SETTLING",
+  "SCAV.DRN.01",
+  "SCAV.DRN.02",
+  "SCAV.DRN.03",
+  "SCAV.DRN.04",
+  "SCAV.DRN.05",
+  "SCAV.DRN.06",
+];
 const isExcludedFromOverdue = (code) =>
   OVERDUE_EXCLUDED_EQUIPMENT_CODES.includes(code);
 
@@ -4938,19 +4946,20 @@ const LuboilAnalysis = () => {
                               : ownerFilteredVessels;
 
                           const visibleColumns = tableColumns.filter(
-                            (colCode) => {
-                              // Return true if ANY of the selected vessels has a report for this equipment
-                              // AND (if source is filtered) that cell's source matches
-                              return rowSourceVessels.some(
-                                (vesselName) => {
-                                  const cell =
-                                    normalizedTable.rows[vesselName]?.[colCode];
-                                  if (!cell || !cell.is_configured || cell.has_report !== true) return false;
-                                  return true;
-                                },
-                              );
-                            },
-                          );
+  (colCode) => {
+    // Return true if ANY of the selected vessels has this equipment configured.
+    // A report is NOT required to show the row — unreported/newly configured
+    // equipment must still appear as a row (its cells will render MISSING).
+    return rowSourceVessels.some(
+      (vesselName) => {
+        const cell =
+          normalizedTable.rows[vesselName]?.[colCode];
+        if (!cell || !cell.is_configured) return false;
+        return true;
+      },
+    );
+  },
+);
 
                           // 2. MAP ONLY THE VISIBLE ROWS (Hiding universal Missing/NA rows)
                           return visibleColumns.map((colCode, rowIndex) => {
