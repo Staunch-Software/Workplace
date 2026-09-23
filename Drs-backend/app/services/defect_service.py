@@ -154,7 +154,7 @@ class DefectService:
             target_close_date=target_close_date,
             json_backup_path=defect_in.json_backup_path,
             before_image_required=auto_image_required or (defect_in.before_image_required or False),
-            after_image_required=auto_image_required or (defect_in.after_image_required or False),
+            after_image_required=True,  # ALWAYS TRUE
             before_image_path=defect_in.before_image_path,
             after_image_path=defect_in.after_image_path,
             is_owner=False,
