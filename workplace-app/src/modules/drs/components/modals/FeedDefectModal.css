@@ -98,8 +98,8 @@
 }
 
 .fm-field-description {
-  flex: 1 1 200px;
-  min-width: 200px;
+  flex: 0 1 auto;
+  max-width: 300px;
 }
 
 .fm-field-value {
