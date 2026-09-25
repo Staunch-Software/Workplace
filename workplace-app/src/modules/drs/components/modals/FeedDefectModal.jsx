@@ -373,6 +373,15 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                     </div>
                   </div>
                   <div className="fm-field">
+                    <span className="fm-label">Status</span>
+                    <div className="fm-field-value">
+                      <span className="fm-value fm-priority-value">
+                        <StatusStageIcon size={13} color={getStatusColor(defect.status)} status={defect.status} />
+                        {defect.status?.replace('_', ' ') || '—'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="fm-field">
                     <span className="fm-label">Defect ID</span>
                     <div className="fm-field-value"><span className="fm-value">{defect.defect_number || '—'}</span></div>
                   </div>
@@ -405,15 +414,6 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                       ) : (
                         <span className="fm-value">{defect.defect_source}</span>
                       )}
-                    </div>
-                  </div>
-                  <div className="fm-field">
-                    <span className="fm-label">Status</span>
-                    <div className="fm-field-value">
-                      <span className="fm-value fm-priority-value">
-                        <StatusStageIcon size={13} color={getStatusColor(defect.status)} status={defect.status} />
-                        {defect.status?.replace('_', ' ') || '—'}
-                      </span>
                     </div>
                   </div>
                 </div>
