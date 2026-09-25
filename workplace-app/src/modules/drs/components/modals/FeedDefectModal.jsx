@@ -315,16 +315,66 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
               <div className="feed-modal-header">
                 <div className={`feed-modal-header-row ${canEditFields ? 'is-edit-mode' : ''}`}>
                   <div className="fm-field">
-                    <span className="fm-label">Defect ID</span>
-                    <div className="fm-field-value"><span className="fm-value">{defect.defect_number || '—'}</span></div>
+                    <span className="fm-label">Report Date</span>
+                    <div className="fm-field-value"><span className="fm-value">{formatDate(defect.date_identified || defect.created_at)}</span></div>
                   </div>
                   <div className="fm-field">
                     <span className="fm-label">Vessel</span>
                     <div className="fm-field-value"><span className="fm-value">{defect.vessel_name}</span></div>
                   </div>
                   <div className="fm-field">
-                    <span className="fm-label">Report Date</span>
-                    <div className="fm-field-value"><span className="fm-value">{formatDate(defect.date_identified || defect.created_at)}</span></div>
+                    <span className="fm-label">Priority</span>
+                    <div className="fm-field-value">
+                      {canEditFields ? (
+                        <PrioritySelect
+                          value={defect.priority}
+                          onChange={(val) => updateField('priority', val)}
+                        />
+                      ) : (
+                        <span className="fm-value fm-priority-value">
+                          <PrioritySignalBarsIcon
+                            size={13}
+                            color={PRIORITY_COLORS[defect.priority] || '#94a3b8'}
+                            level={{ LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 }[defect.priority]}
+                          />
+                          {defect.priority || '—'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {!canEditFields && (
+                    <div className="fm-field fm-field-description">
+                      <span className="fm-label">Description</span>
+                      <div className="fm-field-value"><span className="fm-value fm-description-value">{defect.description}</span></div>
+                    </div>
+                  )}
+                  <div className="fm-field">
+                    <span className="fm-label">Timeline</span>
+                    <div className="fm-field-value">
+                      <span className="fm-value fm-priority-value">
+                        {defect.status === 'CLOSED'
+                          ? 'Closed'
+                          : TIMELINE_LABELS[getDeadlineStatus(defect.target_close_date)]}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={`fm-field ${canEditFields ? 'fm-field-grow' : ''}`}>
+                    <span className="fm-label">Area of Concern</span>
+                    <div className="fm-field-value">
+                      {canEditFields ? (
+                        <ScrollableSelect
+                          value={defect.equipment_name}
+                          options={COMPONENT_OPTIONS}
+                          onChange={(val) => updateField('equipment_name', val)}
+                        />
+                      ) : (
+                        <span className="fm-value">{defect.equipment_name}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="fm-field">
+                    <span className="fm-label">Defect ID</span>
+                    <div className="fm-field-value"><span className="fm-value">{defect.defect_number || '—'}</span></div>
                   </div>
                   <div className="fm-field">
                     <span className="fm-label">Due Date</span>
@@ -358,26 +408,6 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                     </div>
                   </div>
                   <div className="fm-field">
-                    <span className="fm-label">Priority</span>
-                    <div className="fm-field-value">
-                      {canEditFields ? (
-                        <PrioritySelect
-                          value={defect.priority}
-                          onChange={(val) => updateField('priority', val)}
-                        />
-                      ) : (
-                        <span className="fm-value fm-priority-value">
-                          <PrioritySignalBarsIcon
-                            size={13}
-                            color={PRIORITY_COLORS[defect.priority] || '#94a3b8'}
-                            level={{ LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 }[defect.priority]}
-                          />
-                          {defect.priority || '—'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="fm-field">
                     <span className="fm-label">Status</span>
                     <div className="fm-field-value">
                       <span className="fm-value fm-priority-value">
@@ -386,36 +416,6 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                       </span>
                     </div>
                   </div>
-                  <div className="fm-field">
-                    <span className="fm-label">Timeline</span>
-                    <div className="fm-field-value">
-                      <span className="fm-value fm-priority-value">
-                        {defect.status === 'CLOSED'
-                          ? 'Closed'
-                          : TIMELINE_LABELS[getDeadlineStatus(defect.target_close_date)]}
-                      </span>
-                    </div>
-                  </div>
-                  <div className={`fm-field ${canEditFields ? 'fm-field-grow' : ''}`}>
-                    <span className="fm-label">Area of Concern</span>
-                    <div className="fm-field-value">
-                      {canEditFields ? (
-                        <ScrollableSelect
-                          value={defect.equipment_name}
-                          options={COMPONENT_OPTIONS}
-                          onChange={(val) => updateField('equipment_name', val)}
-                        />
-                      ) : (
-                        <span className="fm-value">{defect.equipment_name}</span>
-                      )}
-                    </div>
-                  </div>
-                  {!canEditFields && (
-                    <div className="fm-field fm-field-description">
-                      <span className="fm-label">Description</span>
-                      <div className="fm-field-value"><span className="fm-value fm-description-value">{defect.description}</span></div>
-                    </div>
-                  )}
                 </div>
                 {canEditFields && (
                   <div className="fm-field fm-field-grow fm-field-grow-full">
