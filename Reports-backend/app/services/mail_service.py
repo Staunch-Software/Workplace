@@ -98,6 +98,9 @@ async def process_and_email_pending_attachments(db: AsyncSession):
             "Content-Type": "application/json"
         }
         
+        email_list = [email.strip() for email in notification_email.split(",") if email.strip()]
+        to_recipients = [{"emailAddress": {"address": email}} for email in email_list]
+
         payload = {
             "message": {
                 "subject": f"[Report Tracker] New Reports uploaded ({len(pending_attachments)} files)",
@@ -105,13 +108,7 @@ async def process_and_email_pending_attachments(db: AsyncSession):
                     "contentType": "HTML",
                     "content": email_body_html
                 },
-                "toRecipients": [
-                    {
-                        "emailAddress": {
-                            "address": notification_email
-                        }
-                    }
-                ],
+                "toRecipients": to_recipients,
                 "attachments": graph_attachments
             },
             "saveToSentItems": "false"
