@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import logging
 import sys
 import os
@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from app.core.database import SessionLocal           # FIX: was AsyncSessionLocal (does not exist)
 from app.scraper.smartpal_scraper import run_scraper
 from app.services.aepms_push import push_pending_reports
+from app.services.mail_service import process_and_email_pending_attachments
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-8s %(message)s")
 logger = logging.getLogger(__name__)
@@ -44,8 +45,13 @@ async def main():
     logger.info("Starting Smart Scrape Cron Job...")
     async with SessionLocal() as db:
         # run_scraper with smart_cron=True handles querying latest rows and filtering them.
-        await run_scraper(db, smart_cron=True)
+        await run_scraper(db, smart_cron=True, target_vessel="yamuna")
     logger.info("Smart Scrape Cron Job COMPLETE.")
+
+    logger.info("Starting batch email processing for new attachments...")
+    async with SessionLocal() as db:
+        await process_and_email_pending_attachments(db)
+    logger.info("Batch email processing COMPLETE.")
 
     logger.info("Starting AEPMS push for pending ME/AE reports...")
     async with SessionLocal() as db:

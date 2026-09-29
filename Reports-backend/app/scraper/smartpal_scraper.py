@@ -29,7 +29,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.blob_storage import upload_pdf_to_blob
-from app.models.report import Report, ScrapeStatus, VerifyStatus, ReportConfig, ReportAttachment
+from app.models.report import Report, ScrapeStatus, VerifyStatus, ReportConfig, ReportAttachment, EmailStatus
 
 logger = logging.getLogger("scraper")
 
@@ -1674,15 +1674,21 @@ async def _save_report(db: AsyncSession, data: dict):
         ).options(selectinload(Report.attachments))
         result = await db.execute(stmt)
         existing = result.scalars().first()
+        
+        vessel_name_lower = data.get("vessel_name", "").lower()
+        is_target_vessel = "ganga" in vessel_name_lower or "yamuna" in vessel_name_lower or "fos" in vessel_name_lower
 
         if existing:
             # We already have this exact Job Order in the DB. Update it.
+            old_blob_paths = {att.blob_path for att in existing.attachments}
             existing.attachments.clear()
             for att in data.get("attachments", []):
+                email_status = EmailStatus.PENDING if is_target_vessel and att["blob_path"] not in old_blob_paths else EmailStatus.NOT_REQUIRED
                 existing.attachments.append(ReportAttachment(
                     id=uuid4(),
                     file_name=att["file_name"],
-                    blob_path=att["blob_path"]
+                    blob_path=att["blob_path"],
+                    email_status=email_status
                 ))
 
             existing.report_name   = data["report_name"]
@@ -1738,10 +1744,12 @@ async def _save_report(db: AsyncSession, data: dict):
             )
             
             for att in data.get("attachments", []):
+                email_status = EmailStatus.PENDING if is_target_vessel else EmailStatus.NOT_REQUIRED
                 new_report.attachments.append(ReportAttachment(
                     id=uuid4(),
                     file_name=att["file_name"],
-                    blob_path=att["blob_path"]
+                    blob_path=att["blob_path"],
+                    email_status=email_status
                 ))
             
             db.add(new_report)
