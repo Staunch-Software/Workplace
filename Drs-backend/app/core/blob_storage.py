@@ -201,8 +201,21 @@ def generate_read_sas_url(blob_name: str) -> str:
     Works in both Azurite (offline) and Azure Cloud (online) modes.
     """
     client = get_blob_service_client()
+    target_container = settings.AZURE_CONTAINER_NAME
+    
+    # --- FALLBACK CHECK FOR LEGACY VESSEL SYNC ---
+    try:
+        if not client.get_blob_client(container=target_container, blob=blob_name).exists():
+            # If it's missing in pdf-repository, check the old vessel container
+            if client.get_blob_client(container="ozellar-attachments", blob=blob_name).exists():
+                target_container = "ozellar-attachments"
+                logger.info(f"Fallback to ozellar-attachments for: {blob_name}")
+    except Exception as e:
+        logger.warning(f"Error checking fallback container: {e}")
+    # ---------------------------------------------
+
     blob_client = client.get_blob_client(
-        container=settings.AZURE_CONTAINER_NAME,
+        container=target_container,
         blob=blob_name,
     )
 
@@ -211,7 +224,7 @@ def generate_read_sas_url(blob_name: str) -> str:
     sas_token = generate_blob_sas(
         account_name=client.account_name,
         account_key=account_key,
-        container_name=settings.AZURE_CONTAINER_NAME,
+        container_name=target_container,
         blob_name=blob_name,
         permission=BlobSasPermissions(read=True),
         expiry=datetime.now(timezone.utc) + timedelta(hours=24),

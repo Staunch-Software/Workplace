@@ -19,6 +19,13 @@ class VerifyStatus(str, enum.Enum):
     VERIFIED   = "VERIFIED"
 
 
+class EmailStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    SENT = "SENT"
+    FAILED = "FAILED"
+    NOT_REQUIRED = "NOT_REQUIRED"
+
+
 class Report(Base):
     """
     One record per SmartPAL report per vessel per scrape cycle.
@@ -151,6 +158,7 @@ class ReportAttachment(Base):
     report_id   = Column(UUID(as_uuid=True), ForeignKey("reports.id", ondelete="CASCADE"), nullable=False, index=True)
     file_name   = Column(String(500), nullable=False)
     blob_path   = Column(String(1000), nullable=False)
+    email_status = Column(String(20), default=EmailStatus.NOT_REQUIRED.value)
     created_at  = Column(DateTime, default=datetime.utcnow)
     updated_at  = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

@@ -257,7 +257,7 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
   const { user } = useAuth();
   const toast = useToast();
   const [confirmModal, setConfirmModal] = useState(null);
-  const ALLOWED_DELETE_EMAILS = ['gauravsingh.r@ozellar.com', 'admin@ozellar.com', 'techdevops@ozellar.com'];
+  const ALLOWED_DELETE_EMAILS = ['gauravsingh.r@ozellar.com', 'admin@ozellar.com', 'techdevops@ozellar.com','abhishek.s@ozellar.com'];
   const canDelete = ALLOWED_DELETE_EMAILS.includes(user?.email);
   const queryClient = useQueryClient();
   const [externalDraft, setExternalDraft] = useState("");
@@ -1817,7 +1817,7 @@ const ShoreDashboard = () => {
   const { user } = useAuth();
   const toast = useToast();
   const [confirmModal, setConfirmModal] = useState(null);
-  const ALLOWED_DELETE_EMAILS = ['gauravsingh.r@ozellar.com', 'admin@ozellar.com', 'techdevops@ozellar.com'];
+  const ALLOWED_DELETE_EMAILS = ['gauravsingh.r@ozellar.com', 'admin@ozellar.com', 'techdevops@ozellar.com','abhishek.s@ozellar.com'];
   const canDelete = ALLOWED_DELETE_EMAILS.includes(user?.email);
 
   const [currentPage, setCurrentPage] = useState(1);
