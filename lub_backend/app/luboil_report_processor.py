@@ -208,12 +208,28 @@ def find_smart_match(target_name: str, candidates: Dict[str, str]) -> Optional[s
 
 # --- MAIN PROCESSOR ---
 
+class SampleAlreadyExistsError(ValueError):
+    """Raised by the single-page (matrix cell drop) flow when the sample is already stored
+    and the caller has not yet confirmed that it should be replaced."""
+    def __init__(self, info: Dict[str, Any]):
+        super().__init__("Sample already exists")
+        self.info = info
+
+
 async def save_luboil_report(
-    pdf_file_stream: BinaryIO, 
-    filename: str, 
-    session: Session
+    pdf_file_stream: BinaryIO,
+    filename: str,
+    session: Session,
+    forced_imo: Optional[str] = None,
+    forced_equipment_code: Optional[str] = None,
+    replace_existing: bool = False,
+    report_url: Optional[str] = None,
 ) -> Dict[str, Any]:
-    
+    # forced_imo / forced_equipment_code / replace_existing are used ONLY by the single-page
+    # matrix-cell upload. When they are left at their defaults (the full-report flow) every
+    # code path below behaves exactly as before.
+    single_page_mode = bool(forced_imo and forced_equipment_code)
+
     # 1. EXTRACT DATA
     try:
         extracted_data = extract_lube_oil_report_data(pdf_file_stream)
@@ -228,24 +244,50 @@ async def save_luboil_report(
     vessel_name_extracted = meta.get('vessel_name')
     report_date_str = meta.get('report_date')
 
-    if not vessel_name_extracted or not report_date_str:
+    if single_page_mode:
+        # The vessel comes from the selected matrix cell, and a lone page may not carry the
+        # report-level title, so only the single sample's own data is required here.
+        page_machines = extracted_data.get('machineries', [])
+        if len(page_machines) != 1:
+            raise ValueError(
+                f"Expected a single report page containing one sample, but found {len(page_machines)}. "
+                "Please drop one page of a Lube Oil report."
+            )
+        page_info = page_machines[0].get('sample_info', {}) or {}
+        report_date_str = report_date_str or page_info.get('report_date') or page_info.get('date')
+        if not report_date_str:
+            raise ValueError("Could not read the report/sample date from this page.")
+    elif not vessel_name_extracted or not report_date_str:
         raise ValueError("Missing Vessel Name or Date in report.")
 
     # 2. FIND VESSEL
     with SessionControl() as control_db:
-        vessel = control_db.query(ControlVessel).filter(
-            ControlVessel.name.ilike(f"%{vessel_name_extracted}%"),
-            ControlVessel.is_active == True
-        ).first()
+        vessel = None
+        if single_page_mode:
+            vessel = control_db.query(ControlVessel).filter(
+                ControlVessel.imo == str(forced_imo)
+            ).first()
+            if vessel and vessel_name_extracted and vessel_name_extracted.lower() not in vessel.name.lower() \
+                    and vessel.name.lower() not in vessel_name_extracted.lower():
+                logger.warning(
+                    f"⚠️ Single-page upload: vessel name in PDF ('{vessel_name_extracted}') differs from "
+                    f"selected vessel '{vessel.name}'. Using the selected matrix cell's vessel."
+                )
 
-        if not vessel:
+        if not vessel and not single_page_mode:
+            vessel = control_db.query(ControlVessel).filter(
+                ControlVessel.name.ilike(f"%{vessel_name_extracted}%"),
+                ControlVessel.is_active == True
+            ).first()
+
+        if not vessel and not single_page_mode:
             all_vessels = control_db.query(ControlVessel).filter(ControlVessel.is_active == True).all()
             for v in all_vessels:
                 if len(v.name) > 3 and v.name.lower() in vessel_name_extracted.lower():
                     vessel = v
                     break
 
-        if not vessel:
+        if not vessel and not single_page_mode:
             # FIX: Added '\b' for word boundaries, and added 'and', 'gear', 'winch', 'pump' 
             # to handle strings like "Bearings and Seals AM KIRTI"
             noise_words = r'(?i)\b(crankcase|engine|stern|tube|system|bearings|seals|auxiliary|main|and|gear|winch|pump)\b'
@@ -311,8 +353,41 @@ async def save_luboil_report(
     report = None
     existing_map = {}  # always initialize so sample loop never breaks
 
+    # ── Single-page (matrix cell drop): look for the SAME sample already stored ──
+    # The report-wide duplicate rule below needs the whole set of sample numbers to match, which a
+    # lone page can never do, so a single page is matched on its own sample instead.
+    existing_page_sample = None
+    if single_page_mode:
+        page_sample_info = machineries[0].get('sample_info', {}) or {}
+        page_sample_number = page_sample_info.get('number')
+        page_sample_date_str = page_sample_info.get('date')
+        lookup = (
+            select(LuboilSample)
+            .join(LuboilReport, LuboilSample.report_id == LuboilReport.report_id)
+            .where(LuboilReport.imo_number == vessel_imo)
+        )
+        if page_sample_number:
+            lookup = lookup.where(LuboilSample.sample_number == str(page_sample_number))
+        else:
+            lookup = lookup.where(LuboilSample.equipment_code == forced_equipment_code).where(
+                LuboilSample.sample_date == (
+                    date_type.fromisoformat(page_sample_date_str) if page_sample_date_str else report_date_parsed
+                )
+            )
+        existing_page_sample = (await session.execute(lookup)).scalars().first()
+
+        if existing_page_sample and not replace_existing:
+            raise SampleAlreadyExistsError({
+                "sample_id": existing_page_sample.sample_id,
+                "sample_number": existing_page_sample.sample_number,
+                "sample_date": existing_page_sample.sample_date.isoformat() if existing_page_sample.sample_date else None,
+                "equipment_code": existing_page_sample.equipment_code,
+                "machinery_name": existing_page_sample.machinery_name,
+                "status": existing_page_sample.status,
+            })
+
     # ── Step 1: Check for TRUE DUPLICATE (source + sample numbers match) ──
-    if incoming_sample_numbers:
+    if incoming_sample_numbers and not single_page_mode:
         existing_samples_result = await session.execute(
             select(LuboilSample)
             .join(LuboilReport, LuboilSample.report_id == LuboilReport.report_id)
@@ -378,6 +453,8 @@ async def save_luboil_report(
             full_json_data=extracted_data,
             oil_source=oil_source_extracted
         )
+        if report_url:
+            report.report_url = report_url  # single-page replace: page is already stored in blob
         session.add(report)
         logger.info(f"✅ NEW report created for {vessel_display_name} date={report_date_str} file='{safe_filename}'")
 
@@ -390,13 +467,15 @@ async def save_luboil_report(
         clean_name = re.sub(re.escape(vessel_display_name), '', clean_name, flags=re.IGNORECASE).strip().strip('-').strip()
 
         # Resolve Equipment Code
-        equipment_code = None
+        # Single-page upload: the equipment is the one from the selected matrix cell, so every
+        # matching priority below is skipped (each already checks `not equipment_code`).
+        equipment_code = forced_equipment_code if single_page_mode else None
         lube_analyst_code = machine.get("lube_analyst_code")
         is_shell_source = (oil_source_extracted or "").upper() == "SHELL"
 
         # ── PRIORITY 1: Match by Lube Analyst Code via VesselConfig ──
         # Direct code lookup — fastest and most accurate path (Shell only)
-        if lube_analyst_code and config_imo:
+        if lube_analyst_code and config_imo and not single_page_mode:
             result = await session.execute(
                 select(LuboilVesselConfig).filter(
                     LuboilVesselConfig.imo_number == config_imo,
@@ -554,7 +633,7 @@ async def save_luboil_report(
         # it does not belong to this report — it will appear in a future PDF.
         # Gulf and Tribocare always have sample dates before the report date
         # (collection date vs issue date), so we only apply this to Shell.
-        if is_shell_source and m_sample_info.get('date'):
+        if is_shell_source and m_sample_info.get('date') and not single_page_mode:
             try:
                 m_sample_date = date_type.fromisoformat(m_sample_info.get('date'))
                 if m_sample_date > report_date_parsed:
@@ -635,7 +714,30 @@ async def save_luboil_report(
             'status_change_log'
         }
 
-        if is_duplicate:
+        if single_page_mode and existing_page_sample is not None:
+            # REPLACE (user confirmed): refresh the lab data, move the sample onto the newly stored
+            # page, and keep remarks / attachments / flags exactly as they are.
+            for key, value in tech_data.items():
+                if key not in PROTECTED_FIELDS:
+                    setattr(existing_page_sample, key, value)
+            existing_page_sample.report_id = report.report_id
+            existing_page_sample.equipment_code = equipment_code
+            existing_page_sample.version = (existing_page_sample.version or 1) + 1
+            logger.info(f"🔄 Single page: replaced page for sample {existing_page_sample.sample_id} ({clean_name})")
+
+            # Same as the new-sample path: make sure the equipment is enabled for this vessel
+            cfg_res = await session.execute(
+                select(LuboilVesselConfig).where(
+                    LuboilVesselConfig.imo_number == vessel_imo,
+                    LuboilVesselConfig.equipment_code == equipment_code
+                )
+            )
+            replace_cfg = cfg_res.scalars().first()
+            if not replace_cfg:
+                session.add(LuboilVesselConfig(imo_number=vessel_imo, equipment_code=equipment_code, is_active=True))
+            elif not replace_cfg.is_active:
+                replace_cfg.is_active = True
+        elif is_duplicate:
             # DUPLICATE: search by sample_number scoped to vessel IMO (not just report_id)
             result = await session.execute(
                 select(LuboilSample)
@@ -714,6 +816,7 @@ async def save_luboil_report(
         "sample_count": len(machineries),
         "report_date": report_date_str,
         "is_duplicate": is_duplicate,
+        "replaced_existing": bool(single_page_mode and existing_page_sample is not None),
         "alert_summary": summary_text,
         "status": "Smart Merge (Preserved Remarks)" if is_duplicate else "Processed"
     }
