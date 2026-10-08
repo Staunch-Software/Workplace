@@ -276,3 +276,219 @@
     margin-right: 0 !important;
   }
 }
+/* ============================================================
+   SINGLE REPORT PAGE UPLOAD (matrix cell drag & drop)
+   ============================================================ */
+.page-drop-btn {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #64748b;
+  cursor: pointer;
+  opacity: 0.55;
+  z-index: 4;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+}
+.lub-data-cell:hover .page-drop-btn,
+.page-drop-btn:hover,
+.page-drop-btn:focus-visible {
+  opacity: 1;
+  color: #2563eb;
+  border-color: #2563eb;
+}
+
+/* A file is being dragged somewhere on the page: outline every drop target */
+.lub-data-cell.page-drop-ready {
+  outline: 1.5px dashed #93c5fd;
+  outline-offset: -3px;
+}
+.lub-data-cell.page-drop-over {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+  background-color: #eff6ff !important;
+}
+
+.page-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(239, 246, 255, 0.92);
+  color: #1d4ed8;
+  font-size: 0.7rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.page-drop-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #bfdbfe;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: page-drop-spin 0.8s linear infinite;
+}
+.page-drop-spinner-lg {
+  width: 34px;
+  height: 34px;
+  border-width: 3px;
+}
+@keyframes page-drop-spin {
+  to { transform: rotate(360deg); }
+}
+
+.page-upload-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(3px);
+}
+.page-upload-dialog {
+  width: 100%;
+  max-width: 430px;
+  padding: 22px;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.3);
+}
+.page-upload-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+.page-upload-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.page-upload-details > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.82rem;
+}
+.page-upload-details span {
+  color: #64748b;
+  flex-shrink: 0;
+}
+.page-upload-details strong {
+  text-align: right;
+  word-break: break-word;
+}
+.page-upload-sub {
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.45;
+}
+.page-upload-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0;
+  text-align: center;
+}
+.page-upload-loading .page-upload-title {
+  margin-bottom: 0;
+}
+.page-upload-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+.page-upload-btn {
+  height: 36px;
+  padding: 0 18px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.page-upload-btn.primary {
+  background: #2563eb;
+  color: #ffffff;
+}
+.page-upload-btn.primary:hover {
+  background: #1d4ed8;
+}
+.page-upload-btn.secondary {
+  background: #ffffff;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+.page-upload-btn.secondary:hover {
+  background: #f1f5f9;
+}
+
+.page-upload-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 10060;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 40px));
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
+}
+.page-upload-toast.success {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+.page-upload-toast.error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+.page-upload-toast button {
+  display: flex;
+  margin-left: 4px;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.page-upload-warning {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+}

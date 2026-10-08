@@ -56,7 +56,7 @@ from app.routes import auth
 from app.middleware.permission_check import check_endpoint_permission
 from app.blob_storage import upload_file_to_azure, generate_sas_url
 from app.blob_storage import generate_sas_url
-from app.luboil_report_processor import save_luboil_report
+from app.luboil_report_processor import save_luboil_report, SampleAlreadyExistsError
 from app.luboil_model import LuboilEquipmentType, LuboilVesselConfig, LuboilNameMapping
 from sqlalchemy import case, literal
 
@@ -183,9 +183,10 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(start_background_sync())
         logger.info("Sync worker started (vessel instance).")
 
-    from app.luboil_email_auto_upload import start_async_email_scheduler
-    asyncio.create_task(start_async_email_scheduler())
-    logger.info("Email Auto-Upload Scheduler started in background.")
+    # TEMPORARILY DISABLED: automatic inbox (email) report upload. Uncomment these 3 lines to restore.
+    # from app.luboil_email_auto_upload import start_async_email_scheduler
+    # asyncio.create_task(start_async_email_scheduler())
+    # logger.info("Email Auto-Upload Scheduler started in background.")
 
     yield  # ← App runs here
 
@@ -222,31 +223,32 @@ app.include_router(vessels_router, prefix="/api/vessels", tags=["Vessels"])
 
 
 
-@app.post("/api/admin/trigger-email-sync", tags=["Admin", "Lube Oil"])
-async def trigger_manual_email_sync(
-    # current_user: Any = Depends(auth.get_current_user) # Uncomment if you want to restrict to logged-in users
-):
-    """
-    Manually forces the backend to check the Outlook inbox for LubeAnalyst emails 
-    from the last 24 hours and process them immediately, without waiting for the schedule.
-    """
-    import asyncio
-    from app.luboil_email_auto_upload import run_luboil_email_upload_job
-
-    try:
-        logger.info("Manual Email Sync triggered via API.")
-        
-        # We use create_task so the API returns immediately ("Sync started") 
-        # while the actual download/upload happens in the background.
-        asyncio.create_task(run_luboil_email_upload_job())
-        
-        return {
-            "status": "success", 
-            "message": "Email sync job started in the background. Check logs for progress."
-        }
-    except Exception as e:
-        logger.error(f"Failed to trigger email sync: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+# TEMPORARILY DISABLED: inbox (email) report upload trigger. Uncomment this block to restore.
+# @app.post("/api/admin/trigger-email-sync", tags=["Admin", "Lube Oil"])
+# async def trigger_manual_email_sync(
+#     # current_user: Any = Depends(auth.get_current_user) # Uncomment if you want to restrict to logged-in users
+# ):
+#     """
+#     Manually forces the backend to check the Outlook inbox for LubeAnalyst emails
+#     from the last 24 hours and process them immediately, without waiting for the schedule.
+#     """
+#     import asyncio
+#     from app.luboil_email_auto_upload import run_luboil_email_upload_job
+#
+#     try:
+#         logger.info("Manual Email Sync triggered via API.")
+#
+#         # We use create_task so the API returns immediately ("Sync started")
+#         # while the actual download/upload happens in the background.
+#         asyncio.create_task(run_luboil_email_upload_job())
+#
+#         return {
+#             "status": "success",
+#             "message": "Email sync job started in the background. Check logs for progress."
+#         }
+#     except Exception as e:
+#         logger.error(f"Failed to trigger email sync: {str(e)}")
+#         raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================
@@ -555,7 +557,152 @@ async def upload_luboil_report(
         logger.error(f"System Error processing Lube Oil PDF: {e}\n{tb}")
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
 
-        
+@app.post("/api/luboil/upload-report-page", tags=["Lube Oil"])
+async def upload_luboil_report_page(
+    file: UploadFile = File(...),
+    imo: int = Form(...),
+    equipment_code: str = Form(...),
+    replace_existing: bool = Form(False),
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(auth.get_current_user)
+):
+    """
+    Single report page dropped onto one vessel/equipment matrix cell. Uses the same extraction and
+    save logic as the full-report upload, with the vessel and equipment taken from the cell.
+    The full-report endpoint (/api/upload-luboil-report/) is not touched by this.
+    """
+    # Same audience as the existing upload button: shore users only
+    u_role = str(current_user.get("role") or "").upper() if isinstance(current_user, dict) \
+        else str(getattr(current_user, "role", "") or "").upper()
+    if u_role not in ("SHORE", "ADMIN", "SUPERUSER", "SUPERINTENDENT"):
+        raise HTTPException(status_code=403, detail="You do not have permission to upload reports.")
+
+    allowed_imos, _ = get_allowed_vessel_imos(db, current_user)
+    if str(imo) not in [str(x) for x in allowed_imos]:
+        raise HTTPException(status_code=403, detail="Access Denied")
+
+    if not file.filename or not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
+
+    eq_res = await db.execute(sa_select(LuboilEquipmentType).where(LuboilEquipmentType.code == equipment_code))
+    if not eq_res.scalars().first():
+        raise HTTPException(status_code=400, detail="Unknown equipment.")
+
+    try:
+        contents = await file.read()
+        if not contents:
+            raise HTTPException(status_code=400, detail="The file is empty.")
+        if len(contents) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File size exceeds the 10MB limit.")
+
+        # Count pages up front so a multi-page file gets a clear message
+        try:
+            page_total = len(PdfReader(io.BytesIO(contents)).pages)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Could not read this PDF.")
+        if page_total != 1:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Please drop a single-page PDF (this file has {page_total} pages)."
+            )
+
+        folder_path = f"lube_oil/raw/{datetime.utcnow().strftime('%Y-%m')}"
+        stem = re.sub(r"[^A-Za-z0-9_.-]", "_", file.filename.rsplit('.', 1)[0])
+        blob_name = f"{stem}_page_{uuid.uuid4().hex[:8]}.pdf"
+
+        # Replacing a sample moves it onto the new page, so the page must be safely stored BEFORE
+        # anything in the database changes (otherwise a storage failure would break a working page).
+        pre_blob_url = None
+        if replace_existing:
+            pre_blob_url = upload_file_to_azure(file_data=contents, filename=blob_name, folder_path=folder_path)
+            if not pre_blob_url:
+                raise HTTPException(status_code=500, detail="Could not store the PDF page. Nothing was changed.")
+
+        try:
+            result = await save_luboil_report(
+                pdf_file_stream=io.BytesIO(contents),
+                filename=file.filename,
+                session=db,
+                forced_imo=str(imo),
+                forced_equipment_code=equipment_code,
+                replace_existing=replace_existing,
+                report_url=pre_blob_url,
+            )
+        except SampleAlreadyExistsError as exists_err:
+            await db.rollback()
+            return JSONResponse(
+                status_code=409,
+                content={"code": "SAMPLE_EXISTS", "existing": exists_err.info}
+            )
+
+        report_id = result.get("report_id")
+        if not report_id:
+            raise HTTPException(status_code=500, detail="Page saved but report ID not returned.")
+
+        blob_url = pre_blob_url
+        report_record = None
+        if not blob_url:
+            blob_url = upload_file_to_azure(file_data=contents, filename=blob_name, folder_path=folder_path)
+            res = await db.execute(sa_select(LuboilReport).where(LuboilReport.report_id == report_id))
+            report_record = res.scalars().first()
+            if blob_url and report_record:
+                report_record.report_url = blob_url
+                await db.commit()
+            elif not blob_url:
+                logger.error("Azure upload returned None for single-page upload (no file backup).")
+
+        # Live Feed entry for a genuinely new page (a replacement is not announced as a new report)
+        if not result.get("replaced_existing"):
+            try:
+                vessel_name = result.get("vessel", "Unknown Vessel")
+                report_date = result.get("report_date", "Unknown Date")
+                alert_summary = result.get("alert_summary", "N/A")
+                focus_res = await db.execute(
+                    sa_select(LuboilSample).where(LuboilSample.report_id == report_id)
+                )
+                focus_sample = focus_res.scalars().first()
+                eq_label = focus_sample.machinery_name if focus_sample and focus_sample.machinery_name else equipment_code
+                db.add(LuboilEvent(
+                    vessel_name=vessel_name,
+                    imo=str(imo),
+                    machinery_name=eq_label,
+                    equipment_code=equipment_code,
+                    sample_id=focus_sample.sample_id if focus_sample else None,
+                    event_type="NEW_REPORT",
+                    priority="SUCCESS",
+                    message=(
+                        f"NEW REPORT UPLOADED - {vessel_name}\n"
+                        f"Report page for {eq_label} processed. Health Summary -> {alert_summary}\n"
+                        f"Report Date: {report_date} | Health Summary: {alert_summary}"
+                    ),
+                    created_at=datetime.utcnow()
+                ))
+                await db.commit()
+            except Exception as feed_err:
+                logger.error(f"Failed to add single-page upload event to Live Feed: {feed_err}")
+
+        return {
+            "message": "Report page processed successfully.",
+            "replaced_existing": result.get("replaced_existing", False),
+            "vessel": result.get("vessel"),
+            "report_date": result.get("report_date"),
+            "alert_summary": result.get("alert_summary"),
+            "report_id": report_id,
+            "file_url": blob_url,
+        }
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        await db.rollback()
+        logger.error(f"Validation error during single-page upload: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"System error processing single-page upload: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
+
+
 # Request Schema for updating remarks
 class LuboilRemarksRequest(BaseModel):
     vessel_name: str

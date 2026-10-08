@@ -3508,6 +3508,164 @@ const LuboilAnalysis = () => {
     }
   }, [matrixData, selectedOwner, assignedImos]);
 
+  // ── Single report page upload (drag & drop, or click, on one matrix cell) ──
+  // Shore users only. Uses its own endpoint; the full-report upload below is untouched.
+  const [pageUpload, setPageUpload] = useState(null); // { stage: confirm | replace | uploading, file, target, existing }
+  const [dragOverCellKey, setDragOverCellKey] = useState(null);
+  const [isFileDragActive, setIsFileDragActive] = useState(false);
+  const [pageUploadToast, setPageUploadToast] = useState(null); // { type: success | error, text }
+  const pagePickerRef = useRef(null);
+  const pagePickerTarget = useRef(null);
+
+  useEffect(() => {
+    if (!amIShore) return;
+    let depth = 0;
+    const hasFiles = (e) => Array.from(e.dataTransfer?.types || []).includes("Files");
+    const onEnter = (e) => {
+      if (!hasFiles(e)) return;
+      depth += 1;
+      setIsFileDragActive(true);
+    };
+    const onLeave = (e) => {
+      if (!hasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setIsFileDragActive(false);
+    };
+    const onEnd = () => {
+      depth = 0;
+      setIsFileDragActive(false);
+    };
+    window.addEventListener("dragenter", onEnter);
+    window.addEventListener("dragleave", onLeave);
+    window.addEventListener("drop", onEnd);
+    window.addEventListener("dragend", onEnd);
+    return () => {
+      window.removeEventListener("dragenter", onEnter);
+      window.removeEventListener("dragleave", onLeave);
+      window.removeEventListener("drop", onEnd);
+      window.removeEventListener("dragend", onEnd);
+    };
+  }, [amIShore]);
+
+  useEffect(() => {
+    if (!pageUploadToast) return;
+    const t = setTimeout(() => setPageUploadToast(null), 6000);
+    return () => clearTimeout(t);
+  }, [pageUploadToast]);
+
+  const beginPageUpload = (file, target) => {
+    if (!file || !target) return;
+    const isPdf = file.type === "application/pdf" || (file.name || "").toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      setPageUploadToast({ type: "error", text: "Only a single-page PDF can be uploaded here." });
+      return;
+    }
+    setPageUpload({ stage: "confirm", file, target, existing: null });
+  };
+
+  const submitPageUpload = async (replace = false) => {
+    const current = pageUpload;
+    if (!current) return;
+    setPageUpload({ ...current, stage: "uploading" });
+    try {
+      const fd = new FormData();
+      fd.append("file", current.file);
+      fd.append("imo", String(current.target.imo));
+      fd.append("equipment_code", current.target.code);
+      fd.append("replace_existing", replace ? "true" : "false");
+      const res = (
+        await axiosLub.post("/api/luboil/upload-report-page", fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        })
+      ).data;
+      setPageUpload(null);
+      setPageUploadToast({
+        type: "success",
+        text: res.replaced_existing
+          ? `Page replaced for ${current.target.vesselName} – ${current.target.label}. Remarks, attachments and flags were kept.`
+          : `Page uploaded for ${current.target.vesselName} – ${current.target.label}.`,
+      });
+      await loadData();
+    } catch (err) {
+      if (err?.response?.status === 409 && err.response.data?.code === "SAMPLE_EXISTS") {
+        setPageUpload({ ...current, stage: "replace", existing: err.response.data.existing });
+        return;
+      }
+      const detail = err?.response?.data?.detail;
+      setPageUpload(null);
+      setPageUploadToast({
+        type: "error",
+        text: typeof detail === "string" ? detail : err?.message || "Upload failed.",
+      });
+    }
+  };
+
+  const hasDraggedFiles = (e) => Array.from(e.dataTransfer?.types || []).includes("Files");
+  const cellKeyOf = (target) => (target ? `${target.imo}|${target.code}` : null);
+
+  const getCellDropProps = (target) => {
+    if (!target || pageUpload) return {};
+    const key = cellKeyOf(target);
+    return {
+      onDragOver: (e) => {
+        if (!hasDraggedFiles(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        if (dragOverCellKey !== key) setDragOverCellKey(key);
+      },
+      onDragLeave: (e) => {
+        if (e.currentTarget.contains(e.relatedTarget)) return;
+        setDragOverCellKey((k) => (k === key ? null : k));
+      },
+      onDrop: (e) => {
+        if (!hasDraggedFiles(e)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setDragOverCellKey(null);
+        setIsFileDragActive(false);
+        const files = Array.from(e.dataTransfer.files || []);
+        if (files.length !== 1) {
+          setPageUploadToast({ type: "error", text: "Please drop one single-page PDF at a time." });
+          return;
+        }
+        beginPageUpload(files[0], target);
+      },
+    };
+  };
+
+  const pageDropClass = (target) => {
+    if (!target) return "";
+    return `${isFileDragActive ? "page-drop-ready" : ""} ${dragOverCellKey === cellKeyOf(target) ? "page-drop-over" : ""}`;
+  };
+
+  const renderPageDropTools = (target) => {
+    if (!target) return null;
+    const key = cellKeyOf(target);
+    const isBusy = pageUpload?.stage === "uploading" && cellKeyOf(pageUpload.target) === key;
+    return (
+      <>
+        <button
+          type="button"
+          className="page-drop-btn"
+          title={`Upload a report page for ${target.label} (or drop a PDF here)`}
+          onClick={(e) => {
+            e.stopPropagation();
+            pagePickerTarget.current = target;
+            pagePickerRef.current?.click();
+          }}
+        >
+          <Upload size={12} />
+        </button>
+        {(dragOverCellKey === key || isBusy) && (
+          <div className="page-drop-overlay">
+            {isBusy ? <span className="page-drop-spinner" /> : <Upload size={16} />}
+            <span>{isBusy ? "Processing..." : "Drop page here"}</span>
+          </div>
+        )}
+      </>
+    );
+  };
+
   const handleFileUpload = async (e) => {
     // 1. Convert FileList to an Array
     const files = Array.from(e.target.files);
@@ -3972,6 +4130,110 @@ const LuboilAnalysis = () => {
         user={user}
         onRegisterVessel={() => alert("Register Vessel coming soon")}
       />
+
+      {/* ── Single report page upload: file picker, confirmation dialog and toast ── */}
+      {amIShore && (
+        <input
+          ref={pagePickerRef}
+          type="file"
+          accept=".pdf,application/pdf"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = null;
+            beginPageUpload(file, pagePickerTarget.current);
+          }}
+        />
+      )}
+
+      {pageUpload && (
+        <div className="page-upload-backdrop">
+          <div className="page-upload-dialog" role="dialog" aria-modal="true">
+            {pageUpload.stage === "uploading" ? (
+              <div className="page-upload-loading">
+                <span className="page-drop-spinner page-drop-spinner-lg" />
+                <div className="page-upload-title">Processing report page...</div>
+                <div className="page-upload-sub">
+                  {pageUpload.target.vesselName} – {pageUpload.target.label}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="page-upload-title">
+                  {pageUpload.stage === "replace"
+                    ? "This sample already exists"
+                    : "Upload report page?"}
+                </div>
+                <div className="page-upload-details">
+                  <div>
+                    <span>Vessel</span>
+                    <strong>{pageUpload.target.vesselName}</strong>
+                  </div>
+                  <div>
+                    <span>Equipment</span>
+                    <strong>{pageUpload.target.label}</strong>
+                  </div>
+                  <div>
+                    <span>File</span>
+                    <strong>{pageUpload.file.name}</strong>
+                  </div>
+                </div>
+                {pageUpload.target.notConfigured && (
+                  <div className="page-upload-warning">
+                    This equipment is not configured for this vessel. Uploading
+                    will enable it.
+                  </div>
+                )}
+                {pageUpload.stage === "replace" ? (
+                  <div className="page-upload-sub">
+                    A report for sample {pageUpload.existing?.sample_number || ""}
+                    {pageUpload.existing?.sample_date
+                      ? ` (${pageUpload.existing.sample_date})`
+                      : ""}{" "}
+                    is already stored. Replacing it will use this page as the
+                    report page. Existing remarks, attachments and flags will be
+                    kept.
+                  </div>
+                ) : (
+                  <div className="page-upload-sub">
+                    Do you want to continue with this upload?
+                  </div>
+                )}
+                <div className="page-upload-actions">
+                  <button
+                    type="button"
+                    className="page-upload-btn secondary"
+                    onClick={() => setPageUpload(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="page-upload-btn primary"
+                    onClick={() => submitPageUpload(pageUpload.stage === "replace")}
+                  >
+                    {pageUpload.stage === "replace" ? "Replace page" : "Continue"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {pageUploadToast && (
+        <div className={`page-upload-toast ${pageUploadToast.type}`}>
+          {pageUploadToast.type === "success" ? (
+            <CheckCircle size={18} />
+          ) : (
+            <AlertCircle size={18} />
+          )}
+          <span>{pageUploadToast.text}</span>
+          <button type="button" onClick={() => setPageUploadToast(null)} aria-label="Dismiss">
+            <X size={14} />
+          </button>
+        </div>
+      )}
       {viewMode === "matrix" && (
         <div
           className="section-header-enhanced"
@@ -5034,13 +5296,28 @@ const LuboilAnalysis = () => {
                                     position: "relative",
                                   };
 
+                                  // Drop target for a single report page (shore users). N/A cells are
+                                  // included: uploading enables the equipment for that vessel.
+                                  const dropTarget =
+                                    amIShore && vesselImo
+                                      ? {
+                                          vesselName,
+                                          imo: vesselImo,
+                                          code: cell?.code || colCode,
+                                          label: fullName,
+                                          notConfigured: !cell || !cell.is_configured,
+                                        }
+                                      : null;
+
                                   // --- CONDITION 1: N/A ---
                                   if (!cell || !cell.is_configured) {
                                     return (
                                       <td
                                         key={vesselName}
-                                                                                className={`lub-data-cell empty-cell ${colFocusClass}`}
+                                                                                className={`lub-data-cell empty-cell ${colFocusClass} ${pageDropClass(dropTarget)}`}
+                                        {...getCellDropProps(dropTarget)}
                                       >
+                                        {renderPageDropTools(dropTarget)}
                                         <span className="na-text">N/A</span>
                                       </td>
                                     );
@@ -5052,8 +5329,10 @@ const LuboilAnalysis = () => {
                                     return (
                                       <td
                                         key={vesselName}
-                                                                                className={`lub-data-cell missing-cell ${colFocusClass}`}
+                                                                                className={`lub-data-cell missing-cell ${colFocusClass} ${pageDropClass(dropTarget)}`}
+                                        {...getCellDropProps(dropTarget)}
                                       >
+                                        {renderPageDropTools(dropTarget)}
                                         <div className="missing-label">
                                           MISSING
                                         </div>
@@ -5109,9 +5388,10 @@ const LuboilAnalysis = () => {
                                       //       : "pointer",
                                       //     transition: "background 0.2s",
                                       //   }}
-                                                                            className={`lub-data-cell data-available ${isNormal ? "" : "hover-cell"} ${colFocusClass}`}
+                                                                            className={`lub-data-cell data-available ${isNormal ? "" : "hover-cell"} ${colFocusClass} ${pageDropClass(dropTarget)}`}
+                                      {...getCellDropProps(dropTarget)}
                                     >
-                                     
+                                      {renderPageDropTools(dropTarget)}
                                       <div className="cell-content-wrapper">
                                         <StatusDots
                                           history={cell.history}
@@ -6781,7 +7061,7 @@ const LuboilAnalysis = () => {
                           </div>
                           <iframe
                              src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
-                            //  src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                              // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
                             style={{ width: "100%", flex: 1, border: "none" }}
                             title="Opened View"
                           />
@@ -6810,8 +7090,8 @@ const LuboilAnalysis = () => {
                                 </span>
                               </div>
                               <iframe
-                                 src={`/lub/api/luboil/view-specific-page/${targetId}`}
-                                  // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
+                                  src={`/lub/api/luboil/view-specific-page/${targetId}`}
+                                  //  src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
                                 style={{
                                   width: "100%",
                                   flex: 1,
@@ -6825,7 +7105,7 @@ const LuboilAnalysis = () => {
                       </div>
                     ) : selectedCell.data.report_url ? (
                       <iframe
-                          src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                           src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
                         //  src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
                         style={{ width: "100%", flex: 1, border: "none" }}
                         title="Original Report"
