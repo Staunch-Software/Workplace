@@ -45,7 +45,7 @@ async def main():
     logger.info("Starting Smart Scrape Cron Job...")
     async with SessionLocal() as db:
         # run_scraper with smart_cron=True handles querying latest rows and filtering them.
-        await run_scraper(db, smart_cron=True, target_vessel="yamuna")
+        await run_scraper(db, smart_cron=True)
     logger.info("Smart Scrape Cron Job COMPLETE.")
 
     logger.info("Starting batch email processing for new attachments...")
