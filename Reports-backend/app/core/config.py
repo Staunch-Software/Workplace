@@ -99,6 +99,8 @@ class Settings(BaseSettings):
     AZURE_TENANT_ID: str = ""
     AZURE_CLIENT_ID: str = ""
     AZURE_CLIENT_SECRET: str = ""
+    MAIL_FROM: str = ""
+    NOTIFICATION_EMAIL: str = ""
 
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
