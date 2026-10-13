@@ -24,6 +24,7 @@ import AttachmentLink from '@drs/components/shared/AttachmentLink';
 import ColumnCustomizationModal from '@drs/components/modals/ColumnCustomizationModal';
 import './Vessel.css';
 import EnhancedClosureModal from '@drs/components/modals/EnhancedClosureModal';
+import DefectKanban from '@drs/components/shared/DefectKanban';
 
 import {
   DndContext,
@@ -1359,6 +1360,7 @@ const VesselDashboard = () => {
   const [closureModalOpen, setClosureModalOpen] = useState(false);
   const [closureDefect, setClosureDefect] = useState(null);
   const [closureValidation, setClosureValidation] = useState(null);
+  const [viewMode, setViewMode] = useState('table');
   const [showEditorModal, setShowEditorModal] = useState(false);
   const [editorData, setEditorData] = useState({ defectId: null, to: [], cc: [], subject: '', body: '' });
   const [savingDraft, setSavingDraft] = useState(false);
@@ -1642,6 +1644,14 @@ const VesselDashboard = () => {
     }
 
     updateMutation.mutate({ id, updates: { [field]: value } });
+  };
+
+  const handleKanbanClose = (defect) => handleInlineUpdate(defect.id, 'status', 'CLOSED');
+
+  const handleKanbanCardClick = (defect) => {
+    hasNavigatedRef.current = null;
+    setViewMode('table');
+    setSearchParams({ highlightDefectId: defect.id });
   };
 
   const toggleFlagMutation = useMutation({
@@ -2569,7 +2579,21 @@ const VesselDashboard = () => {
           </div>
         </div>
 
-
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 16px 0' }}>
+          <div className="kanban-toggle">
+            <button type="button" className={viewMode === 'table' ? 'is-active' : ''} onClick={() => setViewMode('table')}>Table</button>
+            <button type="button" className={viewMode === 'board' ? 'is-active' : ''} onClick={() => setViewMode('board')}>Board</button>
+          </div>
+        </div>
+        {viewMode === 'board' ? (
+          <DefectKanban
+            defects={filteredData}
+            role={user?.role}
+            onCardClick={handleKanbanCardClick}
+            onRequestClose={handleKanbanClose}
+            onBlocked={(msg) => toast(msg, 'warning')}
+          />
+        ) : (<>
         <div className='table-scroll-wrapper'>
           <DndContext
             collisionDetection={closestCenter}
@@ -3960,6 +3984,7 @@ const VesselDashboard = () => {
             </div>
           </div>
         </div>
+        </>)}
 
 
         {/* ✅ Column Customization Modal */}

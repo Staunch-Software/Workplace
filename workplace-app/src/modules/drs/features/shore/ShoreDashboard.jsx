@@ -12,6 +12,7 @@ import ColumnCustomizationModal from '@drs/components/modals/ColumnCustomization
 import ShoreClosureModal from '@drs/components/modals/ShoreClosureModal';
 import ShoreReopenModal from '@drs/components/modals/ShoreReopenModal';
 import PrSyncManager from '@drs/components/shared/PrSyncManager';
+import DefectKanban from '@drs/components/shared/DefectKanban';
 
 import { defectApi } from '@drs/services/defectApi';
 import DefectImageSidebar from '@drs/components/shared/DefectImageSidebar';
@@ -1586,6 +1587,8 @@ const ShoreDashboard = () => {
   const [closureModalOpen, setClosureModalOpen] = useState(false);
   const [closureDefect, setClosureDefect] = useState(null);
   const [closureValidation, setClosureValidation] = useState(null);
+  const [viewMode, setViewMode] = useState('table');
+  const [reopenDefect, setReopenDefect] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [autoChatModes, setAutoChatModes] = useState({});
   const [isScrolled, setIsScrolled] = useState(false);
@@ -2428,6 +2431,29 @@ const ShoreDashboard = () => {
 
   };
 
+  const handleKanbanDecision = (defect, newStatus) => {
+    const accept = newStatus === 'CLOSED';
+    setConfirmModal({
+      message: `Are you sure you want to ${accept ? 'Accept & Close' : 'Reject'} this closure request?`,
+      danger: !accept,
+      onConfirm: async () => {
+        try {
+          await defectApi.updateDefect(defect.id, { status: newStatus });
+          queryClient.invalidateQueries(['defects']);
+          queryClient.invalidateQueries(['threads', defect.id]);
+        } catch (err) {
+          toast('Action failed: ' + err.message, 'error');
+        }
+      }
+    });
+  };
+
+  const handleKanbanCardClick = (defect) => {
+    hasNavigatedRef.current = null;
+    setViewMode('table');
+    setSearchParams({ highlightDefectId: defect.id });
+  };
+
   const toggleFlagMutation = useMutation({
     mutationFn: (defectId) => defectApi.toggleFlag(defectId),
     onMutate: async (defectId) => {
@@ -3121,6 +3147,22 @@ const ShoreDashboard = () => {
             </button>
           )} */}
         </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 16px 0' }}>
+          <div className="kanban-toggle">
+            <button type="button" className={viewMode === 'table' ? 'is-active' : ''} onClick={() => setViewMode('table')}>Table</button>
+            <button type="button" className={viewMode === 'board' ? 'is-active' : ''} onClick={() => setViewMode('board')}>Board</button>
+          </div>
+        </div>
+        {viewMode === 'board' ? (
+          <DefectKanban
+            defects={filteredData}
+            role={user?.role}
+            onCardClick={handleKanbanCardClick}
+            onApproveReject={handleKanbanDecision}
+            onRequestReopen={setReopenDefect}
+            onBlocked={(msg) => toast(msg, 'warning')}
+          />
+        ) : (<>
         <div className='table-scroll-wrapper'>
           <DndContext
             collisionDetection={closestCenter}
@@ -4509,6 +4551,7 @@ const ShoreDashboard = () => {
             </div>
           </div>
         </div>
+        </>)}
 
 
         {/* ✅ Column Customization Modal */}
@@ -4543,6 +4586,13 @@ const ShoreDashboard = () => {
             message={confirmModal.message}
             onConfirm={confirmModal.onConfirm}
             onCancel={() => setConfirmModal(null)}
+          />
+        )}
+        {reopenDefect && (
+          <ShoreReopenModal
+            defect={reopenDefect}
+            onClose={() => setReopenDefect(null)}
+            onSuccess={() => setReopenDefect(null)}
           />
         )}
         {closureModalOpen && closureDefect && (

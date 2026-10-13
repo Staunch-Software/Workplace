@@ -212,5 +212,7 @@ export const getStatusColor = (status) => {
   }
 };
 
+export const PRIORITY_COLORS = { CRITICAL: '#dc2626', HIGH: '#f97316', MEDIUM: '#2563eb', LOW: '#16a34a' };
+
 // ✅ Filter-only options (includes internal states for filtering)
 export const FILTER_STATUS_OPTIONS = ['OPEN', 'PENDING_CLOSURE', 'CLOSED'];
