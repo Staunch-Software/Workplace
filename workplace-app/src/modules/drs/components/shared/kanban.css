@@ -177,6 +177,39 @@
   cursor: pointer;
 }
 
+.kanban-chip--party {
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.kanban-chip--party.is-on {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #fff;
+}
+
+.kanban-tag {
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.kanban-tag--owner {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.kanban-board--vessels {
+  display: flex;
+  overflow-x: auto;
+  gap: 14px;
+}
+
+.kanban-board--vessels .kanban-col {
+  flex: 0 0 300px;
+}
+
 .kanban-filters__clear {
   border: 1px solid #ea580c;
   background: #fff;

@@ -52,7 +52,7 @@ const resolveDrop =(isShore, from, to) => {
   return { blocked: 'Vessels can only request closure of open defects.' };
 };
 
-const KanbanCard = ({ defect, draggable, onClick, overlay = false }) => {
+const KanbanCard = ({ defect, draggable, onClick, overlay = false, showStatus = false }) => {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: String(defect.id),
     data: { defect },
@@ -72,6 +72,10 @@ const KanbanCard = ({ defect, draggable, onClick, overlay = false }) => {
       <div className="kanban-card__top">
         <span className="kanban-card__id">{defect.defect_number || `#${defect.id}`}</span>
         <span className="kanban-card__icons">
+          {defect.is_owner && <span className="kanban-tag kanban-tag--owner">Owner</span>}
+          {showStatus && (
+            <StatusStageIcon size={14} color={getStatusColor(defect.status)} status={defect.status} title={defect.status} />
+          )}
           {defect.is_flagged && <Flag size={13} color="#dc2626" />}
           {defect.has_thread_messages && <Paperclip size={13} color="#64748b" />}
           {draggable && <GripVertical size={14} color="#94a3b8" />}
@@ -79,7 +83,7 @@ const KanbanCard = ({ defect, draggable, onClick, overlay = false }) => {
       </div>
       <div className="kanban-card__title">{defect.equipment_name || defect.title || 'Untitled defect'}</div>
       {defect.description && <div className="kanban-card__desc">{defect.description}</div>}
-      <div className="kanban-card__vessel">{defect.vessel_name || defect.vessel_imo}</div>
+      {!showStatus && <div className="kanban-card__vessel">{defect.vessel_name || defect.vessel_imo}</div>}
       <div className="kanban-card__foot">
         <span className="kanban-pill" style={{ background: `${priorityColor}1a`, color: priorityColor }}>
           <PrioritySignalBarsIcon size={12} color={priorityColor} level={PRIORITY_LEVEL[defect.priority]} />
@@ -174,21 +178,22 @@ const VesselSelect = ({ value, options, counts, onChange }) => {
   );
 };
 
-const KanbanColumn = ({ column, cards, canDrag, onCardClick, isOver }) => {
-  const { setNodeRef } = useDroppable({ id: column.id });
+const KanbanColumn = ({ column, cards, canDrag, onCardClick, isOver, byVessel }) => {
+  const { setNodeRef } = useDroppable({ id: column.id, disabled: byVessel });
   const color = getStatusColor(column.id);
+  const openCount = byVessel ? cards.filter((d) => d.status !== 'CLOSED').length : 0;
   return (
-    <div ref={setNodeRef} className={`kanban-col${isOver ? ' kanban-col--over' : ''}`}>
+    <div ref={setNodeRef} className={`kanban-col${isOver ? ' kanban-col--over' : ''}${byVessel ? ' kanban-col--vessel' : ''}`}>
       <div className="kanban-col__head">
         <span className="kanban-col__title">
-          <StatusStageIcon size={14} color={color} status={column.id} />
+          {byVessel ? <Ship size={15} color="#475569" /> : <StatusStageIcon size={14} color={color} status={column.id} />}
           {column.label}
         </span>
-        <span className="kanban-col__count">{cards.length}</span>
+        <span className="kanban-col__count">{byVessel ? `${openCount} open` : cards.length}</span>
       </div>
       <div className="kanban-col__body">
         {cards.map((d) => (
-          <KanbanCard key={d.id} defect={d} draggable={canDrag(d)} onClick={onCardClick} />
+          <KanbanCard key={d.id} defect={d} draggable={canDrag(d)} onClick={onCardClick} showStatus={byVessel} />
         ))}
         {cards.length === 0 && <div className="kanban-col__empty">No defects</div>}
       </div>
@@ -213,6 +218,10 @@ const DefectKanban = ({
 
   const [vesselFilter, setVesselFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState([]);
+  const [partyFilter, setPartyFilter] = useState([]);
+  const [groupBy, setGroupBy] = useState('vessel');
+  const [showClosed, setShowClosed] = useState(false);
+  const byVessel = groupBy === 'vessel';
 
   const vesselOptions = useMemo(
     () => [...new Set(defects.map((d) => d.vessel_name || d.vessel_imo).filter(Boolean))].sort(),
@@ -233,25 +242,48 @@ const DefectKanban = ({
       defects.filter(
         (d) =>
           (!vesselFilter || (d.vessel_name || d.vessel_imo) === vesselFilter) &&
-          (priorityFilter.length === 0 || priorityFilter.includes(d.priority))
+          (priorityFilter.length === 0 || priorityFilter.includes(d.priority)) &&
+          (partyFilter.length === 0 || partyFilter.includes(d.is_owner ? 'OWNER' : 'OTHER')) &&
+          (!byVessel || showClosed || d.status !== 'CLOSED')
       ),
-    [defects, vesselFilter, priorityFilter]
+    [defects, vesselFilter, priorityFilter, partyFilter, byVessel, showClosed]
   );
 
   const togglePriority = (p) =>
     setPriorityFilter((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
-  const hasFilters = vesselFilter !== '' || priorityFilter.length > 0;
+  const toggleParty = (p) =>
+    setPartyFilter((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+  const hasFilters = vesselFilter !== '' || priorityFilter.length > 0 || partyFilter.length > 0;
 
   const grouped = useMemo(() => {
+    if (byVessel) {
+      const g = {};
+      vesselOptions.forEach((v) => { g[v] = []; });
+      visibleDefects.forEach((d) => {
+        const v = d.vessel_name || d.vessel_imo;
+        if (g[v]) g[v].push(d);
+      });
+      const statusRank = { OPEN: 0, PENDING_CLOSURE: 1, CLOSED: 2 };
+      Object.values(g).forEach((list) =>
+        list.sort((a, b) => (statusRank[a.status] - statusRank[b.status]) || sortCards(a, b))
+      );
+      return g;
+    }
     const g = { OPEN: [], PENDING_CLOSURE: [], CLOSED: [] };
     visibleDefects.forEach((d) => {
       if (g[d.status]) g[d.status].push(d);
     });
     Object.values(g).forEach((list) => list.sort(sortCards));
     return g;
-  }, [visibleDefects]);
+  }, [visibleDefects, byVessel, vesselOptions]);
 
-  const canDrag = (d) => (isShore ? true : d.status === 'OPEN');
+  const columns = byVessel
+    ? vesselOptions
+        .filter((v) => (!vesselFilter || v === vesselFilter) && (!hasFilters || grouped[v]?.length > 0))
+        .map((v) => ({ id: v, label: v }))
+    : COLUMNS;
+
+  const canDrag = (d) => (byVessel ? false : isShore ? true : d.status === 'OPEN');
   const activeDefect = activeId ? defects.find((d) => String(d.id) === activeId) : null;
 
   const handleDragEnd = ({ active, over }) => {
@@ -274,6 +306,13 @@ const DefectKanban = ({
   return (
     <>
     <div className="kanban-filters">
+      <div className="kanban-filters__field">
+        <span>Group by</span>
+        <div className="kanban-toggle">
+          <button type="button" className={byVessel ? 'is-active' : ''} onClick={() => setGroupBy('vessel')}>Vessel</button>
+          <button type="button" className={!byVessel ? 'is-active' : ''} onClick={() => setGroupBy('status')}>Status</button>
+        </div>
+      </div>
       {vesselOptions.length > 1 && (
         <div className="kanban-filters__field">
           <span>Vessel</span>
@@ -300,8 +339,35 @@ const DefectKanban = ({
           })}
         </div>
       </div>
+      <div className="kanban-filters__field">
+        <span>Inform</span>
+        <div className="kanban-filters__chips">
+          {[['OWNER', 'Owner'], ['OTHER', 'Other']].map(([key, label]) => {
+            const on = partyFilter.includes(key);
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`kanban-chip kanban-chip--party${on ? ' is-on' : ''}`}
+                onClick={() => toggleParty(key)}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {byVessel && (
+        <button
+          type="button"
+          className={`kanban-chip kanban-chip--party${showClosed ? ' is-on' : ''}`}
+          onClick={() => setShowClosed((s) => !s)}
+        >
+          Show closed
+        </button>
+      )}
       {hasFilters && (
-        <button type="button" className="kanban-filters__clear" onClick={() => { setVesselFilter(''); setPriorityFilter([]); }}>
+        <button type="button" className="kanban-filters__clear" onClick={() => { setVesselFilter(''); setPriorityFilter([]); setPartyFilter([]); }}>
           Clear filters
         </button>
       )}
@@ -314,17 +380,19 @@ const DefectKanban = ({
       onDragCancel={() => { setActiveId(null); setOverId(null); }}
       onDragEnd={handleDragEnd}
     >
-      <div className="kanban-board">
-        {COLUMNS.map((col) => (
+      <div className={`kanban-board${byVessel ? ' kanban-board--vessels' : ''}`}>
+        {columns.map((col) => (
           <KanbanColumn
             key={col.id}
             column={col}
-            cards={grouped[col.id]}
+            cards={grouped[col.id] || []}
             canDrag={canDrag}
             onCardClick={onCardClick}
-            isOver={overId === col.id && activeDefect && activeDefect.status !== col.id}
+            byVessel={byVessel}
+            isOver={!byVessel && overId === col.id && activeDefect && activeDefect.status !== col.id}
           />
         ))}
+        {columns.length === 0 && <div className="kanban-col__empty">No defects match the filters</div>}
       </div>
       <DragOverlay>
         {activeDefect ? <KanbanCard defect={activeDefect} draggable overlay /> : null}
