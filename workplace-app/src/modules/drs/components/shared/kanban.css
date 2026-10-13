@@ -200,7 +200,7 @@
   color: #6d28d9;
 }
 
-.kanban-board--vessels {
+.kanban-board.kanban-board--vessels {
   display: flex;
   overflow-x: auto;
   gap: 14px;
@@ -208,6 +208,28 @@
 
 .kanban-board--vessels .kanban-col {
   flex: 0 0 300px;
+}
+
+.kanban-board.kanban-board--single {
+  display: block;
+  overflow-x: visible;
+}
+
+.kanban-board.kanban-board--single .kanban-col {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.kanban-board--single .kanban-col__body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  align-items: start;
+  max-height: none;
+  overflow: visible;
+}
+
+.kanban-board--single .kanban-col__empty {
+  grid-column: 1 / -1;
 }
 
 .kanban-filters__clear {

@@ -380,7 +380,7 @@ const DefectKanban = ({
       onDragCancel={() => { setActiveId(null); setOverId(null); }}
       onDragEnd={handleDragEnd}
     >
-      <div className={`kanban-board${byVessel ? ' kanban-board--vessels' : ''}`}>
+      <div className={`kanban-board${byVessel ? ' kanban-board--vessels' : ''}${byVessel && columns.length === 1 ? ' kanban-board--single' : ''}`}>
         {columns.map((col) => (
           <KanbanColumn
             key={col.id}
