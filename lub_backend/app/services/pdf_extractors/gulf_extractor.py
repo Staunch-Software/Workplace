@@ -585,8 +585,13 @@ def _parse_block_by_tokens(block: str, page_idx: int, seen_samples: set) -> Opti
 
 # ─── Main Extractor ──────────────────────────────────────────────────────────
 
-def extract(pdf) -> Optional[Dict[str, Any]]:
+def extract(pdf, skip_file_check: bool = False) -> Optional[Dict[str, Any]]:
     """
+    skip_file_check (default False = unchanged behaviour) is used ONLY by the single-page
+    matrix-cell upload as a fallback. A lone Gulf cylinder-oil page has neither the text
+    "gulf marine" (the logo is an image) nor a "Sample Location" row, so the file-level check
+    below can never pass for it. When True, that check is skipped; every per-page rule still applies.
+
     Receives an open pdfplumber PDF object and returns the standard
     extracted-report dictionary used by luboil_report_processor.py.
 
@@ -610,7 +615,7 @@ def extract(pdf) -> Optional[Dict[str, Any]]:
         if "gulf marine" in t or ("machinery unit" in t and "sample location" in t):
             doc_is_gulf = True
             break
-    if not doc_is_gulf:
+    if not doc_is_gulf and not skip_file_check:
         return None
 
     logger.info("Gulf Marine extractor activated.")
