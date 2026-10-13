@@ -12,8 +12,11 @@ import ColumnCustomizationModal from '@drs/components/modals/ColumnCustomization
 import ShoreClosureModal from '@drs/components/modals/ShoreClosureModal';
 import ShoreReopenModal from '@drs/components/modals/ShoreReopenModal';
 import PrSyncManager from '@drs/components/shared/PrSyncManager';
+import DefectKanban from '@drs/components/shared/DefectKanban';
 
 import { defectApi } from '@drs/services/defectApi';
+import DefectImageSidebar from '@drs/components/shared/DefectImageSidebar';
+import DefectImageGalleryModal from '@drs/components/shared/DefectImageGalleryModal';
 import { blobUploadService } from '@drs/services/blobUploadService';
 import { generateId } from '@drs/services/idGenerator';
 import { useAuth } from '@/context/AuthContext';
@@ -1248,25 +1251,69 @@ export const ThreadSection = ({ defectId, defectStatus, closureRemarks, closedAt
 };
 
 
-export const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStatus, onToggleRequired, readOnly = false }) => {
+export const BeforeAfterImageUpload = ({ defectId, defectNumber, type, isMandatory, defectStatus, onToggleRequired, readOnly = false }) => {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [files, setFiles] = useState([]);
-  const [previewImages, setPreviewImages] = useState([]);   // ✅ ADDED
+  const [previewImages, setPreviewImages] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
-  const [localPreviewIndex, setLocalPreviewIndex] = useState(null); // ✅ ADDED
+  const [localPreviewIndex, setLocalPreviewIndex] = useState(null);
+
+  const resolvedDefectNumber = useMemo(() => {
+    if (defectNumber) return defectNumber;
+    try {
+      const cache = queryClient.getQueryCache().findAll({ queryKey: ['defects'] });
+      for (const q of cache) {
+        if (Array.isArray(q.state?.data)) {
+          const found = q.state.data.find(d => d.id === defectId);
+          if (found?.defect_number) return found.defect_number;
+        }
+      }
+    } catch (e) {}
+    return '';
+  }, [defectNumber, defectId, queryClient]);
 
   const isClosed = defectStatus === 'CLOSED';
   const canEdit = !isClosed && !readOnly;
 
-  const { data: existingImages = [] } = useQuery({
-    queryKey: [`${type}-images`, defectId],
+  // Fetch both before and after images so the sidebar and full view show both
+  const { data: beforeImages = [] } = useQuery({
+    queryKey: ['before-images', defectId],
     queryFn: async () => {
-      const images = await defectApi.getDefectImages(defectId, type);
+      const images = await defectApi.getDefectImages(defectId, 'before');
       return images || [];
     }
   });
+
+  const { data: afterImages = [] } = useQuery({
+    queryKey: ['after-images', defectId],
+    queryFn: async () => {
+      const images = await defectApi.getDefectImages(defectId, 'after');
+      return images || [];
+    }
+  });
+
+  const beforeImagesMapped = useMemo(() => beforeImages.map(img => ({
+    id: img.id,
+    url: img.image_url,
+    name: img.file_name,
+    type: 'before',
+    sync_status: img.sync_status,
+    uploaded: true
+  })), [beforeImages]);
+
+  const afterImagesMapped = useMemo(() => afterImages.map(img => ({
+    id: img.id,
+    url: img.image_url,
+    name: img.file_name,
+    type: 'after',
+    sync_status: img.sync_status,
+    uploaded: true
+  })), [afterImages]);
+
+  const existingImagesMapped = type === 'before' ? beforeImagesMapped : afterImagesMapped;
+  const totalCount = existingImagesMapped.length;
 
   const handleFileChange = (e) => {
     if (!canEdit) return;
@@ -1329,22 +1376,15 @@ export const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStat
       toast('Images uploaded successfully!');
       setFiles([]);
       setPreviewImages([]);  // ✅ Clear previews after upload
-      queryClient.invalidateQueries([`${type}-images`, defectId]);
+      queryClient.invalidateQueries({ queryKey: [`${type}-images`, defectId] });
+      queryClient.invalidateQueries({ queryKey: ['before-images', defectId] });
+      queryClient.invalidateQueries({ queryKey: ['after-images', defectId] });
     } catch (err) {
       toast('Upload failed: ' + err.message, 'error');
     } finally {
       setIsUploading(false);
     }
   };
-
-  const existingImagesMapped = existingImages.map(img => ({
-    id: img.id,
-    url: img.image_url,
-    name: img.file_name,
-    uploaded: true
-  }));
-
-  const totalCount = existingImagesMapped.length;
 
   return (
     <div style={{ padding: '12px', background: isClosed ? '#f8fafc' : 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
@@ -1375,7 +1415,7 @@ export const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStat
                 userSelect: 'none'
               }}
             >
-              ⚠️ ALWAYS MANDATORY
+              ALWAYS MANDATORY
             </div>
           ) : (
             canEdit && onToggleRequired && (
@@ -1393,7 +1433,7 @@ export const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStat
                 }}
               >
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', border: isMandatory ? '2px solid #dc2626' : '2px solid #3b82f6', background: 'white' }} />
-                {isMandatory ? '⚠️ MANDATORY' : '📸 IMAGE REQUIRED'}
+                {isMandatory ? 'MANDATORY' : 'IMAGE REQUIRED'}
               </div>
             )
           )}
@@ -1488,19 +1528,29 @@ export const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStat
 
       {isMandatory && (
         <div className='closed-thread' style={{ marginTop: '8px', background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '4px', padding: '6px', fontSize: '10px', color: '#92400e', fontWeight: '600', textAlign: 'center' }}>
-          ⚠️ MANDATORY
+          MANDATORY
         </div>
       )}
 
+      {/* Enhanced Image Sidebar: shows BOTH Before and After */}
       {showSidebar && (
-        <ImageSidebar images={existingImagesMapped} onClose={() => setShowSidebar(false)} title={`${type === 'before' ? 'Before' : 'After'} Images`} />
+        <DefectImageSidebar
+          beforeImages={beforeImagesMapped}
+          afterImages={afterImagesMapped}
+          initialTab="all"
+          defectNumber={resolvedDefectNumber}
+          defectTitle={resolvedDefectNumber}
+          onClose={() => setShowSidebar(false)}
+        />
       )}
 
-      {/* ✅ ADDED: Local preview gallery modal (click filename to view) */}
+      {/* Local preview gallery modal (click filename to view) */}
       {localPreviewIndex !== null && (
-        <ImageGalleryModal
+        <DefectImageGalleryModal
           images={previewImages}
           initialIndex={localPreviewIndex}
+          defectNumber={resolvedDefectNumber}
+          defectTitle={resolvedDefectNumber}
           onClose={() => setLocalPreviewIndex(null)}
         />
       )}
@@ -1508,302 +1558,8 @@ export const BeforeAfterImageUpload = ({ defectId, type, isMandatory, defectStat
   );
 };
 
-const ImageGalleryModal = ({ images, initialIndex = 0, onClose }) => {
-  const [currentIndex, setCurrentIndex] = useState(initialIndex);
-
-  if (!images || images.length === 0) return null;
-
-  const handlePrev = () => setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-  const handleNext = () => setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0, 0, 0, 0.95)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999,
-        cursor: 'pointer'
-      }}
-    >
-      <button
-        onClick={(e) => { e.stopPropagation(); onClose(); }}
-        style={{
-          position: 'absolute',
-          top: '20px',
-          right: '20px',
-          background: 'white',
-          border: 'none',
-          borderRadius: '50%',
-          width: '40px',
-          height: '40px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-          zIndex: 10000
-        }}
-      >
-        <X size={20} />
-      </button>
-
-      {images.length > 1 && (
-        <>
-          <button
-            className='image-size-hearer'
-            onClick={(e) => { e.stopPropagation(); handlePrev(); }}
-            style={{
-              position: 'absolute',
-              left: '20px',
-              background: 'white',
-              border: 'none',
-              borderRadius: '50%',
-              width: '40px',
-              height: '40px',
-              cursor: 'pointer',
-              fontSize: '20px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
-            }}
-          >
-            ‹
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); handleNext(); }}
-            className='image-size-hearer'
-            style={{
-              position: 'absolute',
-              right: '20px',
-              background: 'white',
-              border: 'none',
-              borderRadius: '50%',
-              width: '40px',
-              height: '40px',
-              cursor: 'pointer',
-              fontSize: '20px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
-            }}
-          >
-            ›
-          </button>
-        </>
-      )}
-
-      <div style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-        <img
-          src={images[currentIndex].url}
-          alt={images[currentIndex].name}
-          style={{
-            maxWidth: '85vw',
-            maxHeight: '85vh',
-            objectFit: 'contain',
-            borderRadius: '8px'
-          }}
-        />
-        <p className='closure-hearder' style={{ color: 'white', marginTop: '15px', fontSize: '14px' }}>
-          {currentIndex + 1} / {images.length} - {images[currentIndex].name}
-        </p>
-      </div>
-    </div>
-  );
-};
-
-
-const ImageSidebar = ({ images, onClose, title }) => {
-  const [selectedIndex, setSelectedIndex] = useState(null);
-  const toast = useToast();
-  // ✅ Download image function
-  const handleDownload = async (img) => {
-    try {
-      console.log('📥 Downloading image:', img.name);
-
-      // Fetch the image as a blob
-      const response = await fetch(img.url);
-      const blob = await response.blob();
-
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = img.name || 'image.jpg';
-      document.body.appendChild(link);
-      link.click();
-
-      // Cleanup
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      console.log('✅ Download completed');
-    } catch (error) {
-      console.error('❌ Download failed:', error);
-      toast('Failed to download image', 'error');
-    }
-  };
-
-  return (
-    <>
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: '320px',
-          background: 'white',
-          boxShadow: '-4px 0 12px rgba(0,0,0,0.15)',
-          zIndex: 1000,
-          display: 'flex',
-          flexDirection: 'column',
-          borderLeft: '1px solid #e2e8f0'
-        }}
-      >
-        {/* Header */}
-        <div style={{
-          padding: '15px 20px',
-          borderBottom: '1px solid #e2e8f0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          background: '#f8fafc'
-        }}>
-          <h3 className='closure-hearder' style={{ margin: 0, fontSize: '15px', color: '#334155', fontWeight: '700' }}>
-            {title} ({images.length})
-          </h3>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: '#94a3b8',
-              padding: '4px',
-              display: 'flex'
-            }}
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Image List */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {images.map((img, idx) => (
-              <div
-                key={img.id}
-                style={{
-                  position: 'relative',
-                  borderRadius: '8px',
-                  overflow: 'visible', // ✅ Changed from 'hidden'
-                  border: '2px solid #e2e8f0',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {/* Image Container */}
-                <div
-                  style={{
-                    position: 'relative',
-                    borderRadius: '6px',
-                    overflow: 'hidden'
-                  }}
-                >
-                  {/* Image */}
-                  <img
-                    src={img.url}
-                    alt={img.name}
-                    onClick={() => setSelectedIndex(idx)}
-                    style={{
-                      width: '100%',
-                      height: '180px',
-                      objectFit: 'cover',
-                      cursor: 'pointer',
-                      display: 'block'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.parentElement.parentElement.style.borderColor = '#ea580c'}
-                    onMouseLeave={(e) => e.currentTarget.parentElement.parentElement.style.borderColor = '#e2e8f0'}
-                  />
-
-                  {/* Image name overlay */}
-                  <div style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
-                    padding: '8px',
-                    color: 'white',
-                    pointerEvents: 'none'
-                  }}>
-                    <p className='closure-remark' style={{
-                      margin: 0,
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }}>
-                      {img.name}
-                    </p>
-                  </div>
-
-                  {/* ✅ Download Button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDownload(img);
-                    }}
-                    style={{
-                      position: 'absolute',
-                      top: '-1px',
-                      right: '-1px',
-                      background: 'white',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '0px 0px 0px 50px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      zIndex: 10
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#ea580c';
-                      e.currentTarget.style.borderColor = '#ea580c';
-                      e.currentTarget.querySelector('svg').style.color = 'white';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'white';
-                      e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.querySelector('svg').style.color = '#334155';
-                    }}
-                    title="Download Image"
-                  >
-                    <Download size={13} style={{ color: '#334155', transition: 'color 0.2s' }} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Gallery Modal */}
-      {selectedIndex !== null && (
-        <ImageGalleryModal
-          images={images}
-          initialIndex={selectedIndex}
-          onClose={() => setSelectedIndex(null)}
-        />
-      )}
-    </>
-  );
-};
+export const ImageGalleryModal = (props) => <DefectImageGalleryModal {...props} />;
+export const ImageSidebar = (props) => <DefectImageSidebar {...props} />;
 
 
 const ShoreDashboard = () => {
@@ -1831,6 +1587,8 @@ const ShoreDashboard = () => {
   const [closureModalOpen, setClosureModalOpen] = useState(false);
   const [closureDefect, setClosureDefect] = useState(null);
   const [closureValidation, setClosureValidation] = useState(null);
+  const [viewMode, setViewMode] = useState('table');
+  const [reopenDefect, setReopenDefect] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [autoChatModes, setAutoChatModes] = useState({});
   const [isScrolled, setIsScrolled] = useState(false);
@@ -2673,6 +2431,29 @@ const ShoreDashboard = () => {
 
   };
 
+  const handleKanbanDecision = (defect, newStatus) => {
+    const accept = newStatus === 'CLOSED';
+    setConfirmModal({
+      message: `Are you sure you want to ${accept ? 'Accept & Close' : 'Reject'} this closure request?`,
+      danger: !accept,
+      onConfirm: async () => {
+        try {
+          await defectApi.updateDefect(defect.id, { status: newStatus });
+          queryClient.invalidateQueries(['defects']);
+          queryClient.invalidateQueries(['threads', defect.id]);
+        } catch (err) {
+          toast('Action failed: ' + err.message, 'error');
+        }
+      }
+    });
+  };
+
+  const handleKanbanCardClick = (defect) => {
+    hasNavigatedRef.current = null;
+    setViewMode('table');
+    setSearchParams({ highlightDefectId: defect.id });
+  };
+
   const toggleFlagMutation = useMutation({
     mutationFn: (defectId) => defectApi.toggleFlag(defectId),
     onMutate: async (defectId) => {
@@ -3366,6 +3147,22 @@ const ShoreDashboard = () => {
             </button>
           )} */}
         </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 16px 0' }}>
+          <div className="kanban-toggle">
+            <button type="button" className={viewMode === 'table' ? 'is-active' : ''} onClick={() => setViewMode('table')}>Table</button>
+            <button type="button" className={viewMode === 'board' ? 'is-active' : ''} onClick={() => setViewMode('board')}>Board</button>
+          </div>
+        </div>
+        {viewMode === 'board' ? (
+          <DefectKanban
+            defects={filteredData}
+            role={user?.role}
+            onCardClick={handleKanbanCardClick}
+            onApproveReject={handleKanbanDecision}
+            onRequestReopen={setReopenDefect}
+            onBlocked={(msg) => toast(msg, 'warning')}
+          />
+        ) : (<>
         <div className='table-scroll-wrapper'>
           <DndContext
             collisionDetection={closestCenter}
@@ -4440,9 +4237,10 @@ const ShoreDashboard = () => {
                                   {/* ✅ RIGHT COLUMN: Evidence & Requirements */}
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
 
-                                    {/* ✅ Image Upload Sections with Compact Toggle Badges */}
+                                    {/* Image Upload Sections with Compact Toggle Badges */}
                                     <BeforeAfterImageUpload
                                       defectId={defect.id}
+                                      defectNumber={defect.defect_number}
                                       type="before"
                                       isMandatory={defect.before_image_required}
                                       defectStatus={defect.status}
@@ -4450,6 +4248,7 @@ const ShoreDashboard = () => {
                                     />
                                     <BeforeAfterImageUpload
                                       defectId={defect.id}
+                                      defectNumber={defect.defect_number}
                                       type="after"
                                       isMandatory={true}
                                       defectStatus={defect.status}
@@ -4752,6 +4551,7 @@ const ShoreDashboard = () => {
             </div>
           </div>
         </div>
+        </>)}
 
 
         {/* ✅ Column Customization Modal */}
@@ -4786,6 +4586,13 @@ const ShoreDashboard = () => {
             message={confirmModal.message}
             onConfirm={confirmModal.onConfirm}
             onCancel={() => setConfirmModal(null)}
+          />
+        )}
+        {reopenDefect && (
+          <ShoreReopenModal
+            defect={reopenDefect}
+            onClose={() => setReopenDefect(null)}
+            onSuccess={() => setReopenDefect(null)}
           />
         )}
         {closureModalOpen && closureDefect && (

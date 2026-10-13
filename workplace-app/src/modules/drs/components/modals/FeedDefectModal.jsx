@@ -447,6 +447,7 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                 <div className="fm-images">
                   <BeforeAfterImageUpload
                     defectId={defect.id}
+                    defectNumber={defect.defect_number}
                     type="before"
                     isMandatory={defect.before_image_required}
                     defectStatus={defect.status}
@@ -454,6 +455,7 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                   />
                   <BeforeAfterImageUpload
                     defectId={defect.id}
+                    defectNumber={defect.defect_number}
                     type="after"
                     isMandatory={true}
                     defectStatus={defect.status}

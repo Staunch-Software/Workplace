@@ -159,6 +159,11 @@ async def sync_defect(
     try:
         if "vessel_imo" not in payload.data:
             payload.data["vessel_imo"] = payload.vessel_imo
+            
+        # FORCE after_image_required to True for ALL incoming defects from any vessel,
+        # even if they are running an older backend version.
+        payload.data["after_image_required"] = True
+        
         await SyncService.apply_snapshot(
             db, Defect, payload.entity_id, payload.version, payload.data, control_db=control_db
         )
