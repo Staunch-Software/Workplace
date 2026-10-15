@@ -1,0 +1,14 @@
+{
+  "name": "regenerate-ae-pdfs",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "One-off Playwright script to rebuild AE analytical PDFs into per-generator Azure paths",
+  "scripts": {
+    "dry-run": "node regenerate-ae-pdfs.mjs",
+    "execute": "node regenerate-ae-pdfs.mjs --execute"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

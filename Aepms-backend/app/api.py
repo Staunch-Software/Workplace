@@ -1057,6 +1057,7 @@ async def upload_generated_report(
         folder_base = ""
         imo_number = "unknown"
         report_month = "unknown"
+        generator_id = None
 
         if report_type == 'mainEngine':
             model = MonthlyReportHeader
@@ -1087,9 +1088,15 @@ async def upload_generated_report(
                 elif report_type == 'auxiliaryEngine':
                     imo_number = report.generator.imo_number
                     report_month = report.report_month
+                    generator_id = report.generator_id
 
         # 3. Construct Path
-        folder_path = f"{folder_base}/{imo_number}/{report_month}"
+        # AE: a vessel has several generators reporting the same month, so the
+        # generator id must be part of the path or their PDFs overwrite each other.
+        if report_type == 'auxiliaryEngine' and generator_id is not None:
+            folder_path = f"{folder_base}/{imo_number}/{generator_id}/{report_month}"
+        else:
+            folder_path = f"{folder_base}/{imo_number}/{report_month}"
         
         # 4. Stamp the current rule-set version into the filename.
         #    The tag is what marks a stored PDF as current, so the backend owns
