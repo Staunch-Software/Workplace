@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, ChevronLeft, ChevronRight, ChevronDown, ExternalLink, Flag, Lock, MailOpen, Pencil, Check } from 'lucide-react';
 import { defectApi } from '@drs/services/defectApi';
@@ -28,7 +28,20 @@ const OPTION_ROW_HEIGHT = 34;
 
 const ScrollableSelect = ({ value, options, onChange, disabled }) => {
   const [open, setOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
   const ref = useRef(null);
+
+  // Open towards whichever side has room inside the modal panel (it clips overflow).
+  useLayoutEffect(() => {
+    if (!open || !ref.current) return;
+    const panel = ref.current.closest('.feed-modal-panel');
+    const trigger = ref.current.getBoundingClientRect();
+    const panelRect = panel ? panel.getBoundingClientRect() : { left: 0, right: window.innerWidth };
+    const listWidth = 240;
+    const fitsRight = trigger.left + listWidth <= panelRect.right - 8;
+    const fitsLeft = trigger.right - listWidth >= panelRect.left + 8;
+    setAlignRight(!fitsRight && fitsLeft);
+  }, [open]);
 
   useEffect(() => {
     const close = (e) => {
@@ -50,7 +63,7 @@ const ScrollableSelect = ({ value, options, onChange, disabled }) => {
       </button>
       {open && !disabled && (
         <div
-          className="fm-scrollselect-list"
+          className={`fm-scrollselect-list${alignRight ? ' fm-scrollselect-list--right' : ''}`}
           style={{ maxHeight: `${VISIBLE_OPTION_COUNT * OPTION_ROW_HEIGHT}px` }}
         >
           {options.map(opt => (
@@ -410,13 +423,11 @@ const FeedDefectModalInner = ({
                     <span className="fm-label">Source</span>
                     <div className="fm-field-value">
                       {canEditFields ? (
-                        <select
-                          className="fm-edit-input"
-                          value={defect.defect_source || ''}
-                          onChange={(e) => updateField('defect_source', e.target.value)}
-                        >
-                          {DEFECT_SOURCE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                        </select>
+                        <ScrollableSelect
+                          value={defect.defect_source}
+                          options={DEFECT_SOURCE_OPTIONS}
+                          onChange={(val) => updateField('defect_source', val)}
+                        />
                       ) : (
                         <span className="fm-value">{defect.defect_source}</span>
                       )}
