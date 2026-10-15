@@ -403,8 +403,9 @@ export default function VesselReportsPage() {
                           <td className="rt-col-date">{fmtDate(r.job_start_date || r.report_date || r.job_date)}</td>
                           <td className="rt-col-date">{fmtDate(r.job_end_date || r.report_date || r.job_date)}</td>
                           <td>{r.job_type ? r.job_type.replace('Email (Graph API)', 'Email') : '—'}</td>
+                          <td>{r.job_category || '—'}</td>
                           <td style={{color:'#334155'}}>
-                            {(r.job_type?.toLowerCase().includes('email') || r.frequency?.toLowerCase() === 'daily') ? '—' : (r.approved_by || '—')}
+                            {r.job_type?.toLowerCase().includes('email') ? '—' : (r.approved_by || '—')}
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             {(() => {
