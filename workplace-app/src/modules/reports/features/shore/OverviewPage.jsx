@@ -11,13 +11,15 @@ import BulkDownloadModal from '../../components/BulkDownloadModal';
 import {
   ChevronDown, X, Paperclip, FileWarning, CalendarDays, Layers, Search,
   BarChart3, MessageSquare, Download, AlertCircle, Clock,
+  ChevronLeft, ChevronRight, RotateCcw,
 } from 'lucide-react';
 import '../../styles/Reports.css';
 import '../../styles/OverviewPage.css';
-import { compareReportNames } from '../../reportOrder';
+import { compareReportNames, normalizeReportName } from '../../reportOrder';
 import { fmtDateShort, fmtDate } from '@/utils/dateUtils';
 
 const FREQUENCIES = [
+  { id: 'DAILY',     label: 'Daily' },
   { id: 'WEEKLY',    label: 'Weekly' },
   { id: 'MONTHLY',  label: 'Monthly' },
   { id: 'QUARTERLY',label: 'Quarterly' },
@@ -46,6 +48,7 @@ const QUARTERS = [
 function normalizeFreq(f) {
   if (!f) return 'OTHER';
   const u = f.toUpperCase().replace(/[\s-]/g, '_');
+  if (u.includes('DAIL') || u === '1_DAY') return 'DAILY';
   if (u.includes('WEEK')) return 'WEEKLY';
   if (u.includes('MONTH') || u === '1_MONTH') return 'MONTHLY';
   if (u.includes('QUARTER') || u === '3_MONTH') return 'QUARTERLY';
@@ -73,16 +76,7 @@ function hasValidAttachment(attachments) {
 
 function normalizeName(name) {
   if (!name) return 'UNKNOWN';
-  // 1. Trim edges
-  // 2. Convert to uppercase
-  // 3. Condense multiple spaces to single space
-  // 4. Remove all spaces around any hyphens or dashes to merge "TECH -16" and "TECH-16"
-  let cleaned = name.trim().toUpperCase().replace(/\s+/g, ' ').replace(/\s*[-\u2013\u2014]\s*/g, '-');
-  // 5. Strip " REVIEW" suffix to merge "REPORT" and "REPORT REVIEW" variations
-  if (cleaned.endsWith(' REVIEW')) {
-    cleaned = cleaned.replace(/ REVIEW$/, '').trim();
-  }
-  return cleaned;
+  return normalizeReportName(name);
 }
 
 /* Monday on/before Jan 1 of `year` — start of ISO week 1. */
@@ -121,7 +115,41 @@ function buildYearWeeks(year) {
   return weeks;
 }
 
-function buildBuckets(frequency, year, monthIdx, quarterIdx) {
+function toIsoDate(d) {
+  if (!d) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function buildBuckets(frequency, year, monthIdx, quarterIdx, dailyEndDate = null, isAtLatest = true) {
+  if (frequency === 'DAILY') {
+    const refDate = dailyEndDate instanceof Date ? dailyEndDate : new Date();
+
+    const buckets = [];
+    for (let i = 4; i >= 0; i--) {
+      const d = new Date(refDate);
+      d.setDate(d.getDate() - i);
+
+      const start = new Date(d);
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(d);
+      end.setHours(23, 59, 59, 999);
+
+      const key = `d_${d.getFullYear()}_${d.getMonth() + 1}_${d.getDate()}`;
+      buckets.push({
+        key,
+        label: fmtDateShort(d),
+        sub: fmtDate(d),
+        start,
+        end,
+        isLatest: i === 0 && isAtLatest,
+      });
+    }
+    return buckets;
+  }
   if (frequency === 'WEEKLY') {
     const monthStart = new Date(year, monthIdx, 1);
     const monthEnd = new Date(year, monthIdx + 1, 0, 23, 59, 59);
@@ -145,6 +173,19 @@ function buildBuckets(frequency, year, monthIdx, quarterIdx) {
     start: new Date(year, startMonth, 1),
     end: new Date(year, endMonth, lastDay, 23, 59, 59),
   }];
+}
+
+function findDailyMatch(instances, bucket) {
+  const matches = instances.filter(r => {
+    const d = reportDate(r);
+    if (!d) return false;
+    return fmtDateShort(d) === bucket.label || (d >= bucket.start && d <= bucket.end);
+  });
+  if (matches.length === 0) return null;
+  const withAtt = matches.filter(r => hasValidAttachment(r.attachments));
+  const pool = withAtt.length > 0 ? withAtt : matches;
+  pool.sort((a, b) => (reportDate(a)?.getTime() || 0) - (reportDate(b)?.getTime() || 0));
+  return pool[pool.length - 1];
 }
 
 /* All instances landing inside one bucket, oldest first. A monthly/quarterly
@@ -316,12 +357,12 @@ function AttachmentPreviewModal({ report, onClose }) {
   );
 }
 
-function AttachmentIcon({ report, bucket, onOpen, viewerRole }) {
+function AttachmentIcon({ report, bucket, onOpen, viewerRole, showDate = true }) {
   return (
     <button
       type="button"
-      className="ovw-chip ovw-chip-has"
-      title={`${bucket.label}: ${fmtDateShort(reportDate(report))} — View attachment`}
+      className={`ovw-chip ovw-chip-has${!showDate ? ' ovw-chip-icon-only' : ''}`}
+      title={`${bucket?.label || ''}: ${fmtDateShort(reportDate(report))} — View attachment`}
       onClick={() => onOpen(report)}
     >
       <span className="ovw-chip-has-icon">
@@ -332,7 +373,7 @@ function AttachmentIcon({ report, bucket, onOpen, viewerRole }) {
           </span>
         )}
       </span>
-      <span>{fmtDateShort(reportDate(report))}</span>
+      {showDate && <span>{fmtDateShort(reportDate(report))}</span>}
     </button>
   );
 }
@@ -386,6 +427,7 @@ export default function OverviewPage() {
   const [search, setSearch] = useState('');
   const [previewReport, setPreviewReport] = useState(null);
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [dailyAnchorDate, setDailyAnchorDate] = useState(null);
 
   const { data: coreVessels = [] } = useQuery({
     queryKey: ['core-vessels'],
@@ -409,6 +451,65 @@ export default function OverviewPage() {
     () => reports.filter(r => normalizeFreq(r.frequency) === frequency),
     [reports, frequency]
   );
+
+  const latestDailyDate = useMemo(() => {
+    let latestTime = 0;
+    for (const r of reportsForFreq) {
+      const d = reportDate(r);
+      if (d && !isNaN(d.getTime()) && d.getTime() > latestTime) {
+        latestTime = d.getTime();
+      }
+    }
+    return latestTime > 0 ? new Date(latestTime) : new Date();
+  }, [reportsForFreq]);
+
+  const activeDailyEnd = useMemo(() => {
+    return dailyAnchorDate || latestDailyDate;
+  }, [dailyAnchorDate, latestDailyDate]);
+
+  const isAtLatestDaily = useMemo(() => {
+    if (!dailyAnchorDate) return true;
+    return (
+      dailyAnchorDate.getFullYear() === latestDailyDate.getFullYear() &&
+      dailyAnchorDate.getMonth() === latestDailyDate.getMonth() &&
+      dailyAnchorDate.getDate() === latestDailyDate.getDate()
+    );
+  }, [dailyAnchorDate, latestDailyDate]);
+
+  const handlePrevDaily = useCallback(() => {
+    const base = dailyAnchorDate || latestDailyDate;
+    const d = new Date(base);
+    d.setDate(d.getDate() - 5);
+    setDailyAnchorDate(d);
+  }, [dailyAnchorDate, latestDailyDate]);
+
+  const handleNextDaily = useCallback(() => {
+    if (isAtLatestDaily) return;
+    const base = dailyAnchorDate || latestDailyDate;
+    const d = new Date(base);
+    d.setDate(d.getDate() + 5);
+    if (d >= latestDailyDate) {
+      setDailyAnchorDate(null);
+    } else {
+      setDailyAnchorDate(d);
+    }
+  }, [dailyAnchorDate, latestDailyDate, isAtLatestDaily]);
+
+  const handleResetDaily = useCallback(() => {
+    setDailyAnchorDate(null);
+  }, []);
+
+  const handleDailyDatePicker = useCallback((e) => {
+    const val = e.target.value;
+    if (!val) return;
+    const [y, m, d] = val.split('-').map(Number);
+    const target = new Date(y, m - 1, d);
+    if (target >= latestDailyDate) {
+      setDailyAnchorDate(null);
+    } else {
+      setDailyAnchorDate(target);
+    }
+  }, [latestDailyDate]);
 
   const assignedImos = useMemo(() => {
     // ADMIN and SUPERUSER see the full fleet; VESSEL and SHORE are restricted to their assigned vessels
@@ -441,8 +542,8 @@ export default function OverviewPage() {
   }, [configs, frequency]);
 
   const buckets = useMemo(
-    () => buildBuckets(frequency, year, monthIdx, quarterIdx),
-    [frequency, year, monthIdx, quarterIdx]
+    () => buildBuckets(frequency, year, monthIdx, quarterIdx, activeDailyEnd, isAtLatestDaily),
+    [frequency, year, monthIdx, quarterIdx, activeDailyEnd, isAtLatestDaily]
   );
 
   const instanceIndex = useMemo(() => {
@@ -491,22 +592,34 @@ export default function OverviewPage() {
   const quarterOptions = QUARTERS.map(q => ({ id: q.id, label: q.label, sub: q.sub }));
 
   /* ── Stat counts ── */
+  const isDaily = frequency === 'DAILY';
+  const isWeekly = frequency === 'WEEKLY';
+  const hasSubCols = isWeekly || isDaily;
+  const displayYear = (isDaily && buckets.length > 0 && buckets[buckets.length - 1]?.start)
+    ? buckets[buckets.length - 1].start.getFullYear()
+    : year;
+
   const totalWithAttachments = useMemo(() => {
     let count = 0;
     reportNames.forEach(name => {
       vessels.forEach(v => {
         const instances = instanceIndex[name]?.[v.imo] || [];
-        buckets.forEach(b => {
-          // Count every attachment-bearing job shown in the cell, not just
-          // one per bucket -- matches the multi-icon display in AttachmentCell.
-          count += findMatches(instances, b.start, b.end).filter(m => hasValidAttachment(m.attachments)).length;
-        });
+        if (isDaily) {
+          buckets.forEach(b => {
+            const match = findDailyMatch(instances, b);
+            if (match && hasValidAttachment(match.attachments)) count++;
+          });
+        } else {
+          buckets.forEach(b => {
+            // Count every attachment-bearing job shown in the cell, not just
+            // one per bucket -- matches the multi-icon display in AttachmentCell.
+            count += findMatches(instances, b.start, b.end).filter(m => hasValidAttachment(m.attachments)).length;
+          });
+        }
       });
     });
     return count;
-  }, [reportNames, vessels, instanceIndex, buckets]);
-
-  const isWeekly = frequency === 'WEEKLY';
+  }, [reportNames, vessels, instanceIndex, buckets, isDaily]);
 
   /* Key of the bucket that contains today — used to underline current-week header */
   const currentWeekKey = useMemo(() => {
@@ -529,8 +642,8 @@ export default function OverviewPage() {
     const el = scrollRef.current;
     if (!el) return;
 
-    const totalDataCols = isWeekly ? vessels.length * buckets.length : vessels.length;
-    const baseWidth = isWeekly ? BASE_WEEK_COL_W : BASE_STD_COL_W;
+    const totalDataCols = hasSubCols ? vessels.length * buckets.length : vessels.length;
+    const baseWidth = isWeekly ? BASE_WEEK_COL_W : (isDaily ? 76 : BASE_STD_COL_W);
 
     const recompute = () => {
       if (totalDataCols === 0) { setDataColWidth(null); return; }
@@ -543,10 +656,10 @@ export default function OverviewPage() {
     const ro = new ResizeObserver(recompute);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [vessels.length, buckets.length, isWeekly, isLoading, reportNames.length]);
+  }, [vessels.length, buckets.length, hasSubCols, isWeekly, isDaily, isLoading, reportNames.length]);
 
-  const totalDataColsForWidth = isWeekly ? vessels.length * buckets.length : vessels.length;
-  const baseWidthForWidth = isWeekly ? BASE_WEEK_COL_W : BASE_STD_COL_W;
+  const totalDataColsForWidth = hasSubCols ? vessels.length * buckets.length : vessels.length;
+  const baseWidthForWidth = isWeekly ? BASE_WEEK_COL_W : (isDaily ? 76 : BASE_STD_COL_W);
   const actualDataColWidth = dataColWidth || baseWidthForWidth;
   const totalTableWidth = REPORT_COL_W + (totalDataColsForWidth * actualDataColWidth);
 
@@ -597,7 +710,7 @@ export default function OverviewPage() {
       {/* ── Control Bar ── */}
       <div className="ovw-control-bar">
         <div className="ovw-control-left">
-          <span className="ovw-year-chip">{year}</span>
+          <span className="ovw-year-chip">{displayYear}</span>
 
           {frequency === 'QUARTERLY' ? (
             <CompactSelect
@@ -606,6 +719,53 @@ export default function OverviewPage() {
               options={quarterOptions}
               onChange={handleQuarterChange}
             />
+          ) : frequency === 'DAILY' ? (
+            <div className="ovw-daily-nav-group">
+              <button
+                type="button"
+                className="ovw-nav-arrow-btn"
+                onClick={handlePrevDaily}
+                title="Previous 5 Days"
+              >
+                <ChevronLeft size={14} />
+              </button>
+
+              <label className="ovw-compact-select ovw-daily-picker-label" title="Click to pick an end date">
+                <span className="ovw-compact-select-icon"><CalendarDays size={13} /></span>
+                <span className="ovw-compact-select-value">
+                  {buckets.length > 0 ? `${buckets[0].label} – ${buckets[buckets.length - 1].label}` : 'Daily'}
+                </span>
+                <input
+                  type="date"
+                  className="ovw-hidden-date-input"
+                  value={toIsoDate(activeDailyEnd)}
+                  max={toIsoDate(latestDailyDate)}
+                  onChange={handleDailyDatePicker}
+                />
+              </label>
+
+              <button
+                type="button"
+                className="ovw-nav-arrow-btn"
+                onClick={handleNextDaily}
+                disabled={isAtLatestDaily}
+                title={isAtLatestDaily ? "Already at latest" : "Next 5 Days"}
+              >
+                <ChevronRight size={14} />
+              </button>
+
+              {!isAtLatestDaily && (
+                <button
+                  type="button"
+                  className="ovw-reset-latest-btn"
+                  onClick={handleResetDaily}
+                  title="Jump back to latest daily reports"
+                >
+                  <RotateCcw size={11} style={{ marginRight: 4 }} />
+                  Latest
+                </button>
+              )}
+            </div>
           ) : (
             <CompactSelect
               icon={<CalendarDays size={13} />}
@@ -691,13 +851,15 @@ export default function OverviewPage() {
             style={dataColWidth ? {
               '--ovw-cell-week-w': `${dataColWidth}px`,
               '--ovw-cell-std-w': `${dataColWidth}px`,
-            } : undefined}
+            } : (hasSubCols ? {
+              '--ovw-cell-week-w': `${actualDataColWidth}px`,
+            } : undefined)}
           >
             <table className="ovw-table" style={{ width: `${totalTableWidth}px` }}>
               <colgroup>
                 <col style={{ width: 'var(--ovw-col-report-w)', minWidth: 'var(--ovw-col-report-w)', maxWidth: 'var(--ovw-col-report-w)' }} />
                 {vessels.flatMap(v => 
-                  isWeekly 
+                  hasSubCols 
                     ? buckets.map(b => (
                         <col key={`${v.imo}-${b.key}`} style={{ width: 'var(--ovw-cell-week-w)', minWidth: 'var(--ovw-cell-week-w)', maxWidth: 'var(--ovw-cell-week-w)' }} />
                       ))
@@ -707,7 +869,7 @@ export default function OverviewPage() {
               <thead>
                 {/* ── Row 1: Report Name + Vessel Names ── */}
                 <tr className="ovw-thead-row1">
-                  <th className="ovw-th-report ovw-sticky-col" rowSpan={isWeekly ? 2 : 1}>
+                  <th className="ovw-th-report ovw-sticky-col" rowSpan={hasSubCols ? 2 : 1}>
                     <div className="ovw-th-report-inner">
                       <Layers size={13} className="ovw-th-icon" />
                       Report Name
@@ -717,7 +879,7 @@ export default function OverviewPage() {
                     <th
                       key={v.imo}
                       className="ovw-th-vessel"
-                      colSpan={isWeekly ? buckets.length : 1}
+                      colSpan={hasSubCols ? buckets.length : 1}
                     >
                       <div className="ovw-th-vessel-inner">
                         <span className="ovw-vessel-name">{v.name}</span>
@@ -727,20 +889,23 @@ export default function OverviewPage() {
                   ))}
                 </tr>
 
-                {/* ── Row 2 (Weekly only): W1 W2 W3 W4 sub-headers ── */}
-                {isWeekly && (
+                {/* ── Row 2 (Weekly & Daily): Sub-headers ── */}
+                {hasSubCols && (
                   <tr className="ovw-thead-row2">
                     {vessels.map(v =>
-                      buckets.map(b => (
-                        <th
-                          key={`${v.imo}-${b.key}`}
-                          className={`ovw-th-week${b.key === currentWeekKey ? ' ovw-th-week-current' : ''}`}
-                          title={`Week ${b.number} · ${b.sub}`}
-                        >
-                          {b.label}
-                          {b.key === currentWeekKey && <span className="ovw-current-week-dot" />}
-                        </th>
-                      ))
+                      buckets.map(b => {
+                        const isCurrent = isWeekly ? b.key === currentWeekKey : b.isLatest;
+                        return (
+                          <th
+                            key={`${v.imo}-${b.key}`}
+                            className={`ovw-th-week${isCurrent ? ' ovw-th-week-current' : ''}`}
+                            title={isDaily ? b.sub : `Week ${b.number} · ${b.sub}`}
+                          >
+                            {b.label}
+                            {isCurrent && <span className="ovw-current-week-dot" />}
+                          </th>
+                        );
+                      })
                     )}
                   </tr>
                 )}
@@ -761,7 +926,7 @@ export default function OverviewPage() {
                           <td
                             key={v.imo}
                             className="ovw-td-cell ovw-cell-na"
-                            colSpan={isWeekly ? buckets.length : 1}
+                            colSpan={hasSubCols ? buckets.length : 1}
                           >
                             <span className="ovw-na-text">N/A</span>
                           </td>
@@ -769,6 +934,27 @@ export default function OverviewPage() {
                       }
 
                       const instances = instanceIndex[name]?.[v.imo] || [];
+
+                      if (isDaily) {
+                        return buckets.map(b => {
+                          const match = findDailyMatch(instances, b);
+                          return (
+                            <td key={`${v.imo}-${b.key}`} className="ovw-td-cell ovw-td-week">
+                              {match && hasValidAttachment(match.attachments) ? (
+                                <AttachmentIcon
+                                  report={match}
+                                  bucket={{ label: b.label }}
+                                  onOpen={handleOpenReport}
+                                  viewerRole={user?.role}
+                                  showDate={false}
+                                />
+                              ) : (
+                                <div className="ovw-chip-empty" />
+                              )}
+                            </td>
+                          );
+                        });
+                      }
 
                       if (isWeekly) {
                         return buckets.map(b => (

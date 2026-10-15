@@ -14,7 +14,7 @@ import '../../styles/ReportConfigPage.css';
 import { compareReportNames } from '../../reportOrder';
 
 const EMPTY_FORM = { vessel_name: '', vessel_imo: '', report_name: '', department: 'DECK', frequency: 'MONTHLY' };
-const FREQS = ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'YEARLY', 'OTHER'];
+const FREQS = ['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'YEARLY', 'OTHER'];
 
 const CustomSelect = ({ value, onChange, options, placeholder }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -271,7 +271,7 @@ export default function ReportConfigPage() {
                   <form className="rcfg-form-row" onSubmit={e => { 
                     e.preventDefault(); 
                     if (!addForm.report_name) return; 
-                    const freqPrefix = { 'WEEKLY': 'WK', 'MONTHLY': 'MO', 'QUARTERLY': 'QT', 'HALF_YEARLY': 'HY', 'YEARLY': 'YR' }[addForm.frequency || 'MONTHLY'] || 'XX';
+                    const freqPrefix = { 'DAILY': 'DY', 'WEEKLY': 'WK', 'MONTHLY': 'MO', 'QUARTERLY': 'QT', 'HALF_YEARLY': 'HY', 'YEARLY': 'YR' }[addForm.frequency || 'MONTHLY'] || 'XX';
                     const nameSnippet = addForm.report_name.substring(0, 30).trim().replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
                     const genCode = `${freqPrefix}-XX-${nameSnippet}`;
                     addMutation.mutate({ ...addForm, report_code: genCode, vessel_name: activeVessel.name, vessel_imo: activeVessel.imo }); 

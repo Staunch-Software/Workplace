@@ -8,10 +8,23 @@ import VesselThreadPanel from "../../components/VesselThreadPanel";
 import ReportViewerModal from "../../components/ReportViewerModal";
 import { FileText, MessageSquare, Search, X, WifiOff, ChevronRight, Paperclip, AlertTriangle, CalendarClock } from "lucide-react";
 import "../../styles/Reports.css";
-import { compareReportNames } from "../../reportOrder";
+import { compareReportNames, normalizeReportName } from "../../reportOrder";
 import { fmtDate } from "@/utils/dateUtils";
 
+function normalizeFreq(f) {
+  if (!f) return 'OTHER';
+  const u = f.toUpperCase().replace(/[\s-]/g, '_');
+  if (u.includes('DAIL') || u === '1_DAY') return 'DAILY';
+  if (u.includes('WEEK')) return 'WEEKLY';
+  if (u.includes('MONTH') || u === '1_MONTH') return 'MONTHLY';
+  if (u.includes('QUARTER') || u === '3_MONTH') return 'QUARTERLY';
+  if (u.includes('HALF') || u === '6_MONTH') return 'HALF_YEARLY';
+  if (u.includes('YEAR') || u === '12_MONTH') return 'YEARLY';
+  return 'OTHER';
+}
+
 const FREQUENCIES = [
+  { id: 'DAILY', label: 'DAILY' },
   { id: 'WEEKLY', label: 'WEEKLY' },
   { id: 'MONTHLY', label: 'MONTHLY' },
   { id: 'QUARTERLY', label: 'QUARTERLY' },
@@ -21,7 +34,7 @@ const FREQUENCIES = [
 
 
 export default function VesselReportsPage() {
-  const [expandedFreqs, setExpandedFreqs] = useState(['WEEKLY', 'MONTHLY']);
+  const [expandedFreqs, setExpandedFreqs] = useState(['DAILY', 'WEEKLY', 'MONTHLY']);
   const [selectedReportName, setSelectedReportName] = useState('');
   const [search, setSearch] = useState("");
   const [sidebarSearch, setSidebarSearch] = useState("");
@@ -92,10 +105,8 @@ export default function VesselReportsPage() {
     const map = {};
     
     reports.forEach(r => {
-      let f = (r.frequency || 'OTHER').toUpperCase().replace(/[-\s]/g, '_');
-      if (f === 'HALF YEARLY') f = 'HALF_YEARLY';
-      
-      const name = r.report_name || 'Unknown Report';
+      const f = normalizeFreq(r.frequency);
+      const name = normalizeReportName(r.report_name);
       if (!map[f]) map[f] = {};
       if (!map[f][name]) map[f][name] = [];
       map[f][name].push(r);
@@ -116,7 +127,7 @@ export default function VesselReportsPage() {
   // Auto-select first report if none selected
   useEffect(() => {
     if (reports.length > 0) {
-      const currentExists = reports.some(r => r.report_name === selectedReportName);
+      const currentExists = reports.some(r => normalizeReportName(r.report_name) === selectedReportName);
       if (!currentExists || !selectedReportName) {
         for (let freq of displayFreqs) {
           const names = getSortedNames(freq.id);
@@ -140,6 +151,11 @@ export default function VesselReportsPage() {
     );
   };
 
+  function reportDate(r) {
+    const d = r.report_date || r.due_date || r.job_date || r.job_end_date || r.created_at;
+    return d ? new Date(d) : null;
+  }
+
   const tableData = useMemo(() => {
     if (!selectedReportName) return [];
     let jobs = [];
@@ -151,12 +167,13 @@ export default function VesselReportsPage() {
     const rows = jobs.filter(r => {
       const matchesSearch = !search || 
         r.job_order_no?.toLowerCase().includes(search.toLowerCase()) ||
-        r.report_code?.toLowerCase().includes(search.toLowerCase());
+        r.report_code?.toLowerCase().includes(search.toLowerCase()) ||
+        fmtDate(reportDate(r))?.toLowerCase().includes(search.toLowerCase());
       return matchesSearch;
     });
     return rows.sort((a, b) => {
-      const dateA = new Date(a.due_date || a.job_date || a.created_at || 0).getTime();
-      const dateB = new Date(b.due_date || b.job_date || b.created_at || 0).getTime();
+      const dateA = reportDate(a)?.getTime() || 0;
+      const dateB = reportDate(b)?.getTime() || 0;
       return dateB - dateA;
     });
   }, [treeData, selectedReportName, search]);
@@ -372,7 +389,7 @@ export default function VesselReportsPage() {
                              )}
                              {r.job_order_no || r.report_code}
                           </td>
-                          <td className="rt-col-date">{fmtDate(r.due_date)}</td>
+                          <td className="rt-col-date">{fmtDate(r.report_date || r.due_date || r.job_date)}</td>
                           <td className="rt-col-date">{fmtDate(r.next_due_date)}</td>
                           <td>
                             {isPending ? (
@@ -383,9 +400,9 @@ export default function VesselReportsPage() {
                               r.job_status || '—'
                             )}
                           </td>
-                          <td className="rt-col-date">{fmtDate(r.job_start_date)}</td>
-                          <td className="rt-col-date">{fmtDate(r.job_end_date)}</td>
-                          <td>{r.job_type || '—'}</td>
+                          <td className="rt-col-date">{fmtDate(r.job_start_date || r.report_date || r.job_date)}</td>
+                          <td className="rt-col-date">{fmtDate(r.job_end_date || r.report_date || r.job_date)}</td>
+                          <td>{r.job_type ? r.job_type.replace('Email (Graph API)', 'Email') : '—'}</td>
                           <td>{r.job_category || '—'}</td>
                           <td style={{color:'#334155'}}>{r.approved_by || '—'}</td>
                           <td style={{ textAlign: 'center' }}>
@@ -401,6 +418,7 @@ export default function VesselReportsPage() {
                                     setModalOpen(true);
                                   }}
                                   title={hasAttachment ? 'View Attachment' : 'View / Open Thread'}
+                                  style={hasAttachment ? { color: '#059669' } : undefined}
                                 >
                                   {hasAttachment ? <Paperclip size={16} /> : <MessageSquare size={16} />}
                                 </button>

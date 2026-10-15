@@ -13,7 +13,8 @@ def _make_entry(sr, title, rtype, freq) -> dict:
     def normalize_freq(freq):
         if freq:
             f = str(freq).strip()
-            if f.lower() == "1 month": f = "Monthly"
+            if f.lower() in ("1 day", "daily"): f = "Daily"
+            elif f.lower() == "1 month": f = "Monthly"
             elif f.lower() == "3 month": f = "Quarterly"
             elif f.lower() == "6 month": f = "Half-Yearly"
             elif f.lower() == "12 month": f = "Yearly"
@@ -33,7 +34,7 @@ def _make_entry(sr, title, rtype, freq) -> dict:
         dept = "ELECTRICAL"
 
     # Build a clean report_code from sr + frequency prefix
-    freq_prefix = {"Weekly": "WK", "Monthly": "MO", "Quarterly": "QT", "Half-Yearly": "HY", "Yearly": "YR"}.get(freq, "XX")
+    freq_prefix = {"Daily": "DY", "Weekly": "WK", "Monthly": "MO", "Quarterly": "QT", "Half-Yearly": "HY", "Yearly": "YR"}.get(freq, "XX")
     report_code = f"{freq_prefix}-{str(sr).zfill(2)}-{title[:30].strip().replace(' ', '_')}"
 
     return {
