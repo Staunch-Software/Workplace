@@ -283,6 +283,8 @@ const DefectKanban = ({
         .map((v) => ({ id: v, label: v }))
     : COLUMNS;
 
+  const orderedDefects = columns.flatMap((c) => grouped[c.id] || []);
+
   const canDrag = (d) => (byVessel ? false : isShore ? true : d.status === 'OPEN');
   const activeDefect = activeId ? defects.find((d) => String(d.id) === activeId) : null;
 
@@ -387,7 +389,7 @@ const DefectKanban = ({
             column={col}
             cards={grouped[col.id] || []}
             canDrag={canDrag}
-            onCardClick={onCardClick}
+            onCardClick={(d) => onCardClick?.(d, orderedDefects)}
             byVessel={byVessel}
             isOver={!byVessel && overId === col.id && activeDefect && activeDefect.status !== col.id}
           />

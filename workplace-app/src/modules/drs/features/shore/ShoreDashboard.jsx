@@ -13,6 +13,7 @@ import ShoreClosureModal from '@drs/components/modals/ShoreClosureModal';
 import ShoreReopenModal from '@drs/components/modals/ShoreReopenModal';
 import PrSyncManager from '@drs/components/shared/PrSyncManager';
 import DefectKanban from '@drs/components/shared/DefectKanban';
+import FeedDefectModal from '@drs/components/modals/FeedDefectModal';
 
 import { defectApi } from '@drs/services/defectApi';
 import DefectImageSidebar from '@drs/components/shared/DefectImageSidebar';
@@ -1589,6 +1590,7 @@ const ShoreDashboard = () => {
   const [closureValidation, setClosureValidation] = useState(null);
   const [viewMode, setViewMode] = useState('table');
   const [reopenDefect, setReopenDefect] = useState(null);
+  const [boardModal, setBoardModal] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [autoChatModes, setAutoChatModes] = useState({});
   const [isScrolled, setIsScrolled] = useState(false);
@@ -2448,10 +2450,9 @@ const ShoreDashboard = () => {
     });
   };
 
-  const handleKanbanCardClick = (defect) => {
-    hasNavigatedRef.current = null;
-    setViewMode('table');
-    setSearchParams({ highlightDefectId: defect.id });
+  const handleKanbanCardClick = (defect, ordered = []) => {
+    const ids = ordered.length ? ordered.map(d => d.id) : [defect.id];
+    setBoardModal({ ids, index: Math.max(0, ids.indexOf(defect.id)) });
   };
 
   const toggleFlagMutation = useMutation({
@@ -4586,6 +4587,15 @@ const ShoreDashboard = () => {
             message={confirmModal.message}
             onConfirm={confirmModal.onConfirm}
             onCancel={() => setConfirmModal(null)}
+          />
+        )}
+        {boardModal && (
+          <FeedDefectModal
+            mode="board"
+            items={boardModal.ids.map(id => ({ id, defect_id: id }))}
+            index={boardModal.index}
+            onIndexChange={(i) => setBoardModal(m => ({ ...m, index: i }))}
+            onClose={() => setBoardModal(null)}
           />
         )}
         {reopenDefect && (
