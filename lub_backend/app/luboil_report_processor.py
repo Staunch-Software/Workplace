@@ -237,6 +237,23 @@ async def save_luboil_report(
         logger.error(f"PDF Extraction Failed: {e}", exc_info=True)
         raise
 
+    # Single-page drop only: a lone Gulf cylinder-oil page has no "gulf marine" text and no
+    # "Sample Location" row, so the Gulf extractor's file-level check rejects it. If the normal
+    # extraction found nothing, retry the Gulf extractor with that one check skipped (its
+    # per-page rules still apply). Full-report uploads never take this path.
+    if single_page_mode and (not extracted_data or not extracted_data.get('machineries')):
+        try:
+            import pdfplumber
+            from app.services.pdf_extractors import gulf_extractor
+            pdf_file_stream.seek(0)
+            with pdfplumber.open(pdf_file_stream) as _retry_pdf:
+                gulf_retry = gulf_extractor.extract(_retry_pdf, skip_file_check=True)
+            if gulf_retry and gulf_retry.get('machineries'):
+                logger.info("Single-page upload: Gulf extractor fallback found the sample.")
+                extracted_data = gulf_retry
+        except Exception as e:
+            logger.warning(f"Single-page Gulf fallback failed: {e}")
+
     if not extracted_data:
         raise ValueError(f"PDF parser returned no data for '{filename}'. The file may be corrupted, password-protected, or in an unsupported format.")
 

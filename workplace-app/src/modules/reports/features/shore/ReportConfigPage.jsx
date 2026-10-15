@@ -14,7 +14,7 @@ import '../../styles/ReportConfigPage.css';
 import { compareReportNames } from '../../reportOrder';
 
 const EMPTY_FORM = { vessel_name: '', vessel_imo: '', report_name: '', department: 'DECK', frequency: 'MONTHLY' };
-const FREQS = ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'YEARLY', 'OTHER'];
+const FREQS = ['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'YEARLY', 'OTHER'];
 
 const CustomSelect = ({ value, onChange, options, placeholder }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -80,6 +80,23 @@ export default function ReportConfigPage() {
   });
 
   // ── Mutations ──
+  const [isAssigningAll, setIsAssigningAll] = useState(false);
+
+  const handleAssignAll = async () => {
+    if (!coreVessels.length) return;
+    setIsAssigningAll(true);
+    try {
+      for (const v of coreVessels) {
+        await reportsApi.bulkAssignVessel(v.imo, v.name);
+      }
+      queryClient.invalidateQueries(['report-configs']);
+    } catch (err) {
+      console.error('Bulk assign all failed:', err);
+    } finally {
+      setIsAssigningAll(false);
+    }
+  };
+
   const registerMutation = useMutation({
     mutationFn: (data) => reportsApi.bulkAssignVessel(data.vessel_imo, data.vessel_name),
     onSuccess: (_, variables) => {
@@ -179,7 +196,15 @@ export default function ReportConfigPage() {
           </div>
         </div>
 
-        <div className="rcfg-header-actions">
+        <div className="rcfg-header-actions" style={{ display: 'flex', gap: '8px' }}>
+          <button 
+            className="rcfg-btn rcfg-btn--primary" 
+            onClick={handleAssignAll} 
+            disabled={isAssigningAll || coreVesselsLoading}
+            title="Bulk assign all 45 master default reports to all vessels"
+          >
+            <Zap size={14} /> {isAssigningAll ? 'Assigning All...' : 'Assign Defaults to All Vessels'}
+          </button>
           <button className="rcfg-btn rcfg-btn--ghost" onClick={() => refetch()}>
             <RefreshCcw size={15} /> Refresh
           </button>
@@ -258,7 +283,7 @@ export default function ReportConfigPage() {
                     onClick={() => registerMutation.mutate({ vessel_imo: activeVessel.imo, vessel_name: activeVessel.name })}
                     disabled={registerMutation.isPending}
                   >
-                    <Zap size={14} /> {registerMutation.isPending ? 'Assigning...' : 'Assign 40 Defaults'}
+                    <Zap size={14} /> {registerMutation.isPending ? 'Assigning...' : 'Assign Defaults (45)'}
                   </button>
                   <button className="rcfg-btn rcfg-btn--ghost" onClick={() => setShowAddForm(!showAddForm)}>
                     <Plus size={14} /> Add Custom Target
@@ -271,7 +296,7 @@ export default function ReportConfigPage() {
                   <form className="rcfg-form-row" onSubmit={e => { 
                     e.preventDefault(); 
                     if (!addForm.report_name) return; 
-                    const freqPrefix = { 'WEEKLY': 'WK', 'MONTHLY': 'MO', 'QUARTERLY': 'QT', 'HALF_YEARLY': 'HY', 'YEARLY': 'YR' }[addForm.frequency || 'MONTHLY'] || 'XX';
+                    const freqPrefix = { 'DAILY': 'DY', 'WEEKLY': 'WK', 'MONTHLY': 'MO', 'QUARTERLY': 'QT', 'HALF_YEARLY': 'HY', 'YEARLY': 'YR' }[addForm.frequency || 'MONTHLY'] || 'XX';
                     const nameSnippet = addForm.report_name.substring(0, 30).trim().replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
                     const genCode = `${freqPrefix}-XX-${nameSnippet}`;
                     addMutation.mutate({ ...addForm, report_code: genCode, vessel_name: activeVessel.name, vessel_imo: activeVessel.imo }); 

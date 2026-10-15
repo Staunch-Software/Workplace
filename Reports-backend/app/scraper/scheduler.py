@@ -14,6 +14,7 @@ from apscheduler.triggers.cron import CronTrigger
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.scraper.smartpal_scraper import run_scraper
+from app.scraper.mail_graph_fetcher import run_mail_fetcher
 
 logger = logging.getLogger("scheduler")
 
@@ -25,8 +26,12 @@ async def _scraper_job():
     Wrapper called by APScheduler.
     Opens a DB session, runs the scraper, then closes the session.
     """
-    logger.info("[CRON] SmartPAL scraper job triggered.")
+    logger.info("[CRON] SmartPAL + Mail scraper job triggered.")
     async with SessionLocal() as db:
+        try:
+            await run_mail_fetcher(db, days_back=7, create_events=True)
+        except Exception as e:
+            logger.error(f"[CRON] Mail fetcher job failed: {e}")
         try:
             # smart_cron=True: only scrapes configs that are actually due
             # (new / pending / next_due_date reached) instead of all configs

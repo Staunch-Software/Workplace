@@ -121,6 +121,7 @@ class ReportListOut(BaseModel):
     due_hours:      Optional[float]
     job_start_date: Optional[datetime]
     job_end_date:   Optional[datetime]
+    job_date:       Optional[datetime] = None
     report_date:        Optional[datetime]
     report_date_source: Optional[str]
     scrape_status:  ScrapeStatus

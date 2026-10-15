@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from app.core.database import SessionLocal           # FIX: was AsyncSessionLocal (does not exist)
 from app.scraper.smartpal_scraper import run_scraper
+from app.scraper.mail_graph_fetcher import run_mail_fetcher
 from app.services.aepms_push import push_pending_reports
 from app.services.mail_service import process_and_email_pending_attachments
 
@@ -42,6 +43,14 @@ def _release_lock():
 
 
 async def main():
+    logger.info("Starting Mail Graph API Fetcher for Daily Reports...")
+    async with SessionLocal() as db:
+        try:
+            await run_mail_fetcher(db, days_back=7, create_events=True)
+        except Exception as e:
+            logger.error(f"Mail Graph API Fetcher step failed: {e}")
+    logger.info("Mail Graph API Fetcher COMPLETE.")
+
     logger.info("Starting Smart Scrape Cron Job...")
     async with SessionLocal() as db:
         # run_scraper with smart_cron=True handles querying latest rows and filtering them.

@@ -14,18 +14,19 @@ import {
   Ship, Filter, Search, ChevronDown, ChevronRight, X, CheckCircle2, Clock, AlertCircle, Paperclip, AlertTriangle, CalendarClock, MessageSquare, Download, Upload
 } from 'lucide-react';
 import '../../styles/Reports.css';
-import { compareReportNames } from '../../reportOrder';
+import { compareReportNames, normalizeReportName } from '../../reportOrder';
 import { fmtDate } from '@/utils/dateUtils';
 
-const FREQ_ORDER = ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'YEARLY', 'OTHER'];
+const FREQ_ORDER = ['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'YEARLY', 'OTHER'];
 const FREQ_LABELS = {
-  WEEKLY: 'Weekly', MONTHLY: 'Monthly', QUARTERLY: 'Quarterly',
+  DAILY: 'Daily', WEEKLY: 'Weekly', MONTHLY: 'Monthly', QUARTERLY: 'Quarterly',
   HALF_YEARLY: 'Half-Yearly', YEARLY: 'Yearly', OTHER: 'Other',
 };
 
 function normalizeFreq(f) {
   if (!f) return 'OTHER';
   const u = f.toUpperCase().replace(/[\s-]/g, '_');
+  if (u.includes('DAIL') || u === '1_DAY') return 'DAILY';
   if (u.includes('WEEK')) return 'WEEKLY';
   if (u.includes('MONTH') || u === '1_MONTH') return 'MONTHLY';
   if (u.includes('QUARTER') || u === '3_MONTH') return 'QUARTERLY';
@@ -49,7 +50,7 @@ export default function ShoreReportsPage() {
   const { user } = useAuth();
 
   const [selectedImo, setSelectedImo] = useState('');
-  const [expandedFreqs, setExpandedFreqs] = useState(['WEEKLY', 'MONTHLY']);
+  const [expandedFreqs, setExpandedFreqs] = useState(['DAILY', 'WEEKLY', 'MONTHLY']);
   const [selectedReportName, setSelectedReportName] = useState('');
   const [search, setSearch] = useState('');
   const [sidebarSearch, setSidebarSearch] = useState('');
@@ -192,7 +193,7 @@ export default function ShoreReportsPage() {
     // ONLY add reports that actually have data for this vessel
     vesselReports.forEach(r => {
       const f = normalizeFreq(r.frequency);
-      const name = r.report_name || 'Unknown';
+      const name = normalizeReportName(r.report_name);
       if (!map[f]) map[f] = {};
       if (!map[f][name]) map[f][name] = [];
       map[f][name].push(r);
@@ -238,6 +239,11 @@ export default function ShoreReportsPage() {
     setSelectedRow(null);
   }, []);
 
+function reportDate(r) {
+  const d = r.report_date || r.due_date || r.job_date || r.job_end_date || r.created_at;
+  return d ? new Date(d) : null;
+}
+
   // Table rows for selected report name
   const tableData = useMemo(() => {
     if (!selectedReportName) return [];
@@ -252,11 +258,12 @@ export default function ShoreReportsPage() {
       .filter(r => !q ||
         r.job_order_no?.toLowerCase().includes(q) ||
         r.report_code?.toLowerCase().includes(q) ||
-        r.approved_by?.toLowerCase().includes(q)
+        r.approved_by?.toLowerCase().includes(q) ||
+        fmtDate(reportDate(r))?.toLowerCase().includes(q)
       )
       .sort((a, b) => {
-        const dateA = new Date(a.due_date || a.job_date || a.created_at || 0).getTime();
-        const dateB = new Date(b.due_date || b.job_date || b.created_at || 0).getTime();
+        const dateA = reportDate(a)?.getTime() || 0;
+        const dateB = reportDate(b)?.getTime() || 0;
         return dateB - dateA;
       });
   }, [treeData, selectedReportName, search]);
@@ -511,7 +518,7 @@ export default function ShoreReportsPage() {
                          )}
                          {r.job_order_no || '—'}
                       </td>
-                      <td className="rt-col-date">{fmtDate(r.due_date)}</td>
+                      <td className="rt-col-date">{fmtDate(r.report_date || r.due_date || r.job_date)}</td>
                       <td className="rt-col-date">{fmtDate(r.next_due_date)}</td>
                       <td>
                         {isPending ? (
@@ -522,11 +529,13 @@ export default function ShoreReportsPage() {
                           r.job_status || '—'
                         )}
                       </td>
-                      <td className="rt-col-date">{fmtDate(r.job_start_date)}</td>
-                      <td className="rt-col-date">{fmtDate(r.job_end_date)}</td>
-                      <td>{r.job_type || '—'}</td>
+                      <td className="rt-col-date">{fmtDate(r.job_start_date || r.report_date || r.job_date)}</td>
+                      <td className="rt-col-date">{fmtDate(r.job_end_date || r.report_date || r.job_date)}</td>
+                      <td>{r.job_type ? r.job_type.replace('Email (Graph API)', 'Email') : '—'}</td>
                       <td>{r.job_category || '—'}</td>
-                      <td style={{color:'#334155'}}>{r.approved_by || '—'}</td>
+                      <td style={{color:'#334155'}}>
+                        {(r.job_type?.toLowerCase().includes('email') || r.job_order_no?.startsWith('MAIL-') || r.approved_by?.includes('@')) ? '—' : (r.approved_by || '—')}
+                      </td>
                       <td style={{ textAlign: 'center' }}>
                         {(() => {
                           const hasAttachment = r.attachments?.some(a => !a.blob_path?.startsWith('MISSING:'));
@@ -540,6 +549,7 @@ export default function ShoreReportsPage() {
                                 setModalOpen(true);
                               }}
                               title={hasAttachment ? 'View Attachment' : 'View / Open Thread'}
+                              style={hasAttachment ? { color: '#059669' } : undefined}
                             >
                               {hasAttachment ? <Paperclip size={16} /> : <MessageSquare size={16} />}
                             </button>
