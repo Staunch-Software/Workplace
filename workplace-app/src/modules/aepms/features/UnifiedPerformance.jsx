@@ -7098,7 +7098,12 @@ const confirmDelete = async () => {
         const reportMonthPart = (
           allMonthlyReports[0]?.month || "unknown"
         ).replace(/[^a-z0-9-]/gi, "_");
-        const fileName = `${analysisMode.toLowerCase()}-${vesselPart}-${reportMonthPart}.pdf`;
+        // AE: include the generator and report id so each AE report gets its own file.
+        const aeNamePart =
+          analysisMode === "auxiliaryEngine"
+            ? `-gen${allMonthlyReports[0]?.generator_id ?? selectedGeneratorId}-r${allMonthlyReports[0]?.report_id}`
+            : "";
+        const fileName = `${analysisMode.toLowerCase()}-${vesselPart}${aeNamePart}-${reportMonthPart}.pdf`;
 
         const pdf = new jsPDF("p", "mm", "a4");
         const pageWidth = pdf.internal.pageSize.getWidth();
