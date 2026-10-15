@@ -50,7 +50,7 @@ node regenerate-ae-pdfs.mjs --base-url https://<app-host>
 
 Options: `--base-url`, `--api-base` (default `<base-url>/aepms/api`, or `http://localhost:8005`
 for localhost), `--batch-size`, `--max-failures`, `--pause`, `--max N` (total cap), `--imo`,
-`--generator-id`, `--report-id`, `--retries N`, `--channel`, `--manual-login`, `--headless`,
+`--generator-id`, `--report-id`, `--retries N`, `--channel`, `--manual-login`, `--headless`, `--ignore-https-errors`,
 `--profile DIR`, `--log FILE`.
 
 ## What it does / does not do

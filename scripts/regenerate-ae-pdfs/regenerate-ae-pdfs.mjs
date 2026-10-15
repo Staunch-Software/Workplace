@@ -62,6 +62,9 @@ const PROFILE = path.resolve(opt("profile", "./.browser-profile"));
 // Console only by default. A log file is written ONLY if you pass --log <file>.
 const LOG_FILE = opt("log") ? path.resolve(opt("log")) : null;
 const HEADLESS = flag("headless");
+// Accept the server's self-signed / private-CA certificate (needed when the site's certificate
+// chain is not trusted by the machine running the script). Only use against your own server.
+const IGNORE_HTTPS_ERRORS = flag("ignore-https-errors");
 const MANUAL_LOGIN = flag("manual-login"); // log in by hand in the browser (SSO / MFA accounts)
 const BATCH_SIZE = Math.max(1, parseInt(opt("batch-size", "50"), 10) || 50);
 const MAX_FAILURES = parseInt(opt("max-failures", "5"), 10); // stop the run if one batch fails this many
@@ -80,6 +83,13 @@ const log = (rec) => {
 };
 const norm = (s) => String(s ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** One-line error text with any Bearer token removed (Playwright errors dump request headers). */
+const safeMsg = (e) =>
+  String((e && e.message) || e)
+    .split("\n")[0]
+    .replace(/Bearer\s+[A-Za-z0-9._~+\/=-]+/gi, "Bearer ***")
+    .slice(0, 300);
 
 /** Authenticated GET executed inside the page so it uses the logged-in token. */
 async function apiGet(page, endpoint) {
@@ -198,13 +208,21 @@ async function pickSingleSelect(page, fieldSelector, matcher, what) {
 
 async function regenerateOne(context, item) {
   const page = await context.newPage();
+  let routeError = null;
   try {
     // Make the app treat ONLY this report as "PDF missing" (browser-side only).
     await page.route("**/aux/history*", async (route) => {
       // Browser-side only: ask for all reports instead of the page's default 24.
       const u = new URL(route.request().url());
       u.searchParams.set("limit", String(UI_LIST_LIMIT));
-      const resp = await route.fetch({ url: u.toString() });
+      let resp;
+      try {
+        resp = await route.fetch({ url: u.toString() });
+      } catch (e) {
+        // Do not let a failed request crash the whole run: fail this report only.
+        routeError = safeMsg(e);
+        return route.abort().catch(() => {});
+      }
       let body;
       try {
         body = await resp.json();
@@ -298,6 +316,9 @@ async function regenerateOne(context, item) {
       throw new Error("after upload the report still does not point at the per-generator path");
     }
     return true;
+  } catch (e) {
+    if (routeError) throw new Error(`report list request failed: ${routeError}`);
+    throw e;
   } finally {
     await page.close().catch(() => {});
   }
@@ -432,6 +453,7 @@ async function ensureLoggedIn(page) {
   fs.mkdirSync(PROFILE, { recursive: true });
   const context = await chromium.launchPersistentContext(PROFILE, {
     headless: HEADLESS,
+    ignoreHTTPSErrors: IGNORE_HTTPS_ERRORS,
     ...(opt("channel") ? { channel: opt("channel") } : {}), // e.g. msedge / chrome (installed browser)
     viewport: { width: 1600, height: 1000 },
   });
@@ -494,7 +516,7 @@ async function ensureLoggedIn(page) {
           log({ level: "info", status: "ok", n: `${done}/${todo.length}`, attempt, ...item });
           success = true;
         } catch (e) {
-          log({ level: "error", status: "failed", n: `${done}/${todo.length}`, attempt, ...item, error: String(e.message || e) });
+          log({ level: "error", status: "failed", n: `${done}/${todo.length}`, attempt, ...item, error: safeMsg(e) });
           await sleep(3000);
         }
       }
@@ -540,6 +562,6 @@ async function ensureLoggedIn(page) {
   await context.close();
   process.exit(failed.length || stoppedEarly ? 1 : 0);
 })().catch((e) => {
-  console.error("Fatal:", e.message || e);
+  console.error("Fatal:", safeMsg(e));
   process.exit(1);
 });
