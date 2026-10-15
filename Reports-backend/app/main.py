@@ -47,13 +47,15 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(start_background_sync())
         print("Report Tracker Sync Worker started in background (vessel mode).")
 
-    # NOTE: Scraping is triggered externally via an OS-level cron job running
-    # app/scraper/cron_smart_scrape.py (smart_cron=True), NOT by an in-process
-    # scheduler. Do not re-add an in-process scheduler here without removing
-    # the external cron job first -- running both risks two Playwright
-    # sessions logging into SmartPAL at the same time and invalidating each
-    # other's session.
-    print("Backend ready. Scraping is handled by the external cron job.")
+    # 4. Shore-only background Mail Graph fetcher (polls Microsoft Graph API all day)
+    # Unlike browser scraping (Playwright), Graph API mail fetching is an external
+    # REST API call with no browser session conflicts, so it safely runs all day.
+    if not settings.is_offline_vessel:
+        from app.scraper.cron_mail_fetcher import start_background_mail_fetcher
+        asyncio.create_task(start_background_mail_fetcher(interval_minutes=30))
+        print("Mail Graph API Fetcher started in background (polls every 30m all day).")
+
+    print("Backend ready. SmartPAL scraping is handled by the external cron job.")
 
     yield
 

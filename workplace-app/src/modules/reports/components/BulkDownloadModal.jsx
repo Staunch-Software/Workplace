@@ -10,6 +10,7 @@ import { fmtFilenameDate } from '@/utils/dateUtils';
 
 const FREQUENCIES = [
   { id: 'ALL',       label: 'All' },
+  { id: 'DAILY',     label: 'Daily' },
   { id: 'WEEKLY',    label: 'Weekly' },
   { id: 'MONTHLY',   label: 'Monthly' },
   { id: 'QUARTERLY', label: 'Quarterly' },
@@ -18,6 +19,7 @@ const FREQUENCIES = [
 function normalizeFreq(f) {
   if (!f) return 'OTHER';
   const u = f.toUpperCase().replace(/[\s-]/g, '_');
+  if (u.includes('DAIL') || u === '1_DAY') return 'DAILY';
   if (u.includes('WEEK')) return 'WEEKLY';
   if (u.includes('MONTH') || u === '1_MONTH') return 'MONTHLY';
   if (u.includes('QUARTER') || u === '3_MONTH') return 'QUARTERLY';
@@ -27,7 +29,7 @@ function normalizeFreq(f) {
 }
 
 function reportDate(r) {
-  const d = r.due_date || r.job_date || r.created_at;
+  const d = r.report_date || r.due_date || r.job_date || r.created_at;
   return d ? new Date(d) : null;
 }
 

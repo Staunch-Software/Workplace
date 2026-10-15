@@ -45,6 +45,7 @@ logger = logging.getLogger("scraper")
 # says so. Quarterly/Monthly use calendar-accurate relativedelta (a "month
 # later" is not a fixed number of days) rather than a fixed day count.
 _FREQUENCY_REPORT_DATE_OFFSET = {
+    "daily":     lambda d: d + relativedelta(days=1),
     "weekly":    lambda d: d + relativedelta(days=7),
     "monthly":   lambda d: d + relativedelta(months=1),
     "quarterly": lambda d: d + relativedelta(months=3),
@@ -168,6 +169,14 @@ async def run_scraper(db: AsyncSession, target_frequency: str = None, target_rep
         
     result = await db.execute(stmt)
     db_configs = result.scalars().all()
+
+    # Daily Work Done reports are scraped from Microsoft 365 Mail via Graph API
+    # (see mail_graph_fetcher.py), not from SmartPAL's equipment tree.
+    db_configs = [
+        c for c in db_configs
+        if (c.frequency or "").strip().lower() != "daily"
+        and not (c.report_code or "").upper().startswith("DY-")
+    ]
 
     if target_reports:
         if isinstance(target_reports, list):

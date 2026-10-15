@@ -1,5 +1,40 @@
 [
   {
+    "report_code": "DY-01-DECK_DAILY_WORK_DONE",
+    "report_name": "DAILY - 01 - DECK DAILY WORKDONE REPORT",
+    "department": "DECK",
+    "frequency": "Daily",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "DY-02-ENG_DAILY_WORK_DONE",
+    "report_name": "DAILY - 02 - ENG DAILY WORKDONE REPORT",
+    "department": "ENGINE",
+    "frequency": "Daily",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "DY-03-ELECTRICAL_DAILY_WORK_DONE",
+    "report_name": "DAILY - 03 - ELECTRICAL DAILY WORKDONE REPORT",
+    "department": "ENGINE",
+    "frequency": "Daily",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "DY-04-WORK_PLAN_MEETING_FORM",
+    "report_name": "DAILY - 04 - WORK PLAN MEETING FORM",
+    "department": "DECK",
+    "frequency": "Daily",
+    "type": "TECHNICAL"
+  },
+  {
+    "report_code": "DY-05-RIDING_TEAM_DAILY_WORK_DONE",
+    "report_name": "DAILY - 05 - RIDING TEAM DAILY WORKDONE REPORT",
+    "department": "DECK",
+    "frequency": "Daily",
+    "type": "TECHNICAL"
+  },
+  {
     "report_code": "WK-02-WEEKLY_-_01_-_DECK_WEEKLY_WORK",
     "report_name": "WEEKLY - 01 - DECK WEEKLY WORKDONE REPORT",
     "department": "DECK",
@@ -15,7 +50,7 @@
   },
   {
     "report_code": "WK-04-WEEKLY_-_03_-_ELECTRICAL__WEEK",
-    "report_name": "WEEKLY - 03 - ELECTRICAL  WEEKLY WORKDONE REPORT",
+    "report_name": "WEEKLY - 03 - ELECTRICAL WEEKLY WORKDONE REPORT",
     "department": "ELECTRICAL",
     "frequency": "Weekly",
     "type": "TECHNICAL"
