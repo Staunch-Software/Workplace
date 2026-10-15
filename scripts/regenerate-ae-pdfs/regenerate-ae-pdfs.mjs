@@ -209,6 +209,8 @@ async function pickSingleSelect(page, fieldSelector, matcher, what) {
 async function regenerateOne(context, item) {
   const page = await context.newPage();
   let routeError = null;
+  let liveYear = null; // year group and row of the target report in the list the page received
+  let liveIndex = null;
   try {
     // Make the app treat ONLY this report as "PDF missing" (browser-side only).
     await page.route("**/aux/history*", async (route) => {
@@ -230,6 +232,17 @@ async function regenerateOne(context, item) {
         return route.fulfill({ response: resp });
       }
       if (Array.isArray(body.monthly_performance_list)) {
+        // Work out where THIS report sits in the list the page actually received. Reports of
+        // the same month can come back in a different order from one request to the next, so
+        // the position found during discovery is not reliable.
+        const yearOf = (x) => String(x.report_date || "").substring(0, 4) || "Unknown";
+        const target = body.monthly_performance_list.find((r) => r.report_id === item.report_id);
+        if (target) {
+          liveYear = yearOf(target);
+          liveIndex = body.monthly_performance_list
+            .filter((x) => yearOf(x) === liveYear)
+            .findIndex((x) => x.report_id === item.report_id);
+        }
         for (const r of body.monthly_performance_list) {
           if (r.report_id === item.report_id) {
             r.pdf_missing = true;
@@ -285,13 +298,15 @@ async function regenerateOne(context, item) {
 
     // 5. Select exactly ONE report: year tab -> n-th row in that year
     await reportsField.locator("label + div").first().click();
-    await page.getByText(item.year, { exact: true }).last().click();
+    const pickYear = liveYear ?? item.year;
+    const pickIndex = liveIndex ?? item.indexInYear;
+    await page.getByText(pickYear, { exact: true }).last().click();
     const rows = reportsField.locator("input[type=checkbox]");
     await rows.first().waitFor({ timeout: 10000 });
-    if (item.indexInYear < 0 || item.indexInYear >= (await rows.count())) {
-      throw new Error(`report row index ${item.indexInYear} not in dropdown (list limited to ${UI_LIST_LIMIT})`);
+    if (pickIndex < 0 || pickIndex >= (await rows.count())) {
+      throw new Error(`report row index ${pickIndex} not in dropdown (list limited to ${UI_LIST_LIMIT})`);
     }
-    await rows.nth(item.indexInYear).click();
+    await rows.nth(pickIndex).click();
     await page.keyboard.press("Escape");
 
     // 6. ANALYZE and wait for the app's own PDF upload
