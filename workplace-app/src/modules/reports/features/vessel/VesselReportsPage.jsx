@@ -405,7 +405,7 @@ export default function VesselReportsPage() {
                           <td>{r.job_type ? r.job_type.replace('Email (Graph API)', 'Email') : '—'}</td>
                           <td>{r.job_category || '—'}</td>
                           <td style={{color:'#334155'}}>
-                            {r.job_type?.toLowerCase().includes('email') ? '—' : (r.approved_by || '—')}
+                            {(r.job_type?.toLowerCase().includes('email') || r.job_order_no?.startsWith('MAIL-') || r.approved_by?.includes('@')) ? '—' : (r.approved_by || '—')}
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             {(() => {
