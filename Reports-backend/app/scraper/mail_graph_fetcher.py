@@ -762,8 +762,7 @@ async def _upsert_daily_mail_report(
             existing.frequency = cfg.frequency or "Daily"
             existing.job_status = "COMPLETED"
             existing.job_type = "Email"
-            if sender_email:
-                existing.approved_by = sender_email
+            existing.approved_by = None
             existing.job_date = received_dt
             existing.job_start_date = report_date
             existing.job_end_date = report_date
@@ -816,7 +815,7 @@ async def _upsert_daily_mail_report(
                 job_order_no=job_order_no,
                 job_status="COMPLETED",
                 job_type="Email",
-                approved_by=sender_email or None,
+                approved_by=None,
                 job_date=received_dt,
                 job_start_date=report_date,
                 job_end_date=report_date,
