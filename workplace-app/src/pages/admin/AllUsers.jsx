@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, Filter, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Activity, FileBarChart2, Mail, Trash2 } from "lucide-react";
+import { Search, Filter, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Activity, FileBarChart2, BookOpen, Mail, Trash2 } from "lucide-react";
 import { getUsers, updateUser, assignVessels, getVessels, resendWelcomeEmail, deleteUser } from "./lib/adminApi";
 import ConfirmModal from "./ConfirmModal";
 
@@ -15,6 +15,7 @@ const MODULE_ICONS = [
     { key: "lubeoil", Icon: () => <Droplet size={14} />, label: "Lubeoil" },
     { key: "engine_performance", Icon: () => <Activity size={14} />, label: "Engine" },
     { key: "report_tracker", Icon: () => <FileBarChart2 size={14} />, label: "Reports" },
+    { key: "orb", Icon: () => <BookOpen size={14} />, label: "ORB" },
 ];
 
 function roleBadgeClass(role) {

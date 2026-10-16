@@ -16,6 +16,7 @@ const LubModule = lazy(() => import('./modules/lubeoil/Lubmodule'));
 const JiraModule = lazy(() => import('./modules/jira/JiraModule'));
 const AepmsModule = lazy(() => import('./modules/aepms/AepmsModule'));
 const ReportsModule = lazy(() => import('./modules/reports/ReportsModule'));
+const OrbModule = lazy(() => import('./modules/orb/OrbModule'));
 const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
 
 const moduleLoaderStyle = {
@@ -129,6 +130,15 @@ function App() {
             <ProtectedRoute allowedRoles={['SHORE', 'ADMIN', 'VESSEL']}>
               <Suspense fallback={<ModuleLoader label="Loading Reports..." />}>
                 <ReportsModule />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+
+          {/* ── ORB MODULE (Oil Record Book) ─────────────────── */}
+          <Route path="/orb/*" element={
+            <ProtectedRoute allowedRoles={['SHORE', 'ADMIN']}>
+              <Suspense fallback={<ModuleLoader label="Loading ORB..." />}>
+                <OrbModule />
               </Suspense>
             </ProtectedRoute>
           } />

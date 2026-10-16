@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { FileText, Trello, Droplet, Activity, FileBarChart2 } from "lucide-react";
+import { FileText, Trello, Droplet, Activity, FileBarChart2, BookOpen } from "lucide-react";
 import api from '../../api/axios';
 import './Home.css';
 
@@ -90,6 +90,10 @@ const Home = ({ searchQuery = '' }) => {
     if (appId === 'reports') {
       window.open('/reports/overview', '_blank');
     }
+
+    if (appId === 'orb') {
+      window.open('/orb/dashboard', '_blank');
+    }
   };
 
   const allApps = [
@@ -98,6 +102,7 @@ const Home = ({ searchQuery = '' }) => {
     { id: 'lube', permKey: 'lubeoil', name: 'Lubeoil Analysis', desc: 'Shore Analysis Portal', icon: <Droplet size={32} />, class: 'hm-card-lube', delay: '0.2s' },
     { id: 'engine', permKey: 'engine_performance', name: 'Engine Performance', desc: 'Metrics & Health', icon: <Activity size={32} />, class: 'hm-card-engine', delay: '0.3s' },
     { id: 'reports', permKey: 'report_tracker', name: 'Report Tracker', desc: 'Report Tracking & Threads', icon: <FileBarChart2 size={32} />, class: 'hm-card-reports', delay: '0.4s' },
+    { id: 'orb', permKey: 'orb', name: 'Oil Record Book', desc: 'ORB Digitisation & Compliance', icon: <BookOpen size={32} />, class: 'hm-card-orb', delay: '0.5s' },
   ];
 
   const apps = allApps
