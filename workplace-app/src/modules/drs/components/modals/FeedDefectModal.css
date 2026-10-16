@@ -15,6 +15,8 @@
   background: white;
   border-radius: 12px;
   width: min(1400px, 100%);
+  min-width: 0;
+  box-sizing: border-box;
   height: min(860px, 92vh);
   display: flex;
   flex-direction: column;
@@ -80,9 +82,9 @@
 
 .feed-modal-header-row {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: flex-start;
-  gap: 24px;
+  gap: 12px 24px;
   margin-bottom: 10px;
 }
 
@@ -206,6 +208,11 @@
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.fm-scrollselect-list--right {
+  left: auto;
+  right: 0;
 }
 
 .fm-scrollselect-option {
@@ -425,6 +432,10 @@
   min-height: 0;
 }
 
+.fm-body > * {
+  min-width: 0;
+}
+
 .fm-images {
   display: flex;
   flex-direction: column;
@@ -457,6 +468,37 @@
 
 .feed-modal-swipe-btn:disabled {
   visibility: hidden;
+}
+
+@media (max-width: 1280px) {
+  .feed-modal-overlay {
+    padding: 12px;
+    gap: 0;
+    position: fixed;
+  }
+  .feed-modal-panel {
+    width: 100%;
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+  .feed-modal-swipe-btn {
+    position: absolute;
+    top: 50%;
+    width: 32px;
+    height: 32px;
+    margin-top: -16px;
+    z-index: 3;
+  }
+  .feed-modal-swipe-left {
+    left: 16px;
+  }
+  .feed-modal-swipe-right {
+    right: 16px;
+  }
+  .fm-field-description {
+    max-width: 100%;
+    flex: 1 1 260px;
+  }
 }
 
 @media (max-width: 900px) {

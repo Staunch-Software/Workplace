@@ -25,6 +25,10 @@ import ColumnCustomizationModal from '@drs/components/modals/ColumnCustomization
 import './Vessel.css';
 import EnhancedClosureModal from '@drs/components/modals/EnhancedClosureModal';
 import DefectKanban from '@drs/components/shared/DefectKanban';
+import FeedDefectModal from '@drs/components/modals/FeedDefectModal';
+import VesselFeedDrawer from '@drs/components/shared/VesselFeedDrawer';
+import { countUnreadFeedByVessel } from '@drs/components/shared/feedUtils';
+import VesselLiveFeed from './MyTasks';
 
 import {
   DndContext,
@@ -205,7 +209,7 @@ const getNodeOffsetAt = (root, charOffset) => {
 };
 
 // ✅ UPDATED: Teams-like Thread Section with PENDING_CLOSURE Approval Workflow
-const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
+export const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
   const { user } = useAuth();
   const toast = useToast();
   const [confirmModal, setConfirmModal] = useState(null);
@@ -898,7 +902,7 @@ const ThreadSection = ({ defectId, defectStatus, closureRemarks }) => {
 const ImageSidebar = (props) => <DefectImageSidebar {...props} />;
 
 // Image Upload Component (disabled when closed) with Before & After support
-const BeforeAfterImageUpload = ({ defectId, defectNumber, type, isMandatory, defectStatus }) => {
+export const BeforeAfterImageUpload = ({ defectId, defectNumber, type, isMandatory, defectStatus }) => {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [files, setFiles] = useState([]);
@@ -1361,6 +1365,20 @@ const VesselDashboard = () => {
   const [closureDefect, setClosureDefect] = useState(null);
   const [closureValidation, setClosureValidation] = useState(null);
   const [viewMode, setViewMode] = useState('table');
+  const [boardModal, setBoardModal] = useState(null);
+  const [feedVessel, setFeedVessel] = useState(null);
+
+  const { data: boardFeedItems = [] } = useQuery({
+    queryKey: ['live-feed'],
+    queryFn: () => defectApi.getLiveFeed(),
+    refetchInterval: 15000,
+    enabled: viewMode === 'board',
+  });
+
+  const feedUnreadByVessel = useMemo(
+    () => countUnreadFeedByVessel(boardFeedItems, user?.id),
+    [boardFeedItems, user?.id]
+  );
   const [showEditorModal, setShowEditorModal] = useState(false);
   const [editorData, setEditorData] = useState({ defectId: null, to: [], cc: [], subject: '', body: '' });
   const [savingDraft, setSavingDraft] = useState(false);
@@ -1648,10 +1666,9 @@ const VesselDashboard = () => {
 
   const handleKanbanClose = (defect) => handleInlineUpdate(defect.id, 'status', 'CLOSED');
 
-  const handleKanbanCardClick = (defect) => {
-    hasNavigatedRef.current = null;
-    setViewMode('table');
-    setSearchParams({ highlightDefectId: defect.id });
+  const handleKanbanCardClick = (defect, ordered = []) => {
+    const ids = ordered.length ? ordered.map(d => d.id) : [defect.id];
+    setBoardModal({ ids, index: Math.max(0, ids.indexOf(defect.id)) });
   };
 
   const toggleFlagMutation = useMutation({
@@ -2591,6 +2608,8 @@ const VesselDashboard = () => {
             role={user?.role}
             onCardClick={handleKanbanCardClick}
             onRequestClose={handleKanbanClose}
+            feedCounts={feedUnreadByVessel}
+            onOpenVesselFeed={(imo, name) => imo && setFeedVessel({ imo, name })}
             onBlocked={(msg) => toast(msg, 'warning')}
           />
         ) : (<>
@@ -4017,6 +4036,22 @@ const VesselDashboard = () => {
         )}
 
 
+        {feedVessel && (
+          <VesselFeedDrawer title={`Feed - ${feedVessel.name}`} onClose={() => setFeedVessel(null)}>
+            <VesselLiveFeed />
+          </VesselFeedDrawer>
+        )}
+        {boardModal && (
+          <FeedDefectModal
+            mode="board"
+            ThreadComponent={ThreadSection}
+            ImageUploadComponent={BeforeAfterImageUpload}
+            items={boardModal.ids.map(id => ({ id, defect_id: id }))}
+            index={boardModal.index}
+            onIndexChange={(i) => setBoardModal(m => ({ ...m, index: i }))}
+            onClose={() => setBoardModal(null)}
+          />
+        )}
         {closureModalOpen && closureDefect && (
           <EnhancedClosureModal
             defect={closureDefect}

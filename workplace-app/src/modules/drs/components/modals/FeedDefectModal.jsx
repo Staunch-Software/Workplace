@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, ChevronLeft, ChevronRight, ChevronDown, ExternalLink, Flag, Lock, MailOpen, Pencil, Check } from 'lucide-react';
 import { defectApi } from '@drs/services/defectApi';
@@ -8,8 +8,6 @@ import {
 } from '../shared/constants';
 import { ToastProvider, ThreadSection, BeforeAfterImageUpload, useToast } from '../../features/shore/ShoreDashboard';
 import './FeedDefectModal.css';
-
-const DEFECTS_QUERY_KEY = ['defects', 'global-list'];
 
 const PRIORITY_COLORS = {
   CRITICAL: '#dc2626',
@@ -30,7 +28,20 @@ const OPTION_ROW_HEIGHT = 34;
 
 const ScrollableSelect = ({ value, options, onChange, disabled }) => {
   const [open, setOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
   const ref = useRef(null);
+
+  // Open towards whichever side has room inside the modal panel (it clips overflow).
+  useLayoutEffect(() => {
+    if (!open || !ref.current) return;
+    const panel = ref.current.closest('.feed-modal-panel');
+    const trigger = ref.current.getBoundingClientRect();
+    const panelRect = panel ? panel.getBoundingClientRect() : { left: 0, right: window.innerWidth };
+    const listWidth = 240;
+    const fitsRight = trigger.left + listWidth <= panelRect.right - 8;
+    const fitsLeft = trigger.right - listWidth >= panelRect.left + 8;
+    setAlignRight(!fitsRight && fitsLeft);
+  }, [open]);
 
   useEffect(() => {
     const close = (e) => {
@@ -52,7 +63,7 @@ const ScrollableSelect = ({ value, options, onChange, disabled }) => {
       </button>
       {open && !disabled && (
         <div
-          className="fm-scrollselect-list"
+          className={`fm-scrollselect-list${alignRight ? ' fm-scrollselect-list--right' : ''}`}
           style={{ maxHeight: `${VISIBLE_OPTION_COUNT * OPTION_ROW_HEIGHT}px` }}
         >
           {options.map(opt => (
@@ -118,7 +129,13 @@ const PrioritySelect = ({ value, onChange, disabled }) => {
   );
 };
 
-const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefect }) => {
+const FeedDefectModalInner = ({
+  items, index, onIndexChange, onClose, onGoToDefect,
+  mode = 'feed',
+  ThreadComponent = ThreadSection,
+  ImageUploadComponent = BeforeAfterImageUpload,
+}) => {
+  const isFeed = mode === 'feed';
   const queryClient = useQueryClient();
   const toast = useToast();
   const feedItem = items?.[index];
@@ -146,7 +163,7 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
     },
     onSettled: (_data, _err, { id }) => {
       queryClient.invalidateQueries(['defect-detail', id]);
-      queryClient.invalidateQueries(DEFECTS_QUERY_KEY);
+      queryClient.invalidateQueries(['defects']);
       queryClient.invalidateQueries(['live-feed']);
     },
   });
@@ -186,7 +203,7 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
     },
     onSettled: (_data, _err, id) => {
       queryClient.invalidateQueries(['defect-detail', id]);
-      queryClient.invalidateQueries(DEFECTS_QUERY_KEY);
+      queryClient.invalidateQueries(['defects']);
       queryClient.invalidateQueries(['live-feed']);
     },
   });
@@ -205,7 +222,7 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
   // initial open and again each time next/prev lands on a different defect,
   // since viewing the defect here shows all that info already.
   useEffect(() => {
-    if (!defectId || !items) return;
+    if (!isFeed || !defectId || !items) return;
     items
       .filter(i => i.defect_id === defectId && !i.is_read)
       .forEach(i => markReadMutation.mutate(i.id));
@@ -264,7 +281,7 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
         <div className="feed-modal-panel" onClick={(e) => e.stopPropagation()}>
           <div className="fm-topbar">
             <div className="fm-topbar-left">
-              {defect && (
+              {isFeed && defect && (
                 <button
                   className="fm-goto-btn"
                   onClick={() => onGoToDefect(defect.id, feedItem.meta?.is_internal || feedItem.event_type === 'MENTION')}
@@ -292,14 +309,16 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                   <Flag size={16} color={defect.is_flagged ? '#e8290b' : '#8e8d8d'} fill={defect.is_flagged ? '#e8290b' : 'none'} />
                 </button>
               )}
-              <button
-                className="fm-unread-btn"
-                onClick={() => markUnreadMutation.mutate(feedItem.id)}
-                disabled={markUnreadMutation.isPending}
-                title="Mark as unread"
-              >
-                <MailOpen size={16} /> Mark as unread
-              </button>
+              {isFeed && (
+                <button
+                  className="fm-unread-btn"
+                  onClick={() => markUnreadMutation.mutate(feedItem.id)}
+                  disabled={markUnreadMutation.isPending}
+                  title="Mark as unread"
+                >
+                  <MailOpen size={16} /> Mark as unread
+                </button>
+              )}
               <button className="feed-modal-close" onClick={onClose} title="Close">
                 <X size={18} />
               </button>
@@ -404,13 +423,11 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                     <span className="fm-label">Source</span>
                     <div className="fm-field-value">
                       {canEditFields ? (
-                        <select
-                          className="fm-edit-input"
-                          value={defect.defect_source || ''}
-                          onChange={(e) => updateField('defect_source', e.target.value)}
-                        >
-                          {DEFECT_SOURCE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                        </select>
+                        <ScrollableSelect
+                          value={defect.defect_source}
+                          options={DEFECT_SOURCE_OPTIONS}
+                          onChange={(val) => updateField('defect_source', val)}
+                        />
                       ) : (
                         <span className="fm-value">{defect.defect_source}</span>
                       )}
@@ -436,7 +453,7 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
               )}
 
               <div className="fm-body">
-                <ThreadSection
+                <ThreadComponent
                   defectId={defect.id}
                   defectStatus={defect.status}
                   closureRemarks={defect.closure_remarks}
@@ -445,7 +462,7 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                   fixedHeight="100%"
                 />
                 <div className="fm-images">
-                  <BeforeAfterImageUpload
+                  <ImageUploadComponent
                     defectId={defect.id}
                     defectNumber={defect.defect_number}
                     type="before"
@@ -453,7 +470,7 @@ const FeedDefectModalInner = ({ items, index, onIndexChange, onClose, onGoToDefe
                     defectStatus={defect.status}
                     onToggleRequired={() => updateField('before_image_required', !defect.before_image_required)}
                   />
-                  <BeforeAfterImageUpload
+                  <ImageUploadComponent
                     defectId={defect.id}
                     defectNumber={defect.defect_number}
                     type="after"

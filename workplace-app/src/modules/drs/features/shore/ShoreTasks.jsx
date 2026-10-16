@@ -221,7 +221,7 @@ const applyCommonFilters = (items, { vesselFilter, priorityFilter, sourceFilter,
 };
 
 // ── Main Component ─────────────────────────────────────────────────────────
-const LiveFeed = () => {
+const LiveFeed = ({ lockedVessel = '' }) => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -229,8 +229,8 @@ const LiveFeed = () => {
   // FIX 1: Extract to plain variable — user?.id is not valid in deps array
   const userId = user?.id;
 
-  const [activeTab, setActiveTab] = useState('mine');
-  const [vesselFilter, setVesselFilter] = useState('');
+  const [activeTab, setActiveTab] = useState(lockedVessel ? 'live' : 'mine');
+  const [vesselFilter, setVesselFilter] = useState(lockedVessel);
   const [priorityFilter, setPriorityFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -321,7 +321,7 @@ const LiveFeed = () => {
   };
 
   const clearFilters = () => {
-    setVesselFilter('');
+    setVesselFilter(lockedVessel);
     setPriorityFilter('');
     setSourceFilter('');
     setDateFrom('');
@@ -353,7 +353,7 @@ const LiveFeed = () => {
 
   const myMentionUnreadCount = myMentions.filter(i => !i.is_read).length;
 
-  const hasFilters = vesselFilter || priorityFilter || sourceFilter || dateFrom || dateTo || search;
+  const hasFilters = (vesselFilter && vesselFilter !== lockedVessel) || priorityFilter || sourceFilter || dateFrom || dateTo || search;
 
   // FIX 3: Both tabs use applyCommonFilters independently
   const liveFeedFiltered = useMemo(() => {
@@ -466,7 +466,7 @@ const LiveFeed = () => {
 
         {/* ── Filter Bar ── */}
         <div className="filter-toolbar">
-          <Select value={vesselFilter} onChange={setVesselFilter} options={vesselOptions} placeholder="All Vessels" />
+          {!lockedVessel && <Select value={vesselFilter} onChange={setVesselFilter} options={vesselOptions} placeholder="All Vessels" />}
           <Select value={priorityFilter} onChange={setPriorityFilter} options={priorityOptions} placeholder="All Priorities" />
           <Select value={sourceFilter} onChange={setSourceFilter} options={sourceOptions} placeholder="All Sources" />
 
