@@ -1,0 +1,6 @@
+.env
+venv/
+uploads/
+debug_screenshots/
+__pycache__/
+*.pyc

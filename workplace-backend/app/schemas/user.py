@@ -14,6 +14,7 @@ class UserCreate(BaseModel):
         "drs": False, "jira": False,
         "voyage": False, "lubeoil": False,
         "engine_performance": False,
+        "orb": False,
     }
 
 
