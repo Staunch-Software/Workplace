@@ -117,6 +117,8 @@ function buildYearWeeks(year) {
   return weeks;
 }
 
+const pctTone = p => (p >= 90 ? 'good' : p >= 70 ? 'warn' : 'bad');
+
 function toIsoDate(d) {
   if (!d) return '';
   const y = d.getFullYear();
@@ -359,12 +361,13 @@ function AttachmentPreviewModal({ report, onClose }) {
   );
 }
 
-function AttachmentIcon({ report, bucket, onOpen, viewerRole, showDate = true }) {
+function AttachmentIcon({ report, bucket, onOpen, viewerRole, showDate = true, seenIds }) {
+  const isSeen = !!seenIds && seenIds.has(String(report.id));
   return (
     <button
       type="button"
-      className={`ovw-chip ovw-chip-has${!showDate ? ' ovw-chip-icon-only' : ''}`}
-      title={`${bucket?.label || ''}: ${fmtDateShort(reportDate(report))} — View attachment`}
+      className={`ovw-chip ovw-chip-has ${isSeen ? 'ovw-chip-seen' : 'ovw-chip-new'}${!showDate ? ' ovw-chip-icon-only' : ''}`}
+      title={`${bucket?.label || ''}: ${fmtDateShort(reportDate(report))} — ${isSeen ? 'Viewed' : 'New'} attachment`}
       onClick={() => onOpen(report)}
     >
       <span className="ovw-chip-has-icon">
@@ -380,7 +383,7 @@ function AttachmentIcon({ report, bucket, onOpen, viewerRole, showDate = true })
   );
 }
 
-function AttachmentCell({ instances, bucket, now, onOpen, viewerRole, buckets }) {
+function AttachmentCell({ instances, bucket, now, onOpen, viewerRole, buckets, seenIds }) {
   const latestKey = latestIncompleteBucketKey(instances, buckets);
   const isCurrentBucket = bucket.start <= now && now <= bucket.end;
   const isLatestIncomplete = isCurrentBucket || bucket.key === latestKey;
@@ -405,12 +408,12 @@ function AttachmentCell({ instances, bucket, now, onOpen, viewerRole, buckets })
   // Show one icon+date per job in the same shell instead of collapsing to
   // just the latest.
   if (matches.length === 1) {
-    return <AttachmentIcon report={matches[0]} bucket={bucket} onOpen={onOpen} viewerRole={viewerRole} />;
+    return <AttachmentIcon report={matches[0]} bucket={bucket} onOpen={onOpen} viewerRole={viewerRole} seenIds={seenIds} />;
   }
   return (
     <div className="ovw-chip-multi">
       {matches.map(m => (
-        <AttachmentIcon key={m.id || m.job_order_no} report={m} bucket={bucket} onOpen={onOpen} viewerRole={viewerRole} />
+        <AttachmentIcon key={m.id || m.job_order_no} report={m} bucket={bucket} onOpen={onOpen} viewerRole={viewerRole} seenIds={seenIds} />
       ))}
     </div>
   );
@@ -429,7 +432,27 @@ export default function OverviewPage() {
   const [search, setSearch] = useState('');
   const [previewReport, setPreviewReport] = useState(null);
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [missingOpen, setMissingOpen] = useState(false);
+  const [missingVessel, setMissingVessel] = useState('ALL');
+  const [mmExpanded, setMmExpanded] = useState({});
   const [dailyAnchorDate, setDailyAnchorDate] = useState(null);
+
+  /* Per-user "viewed" memory, stored in the database so it follows the user
+     across browsers and devices. Viewed attachments render dimmer. */
+  const { data: viewedIds } = useQuery({
+    queryKey: ['report-views'],
+    queryFn: () => reportsApi.getViewedReportIds(),
+    staleTime: 60_000,
+    enabled: !!user,
+  });
+  const seenIds = useMemo(() => new Set((viewedIds || []).map(String)), [viewedIds]);
+  const markSeen = useCallback((id) => {
+    if (id == null || seenIds.has(String(id))) return;
+    queryClient.setQueryData(['report-views'], (old) => [...(old || []), String(id)]);
+    reportsApi.markReportViewed(id).catch(() => {
+      queryClient.invalidateQueries({ queryKey: ['report-views'] });
+    });
+  }, [seenIds, queryClient]);
 
   const { data: coreVessels = [] } = useQuery({
     queryKey: ['core-vessels'],
@@ -575,6 +598,7 @@ export default function OverviewPage() {
      instant the report is opened rather than waiting on the round trip. */
   const handleOpenReport = useCallback((report) => {
     setPreviewReport(report);
+    markSeen(report.id);
     const field = user?.role === 'VESSEL' ? 'unread_vessel' : 'unread_shore';
     if (!(report[field] > 0)) return;
 
@@ -585,7 +609,7 @@ export default function OverviewPage() {
     reportsApi.getReport(report.id)
       .then(() => queryClient.invalidateQueries({ queryKey: ['reports-list'] }))
       .catch(() => {});
-  }, [user, queryClient]);
+  }, [user, queryClient, markSeen]);
 
   const handleMonthChange = useCallback((v) => setMonthIdx(v), []);
   const handleQuarterChange = useCallback((v) => setQuarterIdx(v), []);
@@ -622,6 +646,85 @@ export default function OverviewPage() {
     });
     return count;
   }, [reportNames, vessels, instanceIndex, buckets, isDaily]);
+
+  /* Submission completion for the selected frequency tab, counted from the
+     FIRST date each report was submitted for a vessel up to today (not just the
+     visible window). Every period since then is expected; periods without an
+     attachment are missing. The current unfinished period only counts if done. */
+  const completion = useMemo(() => {
+    const pad = n => String(n).padStart(2, '0');
+    const keyOf = d => {
+      if (frequency === 'DAILY') return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      if (frequency === 'WEEKLY') {
+        const m = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        m.setDate(m.getDate() - ((m.getDay() + 6) % 7));
+        return `${m.getFullYear()}-${pad(m.getMonth() + 1)}-${pad(m.getDate())}`;
+      }
+      if (frequency === 'MONTHLY') return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+      return `${d.getFullYear()}-Q${Math.floor(d.getMonth() / 3)}`;
+    };
+    const step = d => {
+      const n = new Date(d);
+      if (frequency === 'DAILY') n.setDate(n.getDate() + 1);
+      else if (frequency === 'WEEKLY') n.setDate(n.getDate() + 7);
+      else if (frequency === 'MONTHLY') { n.setDate(1); n.setMonth(n.getMonth() + 1); }
+      else { n.setDate(1); n.setMonth(n.getMonth() + 3); }
+      return n;
+    };
+    const labelOf = d => {
+      if (frequency === 'DAILY') return fmtDate(d);
+      if (frequency === 'WEEKLY') {
+        const m = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        m.setDate(m.getDate() - ((m.getDay() + 6) % 7));
+        const e = new Date(m); e.setDate(e.getDate() + 6);
+        return `${fmtDateShort(m)} – ${fmtDateShort(e)}`;
+      }
+      if (frequency === 'MONTHLY') return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+      return `Q${Math.floor(d.getMonth() / 3) + 1} ${d.getFullYear()}`;
+    };
+    const today = new Date();
+    const nowKey = keyOf(today);
+    const stats = {};
+    vessels.forEach(v => { stats[v.imo] = { done: 0, expected: 0, since: null, items: [] }; });
+    const overall = { done: 0, expected: 0, since: null };
+
+    reportNames.forEach(name => {
+      vessels.forEach(v => {
+        if (configuredPairs && !configuredPairs.has(`${v.imo}|${name}`)) return;
+        const instances = instanceIndex[name]?.[v.imo] || [];
+        const have = new Set();
+        let first = null;
+        instances.forEach(r => {
+          if (!hasValidAttachment(r.attachments)) return;
+          const d = reportDate(r);
+          if (!d) return;
+          have.add(keyOf(d));
+          if (!first || d < first) first = d;
+        });
+        if (!first) return;
+        const labels = [];
+        let cur = new Date(first), guard = 0;
+        while (guard++ < 5000) {
+          const k = keyOf(cur);
+          if (k === nowKey) { if (have.has(k)) { stats[v.imo].expected++; stats[v.imo].done++; } break; }
+          if (cur > today) break;
+          stats[v.imo].expected++;
+          if (have.has(k)) stats[v.imo].done++;
+          else labels.push(labelOf(cur));
+          cur = step(cur);
+        }
+        if (labels.length) stats[v.imo].items.push({ report: name, labels });
+        const st = stats[v.imo];
+        if (!st.since || first < st.since) st.since = first;
+        if (!overall.since || first < overall.since) overall.since = first;
+      });
+    });
+    const withPct = o => ({ ...o, missing: o.expected - o.done, pct: o.expected > 0 ? Math.round((o.done / o.expected) * 100) : null });
+    Object.keys(stats).forEach(k => { stats[k] = withPct(stats[k]); });
+    Object.values(stats).forEach(st => { overall.done += st.done; overall.expected += st.expected; });
+    Object.values(stats).forEach(st => st.items.sort((x, y) => y.labels.length - x.labels.length));
+    return { overall: withPct(overall), byVessel: stats };
+  }, [frequency, reportNames, vessels, instanceIndex, configuredPairs]);
 
   /* Key of the bucket that contains today — used to underline current-week header */
   const currentWeekKey = useMemo(() => {
@@ -688,6 +791,33 @@ export default function OverviewPage() {
         </div>
 
         <div className="ovw-header-right-actions">
+          {frequency !== 'EVENTS' && completion.overall.pct !== null && (() => {
+            const o = completion.overall;
+            const R = 15, C = 2 * Math.PI * R;
+            const label = FREQUENCIES.find(f => f.id === frequency)?.label;
+            return (
+              <button
+                type="button"
+                className={`ovw-overall-btn ovw-tone-${pctTone(o.pct)}`}
+                onClick={() => { setMissingVessel('ALL'); setMissingOpen(true); }}
+                title="Click to see missing dates"
+              >
+                <span className="ovw-ob-donut">
+                  <svg width="38" height="38" viewBox="0 0 40 40">
+                    <circle cx="20" cy="20" r={R} className="ovw-ob-track" />
+                    <circle cx="20" cy="20" r={R} className="ovw-ob-fill"
+                      strokeDasharray={C} strokeDashoffset={C * (1 - o.pct / 100)} />
+                  </svg>
+                  <span className="ovw-ob-pct">{o.pct}%</span>
+                </span>
+                <span className="ovw-ob-text">
+                  <span className="ovw-ob-title">Overall {label} Completed</span>
+                  <span className="ovw-ob-sub">{o.missing} missing · View details</span>
+                </span>
+                <ChevronRight size={14} className="ovw-ob-chev" />
+              </button>
+            );
+          })()}
           {/* ── Download Button ── */}
           <button className="bdl-trigger-btn" onClick={() => setDownloadModalOpen(true)}>
             <Download size={14} />
@@ -886,9 +1016,28 @@ export default function OverviewPage() {
                       className="ovw-th-vessel"
                       colSpan={hasSubCols ? buckets.length : 1}
                     >
-                      <div className="ovw-th-vessel-inner">
-                        <span className="ovw-vessel-name">{v.name}</span>
-                        <span className="ovw-vessel-imo">IMO {v.imo}</span>
+                      <div className="ovw-th-vessel-inner ovw-th-vessel-inner--pct">
+                        <div className="ovw-vessel-textcol">
+                          <span className="ovw-vessel-name">{v.name}</span>
+                          <span className="ovw-vessel-imo">IMO {v.imo}</span>
+                        </div>
+                        {completion.byVessel[v.imo]?.pct != null && (() => {
+                          const st = completion.byVessel[v.imo];
+                          const R = 13, C = 2 * Math.PI * R;
+                          return (
+                            <span
+                              className={`ovw-vcircle ovw-tone-${pctTone(st.pct)}`}
+                              title={`${st.done} submitted · ${st.missing} missing (of ${st.expected})`}
+                            >
+                              <svg width="34" height="34" viewBox="0 0 34 34">
+                                <circle cx="17" cy="17" r={R} className="ovw-vc-track" />
+                                <circle cx="17" cy="17" r={R} className="ovw-vc-fill"
+                                  strokeDasharray={C} strokeDashoffset={C * (1 - st.pct / 100)} />
+                              </svg>
+                              <span className="ovw-vc-num">{st.pct}%</span>
+                            </span>
+                          );
+                        })()}
                       </div>
                     </th>
                   ))}
@@ -952,6 +1101,7 @@ export default function OverviewPage() {
                                   onOpen={handleOpenReport}
                                   viewerRole={user?.role}
                                   showDate={false}
+                                  seenIds={seenIds}
                                 />
                               ) : (
                                 <div className="ovw-chip-empty" />
@@ -964,7 +1114,7 @@ export default function OverviewPage() {
                       if (isWeekly) {
                         return buckets.map(b => (
                           <td key={`${v.imo}-${b.key}`} className="ovw-td-cell ovw-td-week">
-                            <AttachmentCell instances={instances} bucket={b} now={now} onOpen={handleOpenReport} viewerRole={user?.role} buckets={buckets} />
+                            <AttachmentCell instances={instances} bucket={b} now={now} onOpen={handleOpenReport} viewerRole={user?.role} buckets={buckets} seenIds={seenIds} />
                           </td>
                         ));
                       }
@@ -974,7 +1124,7 @@ export default function OverviewPage() {
                         <td key={v.imo} className="ovw-td-cell">
                           <div className="ovw-icon-group">
                             {buckets.map(b => (
-                              <AttachmentCell key={b.key} instances={instances} bucket={b} now={now} onOpen={handleOpenReport} viewerRole={user?.role} buckets={buckets} />
+                              <AttachmentCell key={b.key} instances={instances} bucket={b} now={now} onOpen={handleOpenReport} viewerRole={user?.role} buckets={buckets} seenIds={seenIds} />
                             ))}
                           </div>
                         </td>
@@ -990,6 +1140,100 @@ export default function OverviewPage() {
       </>)}
 
       </div>
+
+      {missingOpen && (() => {
+        const o = completion.overall;
+        const label = FREQUENCIES.find(f => f.id === frequency)?.label;
+        const LIMIT = 12;
+        const list = vessels.filter(v => (missingVessel === 'ALL' || String(v.imo) === String(missingVessel)) && completion.byVessel[v.imo]?.items.length);
+        return (
+          <div className="ovw-mm-overlay" onClick={() => setMissingOpen(false)}>
+            <div className="ovw-mm" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+              <div className="ovw-mm-head">
+                <div className="ovw-mm-head-top">
+                  <div className="ovw-mm-head-icon"><FileWarning size={20} /></div>
+                  <div className="ovw-mm-head-text">
+                    <div className="ovw-mm-eyebrow">{label} completion</div>
+                    <h3 className="ovw-mm-title">Missing Submissions</h3>
+                  </div>
+                  <button type="button" className="ovw-mm-close" onClick={() => setMissingOpen(false)} aria-label="Close"><X size={16} /></button>
+                </div>
+                <div className="ovw-mm-stats">
+                  <div className="ovw-mm-stat"><b>{o.pct}%</b><span>Completed</span></div>
+                  <div className="ovw-mm-stat"><b>{o.done}</b><span>Submitted</span></div>
+                  <div className="ovw-mm-stat miss"><b>{o.missing}</b><span>Missing</span></div>
+                  <div className="ovw-mm-stat"><b>{o.since ? fmtDate(o.since) : '—'}</b><span>Tracked since</span></div>
+                </div>
+                <div className="ovw-mm-progress"><span style={{ width: `${o.pct}%` }} /></div>
+              </div>
+
+              <div className="ovw-mm-chips">
+                <button type="button" className={`ovw-mm-chip${missingVessel === 'ALL' ? ' active' : ''}`} onClick={() => setMissingVessel('ALL')}>
+                  All vessels <span>{o.missing}</span>
+                </button>
+                {vessels.map(v => (
+                  <button
+                    key={v.imo} type="button"
+                    className={`ovw-mm-chip${String(missingVessel) === String(v.imo) ? ' active' : ''}`}
+                    onClick={() => setMissingVessel(v.imo)}
+                  >
+                    {v.name} <span>{completion.byVessel[v.imo]?.missing ?? 0}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="ovw-mm-body">
+                {list.length === 0 ? (
+                  <div className="ovw-mm-empty">
+                    <div className="ovw-mm-empty-ico">✓</div>
+                    All caught up — nothing missing.
+                  </div>
+                ) : list.map(v => {
+                  const st = completion.byVessel[v.imo];
+                  return (
+                    <section key={v.imo} className="ovw-mm-vessel">
+                      <div className="ovw-mm-vessel-head">
+                        <div className="ovw-mm-vessel-id">
+                          <span className="ovw-mm-vessel-name">{v.name}</span>
+                          <span className="ovw-mm-vessel-imo">IMO {v.imo}</span>
+                        </div>
+                        <div className={`ovw-mm-vessel-pct ovw-tone-${pctTone(st.pct)}`}>
+                          <div className="ovw-mm-vbar"><span style={{ width: `${st.pct}%` }} /></div>
+                          <b>{st.pct}%</b>
+                          <em>{st.missing} missing</em>
+                        </div>
+                      </div>
+                      {st.items.map(it => {
+                        const ek = `${v.imo}|${it.report}`;
+                        const open = !!mmExpanded[ek];
+                        const newest = [...it.labels].reverse();
+                        const shown = open ? newest : newest.slice(0, LIMIT);
+                        return (
+                          <div key={it.report} className="ovw-mm-report">
+                            <div className="ovw-mm-report-name">
+                              <span className="ovw-mm-report-dot" />
+                              {it.report}
+                              <em>{it.labels.length} missing</em>
+                            </div>
+                            <div className="ovw-mm-dates">
+                              {shown.map((l, i) => <span key={i} className="ovw-mm-date">{l}</span>)}
+                              {newest.length > LIMIT && (
+                                <button type="button" className="ovw-mm-more" onClick={() => setMmExpanded(x => ({ ...x, [ek]: !open }))}>
+                                  {open ? 'Show less' : `+${newest.length - LIMIT} more`}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </section>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {previewReport && (
         <AttachmentPreviewModal report={previewReport} onClose={() => setPreviewReport(null)} />
