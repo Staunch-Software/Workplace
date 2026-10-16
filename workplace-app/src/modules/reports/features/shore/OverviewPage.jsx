@@ -8,6 +8,7 @@ import ReportsNavbar from '../../components/ReportsNavbar';
 import AttachmentsPanel from '../../components/AttachmentsPanel';
 import ThreadPanel from '../../components/ThreadPanel';
 import BulkDownloadModal from '../../components/BulkDownloadModal';
+import EventsGrid from './EventsGrid';
 import {
   ChevronDown, X, Paperclip, FileWarning, CalendarDays, Layers, Search,
   BarChart3, MessageSquare, Download, AlertCircle, Clock,
@@ -19,6 +20,7 @@ import { compareReportNames, normalizeReportName } from '../../reportOrder';
 import { fmtDateShort, fmtDate } from '@/utils/dateUtils';
 
 const FREQUENCIES = [
+  { id: 'EVENTS',    label: 'Events' },
   { id: 'DAILY',     label: 'Daily' },
   { id: 'WEEKLY',    label: 'Weekly' },
   { id: 'MONTHLY',  label: 'Monthly' },
@@ -707,6 +709,9 @@ export default function OverviewPage() {
         </div>
       </div>
 
+      {frequency === 'EVENTS' ? (
+        <EventsGrid vessels={vessels} search={search} setSearch={setSearch} />
+      ) : (<>
       {/* ── Control Bar ── */}
       <div className="ovw-control-bar">
         <div className="ovw-control-left">
@@ -982,6 +987,7 @@ export default function OverviewPage() {
           </div>
         )}
       </div>
+      </>)}
 
       </div>
 

@@ -97,6 +97,9 @@ export const reportsApi = {
     shoreClient.delete(`/reports/config/${configId}`).then((r) => r.data),
   bulkAssignVessel: (vessel_imo, vessel_name) =>
     shoreClient.post("/reports/config/bulk-assign", { vessel_imo, vessel_name }).then((r) => r.data),
+  // Vessel_Performance logbook values (Overview "Events" tab)
+  getEventsLogbook: (params = {}) =>
+    shoreClient.get("/events/logbook", { params }).then((r) => r.data),
   // Activity Feed
   getFeed: (params = {}) => shoreClient.get("/feed", { params }).then((r) => r.data),
   // Notifications

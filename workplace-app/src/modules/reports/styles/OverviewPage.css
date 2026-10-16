@@ -1076,4 +1076,24 @@ thead {
   color: #3730a3;
 }
 
-
+/* ── Events tab (logbook values) ── */
+.ovw-ev-row .ovw-td-report,
+.ovw-ev-row .ovw-td-cell { height: 38px; padding-top: 4px; padding-bottom: 4px; }
+.ovw-ev-cell {
+  font-size: 12px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #1e293b;
+}
+.ovw-ev-section td { height: 30px; background: #eef2ff; border-bottom: 1px solid #dbe3f5; }
+.ovw-ev-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #3730a3;
+  padding-left: 16px;
+  background: #eef2ff !important;
+}
