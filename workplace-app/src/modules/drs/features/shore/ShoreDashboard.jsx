@@ -14,6 +14,9 @@ import ShoreReopenModal from '@drs/components/modals/ShoreReopenModal';
 import PrSyncManager from '@drs/components/shared/PrSyncManager';
 import DefectKanban from '@drs/components/shared/DefectKanban';
 import FeedDefectModal from '@drs/components/modals/FeedDefectModal';
+import VesselFeedDrawer from '@drs/components/shared/VesselFeedDrawer';
+import { countUnreadFeedByVessel } from '@drs/components/shared/feedUtils';
+import LiveFeed from './ShoreTasks';
 
 import { defectApi } from '@drs/services/defectApi';
 import DefectImageSidebar from '@drs/components/shared/DefectImageSidebar';
@@ -1591,6 +1594,19 @@ const ShoreDashboard = () => {
   const [viewMode, setViewMode] = useState('table');
   const [reopenDefect, setReopenDefect] = useState(null);
   const [boardModal, setBoardModal] = useState(null);
+  const [feedVessel, setFeedVessel] = useState(null);
+
+  const { data: boardFeedItems = [] } = useQuery({
+    queryKey: ['live-feed'],
+    queryFn: () => defectApi.getLiveFeed(),
+    refetchInterval: 15000,
+    enabled: viewMode === 'board',
+  });
+
+  const feedUnreadByVessel = useMemo(
+    () => countUnreadFeedByVessel(boardFeedItems, user?.id),
+    [boardFeedItems, user?.id]
+  );
   const [searchParams, setSearchParams] = useSearchParams();
   const [autoChatModes, setAutoChatModes] = useState({});
   const [isScrolled, setIsScrolled] = useState(false);
@@ -3159,6 +3175,8 @@ const ShoreDashboard = () => {
             defects={filteredData}
             role={user?.role}
             onCardClick={handleKanbanCardClick}
+            feedCounts={feedUnreadByVessel}
+            onOpenVesselFeed={(imo, name) => imo && setFeedVessel({ imo, name })}
             onApproveReject={handleKanbanDecision}
             onRequestReopen={setReopenDefect}
             onBlocked={(msg) => toast(msg, 'warning')}
@@ -4588,6 +4606,11 @@ const ShoreDashboard = () => {
             onConfirm={confirmModal.onConfirm}
             onCancel={() => setConfirmModal(null)}
           />
+        )}
+        {feedVessel && (
+          <VesselFeedDrawer title={`Feed - ${feedVessel.name}`} onClose={() => setFeedVessel(null)}>
+            <LiveFeed lockedVessel={feedVessel.imo} />
+          </VesselFeedDrawer>
         )}
         {boardModal && (
           <FeedDefectModal

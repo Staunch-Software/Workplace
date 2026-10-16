@@ -26,6 +26,9 @@ import './Vessel.css';
 import EnhancedClosureModal from '@drs/components/modals/EnhancedClosureModal';
 import DefectKanban from '@drs/components/shared/DefectKanban';
 import FeedDefectModal from '@drs/components/modals/FeedDefectModal';
+import VesselFeedDrawer from '@drs/components/shared/VesselFeedDrawer';
+import { countUnreadFeedByVessel } from '@drs/components/shared/feedUtils';
+import VesselLiveFeed from './MyTasks';
 
 import {
   DndContext,
@@ -1363,6 +1366,19 @@ const VesselDashboard = () => {
   const [closureValidation, setClosureValidation] = useState(null);
   const [viewMode, setViewMode] = useState('table');
   const [boardModal, setBoardModal] = useState(null);
+  const [feedVessel, setFeedVessel] = useState(null);
+
+  const { data: boardFeedItems = [] } = useQuery({
+    queryKey: ['live-feed'],
+    queryFn: () => defectApi.getLiveFeed(),
+    refetchInterval: 15000,
+    enabled: viewMode === 'board',
+  });
+
+  const feedUnreadByVessel = useMemo(
+    () => countUnreadFeedByVessel(boardFeedItems, user?.id),
+    [boardFeedItems, user?.id]
+  );
   const [showEditorModal, setShowEditorModal] = useState(false);
   const [editorData, setEditorData] = useState({ defectId: null, to: [], cc: [], subject: '', body: '' });
   const [savingDraft, setSavingDraft] = useState(false);
@@ -2592,6 +2608,8 @@ const VesselDashboard = () => {
             role={user?.role}
             onCardClick={handleKanbanCardClick}
             onRequestClose={handleKanbanClose}
+            feedCounts={feedUnreadByVessel}
+            onOpenVesselFeed={(imo, name) => imo && setFeedVessel({ imo, name })}
             onBlocked={(msg) => toast(msg, 'warning')}
           />
         ) : (<>
@@ -4018,6 +4036,11 @@ const VesselDashboard = () => {
         )}
 
 
+        {feedVessel && (
+          <VesselFeedDrawer title={`Feed - ${feedVessel.name}`} onClose={() => setFeedVessel(null)}>
+            <VesselLiveFeed />
+          </VesselFeedDrawer>
+        )}
         {boardModal && (
           <FeedDefectModal
             mode="board"

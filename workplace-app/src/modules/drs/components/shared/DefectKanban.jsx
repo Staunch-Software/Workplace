@@ -8,13 +8,12 @@ import {
   useDraggable,
   useDroppable,
 } from '@dnd-kit/core';
-import { Flag, Paperclip, Calendar, GripVertical, Ship, ChevronDown, Check, Search, X } from 'lucide-react';
+import { Flag, Paperclip, Calendar, GripVertical, Ship, ChevronDown, Check, Search, X, Bell } from 'lucide-react';
 import {
   PrioritySignalBarsIcon,
   StatusStageIcon,
   PRIORITY_COLORS,
   getStatusColor,
-  getDeadlineStatus,
   formatDate,
 } from '@drs/components/shared/constants';
 import './kanban.css';
@@ -58,7 +57,6 @@ const KanbanCard = ({ defect, draggable, onClick, overlay = false, showStatus = 
     data: { defect },
     disabled: !draggable || overlay,
   });
-  const deadline = defect.status === 'CLOSED' ? 'NORMAL' : getDeadlineStatus(defect.target_close_date);
   const priorityColor = PRIORITY_COLORS[defect.priority] || '#94a3b8';
 
   return (
@@ -89,8 +87,8 @@ const KanbanCard = ({ defect, draggable, onClick, overlay = false, showStatus = 
           <PrioritySignalBarsIcon size={12} color={priorityColor} level={PRIORITY_LEVEL[defect.priority]} />
           {defect.priority}
         </span>
-        <span className={`kanban-card__due${deadline === 'OVERDUE' ? ' is-overdue' : deadline === 'WARNING' ? ' is-warning' : ''}`}>
-          <Calendar size={12} /> {formatDate(defect.target_close_date)}
+        <span className="kanban-card__due" title="Report date">
+          <Calendar size={12} /> {formatDate(defect.date_identified || defect.created_at)}
         </span>
       </div>
     </div>
@@ -178,7 +176,7 @@ const VesselSelect = ({ value, options, counts, onChange }) => {
   );
 };
 
-const KanbanColumn = ({ column, cards, canDrag, onCardClick, isOver, byVessel }) => {
+const KanbanColumn = ({ column, cards, canDrag, onCardClick, isOver, byVessel, feedCount = 0, onOpenFeed }) => {
   const { setNodeRef } = useDroppable({ id: column.id, disabled: byVessel });
   const color = getStatusColor(column.id);
   const openCount = byVessel ? cards.filter((d) => d.status !== 'CLOSED').length : 0;
@@ -188,6 +186,17 @@ const KanbanColumn = ({ column, cards, canDrag, onCardClick, isOver, byVessel })
         <span className="kanban-col__title">
           {byVessel ? <Ship size={15} color="#475569" /> : <StatusStageIcon size={14} color={color} status={column.id} />}
           {column.label}
+          {byVessel && feedCount > 0 && (
+            <button
+              type="button"
+              className="kanban-feed-btn"
+              title={`${feedCount} new feed update${feedCount === 1 ? '' : 's'} - open feed`}
+              onClick={() => onOpenFeed?.()}
+            >
+              <Bell size={13} />
+              <span className="kanban-feed-btn__badge">{feedCount > 99 ? '99+' : feedCount}</span>
+            </button>
+          )}
         </span>
         <span className="kanban-col__count">{byVessel ? `${openCount} open` : cards.length}</span>
       </div>
@@ -209,6 +218,8 @@ const DefectKanban = ({
   onApproveReject,
   onRequestReopen,
   onBlocked,
+  feedCounts = {},
+  onOpenVesselFeed,
 }) => {
   const isShore = role === 'SHORE' || role === 'ADMIN';
   const [activeId, setActiveId] = useState(null);
@@ -227,6 +238,15 @@ const DefectKanban = ({
     () => [...new Set(defects.map((d) => d.vessel_name || d.vessel_imo).filter(Boolean))].sort(),
     [defects]
   );
+
+  const imoByName = useMemo(() => {
+    const m = {};
+    defects.forEach((d) => {
+      const v = d.vessel_name || d.vessel_imo;
+      if (v && d.vessel_imo) m[v] = String(d.vessel_imo);
+    });
+    return m;
+  }, [defects]);
 
   const vesselCounts = useMemo(() => {
     const c = {};
@@ -391,6 +411,8 @@ const DefectKanban = ({
             canDrag={canDrag}
             onCardClick={(d) => onCardClick?.(d, orderedDefects)}
             byVessel={byVessel}
+            feedCount={feedCounts[imoByName[col.id]] || 0}
+            onOpenFeed={() => onOpenVesselFeed?.(imoByName[col.id], col.label)}
             isOver={!byVessel && overId === col.id && activeDefect && activeDefect.status !== col.id}
           />
         ))}
