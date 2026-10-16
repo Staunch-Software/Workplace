@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # Control plane DB (Users, Vessels — shared with workplace)
     CONTROL_DATABASE_URL: str
 
+    # Vessel_Performance DB (read-only, feeds the Overview "Events" tab).
+    # Empty = feature disabled.
+    VESSEL_PERF_DATABASE_URL: str = ""
+
     # Report tracker DB
     DB_USER: str
     DB_PASSWORD: str

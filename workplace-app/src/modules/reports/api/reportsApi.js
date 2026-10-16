@@ -59,6 +59,10 @@ export const reportsApi = {
     shoreClient.get("/reports", { params }).then((r) => r.data),
   getReport: (reportId) =>
     shoreClient.get(`/reports/${reportId}`).then((r) => r.data),
+  getViewedReportIds: () =>
+    shoreClient.get('/report-views').then((r) => r.data),
+  markReportViewed: (reportId) =>
+    shoreClient.post(`/report-views/${reportId}`).then((r) => r.data),
   getPdfUrl: (reportId) =>
     shoreClient.get(`/reports/${reportId}/pdf`).then((r) => r.data),
   getPdfUrlByPath: (reportId, path) =>
@@ -97,6 +101,9 @@ export const reportsApi = {
     shoreClient.delete(`/reports/config/${configId}`).then((r) => r.data),
   bulkAssignVessel: (vessel_imo, vessel_name) =>
     shoreClient.post("/reports/config/bulk-assign", { vessel_imo, vessel_name }).then((r) => r.data),
+  // Vessel_Performance logbook values (Overview "Events" tab)
+  getEventsLogbook: (params = {}) =>
+    shoreClient.get("/events/logbook", { params }).then((r) => r.data),
   // Activity Feed
   getFeed: (params = {}) => shoreClient.get("/feed", { params }).then((r) => r.data),
   // Notifications

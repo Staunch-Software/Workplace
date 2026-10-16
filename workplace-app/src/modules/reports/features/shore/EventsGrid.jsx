@@ -1,0 +1,281 @@
+// src/modules/reports/features/shore/EventsGrid.jsx
+// Overview "Events" tab: logbook column (rows) x vessel (columns), with the
+// latest 5 days of Vessel_Performance noon-report values per vessel.
+import React, { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Layers, FileWarning, AlertCircle, Search, X, CalendarDays, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { reportsApi } from '../../api/reportsApi';
+import '../../styles/EventsCells.css';
+
+const DAYS = 5;
+const SOURCES = [
+  { id: 'mari_apps', label: 'MariApps' },
+  { id: 'wni', label: 'WNI' },
+];
+const SECTIONS = ['Log Info', 'Performance', 'Emission'];
+const SECTION_CLASS = { 'Log Info': 'info', Performance: 'perf', Emission: 'emis' };
+
+function fmtDay(iso) {
+  const d = new Date(`${iso}T00:00:00`);
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+}
+
+function fmtValue(v) {
+  if (v === null || v === undefined || v === '') return '-';
+  const n = Number(v);
+  if (v !== '' && !Number.isNaN(n) && /^-?\d+(\.\d+)?$/.test(String(v).trim())) {
+    return String(Math.round(n * 1000) / 1000);
+  }
+  return String(v);
+}
+
+function toIso(d) {
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+function parseIso(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+export default function EventsGrid({ vessels, search, setSearch }) {
+  const [source, setSource] = useState('mari_apps');
+  const [anchor, setAnchor] = useState(null); // null = latest
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['events-logbook', source, anchor],
+    queryFn: () => reportsApi.getEventsLogbook({ source, days: DAYS, ...(anchor ? { end_date: anchor } : {}) }),
+    refetchInterval: 60000,
+    placeholderData: (prev) => prev,
+  });
+
+  const latestDate = data?.latest_date || null;
+  const isAtLatest = !anchor || (latestDate && anchor >= latestDate);
+
+  const shiftAnchor = (delta) => {
+    const base = parseIso(anchor || latestDate || toIso(new Date()));
+    base.setDate(base.getDate() + delta);
+    const iso = toIso(base);
+    if (delta > 0 && latestDate && iso >= latestDate) setAnchor(null);
+    else setAnchor(iso);
+  };
+  const onPickDate = (e) => {
+    const v = e.target.value;
+    if (!v) return;
+    if (latestDate && v >= latestDate) setAnchor(null);
+    else setAnchor(v);
+  };
+
+  const byImo = useMemo(() => {
+    const m = {};
+    (data?.vessels || []).forEach(v => { m[v.imo] = v.rows; });
+    return m;
+  }, [data]);
+
+  // Per vessel: its latest DAYS dates, oldest -> newest, left-padded to DAYS.
+  const dayCols = useMemo(() => {
+    const out = {};
+    vessels.forEach(v => {
+      const dates = Object.keys(byImo[v.imo] || {}).sort().slice(-DAYS);
+      out[v.imo] = [...Array(DAYS - dates.length).fill(null), ...dates];
+    });
+    return out;
+  }, [vessels, byImo]);
+
+  const rangeLabel = useMemo(() => {
+    const all = Object.values(dayCols).flat().filter(Boolean).sort();
+    if (all.length === 0) return '';
+    return `${fmtDay(all[0])} – ${fmtDay(all[all.length - 1])}`;
+  }, [dayCols]);
+
+  const sections = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return SECTIONS.map(name => ({
+      name,
+      cols: (data?.columns || [])
+        .filter(c => c.category === name)
+        .filter(c => !q || c.display_name.toLowerCase().includes(q)),
+    })).filter(s => s.cols.length > 0);
+  }, [data, search]);
+
+  const totalCols = vessels.length * DAYS;
+
+  return (
+    <>
+      <div className="ovw-control-bar">
+        <div className="ovw-control-left">
+          <div className="ovw-freq-tabs">
+            {SOURCES.map(s => (
+              <button
+                key={s.id}
+                className={`ovw-freq-tab ${source === s.id ? 'active' : ''}`}
+                onClick={() => { setSource(s.id); setAnchor(null); }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <div className="ovw-daily-nav-group">
+            <button type="button" className="ovw-nav-arrow-btn" onClick={() => shiftAnchor(-DAYS)} title="Previous 5 days">
+              <ChevronLeft size={14} />
+            </button>
+            <label className="ovw-compact-select ovw-daily-picker-label" title="Click to pick an end date">
+              <span className="ovw-compact-select-icon"><CalendarDays size={13} /></span>
+              <span className="ovw-compact-select-value">
+                {rangeLabel || 'Latest 5 days'}
+              </span>
+              <input
+                type="date"
+                className="ovw-hidden-date-input"
+                value={anchor || latestDate || ''}
+                max={latestDate || undefined}
+                onChange={onPickDate}
+              />
+            </label>
+            <button
+              type="button"
+              className="ovw-nav-arrow-btn"
+              onClick={() => shiftAnchor(DAYS)}
+              disabled={isAtLatest}
+              title={isAtLatest ? 'Already at latest' : 'Next 5 days'}
+            >
+              <ChevronRight size={14} />
+            </button>
+            {!isAtLatest && (
+              <button type="button" className="ovw-reset-latest-btn" onClick={() => setAnchor(null)} title="Jump back to the latest reports">
+                <RotateCcw size={11} style={{ marginRight: 4 }} />
+                Latest
+              </button>
+            )}
+          </div>
+          <div className="ovw-stat-strip">
+            <span className="ovw-stat-pill">
+              <strong>{vessels.length}</strong>&nbsp;vessels
+            </span>
+            <span className="ovw-stat-pill">
+              Latest <strong>&nbsp;{DAYS}&nbsp;</strong> days of noon reports
+            </span>
+          </div>
+        </div>
+        <div className="ovw-control-right">
+          <div className="ovw-search-box">
+            <Search size={13} />
+            <input
+              type="text"
+              placeholder="Filter column name…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && (
+              <button className="ovw-search-clear" onClick={() => setSearch('')}>
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="ovw-card">
+        {isLoading ? (
+          <div className="ovw-state-container">
+            <div className="ovw-spinner-ring" />
+            <p className="ovw-state-label">Loading logbook data…</p>
+          </div>
+        ) : error ? (
+          <div className="ovw-state-container">
+            <div className="ovw-empty-icon-wrap"><AlertCircle size={32} /></div>
+            <p className="ovw-state-label">Could not load logbook data</p>
+            <p className="ovw-state-sub">{error.response?.data?.detail || error.message}</p>
+          </div>
+        ) : sections.length === 0 || vessels.length === 0 ? (
+          <div className="ovw-state-container">
+            <div className="ovw-empty-icon-wrap"><FileWarning size={32} /></div>
+            <p className="ovw-state-label">No logbook data found</p>
+            <p className="ovw-state-sub">Try another source or clear the filter</p>
+          </div>
+        ) : (
+          <div className="ovw-table-scroll">
+            <table className="ovw-table ev-grid" style={{ width: `${280 + totalCols * 112}px` }}>
+              <colgroup>
+                <col style={{ width: 280, minWidth: 280, maxWidth: 280 }} />
+                {Array.from({ length: totalCols }, (_, i) => (
+                  <col key={i} style={{ width: 112, minWidth: 112, maxWidth: 112 }} />
+                ))}
+              </colgroup>
+              <thead>
+                <tr className="ovw-thead-row1">
+                  <th className="ovw-th-report ovw-sticky-col" rowSpan={2}>
+                    <div className="ovw-th-report-inner">
+                      <Layers size={13} className="ovw-th-icon" />
+                      Logbook Column
+                    </div>
+                  </th>
+                  {vessels.map(v => (
+                    <th key={v.imo} className="ovw-th-vessel" colSpan={DAYS}>
+                      <div className="ovw-th-vessel-inner">
+                        <span className="ovw-vessel-name">{v.name}</span>
+                        <span className="ovw-vessel-imo">IMO {v.imo}</span>
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+                <tr className="ovw-thead-row2">
+                  {vessels.map(v =>
+                    dayCols[v.imo].map((d, i) => (
+                      <th
+                        key={`${v.imo}-${i}`}
+                        className={`ovw-th-week${d && i === DAYS - 1 ? ' ovw-th-week-current' : ''}`}
+                      >
+                        {d ? fmtDay(d) : '-'}
+                        {d && i === DAYS - 1 && <span className="ovw-current-week-dot" />}
+                      </th>
+                    ))
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {sections.map(sec => (
+                  <React.Fragment key={sec.name}>
+                    <tr className={`ovw-ev-section ${SECTION_CLASS[sec.name]}`}>
+                      <td className="ovw-sticky-col ovw-ev-section-label">{sec.name}<em>{sec.cols.length}</em></td>
+                      <td colSpan={totalCols} className="ovw-ev-section-fill" />
+                    </tr>
+                    {sec.cols.map((c, rowIdx) => (
+                      <tr
+                        key={`${sec.name}-${c.db_column}`}
+                        className={`ovw-row ovw-ev-row ${rowIdx % 2 === 0 ? 'even' : 'odd'}`}
+                      >
+                        <td className="ovw-td-report ovw-sticky-col">
+                          <span className="ovw-report-name">
+                            {c.display_name}
+                          </span>
+                          {c.unit && <span className="ev-unit">{c.unit}</span>}
+                        </td>
+                        {vessels.map(v =>
+                          dayCols[v.imo].map((d, i) => {
+                            const val = d ? fmtValue(byImo[v.imo]?.[d]?.[c.db_column]) : '-';
+                            const empty = val === '-';
+                            const isNum = !empty && /^-?\d+(\.\d+)?$/.test(val);
+                            return (
+                              <td
+                                key={`${v.imo}-${i}`}
+                                className={`ovw-td-cell ovw-td-week ovw-ev-cell${i === DAYS - 1 ? ' latest' : ''}${i === 0 ? ' first' : ''}${empty ? ' empty' : ''}${!empty && !isNum ? ' text' : ''}`}
+                                title={empty ? '' : val}
+                              >
+                                {!empty && !isNum ? <span className="ev-pill">{val}</span> : val}
+                              </td>
+                            );
+                          })
+                        )}
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
