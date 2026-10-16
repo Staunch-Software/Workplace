@@ -5326,6 +5326,18 @@ const LuboilAnalysis = () => {
 
                                   // --- CONDITION 2: MISSING ---
                                   if (!cell.has_report) {
+                                    // ME OIL SETTLING is optional: show a blank cell instead of MISSING.
+                                    if ((cell.code || colCode || "").trim() === "ME OIL SETTLING") {
+                                      return (
+                                        <td
+                                          key={vesselName}
+                                          className={`lub-data-cell empty-cell ${colFocusClass} ${pageDropClass(dropTarget)}`}
+                                          {...getCellDropProps(dropTarget)}
+                                        >
+                                          {renderPageDropTools(dropTarget)}
+                                        </td>
+                                      );
+                                    }
                                     return (
                                       <td
                                         key={vesselName}
