@@ -11,18 +11,21 @@ const LubeIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="no
 const EngineIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="2" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2" /></svg>);
 const ReportsIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg>);
 
+const OrbIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>);
+
 const MODULE_LIST = [
     { id: "drs", name: "Defect Reporting System", Icon: DrsIcon },
     { id: "jira", name: "SmartPAL JIRA", Icon: JiraIcon },
     { id: "lubeoil", name: "Lubeoil Analysis", Icon: LubeIcon },
     { id: "engine_performance", name: "Engine Performance", Icon: EngineIcon },
     { id: "report_tracker", name: "SmartPAL Reports", Icon: ReportsIcon },
+    { id: "orb", name: "Oil Record Book (ORB)", Icon: OrbIcon },
 ];
 
 export default function CreateUser() {
     const navigate = useNavigate();
     const [form, setForm] = useState({ full_name: "", email: "", password: "", job_title: "", role: "VESSEL" });
-    const [permissions, setPermissions] = useState({ drs: false, jira: false, lubeoil: false, engine_performance: false, report_tracker: false });
+    const [permissions, setPermissions] = useState({ drs: false, jira: false, lubeoil: false, engine_performance: false, report_tracker: false, orb: false });
     const [selectedVessels, setSelectedVessels] = useState([]);
     const [canSelfAssign, setCanSelfAssign] = useState(false);
     const [vessels, setVessels] = useState([]);
