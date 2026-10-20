@@ -1257,3 +1257,10 @@ thead {
   .ovw-mm-chips { padding: 10px 16px 12px; }
   .ovw-mm-vessel-pct { min-width: 0; justify-content: flex-start; }
 }
+
+/* alternating strip colour per vessel column group (Daily / Weekly / Monthly / Quarterly) */
+.ovw-table thead th.ovw-th-vessel.grp-odd { background: linear-gradient(180deg, #e6ecff, #eff3ff); }
+.ovw-table thead th.ovw-th-week.grp-odd { background: #f1f4ff; }
+.ovw-table tbody td.ovw-td-cell.grp-odd { background-color: #f6f8ff; }
+.ovw-table tbody td.ovw-td-cell.grp-odd.ovw-cell-na { background-color: #eef1f8; }
+.ovw-row:hover td.ovw-td-cell.grp-odd { background-color: #eef1ff; }

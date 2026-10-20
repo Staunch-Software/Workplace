@@ -1013,10 +1013,10 @@ export default function OverviewPage() {
                       Report Name
                     </div>
                   </th>
-                  {vessels.map(v => (
+                  {vessels.map((v, vi) => (
                     <th
                       key={v.imo}
-                      className="ovw-th-vessel"
+                      className={`ovw-th-vessel${vi % 2 ? ' grp-odd' : ''}`}
                       colSpan={hasSubCols ? buckets.length : 1}
                     >
                       <div className="ovw-th-vessel-inner ovw-th-vessel-inner--pct">
@@ -1049,13 +1049,13 @@ export default function OverviewPage() {
                 {/* ── Row 2 (Weekly & Daily): Sub-headers ── */}
                 {hasSubCols && (
                   <tr className="ovw-thead-row2">
-                    {vessels.map(v =>
+                    {vessels.map((v, vi) =>
                       buckets.map(b => {
                         const isCurrent = isWeekly ? b.key === currentWeekKey : b.isLatest;
                         return (
                           <th
                             key={`${v.imo}-${b.key}`}
-                            className={`ovw-th-week${isCurrent ? ' ovw-th-week-current' : ''}`}
+                            className={`ovw-th-week${isCurrent ? ' ovw-th-week-current' : ''}${vi % 2 ? ' grp-odd' : ''}`}
                             title={isDaily ? b.sub : `Week ${b.number} · ${b.sub}`}
                           >
                             {b.label}
@@ -1075,14 +1075,15 @@ export default function OverviewPage() {
                       <span className="ovw-report-name">{name}</span>
                     </td>
 
-                    {vessels.map(v => {
+                    {vessels.map((v, vi) => {
+                      const grp = vi % 2 ? ' grp-odd' : '';
                       const isConfigured = !configuredPairs || configuredPairs.has(`${v.imo}|${name}`);
 
                       if (!isConfigured) {
                         return (
                           <td
                             key={v.imo}
-                            className="ovw-td-cell ovw-cell-na"
+                            className={`ovw-td-cell ovw-cell-na${grp}`}
                             colSpan={hasSubCols ? buckets.length : 1}
                           >
                             <span className="ovw-na-text">N/A</span>
@@ -1096,7 +1097,7 @@ export default function OverviewPage() {
                         return buckets.map(b => {
                           const match = findDailyMatch(instances, b);
                           return (
-                            <td key={`${v.imo}-${b.key}`} className="ovw-td-cell ovw-td-week">
+                            <td key={`${v.imo}-${b.key}`} className={`ovw-td-cell ovw-td-week${grp}`}>
                               {match && hasValidAttachment(match.attachments) ? (
                                 <AttachmentIcon
                                   report={match}
@@ -1116,7 +1117,7 @@ export default function OverviewPage() {
 
                       if (isWeekly) {
                         return buckets.map(b => (
-                          <td key={`${v.imo}-${b.key}`} className="ovw-td-cell ovw-td-week">
+                          <td key={`${v.imo}-${b.key}`} className={`ovw-td-cell ovw-td-week${grp}`}>
                             <AttachmentCell instances={instances} bucket={b} now={now} onOpen={handleOpenReport} viewerRole={user?.role} buckets={buckets} seenIds={seenIds} />
                           </td>
                         ));
@@ -1124,7 +1125,7 @@ export default function OverviewPage() {
 
                       /* Monthly / Quarterly: single merged cell per vessel */
                       return (
-                        <td key={v.imo} className="ovw-td-cell">
+                        <td key={v.imo} className={`ovw-td-cell${grp}`}>
                           <div className="ovw-icon-group">
                             {buckets.map(b => (
                               <AttachmentCell key={b.key} instances={instances} bucket={b} now={now} onOpen={handleOpenReport} viewerRole={user?.role} buckets={buckets} seenIds={seenIds} />
