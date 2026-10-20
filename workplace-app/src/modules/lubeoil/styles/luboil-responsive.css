@@ -570,7 +570,7 @@ div.section-header-enhanced {
 }
 
 .vessel-name-txt {
-  font-size: 0.8rem !important;
+  font-size: 0.84rem !important;
   font-weight: 800 !important;
   color: #0f172a !important;
 }
@@ -2570,9 +2570,9 @@ div.section-header-enhanced {
 
 /* Status Labels */
 .missing-label {
-  color: #be123c !important;
-  font-size: 0.75rem !important;
-  font-weight: 800 !important;
+  color: #64748b !important;
+  font-size: 0.64rem !important;
+  font-weight: 600 !important;
 }
 
 .na-text {
@@ -2862,10 +2862,10 @@ div.section-header-enhanced {
 
 /* Reduced Missing Label for Laptop */
 .missing-label {
-  color: #be123c !important;
+  color: #64748b !important;
   font-size: 0.62rem !important;
   /* Smaller for laptop */
-  font-weight: 800 !important;
+  font-weight: 600 !important;
 }
 
 .na-text {
@@ -3993,13 +3993,15 @@ div.section-header-enhanced {
 
 /* Missing State */
 .missing-cell {
-  background-color: #fff1f2 !important;
+  background-color: #fafbfc !important;
 }
 
 .missing-label {
-  color: #be123c !important;
-  font-size: 0.75rem !important;
-  font-weight: 800 !important;
+  color: #64748b !important;
+  background-color: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+  font-size: 0.64rem !important;
+  font-weight: 600 !important;
   letter-spacing: 0.5px;
 }
 
@@ -10399,54 +10401,46 @@ div.section-header-enhanced {
 
 
 /* ============================================================
-   FIX: MATRIX TABLE HEADER/DATA COLUMN OVERLAP
-
-   Root cause: this file accumulated many separate, uncoordinated
-   width/min-width declarations for the matrix table's columns —
-   .machinery-sticky-cell / .matrix-corner-header / .lub-matrix-footer-label
-   (the sticky left column, repeated in the header/body/footer rows)
-   and .vessel-header-cell / .lub-data-cell / .lub-matrix-footer-cell
-   (the repeating vessel columns, same idea) each had DIFFERENT pixel
-   widths at the same breakpoint depending on which of several
-   duplicate rule blocks happened to be added later in the file. With
-   table-layout:fixed, the header row and body rows must agree on a
-   column's width or the grid drifts out of alignment — worse, some
-   of those duplicates only shrank the body/data cells and not the
-   header cells (or vice versa) at a given breakpoint, so the two
-   edges of the same column literally disagreed on how wide it was.
-   That drift is what showed up as cells overlapping.
-
-   Also, .vessel-table-enhanced had its overall width forced to
-   arbitrary calc(180%/220% - Npx) values at <=1200px/<=900px,
-   unrelated to how many vessel columns actually exist — fighting
-   the table's own inline width:100% and making the drift above worse
-   exactly at those breakpoints.
-
-   Fix: give the sticky column and the vessel columns ONE width each,
-   shared identically by every row (header/body/footer), with no
-   shrinking at smaller sizes — .matrix-scroll-container already has
-   overflow:auto (line ~652), so when columns don't fit the viewport
-   the table scrolls horizontally instead of shrinking columns until
-   they overlap. This works for any number of vessels: more vessel
-   columns just means more horizontal scroll, not narrower columns.
-   Only >=2000px keeps a deliberate (matching, non-conflicting) bump
-   for large-screen readability, consistent with the rest of the file.
-
-   Placed last so it wins the cascade over every earlier conflicting
-   declaration for these same selectors (same specificity, same
-   !important — last rule in the file applies), without editing or
-   removing any of those earlier blocks' other properties (font-size,
-   padding, colors, etc. are untouched).
+   EXACT 5-VESSEL VISIBLE COLUMN RESPONSIVE GRID
+   Requirements:
+   - Exactly 5 vessel columns shown at a time in the visible viewport
+   - Sticky machinery column pinned to the left
+   - Media queries:
+       1) < 1200px (Tablets / Compact)
+       2) 1200px to 1400px (Laptops)
+       3) 1400px to 1900px (Standard Desktop / 1080p)
+       4) 1900px to 2k (1900px to 2560px / QHD)
+       5) 2k to 4k (2560px to 3840px+ / Ultra-wide & 4K)
    ============================================================ */
 
-/* Let the table's own width:100% (inline, LuboilAnalysis.jsx) govern
-   things — no more arbitrary calc() stretch unrelated to column count. */
-.vessel-table-enhanced {
+/* Container query context on matrix card so 100cqw is the exact visible table viewport */
+div.dashboard-container-enhanced .lub-matrix-card.enhanced-card,
+.lub-matrix-card.enhanced-card {
+  container-type: inline-size;
+}
+
+/* Ensure smooth horizontal & vertical scroll without clipping */
+.matrix-scroll-container {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
   width: 100% !important;
 }
 
-/* Sticky left column (corner header + machinery cell + footer label)
-   — one width, shared by all three, at every size below 2000px. */
+/* The table allows expanding horizontally when there are >5 vessels */
+.vessel-table-enhanced {
+  width: max-content !important;
+  min-width: 100% !important;
+  table-layout: fixed !important;
+}
+
+/* --- DEFAULT / BASE (1400px to 1900px) --- */
+:root, div.dashboard-container-enhanced {
+  --matrix-sticky-width: 220px;
+  --matrix-vessel-width: calc((100cqw - 220px) / 5);
+}
+
 .matrix-corner-header,
 .machinery-sticky-cell,
 .lub-matrix-footer-label {
@@ -10455,41 +10449,162 @@ div.section-header-enhanced {
   max-width: 220px !important;
 }
 
-/* Vessel columns (header cell + data cell + footer select-cell)
-   — one width, shared by all three, at every size below 2000px.
-   Using width (not just min-width) on all three removes any
-   ambiguity about which row's declaration a fixed-layout table uses
-   to size the column. */
 .vessel-header-cell,
 .lub-data-cell,
 .lub-matrix-footer-cell {
-  width: 220px !important;
-  min-width: 220px !important;
-  max-width: 220px !important;
+  width: calc((100cqw - 220px) / 5) !important;
+  min-width: calc((100cqw - 220px) / 5) !important;
+  max-width: calc((100cqw - 220px) / 5) !important;
 }
 
-/* Big screens: grow both column groups together, still matching
-   width-for-width across header/body/footer, so nothing drifts. */
-@media (min-width: 2000px) {
+/* --- 1. TABLETS / COMPACT (< 1200px) --- */
+@media (max-width: 1199.98px) {
+  :root, div.dashboard-container-enhanced {
+    --matrix-sticky-width: 180px;
+    --matrix-vessel-width: calc((100cqw - 180px) / 5);
+  }
+
   .matrix-corner-header,
   .machinery-sticky-cell,
   .lub-matrix-footer-label {
-    width: 380px !important;
-    min-width: 380px !important;
-    max-width: 380px !important;
+    width: 180px !important;
+    min-width: 180px !important;
+    max-width: 180px !important;
   }
 
   .vessel-header-cell,
   .lub-data-cell,
   .lub-matrix-footer-cell {
-    width: 420px !important;
-    min-width: 420px !important;
-    max-width: 420px !important;
+    width: calc((100cqw - 180px) / 5) !important;
+    min-width: calc((100cqw - 180px) / 5) !important;
+    max-width: calc((100cqw - 180px) / 5) !important;
   }
 }
 
+/* --- 2. LAPTOPS (1200px to 1400px) --- */
+@media (min-width: 1200px) and (max-width: 1400px) {
+  :root, div.dashboard-container-enhanced {
+    --matrix-sticky-width: 200px;
+    --matrix-vessel-width: calc((100cqw - 200px) / 5);
+  }
 
+  .matrix-corner-header,
+  .machinery-sticky-cell,
+  .lub-matrix-footer-label {
+    width: 200px !important;
+    min-width: 200px !important;
+    max-width: 200px !important;
+  }
 
+  .vessel-header-cell,
+  .lub-data-cell,
+  .lub-matrix-footer-cell {
+    width: calc((100cqw - 200px) / 5) !important;
+    min-width: calc((100cqw - 200px) / 5) !important;
+    max-width: calc((100cqw - 200px) / 5) !important;
+  }
+}
+
+/* --- 3. DESKTOP / 1080p (1400px to 1900px) --- */
+@media (min-width: 1400.02px) and (max-width: 1900px) {
+  :root, div.dashboard-container-enhanced {
+    --matrix-sticky-width: 220px;
+    --matrix-vessel-width: calc((100cqw - 220px) / 5);
+  }
+
+  .matrix-corner-header,
+  .machinery-sticky-cell,
+  .lub-matrix-footer-label {
+    width: 220px !important;
+    min-width: 220px !important;
+    max-width: 220px !important;
+  }
+
+  .vessel-header-cell,
+  .lub-data-cell,
+  .lub-matrix-footer-cell {
+    width: calc((100cqw - 220px) / 5) !important;
+    min-width: calc((100cqw - 220px) / 5) !important;
+    max-width: calc((100cqw - 220px) / 5) !important;
+  }
+}
+
+/* --- 4. LARGE MONITORS / 1440p / 2K (1900px to 2560px) --- */
+@media (min-width: 1900.02px) and (max-width: 2560px) {
+  :root, div.dashboard-container-enhanced {
+    --matrix-sticky-width: 260px;
+    --matrix-vessel-width: calc((100cqw - 260px) / 5);
+  }
+
+  .matrix-corner-header,
+  .machinery-sticky-cell,
+  .lub-matrix-footer-label {
+    width: 260px !important;
+    min-width: 260px !important;
+    max-width: 260px !important;
+  }
+
+  .vessel-header-cell,
+  .lub-data-cell,
+  .lub-matrix-footer-cell {
+    width: calc((100cqw - 260px) / 5) !important;
+    min-width: calc((100cqw - 260px) / 5) !important;
+    max-width: calc((100cqw - 260px) / 5) !important;
+  }
+}
+
+/* --- 5. ULTRA-WIDE & 4K (2560px to 3840px+) --- */
+@media (min-width: 2560.02px) {
+  :root, div.dashboard-container-enhanced {
+    --matrix-sticky-width: 360px;
+    --matrix-vessel-width: calc((100cqw - 360px) / 5);
+  }
+
+  .matrix-corner-header,
+  .machinery-sticky-cell,
+  .lub-matrix-footer-label {
+    width: 360px !important;
+    min-width: 360px !important;
+    max-width: 360px !important;
+  }
+
+  .vessel-header-cell,
+  .lub-data-cell,
+  .lub-matrix-footer-cell {
+    width: calc((100cqw - 360px) / 5) !important;
+    min-width: calc((100cqw - 360px) / 5) !important;
+    max-width: calc((100cqw - 360px) / 5) !important;
+  }
+}
+
+/* --- FALLBACK FOR BROWSERS WITHOUT CONTAINER QUERIES --- */
+@supports not (container-type: inline-size) {
+  @media (max-width: 1199.98px) {
+    .vessel-header-cell, .lub-data-cell, .lub-matrix-footer-cell {
+      width: 190px !important; min-width: 190px !important; max-width: 190px !important;
+    }
+  }
+  @media (min-width: 1200px) and (max-width: 1400px) {
+    .vessel-header-cell, .lub-data-cell, .lub-matrix-footer-cell {
+      width: 216px !important; min-width: 216px !important; max-width: 216px !important;
+    }
+  }
+  @media (min-width: 1400.02px) and (max-width: 1900px) {
+    .vessel-header-cell, .lub-data-cell, .lub-matrix-footer-cell {
+      width: 275px !important; min-width: 275px !important; max-width: 275px !important;
+    }
+  }
+  @media (min-width: 1900.02px) and (max-width: 2560px) {
+    .vessel-header-cell, .lub-data-cell, .lub-matrix-footer-cell {
+      width: 380px !important; min-width: 380px !important; max-width: 380px !important;
+    }
+  }
+  @media (min-width: 2560.02px) {
+    .vessel-header-cell, .lub-data-cell, .lub-matrix-footer-cell {
+      width: 650px !important; min-width: 650px !important; max-width: 650px !important;
+    }
+  }
+}
 
 /* ============================================================
    DASHBOARD HEADER: Title/Subtitle | Summary cards | Owner | Upload
@@ -10792,4 +10907,388 @@ div.dashboard-container-enhanced .lub-matrix-card.enhanced-card {
     width: 32px !important;
     height: 32px !important;
   }
+}
+
+
+/* ================================================================
+   MACHINERY / EQUIPMENT STICKY COLUMN: FULL RIGHT SHADOW & ENHANCEMENT
+   ================================================================ */
+
+/* 1. Header Corner Cell */
+div.dashboard-container-enhanced th.matrix-corner-header,
+.matrix-corner-header {
+  position: sticky !important;
+  left: 0 !important;
+  top: 0 !important;
+  z-index: 1000 !important;
+  background: #f8fafc !important;
+  border-right: 1px solid #e2e8f0 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-left: 3px solid #10b981 !important;
+  box-shadow: 4px 2px 10px -1px rgba(15, 23, 42, 0.08), 2px 0 4px -1px rgba(15, 23, 42, 0.04) !important;
+  padding: 10px 16px !important;
+  vertical-align: middle !important;
+}
+
+/* 2. Body Machinery Sticky Cells */
+div.dashboard-container-enhanced td.machinery-sticky-cell,
+.machinery-sticky-cell {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 10 !important;
+  background-color: #ffffff !important;
+  border-right: 1px solid #e2e8f0 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-left: 3px solid transparent !important;
+  box-shadow: 4px 0 10px -1px rgba(15, 23, 42, 0.08), 2px 0 4px -1px rgba(15, 23, 42, 0.04) !important;
+  padding: 10px 16px !important;
+  vertical-align: middle !important;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Subtle Alternating Zebra Tint on Machinery Column */
+div.dashboard-container-enhanced tr.matrix-table-row:nth-child(even) td.machinery-sticky-cell {
+  background-color: #fafbfc !important;
+}
+
+/* Row Hover Interaction */
+div.dashboard-container-enhanced tr.matrix-table-row:hover td.machinery-sticky-cell {
+  background-color: #f1f5f9 !important;
+  border-left: 3px solid #10b981 !important;
+}
+
+div.dashboard-container-enhanced tr.matrix-table-row:hover .m-code-label {
+  color: #059669 !important;
+}
+
+/* 3. Footer Label Sticky Cell */
+div.dashboard-container-enhanced td.lub-matrix-footer-label,
+.lub-matrix-footer-label {
+  position: sticky !important;
+  left: 0 !important;
+  bottom: -1px !important;
+  z-index: 120 !important;
+  background-color: #f8fafc !important;
+  border-right: 1px solid #e2e8f0 !important;
+  border-top: 1px solid #e2e8f0 !important;
+  border-left: 3px solid #3b82f6 !important;
+  box-shadow: 4px -2px 10px -1px rgba(15, 23, 42, 0.08), 2px 0 4px -1px rgba(15, 23, 42, 0.04) !important;
+  padding: 10px 16px !important;
+  vertical-align: middle !important;
+  border-bottom-left-radius: 12px !important;
+}
+
+/* Typography Hierarchy */
+div.dashboard-container-enhanced .m-code-label {
+  font-size: 0.78rem !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  letter-spacing: -0.01em !important;
+  line-height: 1.25 !important;
+  text-transform: uppercase !important;
+  transition: color 0.15s ease !important;
+}
+
+div.dashboard-container-enhanced .m-desc-label {
+  font-size: 0.65rem !important;
+  font-weight: 500 !important;
+  color: #64748b !important;
+  line-height: 1.2 !important;
+  margin-top: 2px !important;
+}
+
+
+/* ================================================================
+   DATA CELL: COMPACT STATUS DOTS & DUE BADGE (ICON & DUE: IN RED)
+   ================================================================ */
+div.dashboard-container-enhanced .lub-status-dots-container {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 3px !important;
+}
+
+div.dashboard-container-enhanced .lub-status-row-one {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+}
+
+div.dashboard-container-enhanced .lub-dot-item svg {
+  transition: transform 0.15s ease !important;
+}
+
+
+
+div.dashboard-container-enhanced .lub-status-action-btn {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  border-radius: 4px !important;
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+div.dashboard-container-enhanced .lub-status-action-btn:hover {
+  background: #eff6ff !important;
+  border-color: #3b82f6 !important;
+  color: #2563eb !important;
+}
+
+/* Base Due Badge */
+div.dashboard-container-enhanced .lub-status-due-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 1px 2px !important;
+  font-size: 0.62rem !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  margin-top: 2px !important;
+  color: #64748b !important;
+}
+
+div.dashboard-container-enhanced .lub-status-due-badge svg {
+  width: 10px !important;
+  height: 10px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Overdue: Red Icon and Red "Due:" */
+div.dashboard-container-enhanced .lub-status-due-badge.is-overdue svg {
+  color: #dc2626 !important;
+  stroke: #dc2626 !important;
+}
+
+div.dashboard-container-enhanced .lub-status-due-badge.is-overdue .due-label-red {
+  color: #dc2626 !important;
+  font-weight: 700 !important;
+  margin-right: 2px !important;
+}
+
+div.dashboard-container-enhanced .lub-status-due-badge.is-overdue .due-text-normal {
+  color: #475569 !important;
+  font-weight: 500 !important;
+}
+
+/* Upcoming / On-Schedule: Normal Slate Colors */
+div.dashboard-container-enhanced .lub-status-due-badge.is-upcoming svg {
+  color: #94a3b8 !important;
+  stroke: #94a3b8 !important;
+}
+
+div.dashboard-container-enhanced .lub-status-due-badge.is-upcoming .due-label-normal {
+  color: #64748b !important;
+  font-weight: 500 !important;
+  margin-right: 2px !important;
+}
+
+div.dashboard-container-enhanced .lub-status-due-badge.is-upcoming .due-text-normal {
+  color: #64748b !important;
+  font-weight: 500 !important;
+}
+
+
+/* ================================================================
+   NEW UI STYLE FOR VIEW ICON & MISSING CELL
+   ================================================================ */
+div.dashboard-container-enhanced .lub-status-action-btn {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  border-radius: 4px !important;
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #64748b !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+div.dashboard-container-enhanced .lub-status-action-btn:hover {
+  background: #eff6ff !important;
+  border-color: #3b82f6 !important;
+  color: #2563eb !important;
+}
+
+div.dashboard-container-enhanced .lub-status-action-btn svg {
+  transition: color 0.15s ease, stroke 0.15s ease !important;
+}
+
+div.dashboard-container-enhanced .missing-label {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #f87171 !important;
+  background-color: #fef2f2 !important;
+  border: 1px solid #fee2e2 !important;
+  font-size: 0.60rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  padding: 2.5px 8px !important;
+  border-radius: 4px !important;
+  line-height: 1.1 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.02) !important;
+  transition: all 0.15s ease !important;
+}
+
+div.dashboard-container-enhanced .lub-data-cell.missing-cell:hover .missing-label {
+  background-color: #fee2e2 !important;
+  border-color: #fca5a5 !important;
+  color: #ef4444 !important;
+}
+
+div.dashboard-container-enhanced .vessel-due-countdown-txt.is-overdue,
+div.dashboard-container-enhanced .vessel-due-countdown-txt.has-due.is-overdue {
+  color: #dc2626 !important;
+  font-weight: 700 !important;
+}
+
+div.dashboard-container-enhanced .vessel-due-countdown-txt.is-overdue .countdown-dot {
+  background-color: #dc2626 !important;
+}
+
+div.dashboard-container-enhanced .vessel-due-countdown-txt.is-upcoming {
+  color: #059669 !important;
+  font-weight: 600 !important;
+}
+
+div.dashboard-container-enhanced .vessel-due-countdown-txt.is-upcoming .countdown-dot {
+  background-color: #10b981 !important;
+}
+
+
+
+/* ================================================================
+   MATRIX TABLE STICKY STACKING CONTEXTS & UNIFIED HEADER COLOR
+   ================================================================ */
+div.dashboard-container-enhanced .matrix-scroll-container {
+  position: relative !important;
+  overflow: auto !important;
+}
+
+div.dashboard-container-enhanced table.vessel-table-enhanced thead,
+div.dashboard-container-enhanced table thead {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 100 !important;
+}
+
+div.dashboard-container-enhanced th.matrix-corner-header,
+.matrix-corner-header {
+  position: sticky !important;
+  left: 0 !important;
+  top: 0 !important;
+  z-index: 1200 !important;
+  background-color: #f8fafc !important;
+  background: #f8fafc !important;
+  border-right: 1px solid #e2e8f0 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-left: 3px solid #10b981 !important;
+  box-shadow: 4px 2px 10px -1px rgba(15, 23, 42, 0.08), 2px 0 4px -1px rgba(15, 23, 42, 0.04) !important;
+  padding: 10px 16px !important;
+  vertical-align: middle !important;
+}
+
+/* Vessel Column Headers: Uniform clean #f8fafc to match corner and UI */
+div.dashboard-container-enhanced th.vessel-header-cell,
+.vessel-header-cell {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 90 !important;
+  background-color: #f8fafc !important;
+  background: #f8fafc !important;
+  border-right: 1px solid #e2e8f0 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-top: 3px solid #cbd5e1 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+div.dashboard-container-enhanced th.vessel-header-cell:hover {
+  background-color: #f1f5f9 !important;
+  border-top-color: #3b82f6 !important;
+}
+
+div.dashboard-container-enhanced th.vessel-header-cell.vessel-col-focused {
+  background-color: #ecfdf5 !important;
+  border-bottom: 2px solid #10b981 !important;
+  border-top-color: #10b981 !important;
+}
+
+/* Machinery Sticky Column (Body rows): strictly below corner header */
+div.dashboard-container-enhanced td.machinery-sticky-cell,
+.machinery-sticky-cell {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 20 !important;
+  background-color: #ffffff !important;
+  border-right: 1px solid #e2e8f0 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-left: 3px solid transparent !important;
+  box-shadow: 4px 0 10px -1px rgba(15, 23, 42, 0.08), 2px 0 4px -1px rgba(15, 23, 42, 0.04) !important;
+  padding: 10px 16px !important;
+  vertical-align: middle !important;
+}
+
+/* Alternating subtle zebra tint on machinery sticky column */
+div.dashboard-container-enhanced tr.matrix-table-row:nth-child(even) td.machinery-sticky-cell {
+  background-color: #fafbfc !important;
+}
+
+div.dashboard-container-enhanced tr.matrix-table-row:hover td.machinery-sticky-cell {
+  background-color: #f1f5f9 !important;
+  border-left: 3px solid #10b981 !important;
+}
+
+/* Data Cells: Uniform clean background across all vessel columns */
+div.dashboard-container-enhanced td.lub-data-cell {
+  background-color: #ffffff !important;
+  border-right: 1px solid #e2e8f0 !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+div.dashboard-container-enhanced td.lub-data-cell.missing-cell {
+  background-color: #fafbfc !important;
+}
+
+/* Row Hover: Clean smooth highlight across all columns in active row */
+div.dashboard-container-enhanced tbody tr:hover td.lub-data-cell {
+  background-color: #eff6ff !important;
+}
+
+/* Footer Sticky */
+div.dashboard-container-enhanced tfoot.matrix-footer-sticky {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 95 !important;
+}
+
+div.dashboard-container-enhanced td.lub-matrix-footer-label {
+  position: sticky !important;
+  left: 0 !important;
+  bottom: 0 !important;
+  z-index: 1100 !important;
+  background-color: #f8fafc !important;
+}
+
+div.dashboard-container-enhanced td.lub-matrix-footer-cell {
+  background-color: #f8fafc !important;
+  border-right: 1px solid #e2e8f0 !important;
+  border-top: 1px solid #e2e8f0 !important;
 }

@@ -178,6 +178,7 @@ async def lifespan(app: FastAPI):
     # ── STARTUP ──────────────────────────────────────────────────
     logger.info("Application startup: Initializing database...")
     import os, asyncio
+    await run_startup_migrations()
     if os.getenv("IS_VESSEL_INSTANCE", "false").lower() == "true":
         from app.services.sync_worker import start_background_sync
         asyncio.create_task(start_background_sync())
