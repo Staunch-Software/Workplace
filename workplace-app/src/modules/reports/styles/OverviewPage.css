@@ -1241,3 +1241,19 @@ thead {
 .ovw-chip-has.ovw-chip-new .ovw-chip-has-icon { box-shadow: 0 0 0 1px rgba(5,150,105,.25), 0 2px 8px rgba(5,150,105,.28); }
 .ovw-chip-has.ovw-chip-seen { opacity: .62; transition: opacity .15s; }
 .ovw-chip-has.ovw-chip-seen:hover { opacity: 1; }
+
+/* ── Missing popup: aligned, single-row vessel chips ── */
+.ovw-mm-chips { flex-wrap: nowrap; max-height: none; overflow-x: auto; overflow-y: hidden; padding: 12px 24px 14px; scrollbar-width: thin; }
+.ovw-mm-chip { flex: 0 0 auto; white-space: nowrap; }
+.ovw-mm-stats { align-items: stretch; }
+.ovw-mm-stat { min-width: 0; }
+.ovw-mm-stat b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px; line-height: 1.3; }
+.ovw-mm-stat span { white-space: nowrap; }
+.ovw-mm-vessel-pct { min-width: 190px; justify-content: flex-end; }
+.ovw-mm-vbar { flex: 0 0 80px; }
+.ovw-mm-report-name { align-items: center; }
+.ovw-mm-report-name em { white-space: nowrap; }
+@media (max-width: 700px) {
+  .ovw-mm-chips { padding: 10px 16px 12px; }
+  .ovw-mm-vessel-pct { min-width: 0; justify-content: flex-start; }
+}
