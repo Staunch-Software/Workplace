@@ -41,6 +41,16 @@ function parseIso(iso) {
 export default function EventsGrid({ vessels, search, setSearch }) {
   const [source, setSource] = useState('mari_apps');
   const [anchor, setAnchor] = useState(null); // null = latest
+  const [selected, setSelected] = useState(() => new Set()); // highlighted rows
+  // Plain click = single select (click again to clear); Shift+click = add/remove for multi select.
+  const toggleRow = (key, e) => setSelected(prev => {
+    if (e?.shiftKey) {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    }
+    return prev.size === 1 && prev.has(key) ? new Set() : new Set([key]);
+  });
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['events-logbook', source, anchor],
@@ -69,6 +79,12 @@ export default function EventsGrid({ vessels, search, setSearch }) {
   const byImo = useMemo(() => {
     const m = {};
     (data?.vessels || []).forEach(v => { m[v.imo] = v.rows; });
+    return m;
+  }, [data]);
+
+  const viaBackup = useMemo(() => {
+    const m = {};
+    (data?.vessels || []).forEach(v => { if (v.via) m[v.imo] = true; });
     return m;
   }, [data]);
 
@@ -148,6 +164,11 @@ export default function EventsGrid({ vessels, search, setSearch }) {
               </button>
             )}
           </div>
+          {selected.size > 0 && (
+            <button type="button" className="ev-clear-sel" onClick={() => setSelected(new Set())}>
+              <X size={12} /> Clear {selected.size} selected
+            </button>
+          )}
           <div className="ovw-stat-strip">
             <span className="ovw-stat-pill">
               <strong>{vessels.length}</strong>&nbsp;vessels
@@ -210,21 +231,24 @@ export default function EventsGrid({ vessels, search, setSearch }) {
                       Logbook Column
                     </div>
                   </th>
-                  {vessels.map(v => (
-                    <th key={v.imo} className="ovw-th-vessel" colSpan={DAYS}>
+                  {vessels.map((v, vi) => (
+                    <th key={v.imo} className={`ovw-th-vessel${vi % 2 ? ' grp-odd' : ''}`} colSpan={DAYS}>
                       <div className="ovw-th-vessel-inner">
                         <span className="ovw-vessel-name">{v.name}</span>
                         <span className="ovw-vessel-imo">IMO {v.imo}</span>
+                        {viaBackup[v.imo] && (
+                          <span className="ev-via" title="No MariApps data for this period; showing Excel / email noon reports">Excel / Mail</span>
+                        )}
                       </div>
                     </th>
                   ))}
                 </tr>
                 <tr className="ovw-thead-row2">
-                  {vessels.map(v =>
+                  {vessels.map((v, vi) =>
                     dayCols[v.imo].map((d, i) => (
                       <th
                         key={`${v.imo}-${i}`}
-                        className={`ovw-th-week${d && i === DAYS - 1 ? ' ovw-th-week-current' : ''}`}
+                        className={`ovw-th-week${d && i === DAYS - 1 ? ' ovw-th-week-current' : ''}${vi % 2 ? ' grp-odd' : ''}`}
                       >
                         {d ? fmtDay(d) : '-'}
                         {d && i === DAYS - 1 && <span className="ovw-current-week-dot" />}
@@ -243,7 +267,12 @@ export default function EventsGrid({ vessels, search, setSearch }) {
                     {sec.cols.map((c, rowIdx) => (
                       <tr
                         key={`${sec.name}-${c.db_column}`}
-                        className={`ovw-row ovw-ev-row ${rowIdx % 2 === 0 ? 'even' : 'odd'}`}
+                        className={`ovw-row ovw-ev-row ${rowIdx % 2 === 0 ? 'even' : 'odd'}${selected.has(`${sec.name}-${c.db_column}`) ? ' ev-selected' : ''}`}
+                        onClick={(e) => {
+                          window.getSelection?.()?.removeAllRanges();
+                          toggleRow(`${sec.name}-${c.db_column}`, e);
+                        }}
+                        title="Click to highlight this row · Shift+click to select multiple"
                       >
                         <td className="ovw-td-report ovw-sticky-col">
                           <span className="ovw-report-name">
@@ -251,7 +280,7 @@ export default function EventsGrid({ vessels, search, setSearch }) {
                           </span>
                           {c.unit && <span className="ev-unit">{c.unit}</span>}
                         </td>
-                        {vessels.map(v =>
+                        {vessels.map((v, vi) =>
                           dayCols[v.imo].map((d, i) => {
                             const val = d ? fmtValue(byImo[v.imo]?.[d]?.[c.db_column]) : '-';
                             const empty = val === '-';
@@ -259,7 +288,7 @@ export default function EventsGrid({ vessels, search, setSearch }) {
                             return (
                               <td
                                 key={`${v.imo}-${i}`}
-                                className={`ovw-td-cell ovw-td-week ovw-ev-cell${i === DAYS - 1 ? ' latest' : ''}${i === 0 ? ' first' : ''}${empty ? ' empty' : ''}${!empty && !isNum ? ' text' : ''}`}
+                                className={`ovw-td-cell ovw-td-week ovw-ev-cell${i === DAYS - 1 ? ' latest' : ''}${i === 0 ? ' first' : ''}${empty ? ' empty' : ''}${!empty && !isNum ? ' text' : ''}${vi % 2 ? ' grp-odd' : ''}`}
                                 title={empty ? '' : val}
                               >
                                 {!empty && !isNum ? <span className="ev-pill">{val}</span> : val}
