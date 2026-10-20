@@ -20,15 +20,27 @@ _SOURCES = {
 }
 
 # Keys used for lookups, never shown as rows.
-# expanded_*_data still holds AMNS POLAR's Wartsila rows under its old IMO
-# (scripts/fix_amns_imos.py corrected noon_report_data only). Map old -> current.
-_IMO_ALIAS = {"9521813": "9961609"}
+# Vessel_Performance and the Workplace vessel list use different IMOs for some
+# vessels. Map the Vessel_Performance IMO -> the Workplace IMO so rows land under
+# the right vessel column (9521813 is POLAR's old IMO, still in expanded_wni_data).
+_IMO_ALIAS = {
+    "9961609": "9521813",  # AMNS POLAR
+    "9942768": "9628893",  # AMNSI MAXIMUS
+    "9942770": "9628910",  # AMNSI STALLION
+}
+
+
+def _perf_imos(wp_imos):
+    """Workplace IMOs -> every IMO those vessels may be stored under."""
+    wp = set(wp_imos)
+    return sorted(wp | {perf for perf, w in _IMO_ALIAS.items() if w in wp})
+
 
 # Vessels whose noon reports arrive as Excel/email (TUFMAX) or via the Wartsila
 # scraper (POLAR) rather than MariApps. Their data lives in expanded_wni_data;
 # in the MariApps view it is used as a backup when MariApps has no data for the
 # vessel or the backup is newer.
-_BACKUP_VESSELS = {"9486295", "9961609"}
+_BACKUP_VESSELS = {"9486295", "9521813"}  # Workplace IMOs: TUFMAX, POLAR
 _BACKUP_SOURCE = "wni"
 
 _SKIP_COLUMNS = {"vessel_imo", "log_date", "date", "raw_log_id", "source_id"}
@@ -121,9 +133,8 @@ async def get_logbook(
                 status_code=503,
                 detail="Could not verify vessel assignment. Please retry.",
             )
-        allowed = list(assigned)
-        # also match rows still stored under an old IMO
-        allowed += [old for old, new in _IMO_ALIAS.items() if new in allowed]
+        # assigned_vessels are Workplace IMOs; also match the Vessel_Performance IMOs
+        allowed = _perf_imos(assigned)
         if not allowed:
             return {"source": source, "columns": [], "vessels": []}
 
@@ -183,7 +194,7 @@ async def get_logbook(
 
     if source == "mari_apps":
         b_table, b_date = _SOURCES[_BACKUP_SOURCE]
-        b_imos = [i for i in (_BACKUP_VESSELS | {o for o, n in _IMO_ALIAS.items() if n in _BACKUP_VESSELS})
+        b_imos = [i for i in _perf_imos(_BACKUP_VESSELS)
                   if allowed is None or i in allowed]
         if b_imos:
             existing = {r[0] for r in (await db.execute(
