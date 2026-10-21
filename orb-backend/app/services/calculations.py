@@ -186,7 +186,7 @@ async def create_alert_if_new(
     await db.flush()
 
 async def run_all_checks(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
-    """Run all 12 compliance checks scoped closely to avoid duplication loops."""
+    """Run all 14 compliance checks scoped closely to avoid duplication loops."""
     await check_wrong_item_code(vessel_id, upload_id, db)                    # 1
     await check_mass_balance_error(vessel_id, upload_id, db)                 # 2
     await check_tank_capacity_exceeded(vessel_id, upload_id, db)             # 3
@@ -200,6 +200,7 @@ async def run_all_checks(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: 
     await check_missing_master_signature(vessel_id, upload_id, db)           # 11
     await check_chronology_and_erasures(vessel_id, upload_id, db)            # 12
     await check_entry_gaps(vessel_id, upload_id, db)                         # 13
+    await check_item_numbers(vessel_id, upload_id, db)                       # 14
     await db.commit()
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -222,6 +223,35 @@ async def check_wrong_item_code(vessel_id: uuid.UUID, upload_id: uuid.UUID | Non
         if is_wrong:
             msg = f"[{entry.entry_date}] Invalid Item/Code combination ({code or '?'} {item or '-'})."
             await create_alert_if_new(db, vessel_id, entry.id, "wrong_item_code", "major", msg)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Check 14 — Item numbers written for every line of a block
+# ─────────────────────────────────────────────────────────────────────────
+async def check_item_numbers(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
+    """Each row of a block (e.g. 11.1 tank / 11.2 capacity / 11.3 retained) must
+    carry its own item number. Judged only on entries whose line transcription is
+    known (item_lines is not NULL), so older uploads never raise false alerts."""
+    from app.services.item_rules import item_line_problems
+
+    q = select(OrbEntry).where(OrbEntry.vessel_id == vessel_id, OrbEntry.item_lines.isnot(None))
+    if upload_id:
+        q = q.where(OrbEntry.upload_id == upload_id)
+    for entry in (await db.execute(q)).scalars().all():
+        qty_rows = (await db.execute(
+            select(OrbEntryQuantity.qty_type).where(OrbEntryQuantity.entry_id == entry.id)
+        )).scalars().all()
+        problems = item_line_problems(entry.orb_code, entry.item_number, entry.item_lines, qty_rows)
+        where = f" ({entry.tank_location})" if entry.tank_location else ""
+        for p in problems:
+            parts = ", ".join(f"{i} ({l})" for i, l in zip(p["items"], p["labels"]))
+            if p["kind"] == "value_missing":
+                msg = f"[{entry.entry_date}] Code {entry.orb_code}{where}: nothing recorded for item {parts}."
+                await create_alert_if_new(db, vessel_id, entry.id, "item_value_missing", "major", msg)
+            else:
+                msg = (f"[{entry.entry_date}] Code {entry.orb_code}{where}: item number {parts} "
+                       f"not written in the Item column.")
+                await create_alert_if_new(db, vessel_id, entry.id, "item_number_missing", "minor", msg)
 
 # ─────────────────────────────────────────────────────────────────────────
 # Shared helper — real-world handwritten tank names rarely match the

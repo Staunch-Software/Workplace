@@ -21,6 +21,7 @@ from app.models.orb_entry_quantity import OrbEntryQuantity
 from app.models.orb_alert import OrbAlert
 from app.models.vessel import Vessel
 from app.services.report_alerts import alerts_for_upload
+from app.services.report_lines import entry_line_rows
 
 PAGE_W, PAGE_H = landscape(A4)
 NAVY = colors.HexColor("#1F4E79")
@@ -118,29 +119,33 @@ async def generate_pdf(upload_id: uuid.UUID, db: AsyncSession) -> bytes:
     story.append(Paragraph("ORB Entries", h2_style))
     story.append(Spacer(1, 0.3 * cm))
 
-    entry_headers = ["Date", "Code", "Item", "Operation", "Qty", "Officers"]
+    entry_headers = ["Date", "Code", "Item", "Particulars", "Qty", "Officers"]
     col_widths = [2.5 * cm, 1.5 * cm, 1.5 * cm, 9 * cm, 4 * cm, 5 * cm]
 
     table_data = [entry_headers]
     row_fills = [NAVY]
 
+    red_cells = []
     for idx, entry in enumerate(entries):
         quantities = entry_quantities.get(entry.id, [])
-        qty_str = "\n".join(f"{q.qty_value} {q.qty_unit} ({q.qty_type})" for q in quantities)
         officers = "\n".join(filter(None, [
             f"{entry.officer_1_name or ''} ({entry.officer_1_rank or ''})".strip("() "),
             f"{entry.officer_2_name or ''} ({entry.officer_2_rank or ''})".strip("() "),
         ]))
 
-        table_data.append([
-            str(entry.entry_date),
-            entry.orb_code,
-            entry.item_number or "",
-            Paragraph(entry.operation_description or "", normal),
-            Paragraph(qty_str, normal),
-            Paragraph(officers, normal),
-        ])
-        row_fills.append(LIGHT_BLUE if idx % 2 == 0 else colors.white)
+        for line_no, line in enumerate(entry_line_rows(entry, quantities)):
+            first = line_no == 0
+            table_data.append([
+                str(entry.entry_date) if first else "",
+                entry.orb_code if first else "",
+                line["item"],
+                Paragraph(line["text"], normal),
+                Paragraph(line["qty"], normal),
+                Paragraph(officers, normal) if first else "",
+            ])
+            if line["blank_item"]:
+                red_cells.append(len(table_data) - 1)
+            row_fills.append(LIGHT_BLUE if idx % 2 == 0 else colors.white)
 
     entry_table = Table(table_data, colWidths=col_widths, repeatRows=1)
     style_cmds = [
@@ -154,8 +159,11 @@ async def generate_pdf(upload_id: uuid.UUID, db: AsyncSession) -> bytes:
         ("TOPPADDING", (0, 0), (-1, -1), 4),
     ]
     for i in range(1, len(table_data)):
-        bg = LIGHT_BLUE if i % 2 == 0 else colors.white
+        bg = row_fills[i] if i < len(row_fills) else colors.white
         style_cmds.append(("BACKGROUND", (0, i), (-1, i), bg))
+    for i in red_cells:
+        style_cmds.append(("TEXTCOLOR", (2, i), (2, i), colors.HexColor("#C00000")))
+        style_cmds.append(("FONTNAME", (2, i), (2, i), "Helvetica-Bold"))
 
     entry_table.setStyle(TableStyle(style_cmds))
     story.append(entry_table)

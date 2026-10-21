@@ -349,13 +349,28 @@ page (even a sparse or hard-to-read one), set non_orb_page to false and non_orb_
 null, and extract entries normally.
 
 ═══════════════════════════════════════════════════════════════
+ITEM COLUMN TRANSCRIPTION (item_lines):
+Every ORB block is written row by row, and each row has its own Item-column number with a fixed
+meaning (11.1 tank identity, 11.2 capacity, 11.3 quantity retained, 11.4 manual collection;
+13 quantity, 14 time, 15 method/destination; 26.1 place, 26.2 time, 26.3/26.4 type, quantity and
+tank). For EVERY row of the block that carries text, add one item_lines element: "item" is the
+number physically written in the Item column on that row, "text" is that row's own text.
+  - If the Item cell on a row is BLANK, "item" MUST be null. NEVER fill it in because the text
+    says "CAPACITY" or "RETAINED", and never copy the number from a neighbouring row. A crew
+    sometimes forgets to write 11.2/11.3 -- reporting that omission faithfully is the whole point.
+  - A row that only wraps the previous row's sentence (no new number) is its own element with
+    item null.
+  - Do not include the officer-signature rows.
+  - Keep rows in top-to-bottom order. Apply the same rule to "leading_continuation".
+
+═══════════════════════════════════════════════════════════════
 JSON STRUCTURE — return exactly this:
 {
   "page_number": <int>,
   "non_orb_page": <true|false — see NON-ORB PAGES rule above>,
   "non_orb_page_note": "<short description if non_orb_page is true, else null>",
   "master_signature_present": <true|false — see MASTER SIGNATURE rule below>,
-  "leading_continuation": {"text":.., "tank_location":.., "time_start":.., "time_stop":..,
+  "leading_continuation": {"text":.., "item_lines": [...same shape as entry item_lines...], "tank_location":.., "time_start":.., "time_stop":..,
     "position_start":.., "position_stop":.., "quantities": [...same shape as entry quantities...],
     "officer_1_name":.., "officer_1_rank":.., "officer_2_name":.., "officer_2_rank":..} or null,
   "entries": [
@@ -373,6 +388,10 @@ JSON STRUCTURE — return exactly this:
         because the columns were blank, is_continuation must be true.>,
       "item_number": "<lowest item number in block, e.g. 11.1, 12.2, 13, 26.3, or null>",
       "operation_description": "<combined full text of the entire block>",
+      "item_lines": [
+        {"item": "<EXACTLY what is written in the Item column on this row, e.g. 11.1, 11.2, 13, 15.3 -- or null if that cell is BLANK>",
+         "text": "<verbatim text written on this row>"}
+      ],
       "tank_location": "<primary tank name involved, or null>",
       "time_start": "<hhmm or hh:mm string, or null>",
       "time_stop": "<hhmm or hh:mm string, or null>",
@@ -1607,6 +1626,36 @@ async def _write_progress(
         logger.warning(f"Progress heartbeat write failed for upload {upload_id}: {e}")
 
 
+def _normalize_item_lines(raw) -> list[dict] | None:
+    """Clean model output for item_lines; None means 'not provided / unusable'."""
+    if not isinstance(raw, list):
+        return None
+    lines = []
+    for r in raw:
+        if not isinstance(r, dict):
+            continue
+        item = r.get("item")
+        item = str(item).strip().rstrip(".") if item not in (None, "") else None
+        text = str(r.get("text") or "").strip()
+        if item is None and not text:
+            continue
+        lines.append({"item": item or None, "text": text})
+    return lines
+
+
+def _merge_item_lines(a, b):
+    """Combine the item_lines of two fragments of one block.
+
+    If either side has no line data the combined block cannot be judged line by
+    line, so the result is None ("unknown") and the item-number check skips it
+    rather than reporting numbers that simply sit in the part we have no lines for.
+    """
+    if a is None or b is None:
+        return None
+    seen = {(l.get("item"), l.get("text")) for l in a}
+    return a + [l for l in b if (l.get("item"), l.get("text")) not in seen]
+
+
 def _sanitize_page_entries(raw_entries, page_num: int) -> list[dict]:
     """Drop anything in a page's "entries" array (or a single entry's own
     "quantities" array) that isn't actually an object, before any other
@@ -1633,6 +1682,7 @@ def _sanitize_page_entries(raw_entries, page_num: int) -> list[dict]:
         if not isinstance(e, dict):
             logger.warning(f"Page {page_num}: dropped a malformed entry of type {type(e).__name__} instead of an object")
             continue
+        e["item_lines"] = _normalize_item_lines(e.get("item_lines"))
         qtys = e.get("quantities")
         if isinstance(qtys, list):
             good_qtys = [q for q in qtys if isinstance(q, dict)]
@@ -2324,6 +2374,7 @@ async def extract_with_gemini(
                         "officer_2_name": leading_continuation.get("officer_2_name"),
                         "officer_2_rank": leading_continuation.get("officer_2_rank"),
                         "quantities": cont_qtys,
+                        "item_lines": _normalize_item_lines(leading_continuation.get("item_lines")),
                         # Always use the loop's own physical page index, never
                         # Gemini's self-reported "page_number" from the JSON --
                         # the model can hallucinate/misreport that value (seen
@@ -2371,6 +2422,11 @@ async def extract_with_gemini(
                     prev_entry["master_signature_present"] = (
                         bool(prev_entry.get("master_signature_present")) or current_page_signed
                     )
+                    if not already_present:
+                        prev_entry["item_lines"] = _merge_item_lines(
+                            prev_entry.get("item_lines"),
+                            _normalize_item_lines(leading_continuation.get("item_lines")),
+                        )
                     if cont_qtys and not already_present:
                         prev_qty_keys = {_qty_signature(q) for q in prev_qtys}
                         new_qtys = [q for q in cont_qtys if _qty_signature(q) not in prev_qty_keys]
@@ -2714,6 +2770,7 @@ def _dedupe_same_page_entries(page_entries: list[dict]) -> list[dict]:
         if match is not None:
             existing_qtys = match.get("quantities") or []
             match["quantities"] = existing_qtys + [q for q in (entry.get("quantities") or []) if q not in existing_qtys]
+            match["item_lines"] = _merge_item_lines(match.get("item_lines"), entry.get("item_lines"))
             for field in ("tank_location", "time_start", "time_stop", "position_start", "position_stop",
                           "officer_1_name", "officer_1_rank", "officer_2_name", "officer_2_rank"):
                 match[field] = match.get(field) or entry.get(field)
@@ -2936,6 +2993,7 @@ def _merge_split_entries(entries_data: list[dict]) -> list[dict]:
                     p for p in [prev.get("raw_text"), entry.get("raw_text")] if p
                 ).strip()
                 prev["quantities"] = (prev.get("quantities") or []) + (entry.get("quantities") or [])
+                prev["item_lines"] = _merge_item_lines(prev.get("item_lines"), entry.get("item_lines"))
                 for field in ("tank_location", "time_start", "time_stop", "position_start",
                               "position_stop", "officer_1_name", "officer_1_rank",
                               "officer_2_name", "officer_2_rank"):
@@ -3419,6 +3477,10 @@ def _split_swallowed_weekly_inventory(entries_data: list[dict]) -> list[dict]:
             entry["raw_text"] = before_raw
             entry["operation_description"] = before_desc
             entry["quantities"] = remaining_qtys
+            lines = entry.get("item_lines")
+            after_norm = re.sub(r"\s+", " ", after_raw.upper())
+            moved = [l for l in (lines or []) if l.get("text") and re.sub(r"\s+", " ", l["text"].upper()) in after_norm]
+            entry["item_lines"] = [l for l in lines if l not in moved] if lines is not None else None
             result.append(entry)
 
             new_entry = dict(entry)
@@ -3429,6 +3491,7 @@ def _split_swallowed_weekly_inventory(entries_data: list[dict]) -> list[dict]:
             new_entry["raw_text"] = after_raw
             new_entry["operation_description"] = after_desc
             new_entry["quantities"] = inventory_qtys
+            new_entry["item_lines"] = moved if lines is not None else None
             new_entry["is_continuation"] = False
             result.append(new_entry)
         else:
@@ -4166,6 +4229,7 @@ async def run_extraction(
                         confidence_score=entry_dict.get("confidence_score"),
                         page_number=entry_dict.get("page_number"),
                         has_gap_before=bool(entry_dict.get("has_gap_before", False)),
+                        item_lines=entry_dict.get("item_lines"),
                         has_erasure=bool(entry_dict.get("has_erasure", False)),
                         master_signature_present=entry_dict.get("master_signature_present"),
                     )

@@ -38,6 +38,7 @@ class EntryResponse(BaseModel):
     raw_text: Optional[str] = None
     confidence_score: Optional[float] = None
     page_number: Optional[int] = None
+    item_lines: Optional[List[dict]] = None
     created_at: datetime
     updated_at: datetime
     quantities: List[QuantityResponse] = []

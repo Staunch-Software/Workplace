@@ -14,6 +14,7 @@ from app.models.orb_entry_quantity import OrbEntryQuantity
 from app.models.orb_alert import OrbAlert
 from app.models.vessel import Vessel
 from app.models.vessel_tank import VesselTank
+from app.services.report_lines import entry_line_rows
 from app.services.report_alerts import alerts_for_upload, alert_entry_date
 
 
@@ -93,31 +94,34 @@ async def generate_excel(upload_id: uuid.UUID, db: AsyncSession) -> bytes:
         cell.fill = HEADER_FILL
         cell.alignment = Alignment(wrap_text=True)
 
+    BLANK_FONT = Font(color="C00000", bold=True)
+    next_row = 7
     for idx, entry in enumerate(entries, 1):
         quantities = entry_quantities.get(entry.id, [])
-        qty_str = " / ".join(
-            f"{q.qty_value} {q.qty_unit} ({q.qty_type})" for q in quantities
-        )
         officer1 = f"{entry.officer_1_name or ''} {entry.officer_1_rank or ''}".strip()
         officer2 = f"{entry.officer_2_name or ''} {entry.officer_2_rank or ''}".strip()
         time_pos = " / ".join(filter(None, [entry.time_start, entry.position_start]))
-
-        row_data = [
-            idx,
-            str(entry.entry_date),
-            entry.orb_code,
-            entry.item_number or "",
-            entry.operation_description,
-            qty_str,
-            entry.tank_location or "",
-            time_pos,
-            officer1,
-            officer2,
-        ]
-        ws1.append(row_data)
         fill = ALT_FILL if idx % 2 == 0 else WHITE_FILL
-        for col_num in range(1, len(headers) + 1):
-            ws1.cell(row=6 + idx, column=col_num).fill = fill
+
+        for line_no, line in enumerate(entry_line_rows(entry, quantities)):
+            first = line_no == 0
+            ws1.append([
+                idx if first else "",
+                str(entry.entry_date) if first else "",
+                entry.orb_code if first else "",
+                line["item"],
+                line["text"],
+                line["qty"],
+                (entry.tank_location or "") if first else "",
+                time_pos if first else "",
+                officer1 if first else "",
+                officer2 if first else "",
+            ])
+            for col_num in range(1, len(headers) + 1):
+                ws1.cell(row=next_row, column=col_num).fill = fill
+            if line["blank_item"]:
+                ws1.cell(row=next_row, column=4).font = BLANK_FONT
+            next_row += 1
 
     auto_fit(ws1)
 

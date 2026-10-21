@@ -311,7 +311,11 @@ export default function UploadDetail() {
                         <tr key={e.id} className={e.confidence_score < 0.75 ? 'row-low-confidence' : ''}>
                           <td>{e.entry_date}</td>
                           <td><span className="ud-code">{e.orb_code}</span></td>
-                          <td>{e.item_number || '—'}</td>
+                          <td title={(e.item_lines || []).map(l => `${l.item || '(blank)'} ${l.text}`).join('\n')}>
+                            {(e.item_lines || []).some(l => l.item)
+                              ? e.item_lines.filter(l => l.item).map(l => l.item).join(' · ')
+                              : (e.item_number || '—')}
+                          </td>
                           <td className="ud-op">{e.operation_description}</td>
                           <td className="ud-small">
                             {e.quantities?.map(q => `${q.qty_value} ${q.qty_unit} (${q.qty_type})`).join(', ') || '—'}

@@ -3,7 +3,7 @@ from datetime import date
 from typing import Optional
 from sqlalchemy import String, Text, Float, Date, Boolean, Integer, ForeignKey
 from sqlalchemy.orm import mapped_column, Mapped
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.models.base import Base, TimestampMixin
 
 class OrbEntry(Base, TimestampMixin):
@@ -33,3 +33,8 @@ class OrbEntry(Base, TimestampMixin):
     has_erasure: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     page_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     has_gap_before: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    # Row-by-row transcription of the block as written: [{"item": "11.2" | None, "text": "..."}].
+    # item is exactly what the Item column held (None = the cell was blank). NULL for
+    # entries extracted before this column existed, or whose lines could not be tied
+    # to their item numbers -- the item-number check skips those.
+    item_lines: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
