@@ -38,6 +38,7 @@ const ALERT_TYPES = [
   'erasure_detected',                // 12 Observation
   'item_number_missing',             // 14 Minor  — a line's item number (e.g. 11.2) not written
   'item_value_missing',              // 14 Major  — nothing recorded for an item (e.g. capacity)
+  'reading_needs_review',            // Observation — figure looks wrong but the entry is uncertain
 ];
 
 export default function Alerts() {

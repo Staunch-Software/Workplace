@@ -18,6 +18,9 @@ from app.models.orb_upload import OrbUpload
 from app.models.orb_entry import OrbEntry
 from app.models.orb_entry_quantity import OrbEntryQuantity
 from app.models.vessel import Vessel
+from app.services.extraction_repair import (
+    reattach_split_blocks, trim_foreign_rows, verify_suspect_readings,
+)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -634,12 +637,14 @@ corrupting the tank balances. Output a decimal point only when a dot is clearly 
 the digits. If a two-digit figure could honestly be either, prefer the reading that is consistent
 with the same tank's neighbouring readings and score the entry's confidence_score 0.6-0.75.
 
-QUANTITY DIGIT AMBIGUITY: the same confusable digit pairs (9/5, 1/7, 3/8, 0/6, and also 0/8)
+QUANTITY DIGIT AMBIGUITY: the same confusable digit pairs (9/5, 1/7, 3/8, 0/6, 0/8, and also 7/9 and 4/9)
 apply to quantity figures (retained/transferred/capacity/etc.), not just dates. Confirmed in
 production: a retained figure clearly written as "0.8" was read as "0.0", scored at high
 confidence -- the officer's own trailing signature and the neighboring entries all corroborated
 0.8, but nothing in the output flagged the reading as uncertain. Apply the exact same rule here:
-if a quantity's digit shape could plausibly be one of these confusable pairs, score that entry's
+(Confirmed in production: a weekly inventory written "24.7" was read as "24.9" -- 7 and 9 are easy
+to confuse when the stem of the 7 is long.) If a quantity's digit shape could plausibly be one of
+these confusable pairs, score that entry's
 confidence_score in the 0.6-0.75 range rather than 0.9+, even if every other part of the entry is
 perfectly clear -- confidence_score reflects the single least-certain reading in the entry, not
 an average of how legible most of it is.
@@ -2510,6 +2515,13 @@ async def extract_with_gemini(
 
         await _write_progress(session_factory, upload_id, pages_processed=page_num)
 
+    # One focused re-read of retained figures that disagree with the running balance (see
+    # extraction_repair). Failure here must never cost the extraction itself.
+    try:
+        await verify_suspect_readings(client, pages, all_entries, timeout=_GEMINI_CALL_TIMEOUT_SECONDS)
+    except Exception as e:
+        logger.warning(f"Suspect-reading re-read skipped: {e}")
+
     return all_entries, failed_pages
 
 _SIGNATURE_PATTERNS = [
@@ -4075,6 +4087,8 @@ async def run_extraction(
                     return
 
             entries_data = _merge_split_entries(entries_data)
+            entries_data = reattach_split_blocks(entries_data)
+            entries_data = trim_foreign_rows(entries_data)
             entries_data = _drop_untanked_sounding_fragments(entries_data)
             entries_data = _split_swallowed_weekly_inventory(entries_data)
             entries_data = _propagate_shared_officer(entries_data)
