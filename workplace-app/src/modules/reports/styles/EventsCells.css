@@ -86,3 +86,59 @@
 .ev-grid .ovw-ev-section.info .ovw-ev-section-label em { color: #6366f1; }
 .ev-grid .ovw-ev-section.perf .ovw-ev-section-label em { color: #d97706; }
 .ev-grid .ovw-ev-section.emis .ovw-ev-section-label em { color: #10b981; }
+
+/* backup-source marker in the vessel header */
+.ev-via {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  color: #b45309; background: #fff4e0; border-radius: 999px; padding: 1px 8px; line-height: 1.4;
+}
+
+/* alternating strip colour per vessel column group */
+.ev-grid thead th.ovw-th-vessel.grp-odd { background: linear-gradient(180deg, #e6ecff, #eff3ff) !important; }
+.ev-grid thead th.ovw-th-week.grp-odd { background: #f1f4ff; }
+.ev-grid .ovw-ev-cell.grp-odd { background-color: #f6f8ff; }
+.ev-grid .ovw-ev-cell.grp-odd.latest { background-color: #eceffd; }
+.ev-grid .ovw-ev-cell.latest { background-color: #f3f4fb; }
+.ev-grid .ovw-row:hover .ovw-ev-cell { background-color: #eef1ff; }
+
+/* no special "today/latest" column — all days look the same */
+.ev-grid .ovw-ev-cell.latest { font-weight: 500; }
+
+/* no special highlight for the newest day */
+.ev-grid .ovw-ev-cell.latest,
+.ev-grid .ovw-ev-cell.latest.grp-odd { font-weight: 400; color: #334155; }
+.ev-grid .ovw-ev-cell.latest { background-color: transparent; background-image: none; }
+.ev-grid .ovw-ev-cell.grp-odd,
+.ev-grid .ovw-ev-cell.grp-odd.latest { background-color: #f6f8ff; }
+
+/* newest day: full-column highlight (header keeps the standard current-day style) */
+.ev-grid .ovw-ev-cell.latest,
+.ev-grid .ovw-ev-cell.latest.grp-odd {
+  background-color: #eef2ff;
+  background-image: none;
+  font-weight: 500;
+  color: #1e1b4b;
+  box-shadow: inset 2px 0 0 rgba(79,70,229,.35), inset -2px 0 0 rgba(79,70,229,.35);
+}
+.ev-grid .ovw-row:hover .ovw-ev-cell.latest { background-color: #e4e9ff; }
+
+/* remove side lines on the newest-day column */
+.ev-grid .ovw-ev-cell.latest,
+.ev-grid .ovw-ev-cell.latest.grp-odd { box-shadow: none; }
+
+/* click-to-select rows */
+.ev-grid .ovw-ev-row { cursor: pointer; }
+.ev-grid .ovw-ev-row.ev-selected td,
+.ev-grid .ovw-ev-row.ev-selected .ovw-ev-cell,
+.ev-grid .ovw-ev-row.ev-selected .ovw-ev-cell.grp-odd,
+.ev-grid .ovw-ev-row.ev-selected .ovw-ev-cell.latest { background-color: #fff3d6 !important; background-image: none; }
+.ev-grid .ovw-ev-row.ev-selected .ovw-td-report { box-shadow: inset 3px 0 0 #f59e0b; }
+.ev-grid .ovw-ev-row.ev-selected .ovw-report-name { font-weight: 700; color: #92400e; }
+.ev-grid .ovw-ev-row.ev-selected td { border-top: 1px solid #f6d79a; border-bottom: 1px solid #f6d79a; }
+.ev-clear-sel {
+  display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px;
+  border: 1px solid #f6d79a; background: #fff8e8; color: #92400e; border-radius: 999px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.ev-clear-sel:hover { background: #ffefc7; }
+.ev-grid .ovw-ev-row { user-select: none; }

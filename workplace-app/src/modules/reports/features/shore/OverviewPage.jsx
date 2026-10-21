@@ -647,10 +647,10 @@ export default function OverviewPage() {
     return count;
   }, [reportNames, vessels, instanceIndex, buckets, isDaily]);
 
-  /* Submission completion for the selected frequency tab, counted from the
-     FIRST date each report was submitted for a vessel up to today (not just the
-     visible window). Every period since then is expected; periods without an
-     attachment are missing. The current unfinished period only counts if done. */
+  /* Completion for the CURRENT period of the selected tab across all vessels:
+     Daily = today, Weekly = this week, Monthly = this month, Quarterly = this
+     quarter. A report/vessel pair is expected once its first attachment exists;
+     it is missing if the current period has no attachment yet. */
   const completion = useMemo(() => {
     const pad = n => String(n).padStart(2, '0');
     const keyOf = d => {
@@ -685,8 +685,9 @@ export default function OverviewPage() {
     const today = new Date();
     const nowKey = keyOf(today);
     const stats = {};
-    vessels.forEach(v => { stats[v.imo] = { done: 0, expected: 0, since: null, items: [] }; });
-    const overall = { done: 0, expected: 0, since: null };
+    const life = {};
+    vessels.forEach(v => { stats[v.imo] = { done: 0, expected: 0, items: [] }; life[v.imo] = { done: 0, expected: 0 }; });
+    const overall = { done: 0, expected: 0 };
 
     reportNames.forEach(name => {
       vessels.forEach(v => {
@@ -703,27 +704,29 @@ export default function OverviewPage() {
         });
         if (!first) return;
         const labels = [];
+        // Lifetime (first submission -> today), used for the per-vessel circles.
         let cur = new Date(first), guard = 0;
         while (guard++ < 5000) {
           const k = keyOf(cur);
-          if (k === nowKey) { if (have.has(k)) { stats[v.imo].expected++; stats[v.imo].done++; } break; }
+          if (k === nowKey) { if (have.has(k)) { life[v.imo].expected++; life[v.imo].done++; } break; }
           if (cur > today) break;
-          stats[v.imo].expected++;
-          if (have.has(k)) stats[v.imo].done++;
-          else labels.push(labelOf(cur));
+          life[v.imo].expected++;
+          if (have.has(k)) life[v.imo].done++;
           cur = step(cur);
         }
+        // Current period only (today / this week / this month / this quarter), used for the overall figure.
+        stats[v.imo].expected++;
+        if (have.has(nowKey)) stats[v.imo].done++;
+        else labels.push(labelOf(today));
         if (labels.length) stats[v.imo].items.push({ report: name, labels });
-        const st = stats[v.imo];
-        if (!st.since || first < st.since) st.since = first;
-        if (!overall.since || first < overall.since) overall.since = first;
       });
     });
     const withPct = o => ({ ...o, missing: o.expected - o.done, pct: o.expected > 0 ? Math.round((o.done / o.expected) * 100) : null });
-    Object.keys(stats).forEach(k => { stats[k] = withPct(stats[k]); });
+    Object.keys(stats).forEach(k => { stats[k] = withPct(stats[k]); life[k] = withPct(life[k]); });
     Object.values(stats).forEach(st => { overall.done += st.done; overall.expected += st.expected; });
     Object.values(stats).forEach(st => st.items.sort((x, y) => y.labels.length - x.labels.length));
-    return { overall: withPct(overall), byVessel: stats };
+    const prefix = { DAILY: 'Today', WEEKLY: 'This week', MONTHLY: 'This month', QUARTERLY: 'This quarter' }[frequency];
+    return { overall: withPct(overall), byVessel: stats, lifeByVessel: life, periodTitle: prefix, periodLabel: labelOf(today) };
   }, [frequency, reportNames, vessels, instanceIndex, configuredPairs]);
 
   /* Key of the bucket that contains today — used to underline current-week header */
@@ -1010,10 +1013,10 @@ export default function OverviewPage() {
                       Report Name
                     </div>
                   </th>
-                  {vessels.map(v => (
+                  {vessels.map((v, vi) => (
                     <th
                       key={v.imo}
-                      className="ovw-th-vessel"
+                      className={`ovw-th-vessel${vi % 2 ? ' grp-odd' : ''}`}
                       colSpan={hasSubCols ? buckets.length : 1}
                     >
                       <div className="ovw-th-vessel-inner ovw-th-vessel-inner--pct">
@@ -1021,8 +1024,8 @@ export default function OverviewPage() {
                           <span className="ovw-vessel-name">{v.name}</span>
                           <span className="ovw-vessel-imo">IMO {v.imo}</span>
                         </div>
-                        {completion.byVessel[v.imo]?.pct != null && (() => {
-                          const st = completion.byVessel[v.imo];
+                        {completion.lifeByVessel[v.imo]?.pct != null && (() => {
+                          const st = completion.lifeByVessel[v.imo];
                           const R = 13, C = 2 * Math.PI * R;
                           return (
                             <span
@@ -1046,13 +1049,13 @@ export default function OverviewPage() {
                 {/* ── Row 2 (Weekly & Daily): Sub-headers ── */}
                 {hasSubCols && (
                   <tr className="ovw-thead-row2">
-                    {vessels.map(v =>
+                    {vessels.map((v, vi) =>
                       buckets.map(b => {
                         const isCurrent = isWeekly ? b.key === currentWeekKey : b.isLatest;
                         return (
                           <th
                             key={`${v.imo}-${b.key}`}
-                            className={`ovw-th-week${isCurrent ? ' ovw-th-week-current' : ''}`}
+                            className={`ovw-th-week${isCurrent ? ' ovw-th-week-current' : ''}${vi % 2 ? ' grp-odd' : ''}`}
                             title={isDaily ? b.sub : `Week ${b.number} · ${b.sub}`}
                           >
                             {b.label}
@@ -1072,14 +1075,15 @@ export default function OverviewPage() {
                       <span className="ovw-report-name">{name}</span>
                     </td>
 
-                    {vessels.map(v => {
+                    {vessels.map((v, vi) => {
+                      const grp = vi % 2 ? ' grp-odd' : '';
                       const isConfigured = !configuredPairs || configuredPairs.has(`${v.imo}|${name}`);
 
                       if (!isConfigured) {
                         return (
                           <td
                             key={v.imo}
-                            className="ovw-td-cell ovw-cell-na"
+                            className={`ovw-td-cell ovw-cell-na${grp}`}
                             colSpan={hasSubCols ? buckets.length : 1}
                           >
                             <span className="ovw-na-text">N/A</span>
@@ -1093,7 +1097,7 @@ export default function OverviewPage() {
                         return buckets.map(b => {
                           const match = findDailyMatch(instances, b);
                           return (
-                            <td key={`${v.imo}-${b.key}`} className="ovw-td-cell ovw-td-week">
+                            <td key={`${v.imo}-${b.key}`} className={`ovw-td-cell ovw-td-week${grp}`}>
                               {match && hasValidAttachment(match.attachments) ? (
                                 <AttachmentIcon
                                   report={match}
@@ -1113,7 +1117,7 @@ export default function OverviewPage() {
 
                       if (isWeekly) {
                         return buckets.map(b => (
-                          <td key={`${v.imo}-${b.key}`} className="ovw-td-cell ovw-td-week">
+                          <td key={`${v.imo}-${b.key}`} className={`ovw-td-cell ovw-td-week${grp}`}>
                             <AttachmentCell instances={instances} bucket={b} now={now} onOpen={handleOpenReport} viewerRole={user?.role} buckets={buckets} seenIds={seenIds} />
                           </td>
                         ));
@@ -1121,7 +1125,7 @@ export default function OverviewPage() {
 
                       /* Monthly / Quarterly: single merged cell per vessel */
                       return (
-                        <td key={v.imo} className="ovw-td-cell">
+                        <td key={v.imo} className={`ovw-td-cell${grp}`}>
                           <div className="ovw-icon-group">
                             {buckets.map(b => (
                               <AttachmentCell key={b.key} instances={instances} bucket={b} now={now} onOpen={handleOpenReport} viewerRole={user?.role} buckets={buckets} seenIds={seenIds} />
@@ -1162,7 +1166,7 @@ export default function OverviewPage() {
                   <div className="ovw-mm-stat"><b>{o.pct}%</b><span>Completed</span></div>
                   <div className="ovw-mm-stat"><b>{o.done}</b><span>Submitted</span></div>
                   <div className="ovw-mm-stat miss"><b>{o.missing}</b><span>Missing</span></div>
-                  <div className="ovw-mm-stat"><b>{o.since ? fmtDate(o.since) : '—'}</b><span>Tracked since</span></div>
+                  <div className="ovw-mm-stat"><b>{completion.periodLabel}</b><span>{completion.periodTitle}</span></div>
                 </div>
                 <div className="ovw-mm-progress"><span style={{ width: `${o.pct}%` }} /></div>
               </div>

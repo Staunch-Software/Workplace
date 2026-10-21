@@ -20,6 +20,29 @@ _SOURCES = {
 }
 
 # Keys used for lookups, never shown as rows.
+# Vessel_Performance and the Workplace vessel list use different IMOs for some
+# vessels. Map the Vessel_Performance IMO -> the Workplace IMO so rows land under
+# the right vessel column (9521813 is POLAR's old IMO, still in expanded_wni_data).
+_IMO_ALIAS = {
+    "9961609": "9521813",  # AMNS POLAR
+    "9942768": "9628893",  # AMNSI MAXIMUS
+    "9942770": "9628910",  # AMNSI STALLION
+}
+
+
+def _perf_imos(wp_imos):
+    """Workplace IMOs -> every IMO those vessels may be stored under."""
+    wp = set(wp_imos)
+    return sorted(wp | {perf for perf, w in _IMO_ALIAS.items() if w in wp})
+
+
+# Vessels whose noon reports arrive as Excel/email (TUFMAX) or via the Wartsila
+# scraper (POLAR) rather than MariApps. Their data lives in expanded_wni_data;
+# in the MariApps view it is used as a backup when MariApps has no data for the
+# vessel or the backup is newer.
+_BACKUP_VESSELS = {"9486295", "9521813"}  # Workplace IMOs: TUFMAX, POLAR
+_BACKUP_SOURCE = "wni"
+
 _SKIP_COLUMNS = {"vessel_imo", "log_date", "date", "raw_log_id", "source_id"}
 
 # Voyage fields shown in Log Info, above the Performance/Emission sections.
@@ -36,6 +59,55 @@ _HEADER_COLUMNS = [
 
 def _quote(ident: str) -> str:
     return '"' + ident.replace('"', '""') + '"'
+
+
+async def _fetch_rows(db, table, date_col, cols, days, end_date, imos):
+    """Latest `days` distinct dates per vessel -> {imo: {date: {col: value}}}."""
+    cols = sorted(cols)
+    if not cols:
+        return {}
+    dcol = _quote(date_col)
+    sql = (
+        f"WITH ranked AS ("
+        f"  SELECT vessel_imo, {dcol} AS d, "
+        f"         DENSE_RANK() OVER (PARTITION BY vessel_imo ORDER BY {dcol} DESC) AS rk "
+        f"  FROM {table} WHERE {dcol} IS NOT NULL"
+        f"  {'AND vessel_imo = ANY(:imos)' if imos is not None else ''}"
+        f"  {'AND ' + dcol + '::date <= :end_date' if end_date else ''}"
+        f") "
+        f"SELECT t.vessel_imo, t.{dcol} AS d, {', '.join('t.' + _quote(c) for c in cols)} "
+        f"FROM {table} t JOIN ranked r "
+        f"  ON r.vessel_imo = t.vessel_imo AND r.d = t.{dcol} "
+        f"WHERE r.rk <= :days "
+        f"ORDER BY t.vessel_imo, t.{dcol} DESC, t.ctid DESC"
+    )
+    params = {"days": days}
+    if imos is not None:
+        params["imos"] = imos
+    if end_date:
+        params["end_date"] = end_date
+    result = await db.execute(text(sql), params)
+    keys = list(result.keys())
+    out, seen = {}, set()
+    for row in result.fetchall():
+        m = dict(zip(keys, row))
+        imo, d = _IMO_ALIAS.get(m["vessel_imo"], m["vessel_imo"]), str(m["d"])[:10]
+        if (imo, d) in seen:  # keep one log per day (the latest)
+            continue
+        seen.add((imo, d))
+        out.setdefault(imo, {})[d] = {c: (None if m[c] is None else str(m[c])) for c in cols}
+    return out
+
+
+async def _latest_date(db, table, date_col, imos):
+    dcol = _quote(date_col)
+    return (await db.execute(
+        text(
+            f"SELECT MAX({dcol}::date) FROM {table}"
+            + (" WHERE vessel_imo = ANY(:imos)" if imos is not None else "")
+        ),
+        {"imos": imos} if imos is not None else {},
+    )).scalar()
 
 
 @router.get("/logbook")
@@ -61,7 +133,8 @@ async def get_logbook(
                 status_code=503,
                 detail="Could not verify vessel assignment. Please retry.",
             )
-        allowed = list(assigned)
+        # assigned_vessels are Workplace IMOs; also match the Vessel_Performance IMOs
+        allowed = _perf_imos(assigned)
         if not allowed:
             return {"source": source, "columns": [], "vessels": []}
 
@@ -115,56 +188,36 @@ async def get_logbook(
                 "category": "Emission",
             })
 
-    select_cols = ", ".join(_quote(c) for c in sorted(used))
-    dcol = _quote(date_col)
-    sql = (
-        f"WITH ranked AS ("
-        f"  SELECT vessel_imo, {dcol} AS d, "
-        f"         DENSE_RANK() OVER (PARTITION BY vessel_imo ORDER BY {dcol} DESC) AS rk "
-        f"  FROM {table} WHERE {dcol} IS NOT NULL"
-        f"  {'AND vessel_imo = ANY(:imos)' if allowed is not None else ''}"
-        f"  {'AND ' + dcol + '::date <= :end_date' if end_date else ''}"
-        f") "
-        f"SELECT t.vessel_imo, t.{dcol} AS d, {', '.join('t.' + _quote(c) for c in sorted(used))} "
-        f"FROM {table} t JOIN ranked r "
-        f"  ON r.vessel_imo = t.vessel_imo AND r.d = t.{dcol} "
-        f"WHERE r.rk <= :days "
-        f"ORDER BY t.vessel_imo, t.{dcol} DESC, t.ctid DESC"
-    ) if select_cols else None
+    vessels = await _fetch_rows(db, table, date_col, used, days, end_date, allowed)
+    latest = await _latest_date(db, table, date_col, allowed)
+    via_backup = []
 
-    vessels: dict = {}
-    if sql:
-        params = {"days": days}
-        if allowed is not None:
-            params["imos"] = allowed
-        if end_date:
-            params["end_date"] = end_date
-        result = await db.execute(text(sql), params)
-        keys = list(result.keys())
-        seen = set()
-        for row in result.fetchall():
-            m = dict(zip(keys, row))
-            imo, d = m["vessel_imo"], str(m["d"])[:10]
-            if (imo, d) in seen:  # keep one log per day (the latest)
-                continue
-            seen.add((imo, d))
-            vessels.setdefault(imo, {})[d] = {
-                c: (None if m[c] is None else str(m[c])) for c in used
-            }
-
-    # Newest date in the data (ignores end_date) so the UI knows where "Latest" is.
-    lat_params = {"imos": allowed} if allowed is not None else {}
-    latest = (await db.execute(
-        text(
-            f"SELECT MAX({dcol}::date) FROM {table}"
-            + (" WHERE vessel_imo = ANY(:imos)" if allowed is not None else "")
-        ),
-        lat_params,
-    )).scalar()
+    if source == "mari_apps":
+        b_table, b_date = _SOURCES[_BACKUP_SOURCE]
+        b_imos = [i for i in _perf_imos(_BACKUP_VESSELS)
+                  if allowed is None or i in allowed]
+        if b_imos:
+            existing = {r[0] for r in (await db.execute(
+                text("SELECT column_name FROM information_schema.columns WHERE table_name = :t"),
+                {"t": b_table},
+            )).fetchall()}
+            b_cols = {c for c in used if c in existing}
+            backup = await _fetch_rows(db, b_table, b_date, b_cols, days, end_date, b_imos)
+            for imo, b_rows in backup.items():
+                m_rows = vessels.get(imo)
+                if not m_rows or max(b_rows) > max(m_rows):
+                    vessels[imo] = b_rows
+                    via_backup.append(imo)
+            b_latest = await _latest_date(db, b_table, b_date, b_imos)
+            if b_latest and (latest is None or b_latest > latest):
+                latest = b_latest
 
     return {
         "source": source,
         "latest_date": latest.isoformat() if latest else None,
         "columns": columns,
-        "vessels": [{"imo": imo, "rows": rows} for imo, rows in vessels.items()],
+        "vessels": [
+            {"imo": imo, "rows": rows, **({"via": "excel_mail"} if imo in via_backup else {})}
+            for imo, rows in vessels.items()
+        ],
     }
