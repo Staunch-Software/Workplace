@@ -16,7 +16,7 @@ import asyncio
 import logging
 import re
 
-from app.services.gemini_config import gemini_model, gemini_thinking_config, gemini_max_output_tokens
+from app.services.gemini_config import generate as gemini_generate
 
 logger = logging.getLogger(__name__)
 
@@ -334,9 +334,9 @@ def _call_value_reread(client, page_image, tank: str, date_str: str, kind: str =
     buf = _io.BytesIO()
     page_image.save(buf, format="PNG")
     try:
-        response = client.models.generate_content(
-            model=gemini_model(),
-            contents=[
+        response = gemini_generate(
+            client, "value_reread",
+            [
                 types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
                 _REREAD_PROMPT.format(
                     what=(f'the Code I WEEKLY INVENTORY entry of the tank "{tank}"' if kind == "inventory"
@@ -345,12 +345,7 @@ def _call_value_reread(client, page_image, tank: str, date_str: str, kind: str =
                     item_hint=("" if kind == "inventory" else ", item 11.3"),
                 ),
             ],
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-                max_output_tokens=gemini_max_output_tokens(500),
-                response_mime_type="application/json",
-                thinking_config=gemini_thinking_config(types),
-            ),
+            light=True, small_output=500, temperature=0.0, response_mime_type="application/json",
         )
         data = _json.loads(response.text.strip())
         return data if isinstance(data, dict) else None

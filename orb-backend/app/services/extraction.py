@@ -14,7 +14,9 @@ from sqlalchemy import select
 from sqlalchemy import select as sa_select
 
 from app.config import get_settings
-from app.services.gemini_config import gemini_model, gemini_thinking_config, gemini_max_output_tokens
+from app.services.gemini_config import generate as gemini_generate, gemini_model
+from app.services.gemini_usage import start_collection
+from app.models.orb_upload_raw import OrbUploadRaw
 from app.models.orb_upload import OrbUpload
 from app.models.orb_entry import OrbEntry
 from app.models.orb_entry_quantity import OrbEntryQuantity
@@ -1161,18 +1163,10 @@ def _detect_vessel_name(client, page_image) -> str | None:
     buf = _io.BytesIO()
     page_image.save(buf, format="PNG")
     try:
-        response = client.models.generate_content(
-            model=gemini_model(),
-            contents=[
-                types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
-                _VESSEL_NAME_CHECK_PROMPT,
-            ],
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-                max_output_tokens=gemini_max_output_tokens(500),
-                response_mime_type="application/json",
-                thinking_config=gemini_thinking_config(types),
-            ),
+        response = gemini_generate(
+            client, "vessel_name",
+            [types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"), _VESSEL_NAME_CHECK_PROMPT],
+            light=True, small_output=500, temperature=0.0, response_mime_type="application/json",
         )
         data = _json.loads(response.text.strip())
         name = data.get("ship_name") if isinstance(data, dict) else None
@@ -1213,17 +1207,10 @@ def _detect_stacked_pages(client, page_image) -> tuple[int, float | None]:
     buf = _io.BytesIO()
     page_image.save(buf, format="PNG")
     try:
-        response = client.models.generate_content(
-            model=gemini_model(),
-            contents=[
-                types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
-                _STACK_SPLIT_PROMPT,
-            ],
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-                max_output_tokens=gemini_max_output_tokens(2000),
-                response_mime_type="application/json",
-            ),
+        response = gemini_generate(
+            client, "stack_detect",
+            [types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"), _STACK_SPLIT_PROMPT],
+            light=True, small_output=2000, temperature=0.0, response_mime_type="application/json",
         )
         data = _json.loads(response.text.strip())
         count = int(data.get("page_count") or 1)
@@ -1338,18 +1325,10 @@ def _call_boundary_recheck(client, page_image) -> dict | None:
     buf = _io.BytesIO()
     strip.save(buf, format="PNG")
     try:
-        response = client.models.generate_content(
-            model=gemini_model(),
-            contents=[
-                types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
-                _BOUNDARY_RECHECK_PROMPT,
-            ],
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-                max_output_tokens=gemini_max_output_tokens(2000),
-                response_mime_type="application/json",
-                thinking_config=gemini_thinking_config(types),
-            ),
+        response = gemini_generate(
+            client, "boundary_recheck",
+            [types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"), _BOUNDARY_RECHECK_PROMPT],
+            light=True, small_output=2000, temperature=0.0, response_mime_type="application/json",
         )
         data = _json.loads(response.text.strip())
         continuation = data.get("continuation")
@@ -1518,18 +1497,10 @@ def _call_targeted_orphan_recheck(client, page_image, orphan: dict) -> dict | No
     strip.save(buf, format="PNG")
     prompt = _build_targeted_orphan_prompt(orphan)
     try:
-        response = client.models.generate_content(
-            model=gemini_model(),
-            contents=[
-                types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
-                prompt,
-            ],
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-                max_output_tokens=gemini_max_output_tokens(2000),
-                response_mime_type="application/json",
-                thinking_config=gemini_thinking_config(types),
-            ),
+        response = gemini_generate(
+            client, "orphan_recheck",
+            [types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"), prompt],
+            light=True, small_output=2000, temperature=0.0, response_mime_type="application/json",
         )
         data = _json.loads(response.text.strip())
         continuation = data.get("continuation")
@@ -2053,39 +2024,19 @@ async def extract_with_gemini(
         prompt_text = f"Extract all ORB entries from page {page_num}."
         if roster_hint:
             prompt_text += f"\n\n{roster_hint}"
-        response = client.models.generate_content(
-            model=gemini_model(),
-            contents=[
-                types.Part.from_bytes(
-                    data=buf.getvalue(),
-                    mime_type="image/png",
-                ),
-                prompt_text,
-            ],
-            config=types.GenerateContentConfig(
-                system_instruction=EXTRACTION_SYSTEM_PROMPT,
-                # A page with several dense entries (verbatim raw_text, quantities,
-                # positions, officer info per entry) can approach/exceed 8192 tokens,
-                # silently truncating the JSON and dropping the last entries on the
-                # page. Raised with margin — see the 08-Mar case where the last two
-                # of six entries on one page vanished with no error at all.
-                max_output_tokens=32768,
-                # gemini-2.5-flash spends part of any output-token budget on its own
-                # internal "thinking" before writing the actual JSON -- confirmed in
-                # production via the debug dump (EXTRACTION_DEBUG_DIR): two separate
-                # pages' raw responses cut off mid-object, mid-entry, with the closing
-                # brackets simply never generated, well inside what 32768 tokens should
-                # cover for a single page's JSON. This task doesn't need extended
-                # reasoning -- the system prompt above already spells out, step by step,
-                # exactly how to resolve every judgment call (entry boundaries, date
-                # ambiguity, continuations) -- so disabling thinking removes the
-                # competition for the output budget entirely rather than trying to
-                # guess a max_output_tokens large enough to outrun an unpredictable
-                # thinking allocation.
-                thinking_config=gemini_thinking_config(types),
-                temperature=0.1,
-                response_mime_type="application/json",
-            ),
+        response = gemini_generate(
+            client, "extract",
+            [types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"), prompt_text],
+            system_instruction=EXTRACTION_SYSTEM_PROMPT,
+            # A page with several dense entries (verbatim raw_text, quantities, positions, officer
+            # info per entry) can approach/exceed 8192 tokens, silently truncating the JSON and
+            # dropping the last entries on the page (the 08-Mar case) -- hence the large limit.
+            # Thinking is controlled centrally (gemini_config.gemini_thinking_config): switched off
+            # on 2.5 models, lowered by GEMINI_THINKING_LEVEL on newer ones, because thinking tokens
+            # compete with the JSON for this output budget and are billed as output.
+            max_output_tokens=32768,
+            temperature=0.1,
+            response_mime_type="application/json",
         )
         return response.text.strip()
 
@@ -4041,13 +3992,48 @@ def _flag_fused_continuation_entries(entries_data: list[dict]) -> list[dict]:
     return entries_data
 
 
+async def _save_raw_extraction(session_factory, upload_id, entries_data, failed_pages, usage_summary) -> None:
+    """Keep what the extractor returned so post-processing can be re-applied without Gemini.
+    Never raises: losing this copy must not fail an upload."""
+    try:
+        payload = json.loads(json.dumps(entries_data, default=str))
+        failed = {"pages": list(failed_pages or []), "reasons": {str(k): v for k, v in getattr(failed_pages, "reasons", {}).items()}}
+        async with session_factory() as s:
+            rec = await s.get(OrbUploadRaw, upload_id)
+            if rec is None:
+                s.add(OrbUploadRaw(upload_id=upload_id, entries=payload, failed_pages=failed, usage=usage_summary, model=gemini_model()))
+            else:
+                rec.entries, rec.failed_pages, rec.usage, rec.model = payload, failed, usage_summary, gemini_model()
+            await s.commit()
+    except Exception:
+        logger.exception("Could not save the raw extraction of upload %s", upload_id)
+
+
+async def _load_raw_extraction(session_factory, upload_id):
+    """(entries, FailedPages) saved for this upload, or None."""
+    async with session_factory() as s:
+        rec = await s.get(OrbUploadRaw, upload_id)
+        if rec is None:
+            return None
+        failed = FailedPages(rec.failed_pages.get("pages", []) if rec.failed_pages else [])
+        for k, v in ((rec.failed_pages or {}).get("reasons") or {}).items():
+            failed.reasons[int(k)] = v
+        return json.loads(json.dumps(rec.entries)), failed
+
+
 async def run_extraction(
     upload_id: uuid.UUID,
     storage_path: str,
     vessel_id: uuid.UUID,
     session_factory: async_sessionmaker,
+    use_saved: bool = False,
 ):
-    """Background task: extract entries from uploaded PDF and run calculations."""
+    """Background task: extract entries from uploaded PDF and run calculations.
+
+    use_saved=True skips Gemini and re-applies post-processing to the extraction saved earlier
+    (orb_upload_raw) -- a free way to pick up fixes to the repair / de-duplication / check steps.
+    """
+    usage = start_collection()      # token usage of every Gemini call made for this upload
     async with session_factory() as db:
         try:
             result = await db.execute(sa_select(OrbUpload).where(OrbUpload.id == upload_id))
@@ -4069,7 +4055,17 @@ async def run_extraction(
             await db.commit()
 
             failed_pages: list[int] = []
-            if settings.USE_MOCK_EXTRACTION:
+            if use_saved:
+                saved = await _load_raw_extraction(session_factory, upload_id)
+                if saved is None:
+                    upload.status = "failed"
+                    upload.error_message = "No saved extraction for this upload -- run a full re-extraction once first."
+                    upload.updated_at = datetime.now(timezone.utc)
+                    await db.commit()
+                    return
+                entries_data, failed_pages = saved
+                logger.warning("Upload %s re-processed from its saved extraction (no Gemini calls)", upload_id)
+            elif settings.USE_MOCK_EXTRACTION:
                 entries_data = get_mock_data(vessel_id, upload_id)
             else:
                 try:
@@ -4088,6 +4084,8 @@ async def run_extraction(
                         )
                 except GeminiBillingError as e:
                     logger.error(f"Upload {upload_id} stopped: {e}")
+                    if usage.by_kind:
+                        logger.warning("Gemini usage for upload %s (stopped): %s", upload_id, usage.describe())
                     upload.status = "failed"
                     upload.error_message = f"{e}. Top up the Gemini account, then re-run the upload."
                     upload.updated_at = datetime.now(timezone.utc)
@@ -4100,6 +4098,12 @@ async def run_extraction(
                     upload.updated_at = datetime.now(timezone.utc)
                     await db.commit()
                     return
+
+            if usage.by_kind:
+                logger.warning("Gemini usage for upload %s: %s", upload_id, usage.describe())
+            if not use_saved:
+                # Before ANY post-processing: this is the expensive part, keep it.
+                await _save_raw_extraction(session_factory, upload_id, entries_data, failed_pages, usage.summary())
 
             entries_data = _merge_split_entries(entries_data)
             entries_data = reattach_split_blocks(entries_data)

@@ -15,6 +15,7 @@ from app.models.orb_upload import OrbUpload
 from app.models.orb_entry import OrbEntry
 from app.models.orb_entry_quantity import OrbEntryQuantity
 from app.models.orb_alert import OrbAlert
+from app.models.orb_upload_raw import OrbUploadRaw
 from app.models.vessel import Vessel
 from app.models.user import User as OrbHistoryUser
 from app.models.control_user import ControlUser
@@ -211,6 +212,45 @@ async def reprocess_upload(
     background_tasks.add_task(run_extraction, upload_id, upload.storage_path, upload.vessel_id, AsyncSessionLocal)
     logger.warning("Upload %s re-queued for extraction by %s (temporary reprocess endpoint)", upload_id, user.id)
     return success(message="Re-extraction queued")
+
+
+# ── TEMPORARY (testing only) ─────────────────────────────────────────────────
+# Re-apply post-processing (repairs, de-duplication, checks) to the extraction saved for this
+# upload, WITHOUT calling Gemini. Remove together with /reprocess once testing is done.
+@router.post("/{upload_id}/reprocess-saved")
+async def reprocess_saved(
+    upload_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    user: ControlUser = Depends(require_admin),
+):
+    result = await db.execute(select(OrbUpload).where(OrbUpload.id == upload_id))
+    upload = result.scalar_one_or_none()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    if upload.status in ("pending", "processing"):
+        from datetime import datetime, timezone, timedelta
+        last = upload.updated_at or upload.created_at
+        if last is not None and (datetime.now(timezone.utc) - last) < timedelta(minutes=30):
+            raise HTTPException(status_code=409, detail="This upload is still being processed (activity within the last 30 minutes)")
+    if await db.get(OrbUploadRaw, upload_id) is None:
+        raise HTTPException(status_code=404, detail="No saved extraction for this upload. Run a full re-extraction once; later fixes can then be re-applied for free.")
+
+    entry_ids = select(OrbEntry.id).where(OrbEntry.upload_id == upload_id)
+    await db.execute(delete(OrbAlert).where(OrbAlert.entry_id.in_(entry_ids)))
+    await db.execute(delete(OrbEntryQuantity).where(OrbEntryQuantity.entry_id.in_(entry_ids)))
+    await db.execute(delete(OrbEntry).where(OrbEntry.upload_id == upload_id))
+    upload.status = "pending"
+    upload.error_message = None
+    upload.pages_processed = 0
+    upload.extracted_entries_count = 0
+    upload.duplicate_entries_skipped = 0
+    await db.commit()
+
+    from app.services.extraction import run_extraction
+    background_tasks.add_task(run_extraction, upload_id, upload.storage_path, upload.vessel_id, AsyncSessionLocal, True)
+    logger.warning("Upload %s re-processed from saved extraction by %s (temporary endpoint)", upload_id, user.id)
+    return success(message="Re-processing from the saved extraction queued")
 
 
 @router.get("/{upload_id}/pdf")

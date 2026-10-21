@@ -21,6 +21,18 @@ class Settings(BaseSettings):
     # Model used for every extraction / re-check call. Google gates older models for new
     # projects, so this must be changeable without a code release.
     GEMINI_MODEL: str = "gemini-2.5-flash"
+    # Cheaper model for the simple calls (page layout, vessel name, boundary / value re-checks).
+    # Empty = use GEMINI_MODEL for everything.
+    GEMINI_MODEL_LIGHT: str = ""
+    # Thinking level for non-2.5 models: minimal | low | medium | high. Empty = model default.
+    # Thinking tokens are billed as output, so a lower level is the main cost lever.
+    GEMINI_THINKING_LEVEL: str = ""
+    # Prices (USD per 1M tokens) used ONLY for the per-upload cost estimate in the log.
+    GEMINI_PRICE_IN_PER_M: float = 0.75
+    GEMINI_PRICE_OUT_PER_M: float = 3.75
+    GEMINI_LIGHT_PRICE_IN_PER_M: float = 0.0     # 0 = same as the main model
+    GEMINI_LIGHT_PRICE_OUT_PER_M: float = 0.0
+    GEMINI_USD_INR: float = 0.0                  # >0 also shows the estimate in rupees
     USE_MOCK_EXTRACTION: bool = True
     UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_SIZE_MB: int = 50

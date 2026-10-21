@@ -134,6 +134,20 @@ export default function UploadDetail() {
     }
   };
 
+  // TEMPORARY (testing only): re-apply post-processing to the saved extraction -- no Gemini cost.
+  const reprocessSaved = async () => {
+    if (!window.confirm('Re-process this upload from its saved extraction?\n\nNo Gemini calls are made (no cost). Its current entries and their alerts are deleted and rebuilt with the latest repair and check rules.')) return;
+    setReprocessing(true);
+    try {
+      await api.post(`/api/uploads/${id}/reprocess-saved`);
+      await load();
+    } catch (err) {
+      window.alert(err.response?.data?.detail || 'Could not start re-processing');
+    } finally {
+      setReprocessing(false);
+    }
+  };
+
   // While an upload is being (re)processed, refresh every 5s so the status updates by itself.
   useEffect(() => {
     if (!upload || !['pending', 'processing'].includes(upload.status)) return undefined;
@@ -212,6 +226,12 @@ export default function UploadDetail() {
                       <FileText size={15} />
                       Preview PDF
                     </button>
+                    {isAdmin && ['completed', 'failed'].includes(upload.status) && (
+                      <button className="ud-btn ud-btn--secondary" onClick={reprocessSaved} disabled={reprocessing}
+                              title="Temporary testing option: re-apply the latest rules to the saved extraction (no Gemini cost)">
+                        <RefreshCw size={15} />Re-process saved (free)
+                      </button>
+                    )}
                     {isAdmin && ['completed', 'failed', 'processing'].includes(upload.status) && (
                       <button className="ud-btn ud-btn--secondary" onClick={reprocess} disabled={reprocessing}
                               title="Temporary testing option: rebuild this upload's entries from the PDF">
