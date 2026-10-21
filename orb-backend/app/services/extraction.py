@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy import select as sa_select
 
 from app.config import get_settings
+from app.services.gemini_config import gemini_model, gemini_thinking_config
 from app.models.orb_upload import OrbUpload
 from app.models.orb_entry import OrbEntry
 from app.models.orb_entry_quantity import OrbEntryQuantity
@@ -1161,7 +1162,7 @@ def _detect_vessel_name(client, page_image) -> str | None:
     page_image.save(buf, format="PNG")
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=gemini_model(),
             contents=[
                 types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
                 _VESSEL_NAME_CHECK_PROMPT,
@@ -1170,7 +1171,7 @@ def _detect_vessel_name(client, page_image) -> str | None:
                 temperature=0.0,
                 max_output_tokens=500,
                 response_mime_type="application/json",
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                thinking_config=gemini_thinking_config(types),
             ),
         )
         data = _json.loads(response.text.strip())
@@ -1213,7 +1214,7 @@ def _detect_stacked_pages(client, page_image) -> tuple[int, float | None]:
     page_image.save(buf, format="PNG")
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=gemini_model(),
             contents=[
                 types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
                 _STACK_SPLIT_PROMPT,
@@ -1338,7 +1339,7 @@ def _call_boundary_recheck(client, page_image) -> dict | None:
     strip.save(buf, format="PNG")
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=gemini_model(),
             contents=[
                 types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
                 _BOUNDARY_RECHECK_PROMPT,
@@ -1347,7 +1348,7 @@ def _call_boundary_recheck(client, page_image) -> dict | None:
                 temperature=0.0,
                 max_output_tokens=2000,
                 response_mime_type="application/json",
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                thinking_config=gemini_thinking_config(types),
             ),
         )
         data = _json.loads(response.text.strip())
@@ -1518,7 +1519,7 @@ def _call_targeted_orphan_recheck(client, page_image, orphan: dict) -> dict | No
     prompt = _build_targeted_orphan_prompt(orphan)
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=gemini_model(),
             contents=[
                 types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
                 prompt,
@@ -1527,7 +1528,7 @@ def _call_targeted_orphan_recheck(client, page_image, orphan: dict) -> dict | No
                 temperature=0.0,
                 max_output_tokens=2000,
                 response_mime_type="application/json",
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                thinking_config=gemini_thinking_config(types),
             ),
         )
         data = _json.loads(response.text.strip())
@@ -2053,7 +2054,7 @@ async def extract_with_gemini(
         if roster_hint:
             prompt_text += f"\n\n{roster_hint}"
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=gemini_model(),
             contents=[
                 types.Part.from_bytes(
                     data=buf.getvalue(),
@@ -2081,7 +2082,7 @@ async def extract_with_gemini(
                 # competition for the output budget entirely rather than trying to
                 # guess a max_output_tokens large enough to outrun an unpredictable
                 # thinking allocation.
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                thinking_config=gemini_thinking_config(types),
                 temperature=0.1,
                 response_mime_type="application/json",
             ),

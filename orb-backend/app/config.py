@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ANTHROPIC_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
+    # Model used for every extraction / re-check call. Google gates older models for new
+    # projects, so this must be changeable without a code release.
+    GEMINI_MODEL: str = "gemini-2.5-flash"
     USE_MOCK_EXTRACTION: bool = True
     UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_SIZE_MB: int = 50

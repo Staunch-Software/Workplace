@@ -16,6 +16,8 @@ import asyncio
 import logging
 import re
 
+from app.services.gemini_config import gemini_model, gemini_thinking_config
+
 logger = logging.getLogger(__name__)
 
 # Items that can only CONTINUE a block (the block's first item is 11.1 / 13 / 26.1).
@@ -323,7 +325,7 @@ def _call_value_reread(client, page_image, tank: str, date_str: str) -> dict | N
     page_image.save(buf, format="PNG")
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=gemini_model(),
             contents=[
                 types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
                 _REREAD_PROMPT.format(tank=tank, date=date_str),
@@ -332,7 +334,7 @@ def _call_value_reread(client, page_image, tank: str, date_str: str) -> dict | N
                 temperature=0.0,
                 max_output_tokens=500,
                 response_mime_type="application/json",
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                thinking_config=gemini_thinking_config(types),
             ),
         )
         data = _json.loads(response.text.strip())
