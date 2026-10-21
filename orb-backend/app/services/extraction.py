@@ -1060,6 +1060,50 @@ set only when page_count is 2>}
 """
 
 
+class GeminiBillingError(Exception):
+    """Gemini refused the call because the account has no usable credit/quota left.
+
+    Not worth retrying and not recoverable by the next page: continuing would
+    just burn 3 attempts per remaining page and then report an empty "completed"
+    upload (confirmed in production: ORB Sept 2026.PDF, 32 pages, all HTTP 402
+    "prepayment credits are depleted", saved as completed with 0 entries).
+    """
+
+
+class FailedPages(list):
+    """List of page numbers that could not be extracted, plus why (page -> reason)."""
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.reasons: dict[int, str] = {}
+
+
+def _is_billing_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return (
+        "credits are depleted" in text
+        or "billing" in text and "resource_exhausted" in text
+        or text.lstrip().startswith("402")
+        or "prepayment" in text
+    )
+
+
+def _compress_pages(pages: list[int]) -> str:
+    """[1,2,3,7,9,10] -> "1-3, 7, 9-10"."""
+    out, start, prev = [], None, None
+    for n in sorted(pages):
+        if start is None:
+            start = prev = n
+        elif n == prev + 1:
+            prev = n
+        else:
+            out.append(f"{start}-{prev}" if start != prev else str(start))
+            start = prev = n
+    if start is not None:
+        out.append(f"{start}-{prev}" if start != prev else str(start))
+    return ", ".join(out)
+
+
 class VesselMismatchError(Exception):
     """Raised before any real extraction work happens when the document's
     own "NAME OF SHIP" header clearly names a different vessel than the one
@@ -2040,7 +2084,7 @@ async def extract_with_gemini(
         return response.text.strip()
 
     all_entries = []
-    failed_pages: list[int] = []
+    failed_pages = FailedPages()
     # Running per-rank tally of confidently-read officer names, built up as
     # pages are processed in order and fed to each subsequent page's call as
     # a spelling-reference hint (see OFFICER NAME CONSISTENCY in the prompt
@@ -2177,10 +2221,16 @@ async def extract_with_gemini(
             except Exception as e:
                 last_error = e
                 logger.warning(f"Page {page_num} attempt {attempt + 1}/3 failed: {e}")
+                if _is_billing_error(e):
+                    # Stop the whole run at once instead of 3 attempts x every remaining page.
+                    raise GeminiBillingError(
+                        f"Gemini API credits are depleted (stopped at page {page_num}): {str(e)[:200]}"
+                    ) from e
 
         if page_data is None:
             logger.error(f"Page {page_num} extraction failed after 3 attempts: {last_error}")
             failed_pages.append(page_num)
+            failed_pages.reasons[page_num] = str(last_error)[:200]
             await _write_progress(session_factory, upload_id, pages_processed=page_num)
             continue
 
@@ -2454,6 +2504,7 @@ async def extract_with_gemini(
         except Exception as e:
             logger.error(f"Page {page_num} post-processing failed: {e}")
             failed_pages.append(page_num)
+            failed_pages.reasons[page_num] = f"post-processing error: {str(e)[:150]}"
             await _write_progress(session_factory, upload_id, pages_processed=page_num)
             continue
 
@@ -4008,6 +4059,13 @@ async def run_extraction(
                             storage_path, upload_id=upload_id, session_factory=session_factory,
                             expected_vessel_name=vessel.name if vessel else None,
                         )
+                except GeminiBillingError as e:
+                    logger.error(f"Upload {upload_id} stopped: {e}")
+                    upload.status = "failed"
+                    upload.error_message = f"{e}. Top up the Gemini account, then re-run the upload."
+                    upload.updated_at = datetime.now(timezone.utc)
+                    await db.commit()
+                    return
                 except VesselMismatchError as e:
                     logger.warning(f"Upload {upload_id} rejected: {e}")
                     upload.status = "failed"
@@ -4409,13 +4467,37 @@ async def run_extraction(
             upload.duplicate_entries_skipped = duplicate_count
 
             msg_parts = []
+            if failed_pages:
+                # total_pages is written by a separate session (_write_progress); read it
+                # without refresh() so the status/counts set above are not discarded.
+                try:
+                    total_pages = (await db.execute(
+                        sa_select(OrbUpload.total_pages).where(OrbUpload.id == upload_id)
+                    )).scalar_one_or_none()
+                except Exception:
+                    total_pages = None
+                total = f" of {total_pages}" if total_pages else ""
+                first_reason = next(iter(getattr(failed_pages, "reasons", {}).values()), "")
+                msg_parts.append(
+                    f"{len(failed_pages)}{total} page(s) failed to extract "
+                    f"(pages {_compress_pages(list(failed_pages))})"
+                    + (f": {first_reason}" if first_reason else "")
+                )
             if errors:
                 msg_parts.append(f"{len(errors)} entries failed to save")
             if duplicate_count:
                 msg_parts.append(f"{duplicate_count} duplicate {'entry' if duplicate_count == 1 else 'entries'} skipped")
             upload.error_message = "; ".join(msg_parts) if msg_parts else None
+            # An upload that ends with nothing saved is not a success -- unless every
+            # entry was a known duplicate of an earlier upload, which is a legitimate
+            # (already explained) outcome.
+            if entry_count == 0 and duplicate_count == 0:
+                upload.status = "failed"
+                upload.error_message = "No entries were extracted. " + (upload.error_message or "The PDF produced no readable ORB entries.")
             upload.updated_at = datetime.now(timezone.utc)
             await db.commit()
+            if entry_count == 0:
+                return
 
             # Run compliance checks
             try:
