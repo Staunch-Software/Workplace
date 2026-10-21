@@ -606,6 +606,15 @@ shape itself could honestly go either way. A downstream check uses this signal t
 know when it's safe to reconsider a date; scoring a genuinely ambiguous digit as
 high-confidence would suppress that safety net.
 
+WHOLE NUMBERS HAVE NO DECIMAL POINT: officers write whole-number quantities without a dot
+("13 m3", "16 m3", "17 m3", "18 m3", "24 m3"). Never insert a decimal point that is not
+physically drawn on the page -- "13 m3" is thirteen, NOT 1.3; "18 m3" is eighteen, NOT 1.8; "24 m3"
+is twenty-four, NOT 2.4. Confirmed in production on one page set: five whole-number readings
+(13, 16, 17, 18, 24) were each returned as a one-decimal value (1.3, 1.6, 1.2, 1.8, 2.4), silently
+corrupting the tank balances. Output a decimal point only when a dot is clearly visible between
+the digits. If a two-digit figure could honestly be either, prefer the reading that is consistent
+with the same tank's neighbouring readings and score the entry's confidence_score 0.6-0.75.
+
 QUANTITY DIGIT AMBIGUITY: the same confusable digit pairs (9/5, 1/7, 3/8, 0/6, and also 0/8)
 apply to quantity figures (retained/transferred/capacity/etc.), not just dates. Confirmed in
 production: a retained figure clearly written as "0.8" was read as "0.0", scored at high
@@ -2964,7 +2973,22 @@ def _drop_untanked_sounding_fragments(entries_data: list[dict]) -> list[dict]:
     kept = []
     for entry in entries_data:
         item = (entry.get("item_number") or "").strip()
-        if entry.get("orb_code") == "C" and item == "11.1" and not (entry.get("tank_location") or "").strip():
+        no_tank = not (entry.get("tank_location") or "").strip()
+        # A Code C entry always carries an item number (11.x / 12.x); with no
+        # item AND no tank it is the bare tail of a block that began on the
+        # previous page ("CAPACITY - 26.7 m3, RETAINED - 18 m3" + signature).
+        # Confirmed on AMNSI MAXIMUS: that tail was already merged into the
+        # weekly-inventory entry, but the page's own copy of it survived as a
+        # second entry with a misread year (2024) and retained 1.8 instead of 18.
+        qty_types = {(q.get("qty_type") or q.get("type")) for q in (entry.get("quantities") or [])}
+        bare_tail = qty_types <= {"capacity", "retained"}
+        if entry.get("orb_code") == "C" and not item and no_tank and bare_tail:
+            logger.warning(
+                f"Dropped orphan Code C fragment (no item, no tank_location): "
+                f"date={entry.get('entry_date')} raw_text={entry.get('raw_text')!r}"
+            )
+            continue
+        if entry.get("orb_code") == "C" and item == "11.1" and no_tank:
             logger.warning(
                 f"Dropped untanked Code C 11.1 fragment (no tank_location -- not a real sounding): "
                 f"date={entry.get('entry_date')} raw_text={entry.get('raw_text')!r}"
@@ -3328,6 +3352,14 @@ def _reconcile_tank_capacity_readings(entries_data: list[dict]) -> list[dict]:
 
 
 _WEEKLY_INVENTORY_RE = re.compile(r"WEEKLY\s+INVENTORY\s+OF\s+BILGE\s*(?:HOLDING)?\s*TANK", re.IGNORECASE)
+# A Code I OWS alarm / 3-way valve test is the other remark that gets folded
+# into the preceding Code C sounding (confirmed: AMNSI MAXIMUS 16-Aug, the OWS
+# test text ended up inside the waste-oil-tank sounding and the test itself,
+# signed by a different officer, was lost as an entry).
+_OWS_TEST_RE = re.compile(r"OWS\s*15[\s\-]*PPM\s+ALARM", re.IGNORECASE)
+_SWALLOWED_REMARK_RE = re.compile(
+    _WEEKLY_INVENTORY_RE.pattern + "|" + _OWS_TEST_RE.pattern, re.IGNORECASE
+)
 
 
 def _split_swallowed_weekly_inventory(entries_data: list[dict]) -> list[dict]:
@@ -3349,13 +3381,13 @@ def _split_swallowed_weekly_inventory(entries_data: list[dict]) -> list[dict]:
     result: list[dict] = []
     for entry in entries_data:
         raw = entry.get("raw_text") or ""
-        match = _WEEKLY_INVENTORY_RE.search(raw)
+        match = _SWALLOWED_REMARK_RE.search(raw)
         if entry.get("orb_code") != "I" and match and match.start() > 0:
             before_raw = raw[:match.start()].strip()
             after_raw = raw[match.start():].strip()
 
             desc = entry.get("operation_description") or ""
-            desc_match = _WEEKLY_INVENTORY_RE.search(desc)
+            desc_match = _SWALLOWED_REMARK_RE.search(desc)
             if desc_match:
                 before_desc = desc[:desc_match.start()].strip()
                 after_desc = desc[desc_match.start():].strip()
@@ -3392,7 +3424,8 @@ def _split_swallowed_weekly_inventory(entries_data: list[dict]) -> list[dict]:
             new_entry = dict(entry)
             new_entry["orb_code"] = "I"
             new_entry["item_number"] = None
-            new_entry["tank_location"] = "BILGE TANK"
+            is_weekly = bool(_WEEKLY_INVENTORY_RE.match(after_raw))
+            new_entry["tank_location"] = "BILGE TANK" if is_weekly else None
             new_entry["raw_text"] = after_raw
             new_entry["operation_description"] = after_desc
             new_entry["quantities"] = inventory_qtys
@@ -3421,6 +3454,58 @@ _DIGIT_CONFUSIONS = {
 # as genuinely hard to distinguish (see the DATE DIGIT AMBIGUITY prompt
 # section) -- only then is it safe to reconsider the date at all.
 _DATE_AMBIGUITY_CONFIDENCE_THRESHOLD = 0.8
+
+
+def _reconcile_year_outliers(entries_data: list[dict]) -> list[dict]:
+    """Fix an entry whose YEAR was misread when every other entry agrees on one.
+
+    A log covers a short span, so almost every entry shares one year. A lone
+    entry dated years away ("2024-07-12" among 2026 entries, "2016-01-03",
+    "30 AUGUST-2014" in a signature) is a handwriting misread of the year digit,
+    not a real date -- and it fans out into a false "non-chronological" alert
+    plus a wrong "Period covered" in every report. The correction is applied
+    only when putting the dominant year back makes the entry fit between its
+    neighbours, so a genuinely backdated entry is never rewritten.
+    """
+    from collections import Counter
+    from datetime import timedelta
+
+    parsed: list[date | None] = []
+    for e in entries_data:
+        try:
+            parsed.append(parse_entry_date((e.get("entry_date") or "").strip()))
+        except Exception:
+            parsed.append(None)
+
+    years = Counter(d.year for d in parsed if d)
+    if not years:
+        return entries_data
+    dominant, count = years.most_common(1)[0]
+    if count < 5 or count / sum(years.values()) < 0.7:
+        return entries_data
+
+    outliers = {i for i, d in enumerate(parsed) if d and d.year != dominant and abs(d.year - dominant) <= 12}
+    slack = timedelta(days=3)
+    for i in sorted(outliers):
+        try:
+            candidate = parsed[i].replace(year=dominant)
+        except ValueError:
+            continue  # 29 Feb in a non-leap dominant year
+        prev_d = next((parsed[j] for j in range(i - 1, -1, -1) if parsed[j] and j not in outliers), None)
+        next_d = next((parsed[j] for j in range(i + 1, len(parsed)) if parsed[j] and j not in outliers), None)
+        if prev_d and candidate < prev_d - slack:
+            continue
+        if next_d and candidate > next_d + slack:
+            continue
+        logger.warning(
+            f"Year outlier corrected: {entries_data[i].get('entry_date')!r} -> {candidate} "
+            f"(every other entry is in {dominant}) code={entries_data[i].get('orb_code')} "
+            f"tank={entries_data[i].get('tank_location')!r}"
+        )
+        entries_data[i]["entry_date"] = candidate.strftime("%d-%b-%Y").upper()
+        conf = entries_data[i].get("confidence_score")
+        entries_data[i]["confidence_score"] = min(conf, 0.7) if conf is not None else 0.7
+    return entries_data
 
 
 def _reconcile_chronology(entries_data: list[dict]) -> list[dict]:
@@ -3873,6 +3958,7 @@ async def run_extraction(
             entries_data = _split_swallowed_weekly_inventory(entries_data)
             entries_data = _propagate_shared_officer(entries_data)
             entries_data = _reconcile_tank_capacity_readings(entries_data)
+            entries_data = _reconcile_year_outliers(entries_data)
             entries_data = _reconcile_chronology(entries_data)
             entries_data = _reconcile_entry_date_vs_own_header(entries_data)
             entries_data = _reconcile_entry_date_vs_own_signature(entries_data)

@@ -20,6 +20,7 @@ from app.models.orb_entry import OrbEntry
 from app.models.orb_entry_quantity import OrbEntryQuantity
 from app.models.orb_alert import OrbAlert
 from app.models.vessel import Vessel
+from app.services.report_alerts import alerts_for_upload
 
 PAGE_W, PAGE_H = landscape(A4)
 NAVY = colors.HexColor("#1F4E79")
@@ -51,10 +52,9 @@ async def generate_pdf(upload_id: uuid.UUID, db: AsyncSession) -> bytes:
     )
     entries = entries_result.scalars().all()
 
-    alerts_result = await db.execute(
-        select(OrbAlert).where(OrbAlert.vessel_id == upload.vessel_id).order_by(OrbAlert.severity)
-    )
-    alerts = alerts_result.scalars().all()
+    alerts = await alerts_for_upload(db, upload, entries)
+    _rank = {"critical": 0, "major": 1, "minor": 2, "observation": 3}
+    alerts.sort(key=lambda a: (_rank.get(a.severity, 9), a.created_at.timestamp() if a.created_at else 0))
 
     entry_quantities: dict[uuid.UUID, list] = {}
     for entry in entries:
