@@ -227,6 +227,14 @@ def find_suspect_readings(entries: list[dict]) -> list[dict]:
     last: dict[str, tuple[int, float]] = {}
     suspects: list[dict] = []
     for idx, e in enumerate(entries):
+        # Only a sounding (Code C 11.x) or a weekly inventory (Code I) with ONE retained figure can
+        # be re-read unambiguously. A transfer entry carries two retained figures (source and
+        # destination tank) and the same tank can appear in several entries on one day -- the
+        # re-read then picks a neighbour's number (confirmed on AM KIRTI: 6 of 6 flags were false).
+        # Such entries still update the running balance below; they just are never second-guessed.
+        n_retained = sum(1 for q in e.get("quantities") or [] if _qty_type(q) == "retained")
+        item = _norm_item(e.get("item_number")) or ""
+        rereadable = n_retained == 1 and ((e.get("orb_code") == "C" and item.startswith("11")) or e.get("orb_code") == "I")
         for q in e.get("quantities") or []:
             if _qty_type(q) != "retained":
                 continue
@@ -242,7 +250,7 @@ def find_suspect_readings(entries: list[dict]) -> list[dict]:
                     for mq in entries[j].get("quantities") or []:
                         if _qty_type(mq) in _MOVEMENT_TYPES and tank in (_tank_key(mq.get("from_tank")), _tank_key(mq.get("to_tank"))):
                             moved = True
-                if not moved and abs(value - prev_val) > 0.004:
+                if rereadable and not moved and abs(value - prev_val) > 0.004:
                     kind = None
                     if abs(value - prev_val) <= SMALL_CHANGE_MAX:
                         kind = "small_unexplained_change"
@@ -307,8 +315,8 @@ def apply_reread(entry: dict, qty: dict, original: float, expected: float, rerea
 
 
 _REREAD_PROMPT = """This image is one page of a ship's handwritten Oil Record Book.
-Find the sounding / inventory entry for the tank "{tank}" dated {date} and read ONLY its
-RETAINED quantity (item 11.3, or the word RETAINED / RETD).
+Find {what} dated {date} and read ONLY its RETAINED quantity (the word RETAINED / RETD{item_hint}).
+Ignore every other figure on the page, including other tanks and other entries of the same day.
 Read it digit by digit and check whether a decimal point is actually drawn between two digits --
 whole numbers such as "13" or "24" are written WITHOUT a decimal point.
 Return JSON only:
@@ -318,7 +326,7 @@ Return JSON only:
   "legible": <true|false>}}"""
 
 
-def _call_value_reread(client, page_image, tank: str, date_str: str) -> dict | None:
+def _call_value_reread(client, page_image, tank: str, date_str: str, kind: str = "sounding") -> dict | None:
     import io as _io
     import json as _json
     from google.genai import types
@@ -330,7 +338,12 @@ def _call_value_reread(client, page_image, tank: str, date_str: str) -> dict | N
             model=gemini_model(),
             contents=[
                 types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
-                _REREAD_PROMPT.format(tank=tank, date=date_str),
+                _REREAD_PROMPT.format(
+                    what=(f'the Code I WEEKLY INVENTORY entry of the tank "{tank}"' if kind == "inventory"
+                          else f'the Code C item 11.1 sounding block of the tank "{tank}"'),
+                    date=date_str,
+                    item_hint=("" if kind == "inventory" else ", item 11.3"),
+                ),
             ],
             config=types.GenerateContentConfig(
                 temperature=0.0,
@@ -377,7 +390,8 @@ async def verify_suspect_readings(client, pages: list, entries: list[dict], time
             try:
                 reread = await asyncio.wait_for(
                     asyncio.to_thread(call, client, pages[page_no - 1], entry.get("tank_location") or s["tank"],
-                                      str(entry.get("entry_date") or "")),
+                                      str(entry.get("entry_date") or ""),
+                                      "inventory" if entry.get("orb_code") == "I" else "sounding"),
                     timeout=min(timeout, remaining),
                 )
             except Exception as e:
