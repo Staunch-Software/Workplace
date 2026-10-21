@@ -186,7 +186,7 @@ async def create_alert_if_new(
     await db.flush()
 
 async def run_all_checks(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
-    """Run all 12 compliance checks scoped closely to avoid duplication loops."""
+    """Run all 14 compliance checks scoped closely to avoid duplication loops."""
     await check_wrong_item_code(vessel_id, upload_id, db)                    # 1
     await check_mass_balance_error(vessel_id, upload_id, db)                 # 2
     await check_tank_capacity_exceeded(vessel_id, upload_id, db)             # 3
@@ -200,6 +200,7 @@ async def run_all_checks(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: 
     await check_missing_master_signature(vessel_id, upload_id, db)           # 11
     await check_chronology_and_erasures(vessel_id, upload_id, db)            # 12
     await check_entry_gaps(vessel_id, upload_id, db)                         # 13
+    await check_item_numbers(vessel_id, upload_id, db)                       # 14
     await db.commit()
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -222,6 +223,35 @@ async def check_wrong_item_code(vessel_id: uuid.UUID, upload_id: uuid.UUID | Non
         if is_wrong:
             msg = f"[{entry.entry_date}] Invalid Item/Code combination ({code or '?'} {item or '-'})."
             await create_alert_if_new(db, vessel_id, entry.id, "wrong_item_code", "major", msg)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Check 14 — Item numbers written for every line of a block
+# ─────────────────────────────────────────────────────────────────────────
+async def check_item_numbers(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
+    """Each row of a block (e.g. 11.1 tank / 11.2 capacity / 11.3 retained) must
+    carry its own item number. Judged only on entries whose line transcription is
+    known (item_lines is not NULL), so older uploads never raise false alerts."""
+    from app.services.item_rules import item_line_problems
+
+    q = select(OrbEntry).where(OrbEntry.vessel_id == vessel_id, OrbEntry.item_lines.isnot(None))
+    if upload_id:
+        q = q.where(OrbEntry.upload_id == upload_id)
+    for entry in (await db.execute(q)).scalars().all():
+        qty_rows = (await db.execute(
+            select(OrbEntryQuantity.qty_type).where(OrbEntryQuantity.entry_id == entry.id)
+        )).scalars().all()
+        problems = item_line_problems(entry.orb_code, entry.item_number, entry.item_lines, qty_rows)
+        where = f" ({entry.tank_location})" if entry.tank_location else ""
+        for p in problems:
+            parts = ", ".join(f"{i} ({l})" for i, l in zip(p["items"], p["labels"]))
+            if p["kind"] == "value_missing":
+                msg = f"[{entry.entry_date}] Code {entry.orb_code}{where}: nothing recorded for item {parts}."
+                await create_alert_if_new(db, vessel_id, entry.id, "item_value_missing", "major", msg)
+            else:
+                msg = (f"[{entry.entry_date}] Code {entry.orb_code}{where}: item number {parts} "
+                       f"not written in the Item column.")
+                await create_alert_if_new(db, vessel_id, entry.id, "item_number_missing", "minor", msg)
 
 # ─────────────────────────────────────────────────────────────────────────
 # Shared helper — real-world handwritten tank names rarely match the
@@ -368,6 +398,17 @@ async def check_mass_balance_error(vessel_id: uuid.UUID, upload_id: uuid.UUID | 
 # ─────────────────────────────────────────────────────────────────────────
 # Check 3 — Tank Capacity Exceeded (+ capacity-reading transcription check)
 # ─────────────────────────────────────────────────────────────────────────
+# Entries at or below this confidence carry figures the extractor could not stand behind.
+_UNCERTAIN_CONFIDENCE = 0.4
+
+
+def _reading_is_uncertain(entry) -> bool:
+    conf = entry.confidence_score
+    if conf is not None and conf <= _UNCERTAIN_CONFIDENCE:
+        return True
+    return "auto-corrected" in (entry.operation_description or "").lower()
+
+
 async def check_tank_capacity_exceeded(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
     tanks = (await db.execute(select(VesselTank).where(VesselTank.vessel_id == vessel_id, VesselTank.is_active == True))).scalars().all()
     if not tanks: return
@@ -383,6 +424,16 @@ async def check_tank_capacity_exceeded(vessel_id: uuid.UUID, upload_id: uuid.UUI
         retained_rows = [(e, qy) for e, qy in rows if qy.qty_type == "retained"]
         for entry, qy in retained_rows:
             if qy.qty_value > tank.capacity_m3:
+                if _reading_is_uncertain(entry):
+                    # A figure the extractor itself marked unreliable (auto-corrected capacity, or
+                    # low confidence because its block was cut across a page) must not raise a
+                    # Critical alert: confirmed on AM KIRTI 7-Feb, where another tank's 8.5 m3 landed
+                    # on the L.O. drain tank and produced a false "exceeds certified capacity".
+                    msg = (f"[{entry.entry_date}] Tank {tank.tank_name}: retained {qy.qty_value}m³ appears to exceed "
+                           f"the certified capacity {tank.capacity_m3}m³, but this entry's figures are uncertain "
+                           f"(low confidence or auto-corrected) -- verify against the original page.")
+                    await create_alert_if_new(db, vessel_id, entry.id, "reading_needs_review", "observation", msg)
+                    continue
                 msg = f"[{entry.entry_date}] Tank {tank.tank_name} exceeds certified capacity."
                 await create_alert_if_new(db, vessel_id, entry.id, "tank_capacity_exceeded", "critical", msg)
 
@@ -451,6 +502,9 @@ async def check_sludge_generation_rate(vessel_id: uuid.UUID, upload_id: uuid.UUI
 # ─────────────────────────────────────────────────────────────────────────
 # Check 6 — Bilge Increasing Rate
 # ─────────────────────────────────────────────────────────────────────────
+BILGE_RISE_TOLERANCE_M3 = 0.3
+
+
 async def check_bilge_increasing_rate(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
     tanks_all = (await db.execute(select(VesselTank).where(VesselTank.vessel_id == vessel_id, VesselTank.is_active == True))).scalars().all()
     protect = _compute_protected_tank_words(tanks_all)
@@ -478,7 +532,9 @@ async def check_bilge_increasing_rate(vessel_id: uuid.UUID, upload_id: uuid.UUID
             # in the entry, but the discharge_dates window below only looks
             # at STRICTLY LATER dates, so a same-day pair would otherwise
             # never find its own entry as the explaining discharge.
-            if prev_v is not None and qty.qty_value > prev_v and entry.id != prev_entry_id:
+            # A rise within sounding tolerance (tank gauging is only accurate to a few tenths of a
+            # m3 -- MARPOL ORB instructions) is not an unexplained discharge.
+            if prev_v is not None and qty.qty_value - prev_v > BILGE_RISE_TOLERANCE_M3 + 1e-9 and entry.id != prev_entry_id:
                 if not any(prev_d < d <= entry.entry_date for d in discharge_dates):
                     msg = f"[{entry.entry_date}] Bilge rising in {tank.tank_name} from {prev_v}m³ to {qty.qty_value}m³ without a discharge logged in between."
                     await create_alert_if_new(db, vessel_id, entry.id, "bilge_increasing_rate", "major", msg)

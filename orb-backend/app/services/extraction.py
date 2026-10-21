@@ -14,10 +14,14 @@ from sqlalchemy import select
 from sqlalchemy import select as sa_select
 
 from app.config import get_settings
+from app.services.gemini_config import gemini_model, gemini_thinking_config
 from app.models.orb_upload import OrbUpload
 from app.models.orb_entry import OrbEntry
 from app.models.orb_entry_quantity import OrbEntryQuantity
 from app.models.vessel import Vessel
+from app.services.extraction_repair import (
+    reattach_split_blocks, trim_foreign_rows, verify_suspect_readings,
+)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -349,13 +353,28 @@ page (even a sparse or hard-to-read one), set non_orb_page to false and non_orb_
 null, and extract entries normally.
 
 ═══════════════════════════════════════════════════════════════
+ITEM COLUMN TRANSCRIPTION (item_lines):
+Every ORB block is written row by row, and each row has its own Item-column number with a fixed
+meaning (11.1 tank identity, 11.2 capacity, 11.3 quantity retained, 11.4 manual collection;
+13 quantity, 14 time, 15 method/destination; 26.1 place, 26.2 time, 26.3/26.4 type, quantity and
+tank). For EVERY row of the block that carries text, add one item_lines element: "item" is the
+number physically written in the Item column on that row, "text" is that row's own text.
+  - If the Item cell on a row is BLANK, "item" MUST be null. NEVER fill it in because the text
+    says "CAPACITY" or "RETAINED", and never copy the number from a neighbouring row. A crew
+    sometimes forgets to write 11.2/11.3 -- reporting that omission faithfully is the whole point.
+  - A row that only wraps the previous row's sentence (no new number) is its own element with
+    item null.
+  - Do not include the officer-signature rows.
+  - Keep rows in top-to-bottom order. Apply the same rule to "leading_continuation".
+
+═══════════════════════════════════════════════════════════════
 JSON STRUCTURE — return exactly this:
 {
   "page_number": <int>,
   "non_orb_page": <true|false — see NON-ORB PAGES rule above>,
   "non_orb_page_note": "<short description if non_orb_page is true, else null>",
   "master_signature_present": <true|false — see MASTER SIGNATURE rule below>,
-  "leading_continuation": {"text":.., "tank_location":.., "time_start":.., "time_stop":..,
+  "leading_continuation": {"text":.., "item_lines": [...same shape as entry item_lines...], "tank_location":.., "time_start":.., "time_stop":..,
     "position_start":.., "position_stop":.., "quantities": [...same shape as entry quantities...],
     "officer_1_name":.., "officer_1_rank":.., "officer_2_name":.., "officer_2_rank":..} or null,
   "entries": [
@@ -373,6 +392,10 @@ JSON STRUCTURE — return exactly this:
         because the columns were blank, is_continuation must be true.>,
       "item_number": "<lowest item number in block, e.g. 11.1, 12.2, 13, 26.3, or null>",
       "operation_description": "<combined full text of the entire block>",
+      "item_lines": [
+        {"item": "<EXACTLY what is written in the Item column on this row, e.g. 11.1, 11.2, 13, 15.3 -- or null if that cell is BLANK>",
+         "text": "<verbatim text written on this row>"}
+      ],
       "tank_location": "<primary tank name involved, or null>",
       "time_start": "<hhmm or hh:mm string, or null>",
       "time_stop": "<hhmm or hh:mm string, or null>",
@@ -606,12 +629,23 @@ shape itself could honestly go either way. A downstream check uses this signal t
 know when it's safe to reconsider a date; scoring a genuinely ambiguous digit as
 high-confidence would suppress that safety net.
 
-QUANTITY DIGIT AMBIGUITY: the same confusable digit pairs (9/5, 1/7, 3/8, 0/6, and also 0/8)
+WHOLE NUMBERS HAVE NO DECIMAL POINT: officers write whole-number quantities without a dot
+("13 m3", "16 m3", "17 m3", "18 m3", "24 m3"). Never insert a decimal point that is not
+physically drawn on the page -- "13 m3" is thirteen, NOT 1.3; "18 m3" is eighteen, NOT 1.8; "24 m3"
+is twenty-four, NOT 2.4. Confirmed in production on one page set: five whole-number readings
+(13, 16, 17, 18, 24) were each returned as a one-decimal value (1.3, 1.6, 1.2, 1.8, 2.4), silently
+corrupting the tank balances. Output a decimal point only when a dot is clearly visible between
+the digits. If a two-digit figure could honestly be either, prefer the reading that is consistent
+with the same tank's neighbouring readings and score the entry's confidence_score 0.6-0.75.
+
+QUANTITY DIGIT AMBIGUITY: the same confusable digit pairs (9/5, 1/7, 3/8, 0/6, 0/8, and also 7/9 and 4/9)
 apply to quantity figures (retained/transferred/capacity/etc.), not just dates. Confirmed in
 production: a retained figure clearly written as "0.8" was read as "0.0", scored at high
 confidence -- the officer's own trailing signature and the neighboring entries all corroborated
 0.8, but nothing in the output flagged the reading as uncertain. Apply the exact same rule here:
-if a quantity's digit shape could plausibly be one of these confusable pairs, score that entry's
+(Confirmed in production: a weekly inventory written "24.7" was read as "24.9" -- 7 and 9 are easy
+to confuse when the stem of the 7 is long.) If a quantity's digit shape could plausibly be one of
+these confusable pairs, score that entry's
 confidence_score in the 0.6-0.75 range rather than 0.9+, even if every other part of the entry is
 perfectly clear -- confidence_score reflects the single least-certain reading in the entry, not
 an average of how legible most of it is.
@@ -1032,6 +1066,50 @@ set only when page_count is 2>}
 """
 
 
+class GeminiBillingError(Exception):
+    """Gemini refused the call because the account has no usable credit/quota left.
+
+    Not worth retrying and not recoverable by the next page: continuing would
+    just burn 3 attempts per remaining page and then report an empty "completed"
+    upload (confirmed in production: ORB Sept 2026.PDF, 32 pages, all HTTP 402
+    "prepayment credits are depleted", saved as completed with 0 entries).
+    """
+
+
+class FailedPages(list):
+    """List of page numbers that could not be extracted, plus why (page -> reason)."""
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.reasons: dict[int, str] = {}
+
+
+def _is_billing_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return (
+        "credits are depleted" in text
+        or "billing" in text and "resource_exhausted" in text
+        or text.lstrip().startswith("402")
+        or "prepayment" in text
+    )
+
+
+def _compress_pages(pages: list[int]) -> str:
+    """[1,2,3,7,9,10] -> "1-3, 7, 9-10"."""
+    out, start, prev = [], None, None
+    for n in sorted(pages):
+        if start is None:
+            start = prev = n
+        elif n == prev + 1:
+            prev = n
+        else:
+            out.append(f"{start}-{prev}" if start != prev else str(start))
+            start = prev = n
+    if start is not None:
+        out.append(f"{start}-{prev}" if start != prev else str(start))
+    return ", ".join(out)
+
+
 class VesselMismatchError(Exception):
     """Raised before any real extraction work happens when the document's
     own "NAME OF SHIP" header clearly names a different vessel than the one
@@ -1084,7 +1162,7 @@ def _detect_vessel_name(client, page_image) -> str | None:
     page_image.save(buf, format="PNG")
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=gemini_model(),
             contents=[
                 types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
                 _VESSEL_NAME_CHECK_PROMPT,
@@ -1093,7 +1171,7 @@ def _detect_vessel_name(client, page_image) -> str | None:
                 temperature=0.0,
                 max_output_tokens=500,
                 response_mime_type="application/json",
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                thinking_config=gemini_thinking_config(types),
             ),
         )
         data = _json.loads(response.text.strip())
@@ -1136,7 +1214,7 @@ def _detect_stacked_pages(client, page_image) -> tuple[int, float | None]:
     page_image.save(buf, format="PNG")
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=gemini_model(),
             contents=[
                 types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
                 _STACK_SPLIT_PROMPT,
@@ -1261,7 +1339,7 @@ def _call_boundary_recheck(client, page_image) -> dict | None:
     strip.save(buf, format="PNG")
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=gemini_model(),
             contents=[
                 types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
                 _BOUNDARY_RECHECK_PROMPT,
@@ -1270,7 +1348,7 @@ def _call_boundary_recheck(client, page_image) -> dict | None:
                 temperature=0.0,
                 max_output_tokens=2000,
                 response_mime_type="application/json",
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                thinking_config=gemini_thinking_config(types),
             ),
         )
         data = _json.loads(response.text.strip())
@@ -1441,7 +1519,7 @@ def _call_targeted_orphan_recheck(client, page_image, orphan: dict) -> dict | No
     prompt = _build_targeted_orphan_prompt(orphan)
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=gemini_model(),
             contents=[
                 types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
                 prompt,
@@ -1450,7 +1528,7 @@ def _call_targeted_orphan_recheck(client, page_image, orphan: dict) -> dict | No
                 temperature=0.0,
                 max_output_tokens=2000,
                 response_mime_type="application/json",
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                thinking_config=gemini_thinking_config(types),
             ),
         )
         data = _json.loads(response.text.strip())
@@ -1598,6 +1676,36 @@ async def _write_progress(
         logger.warning(f"Progress heartbeat write failed for upload {upload_id}: {e}")
 
 
+def _normalize_item_lines(raw) -> list[dict] | None:
+    """Clean model output for item_lines; None means 'not provided / unusable'."""
+    if not isinstance(raw, list):
+        return None
+    lines = []
+    for r in raw:
+        if not isinstance(r, dict):
+            continue
+        item = r.get("item")
+        item = str(item).strip().rstrip(".") if item not in (None, "") else None
+        text = str(r.get("text") or "").strip()
+        if item is None and not text:
+            continue
+        lines.append({"item": item or None, "text": text})
+    return lines
+
+
+def _merge_item_lines(a, b):
+    """Combine the item_lines of two fragments of one block.
+
+    If either side has no line data the combined block cannot be judged line by
+    line, so the result is None ("unknown") and the item-number check skips it
+    rather than reporting numbers that simply sit in the part we have no lines for.
+    """
+    if a is None or b is None:
+        return None
+    seen = {(l.get("item"), l.get("text")) for l in a}
+    return a + [l for l in b if (l.get("item"), l.get("text")) not in seen]
+
+
 def _sanitize_page_entries(raw_entries, page_num: int) -> list[dict]:
     """Drop anything in a page's "entries" array (or a single entry's own
     "quantities" array) that isn't actually an object, before any other
@@ -1624,6 +1732,7 @@ def _sanitize_page_entries(raw_entries, page_num: int) -> list[dict]:
         if not isinstance(e, dict):
             logger.warning(f"Page {page_num}: dropped a malformed entry of type {type(e).__name__} instead of an object")
             continue
+        e["item_lines"] = _normalize_item_lines(e.get("item_lines"))
         qtys = e.get("quantities")
         if isinstance(qtys, list):
             good_qtys = [q for q in qtys if isinstance(q, dict)]
@@ -1945,7 +2054,7 @@ async def extract_with_gemini(
         if roster_hint:
             prompt_text += f"\n\n{roster_hint}"
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=gemini_model(),
             contents=[
                 types.Part.from_bytes(
                     data=buf.getvalue(),
@@ -1973,7 +2082,7 @@ async def extract_with_gemini(
                 # competition for the output budget entirely rather than trying to
                 # guess a max_output_tokens large enough to outrun an unpredictable
                 # thinking allocation.
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                thinking_config=gemini_thinking_config(types),
                 temperature=0.1,
                 response_mime_type="application/json",
             ),
@@ -1981,7 +2090,7 @@ async def extract_with_gemini(
         return response.text.strip()
 
     all_entries = []
-    failed_pages: list[int] = []
+    failed_pages = FailedPages()
     # Running per-rank tally of confidently-read officer names, built up as
     # pages are processed in order and fed to each subsequent page's call as
     # a spelling-reference hint (see OFFICER NAME CONSISTENCY in the prompt
@@ -2118,10 +2227,16 @@ async def extract_with_gemini(
             except Exception as e:
                 last_error = e
                 logger.warning(f"Page {page_num} attempt {attempt + 1}/3 failed: {e}")
+                if _is_billing_error(e):
+                    # Stop the whole run at once instead of 3 attempts x every remaining page.
+                    raise GeminiBillingError(
+                        f"Gemini API credits are depleted (stopped at page {page_num}): {str(e)[:200]}"
+                    ) from e
 
         if page_data is None:
             logger.error(f"Page {page_num} extraction failed after 3 attempts: {last_error}")
             failed_pages.append(page_num)
+            failed_pages.reasons[page_num] = str(last_error)[:200]
             await _write_progress(session_factory, upload_id, pages_processed=page_num)
             continue
 
@@ -2315,6 +2430,7 @@ async def extract_with_gemini(
                         "officer_2_name": leading_continuation.get("officer_2_name"),
                         "officer_2_rank": leading_continuation.get("officer_2_rank"),
                         "quantities": cont_qtys,
+                        "item_lines": _normalize_item_lines(leading_continuation.get("item_lines")),
                         # Always use the loop's own physical page index, never
                         # Gemini's self-reported "page_number" from the JSON --
                         # the model can hallucinate/misreport that value (seen
@@ -2362,6 +2478,11 @@ async def extract_with_gemini(
                     prev_entry["master_signature_present"] = (
                         bool(prev_entry.get("master_signature_present")) or current_page_signed
                     )
+                    if not already_present:
+                        prev_entry["item_lines"] = _merge_item_lines(
+                            prev_entry.get("item_lines"),
+                            _normalize_item_lines(leading_continuation.get("item_lines")),
+                        )
                     if cont_qtys and not already_present:
                         prev_qty_keys = {_qty_signature(q) for q in prev_qtys}
                         new_qtys = [q for q in cont_qtys if _qty_signature(q) not in prev_qty_keys]
@@ -2389,10 +2510,18 @@ async def extract_with_gemini(
         except Exception as e:
             logger.error(f"Page {page_num} post-processing failed: {e}")
             failed_pages.append(page_num)
+            failed_pages.reasons[page_num] = f"post-processing error: {str(e)[:150]}"
             await _write_progress(session_factory, upload_id, pages_processed=page_num)
             continue
 
         await _write_progress(session_factory, upload_id, pages_processed=page_num)
+
+    # One focused re-read of retained figures that disagree with the running balance (see
+    # extraction_repair). Failure here must never cost the extraction itself.
+    try:
+        await verify_suspect_readings(client, pages, all_entries, timeout=_GEMINI_CALL_TIMEOUT_SECONDS)
+    except Exception as e:
+        logger.warning(f"Suspect-reading re-read skipped: {e}")
 
     return all_entries, failed_pages
 
@@ -2705,6 +2834,7 @@ def _dedupe_same_page_entries(page_entries: list[dict]) -> list[dict]:
         if match is not None:
             existing_qtys = match.get("quantities") or []
             match["quantities"] = existing_qtys + [q for q in (entry.get("quantities") or []) if q not in existing_qtys]
+            match["item_lines"] = _merge_item_lines(match.get("item_lines"), entry.get("item_lines"))
             for field in ("tank_location", "time_start", "time_stop", "position_start", "position_stop",
                           "officer_1_name", "officer_1_rank", "officer_2_name", "officer_2_rank"):
                 match[field] = match.get(field) or entry.get(field)
@@ -2927,6 +3057,7 @@ def _merge_split_entries(entries_data: list[dict]) -> list[dict]:
                     p for p in [prev.get("raw_text"), entry.get("raw_text")] if p
                 ).strip()
                 prev["quantities"] = (prev.get("quantities") or []) + (entry.get("quantities") or [])
+                prev["item_lines"] = _merge_item_lines(prev.get("item_lines"), entry.get("item_lines"))
                 for field in ("tank_location", "time_start", "time_stop", "position_start",
                               "position_stop", "officer_1_name", "officer_1_rank",
                               "officer_2_name", "officer_2_rank"):
@@ -2964,7 +3095,22 @@ def _drop_untanked_sounding_fragments(entries_data: list[dict]) -> list[dict]:
     kept = []
     for entry in entries_data:
         item = (entry.get("item_number") or "").strip()
-        if entry.get("orb_code") == "C" and item == "11.1" and not (entry.get("tank_location") or "").strip():
+        no_tank = not (entry.get("tank_location") or "").strip()
+        # A Code C entry always carries an item number (11.x / 12.x); with no
+        # item AND no tank it is the bare tail of a block that began on the
+        # previous page ("CAPACITY - 26.7 m3, RETAINED - 18 m3" + signature).
+        # Confirmed on AMNSI MAXIMUS: that tail was already merged into the
+        # weekly-inventory entry, but the page's own copy of it survived as a
+        # second entry with a misread year (2024) and retained 1.8 instead of 18.
+        qty_types = {(q.get("qty_type") or q.get("type")) for q in (entry.get("quantities") or [])}
+        bare_tail = qty_types <= {"capacity", "retained"}
+        if entry.get("orb_code") == "C" and not item and no_tank and bare_tail:
+            logger.warning(
+                f"Dropped orphan Code C fragment (no item, no tank_location): "
+                f"date={entry.get('entry_date')} raw_text={entry.get('raw_text')!r}"
+            )
+            continue
+        if entry.get("orb_code") == "C" and item == "11.1" and no_tank:
             logger.warning(
                 f"Dropped untanked Code C 11.1 fragment (no tank_location -- not a real sounding): "
                 f"date={entry.get('entry_date')} raw_text={entry.get('raw_text')!r}"
@@ -3328,6 +3474,14 @@ def _reconcile_tank_capacity_readings(entries_data: list[dict]) -> list[dict]:
 
 
 _WEEKLY_INVENTORY_RE = re.compile(r"WEEKLY\s+INVENTORY\s+OF\s+BILGE\s*(?:HOLDING)?\s*TANK", re.IGNORECASE)
+# A Code I OWS alarm / 3-way valve test is the other remark that gets folded
+# into the preceding Code C sounding (confirmed: AMNSI MAXIMUS 16-Aug, the OWS
+# test text ended up inside the waste-oil-tank sounding and the test itself,
+# signed by a different officer, was lost as an entry).
+_OWS_TEST_RE = re.compile(r"OWS\s*15[\s\-]*PPM\s+ALARM", re.IGNORECASE)
+_SWALLOWED_REMARK_RE = re.compile(
+    _WEEKLY_INVENTORY_RE.pattern + "|" + _OWS_TEST_RE.pattern, re.IGNORECASE
+)
 
 
 def _split_swallowed_weekly_inventory(entries_data: list[dict]) -> list[dict]:
@@ -3349,13 +3503,13 @@ def _split_swallowed_weekly_inventory(entries_data: list[dict]) -> list[dict]:
     result: list[dict] = []
     for entry in entries_data:
         raw = entry.get("raw_text") or ""
-        match = _WEEKLY_INVENTORY_RE.search(raw)
+        match = _SWALLOWED_REMARK_RE.search(raw)
         if entry.get("orb_code") != "I" and match and match.start() > 0:
             before_raw = raw[:match.start()].strip()
             after_raw = raw[match.start():].strip()
 
             desc = entry.get("operation_description") or ""
-            desc_match = _WEEKLY_INVENTORY_RE.search(desc)
+            desc_match = _SWALLOWED_REMARK_RE.search(desc)
             if desc_match:
                 before_desc = desc[:desc_match.start()].strip()
                 after_desc = desc[desc_match.start():].strip()
@@ -3387,15 +3541,21 @@ def _split_swallowed_weekly_inventory(entries_data: list[dict]) -> list[dict]:
             entry["raw_text"] = before_raw
             entry["operation_description"] = before_desc
             entry["quantities"] = remaining_qtys
+            lines = entry.get("item_lines")
+            after_norm = re.sub(r"\s+", " ", after_raw.upper())
+            moved = [l for l in (lines or []) if l.get("text") and re.sub(r"\s+", " ", l["text"].upper()) in after_norm]
+            entry["item_lines"] = [l for l in lines if l not in moved] if lines is not None else None
             result.append(entry)
 
             new_entry = dict(entry)
             new_entry["orb_code"] = "I"
             new_entry["item_number"] = None
-            new_entry["tank_location"] = "BILGE TANK"
+            is_weekly = bool(_WEEKLY_INVENTORY_RE.match(after_raw))
+            new_entry["tank_location"] = "BILGE TANK" if is_weekly else None
             new_entry["raw_text"] = after_raw
             new_entry["operation_description"] = after_desc
             new_entry["quantities"] = inventory_qtys
+            new_entry["item_lines"] = moved if lines is not None else None
             new_entry["is_continuation"] = False
             result.append(new_entry)
         else:
@@ -3421,6 +3581,58 @@ _DIGIT_CONFUSIONS = {
 # as genuinely hard to distinguish (see the DATE DIGIT AMBIGUITY prompt
 # section) -- only then is it safe to reconsider the date at all.
 _DATE_AMBIGUITY_CONFIDENCE_THRESHOLD = 0.8
+
+
+def _reconcile_year_outliers(entries_data: list[dict]) -> list[dict]:
+    """Fix an entry whose YEAR was misread when every other entry agrees on one.
+
+    A log covers a short span, so almost every entry shares one year. A lone
+    entry dated years away ("2024-07-12" among 2026 entries, "2016-01-03",
+    "30 AUGUST-2014" in a signature) is a handwriting misread of the year digit,
+    not a real date -- and it fans out into a false "non-chronological" alert
+    plus a wrong "Period covered" in every report. The correction is applied
+    only when putting the dominant year back makes the entry fit between its
+    neighbours, so a genuinely backdated entry is never rewritten.
+    """
+    from collections import Counter
+    from datetime import timedelta
+
+    parsed: list[date | None] = []
+    for e in entries_data:
+        try:
+            parsed.append(parse_entry_date((e.get("entry_date") or "").strip()))
+        except Exception:
+            parsed.append(None)
+
+    years = Counter(d.year for d in parsed if d)
+    if not years:
+        return entries_data
+    dominant, count = years.most_common(1)[0]
+    if count < 5 or count / sum(years.values()) < 0.7:
+        return entries_data
+
+    outliers = {i for i, d in enumerate(parsed) if d and d.year != dominant and abs(d.year - dominant) <= 12}
+    slack = timedelta(days=3)
+    for i in sorted(outliers):
+        try:
+            candidate = parsed[i].replace(year=dominant)
+        except ValueError:
+            continue  # 29 Feb in a non-leap dominant year
+        prev_d = next((parsed[j] for j in range(i - 1, -1, -1) if parsed[j] and j not in outliers), None)
+        next_d = next((parsed[j] for j in range(i + 1, len(parsed)) if parsed[j] and j not in outliers), None)
+        if prev_d and candidate < prev_d - slack:
+            continue
+        if next_d and candidate > next_d + slack:
+            continue
+        logger.warning(
+            f"Year outlier corrected: {entries_data[i].get('entry_date')!r} -> {candidate} "
+            f"(every other entry is in {dominant}) code={entries_data[i].get('orb_code')} "
+            f"tank={entries_data[i].get('tank_location')!r}"
+        )
+        entries_data[i]["entry_date"] = candidate.strftime("%d-%b-%Y").upper()
+        conf = entries_data[i].get("confidence_score")
+        entries_data[i]["confidence_score"] = min(conf, 0.7) if conf is not None else 0.7
+    return entries_data
 
 
 def _reconcile_chronology(entries_data: list[dict]) -> list[dict]:
@@ -3860,6 +4072,13 @@ async def run_extraction(
                             storage_path, upload_id=upload_id, session_factory=session_factory,
                             expected_vessel_name=vessel.name if vessel else None,
                         )
+                except GeminiBillingError as e:
+                    logger.error(f"Upload {upload_id} stopped: {e}")
+                    upload.status = "failed"
+                    upload.error_message = f"{e}. Top up the Gemini account, then re-run the upload."
+                    upload.updated_at = datetime.now(timezone.utc)
+                    await db.commit()
+                    return
                 except VesselMismatchError as e:
                     logger.warning(f"Upload {upload_id} rejected: {e}")
                     upload.status = "failed"
@@ -3869,10 +4088,13 @@ async def run_extraction(
                     return
 
             entries_data = _merge_split_entries(entries_data)
+            entries_data = reattach_split_blocks(entries_data)
+            entries_data = trim_foreign_rows(entries_data)
             entries_data = _drop_untanked_sounding_fragments(entries_data)
             entries_data = _split_swallowed_weekly_inventory(entries_data)
             entries_data = _propagate_shared_officer(entries_data)
             entries_data = _reconcile_tank_capacity_readings(entries_data)
+            entries_data = _reconcile_year_outliers(entries_data)
             entries_data = _reconcile_chronology(entries_data)
             entries_data = _reconcile_entry_date_vs_own_header(entries_data)
             entries_data = _reconcile_entry_date_vs_own_signature(entries_data)
@@ -4080,6 +4302,7 @@ async def run_extraction(
                         confidence_score=entry_dict.get("confidence_score"),
                         page_number=entry_dict.get("page_number"),
                         has_gap_before=bool(entry_dict.get("has_gap_before", False)),
+                        item_lines=entry_dict.get("item_lines"),
                         has_erasure=bool(entry_dict.get("has_erasure", False)),
                         master_signature_present=entry_dict.get("master_signature_present"),
                     )
@@ -4259,13 +4482,37 @@ async def run_extraction(
             upload.duplicate_entries_skipped = duplicate_count
 
             msg_parts = []
+            if failed_pages:
+                # total_pages is written by a separate session (_write_progress); read it
+                # without refresh() so the status/counts set above are not discarded.
+                try:
+                    total_pages = (await db.execute(
+                        sa_select(OrbUpload.total_pages).where(OrbUpload.id == upload_id)
+                    )).scalar_one_or_none()
+                except Exception:
+                    total_pages = None
+                total = f" of {total_pages}" if total_pages else ""
+                first_reason = next(iter(getattr(failed_pages, "reasons", {}).values()), "")
+                msg_parts.append(
+                    f"{len(failed_pages)}{total} page(s) failed to extract "
+                    f"(pages {_compress_pages(list(failed_pages))})"
+                    + (f": {first_reason}" if first_reason else "")
+                )
             if errors:
                 msg_parts.append(f"{len(errors)} entries failed to save")
             if duplicate_count:
                 msg_parts.append(f"{duplicate_count} duplicate {'entry' if duplicate_count == 1 else 'entries'} skipped")
             upload.error_message = "; ".join(msg_parts) if msg_parts else None
+            # An upload that ends with nothing saved is not a success -- unless every
+            # entry was a known duplicate of an earlier upload, which is a legitimate
+            # (already explained) outcome.
+            if entry_count == 0 and duplicate_count == 0:
+                upload.status = "failed"
+                upload.error_message = "No entries were extracted. " + (upload.error_message or "The PDF produced no readable ORB entries.")
             upload.updated_at = datetime.now(timezone.utc)
             await db.commit()
+            if entry_count == 0:
+                return
 
             # Run compliance checks
             try:

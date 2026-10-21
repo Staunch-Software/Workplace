@@ -36,6 +36,9 @@ const ALERT_TYPES = [
   'missing_master_signature',        // 11 Minor
   'non_chronological_entry',         // 12 Minor
   'erasure_detected',                // 12 Observation
+  'item_number_missing',             // 14 Minor  — a line's item number (e.g. 11.2) not written
+  'item_value_missing',              // 14 Major  — nothing recorded for an item (e.g. capacity)
+  'reading_needs_review',            // Observation — figure looks wrong but the entry is uncertain
 ];
 
 export default function Alerts() {
@@ -289,6 +292,16 @@ export default function Alerts() {
                                           <div><span className="al-k">Item:</span> {entry.item_number || '—'}</div>
                                           <div><span className="al-k">Tank/Location:</span> {entry.tank_location || '—'}</div>
                                           <div className="al-detail__wide"><span className="al-k">Operation:</span> {entry.operation_description}</div>
+                                          {entry.item_lines?.length > 0 && (
+                                            <div className="al-detail__wide">
+                                              <span className="al-k">Lines as written:</span>
+                                              {entry.item_lines.map((l, i) => (
+                                                <div key={i} className="en-mono">
+                                                  <strong style={l.item ? undefined : { color: '#c00000' }}>{l.item || '(blank)'}</strong> {l.text}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
                                           <div><span className="al-k">Officer 1:</span> {entry.officer_1_name || '—'} {entry.officer_1_rank ? `(${entry.officer_1_rank})` : ''}</div>
                                           <div><span className="al-k">Officer 2:</span> {entry.officer_2_name || '—'} {entry.officer_2_rank ? `(${entry.officer_2_rank})` : ''}</div>
                                           <div><span className="al-k">Confidence:</span> {entry.confidence_score != null ? `${(entry.confidence_score * 100).toFixed(0)}%` : '—'}</div>

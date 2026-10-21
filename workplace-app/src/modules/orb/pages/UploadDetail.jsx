@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useNavigate } from '../hooks/useOrbNavigate';
-import { FileText, FileSpreadsheet, Download, Ship, User, CalendarClock, ListChecks, Layers, Copy, AlertTriangle, CheckCircle2, XCircle, Table2, ClipboardList, Anchor } from 'lucide-react';
+import { RefreshCw, FileText, FileSpreadsheet, Download, Ship, User, CalendarClock, ListChecks, Layers, Copy, AlertTriangle, CheckCircle2, XCircle, Table2, ClipboardList, Anchor } from 'lucide-react';
 import Sidebar from '../components/Layout/Sidebar';
 import Header from '../components/Layout/Header';
 import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import api from '../api/axiosOrb';
+import { useAuth } from '../context/AuthContext';
 import './UploadDetail.css';
 
 const TABS = ['Entries', 'Alerts', 'Daily Log'];
@@ -60,6 +61,8 @@ export default function UploadDetail() {
   const [logLoading, setLogLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('Entries');
   const [preview, setPreview] = useState(null); // { url, loading }
+  const { isAdmin } = useAuth();
+  const [reprocessing, setReprocessing] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -116,6 +119,34 @@ export default function UploadDetail() {
     if (preview?.url) window.URL.revokeObjectURL(preview.url);
     setPreview(null);
   };
+
+  // TEMPORARY (testing only): re-run extraction on this upload. Remove with the backend endpoint.
+  const reprocess = async () => {
+    if (!window.confirm('Re-run extraction on this upload?\n\nIts current entries and their alerts are deleted and rebuilt from the PDF. Resolved-alert history for those entries is lost.')) return;
+    setReprocessing(true);
+    try {
+      await api.post(`/api/uploads/${id}/reprocess`);
+      await load();
+    } catch (err) {
+      window.alert(err.response?.data?.detail || 'Could not start re-extraction');
+    } finally {
+      setReprocessing(false);
+    }
+  };
+
+  // While an upload is being (re)processed, refresh every 5s so the status updates by itself.
+  useEffect(() => {
+    if (!upload || !['pending', 'processing'].includes(upload.status)) return undefined;
+    const t = setInterval(async () => {
+      // Quiet refresh of the upload row only (load() would flash the full-page spinner).
+      const r = await api.get(`/api/uploads/${id}`);
+      const next = r.data.data;
+      setUpload(next);
+      if (!['pending', 'processing'].includes(next.status)) load();
+    }, 5000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [upload?.status]);
 
   const downloadFile = async (type) => {
     const res = await api.get(`/api/uploads/${id}/export/${type}`, { responseType: 'blob' });
@@ -181,6 +212,12 @@ export default function UploadDetail() {
                       <FileText size={15} />
                       Preview PDF
                     </button>
+                    {isAdmin && ['completed', 'failed'].includes(upload.status) && (
+                      <button className="ud-btn ud-btn--secondary" onClick={reprocess} disabled={reprocessing}
+                              title="Temporary testing option: rebuild this upload's entries from the PDF">
+                        <RefreshCw size={15} />{reprocessing ? 'Starting…' : 'Re-run extraction'}
+                      </button>
+                    )}
                     {upload.status === 'completed' && (
                       <>
                         <button className="ud-btn ud-btn--secondary" onClick={() => downloadFile('excel')}>
@@ -311,7 +348,11 @@ export default function UploadDetail() {
                         <tr key={e.id} className={e.confidence_score < 0.75 ? 'row-low-confidence' : ''}>
                           <td>{e.entry_date}</td>
                           <td><span className="ud-code">{e.orb_code}</span></td>
-                          <td>{e.item_number || '—'}</td>
+                          <td title={(e.item_lines || []).map(l => `${l.item || '(blank)'} ${l.text}`).join('\n')}>
+                            {(e.item_lines || []).some(l => l.item)
+                              ? e.item_lines.filter(l => l.item).map(l => l.item).join(' · ')
+                              : (e.item_number || '—')}
+                          </td>
                           <td className="ud-op">{e.operation_description}</td>
                           <td className="ud-small">
                             {e.quantities?.map(q => `${q.qty_value} ${q.qty_unit} (${q.qty_type})`).join(', ') || '—'}
