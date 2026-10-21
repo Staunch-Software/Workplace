@@ -113,14 +113,33 @@ def _generate_summary_error(comments: Optional[str], chemistry: Dict[str, Any]) 
     return " & ".join(found) if found else None
 
 
+# Continuation marker: a page that follows a data page without its own "LUBE OIL TREND REPORT"
+# header is taken only if it carries result rows, i.e. "<label> - <unit> ... <numbers>"
+# (e.g. "Iron - ppm ASTM D5185 16"). Graph, summary and explanation pages have no such rows.
+_CONT_ROW_RE = re.compile(
+    r"^[A-Za-z][^\n]*?\s-\s*\S[^\n]*?(?:\s[<>]?\d+(?:\.\d+)?)+\s*$",
+    re.MULTILINE,
+)
+_CONT_MIN_ROWS = 2
+_CONT_MAX_PAGES = 4
+
+
+def _is_continuation_page(page_text: str) -> bool:
+    return len(_CONT_ROW_RE.findall(page_text or "")) >= _CONT_MIN_ROWS
+
+
 # ─── Main Extractor ──────────────────────────────────────────────────────────
 
-def extract(pdf) -> Optional[Dict[str, Any]]:
+def extract(pdf, read_continuation: bool = False) -> Optional[Dict[str, Any]]:
     """
     Receives an open pdfplumber PDF object and returns the standard
     extracted-report dictionary used by luboil_report_processor.py.
 
     Returns None if this PDF cannot be identified as a Viswa Lab report.
+
+    read_continuation is True ONLY for the single-sample matrix-cell upload: the pages right
+    after a data page that pass the continuation marker are appended to its text, so fields
+    missing from the data page are filled from them (first match wins).
     """
     if not pdf.pages:
         return None
@@ -155,6 +174,17 @@ def extract(pdf) -> Optional[Dict[str, Any]]:
         if "lube oil trend report" not in text.lower():
             continue
 
+        continuation_pages: List[int] = []
+        if read_continuation:
+            for next_idx in range(page_idx + 1, min(len(pdf.pages), page_idx + 1 + _CONT_MAX_PAGES)):
+                next_text = pdf.pages[next_idx].extract_text() or ""
+                if not next_text.strip() or "lube oil trend report" in next_text.lower():
+                    break
+                if not _is_continuation_page(next_text):
+                    break
+                text = text + "\n" + next_text
+                continuation_pages.append(next_idx)
+
         machine: Dict[str, Any] = {
             "page_index":        page_idx,
             "name":              None,
@@ -177,6 +207,10 @@ def extract(pdf) -> Optional[Dict[str, Any]]:
                 "physical":      {},
             },
         }
+
+        if continuation_pages:
+            # Saved with the report's full_json_data so the viewer can show these pages too.
+            machine["continuation_pages"] = continuation_pages
 
         # ── Machine name ("Equipment ... OIL CONDITION") ──────────────────
         eq_m = re.search(r"Equipment\s+(.+?)\s+OIL CONDITION", text, re.IGNORECASE)

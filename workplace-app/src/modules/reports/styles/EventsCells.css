@@ -142,3 +142,16 @@
 }
 .ev-clear-sel:hover { background: #ffefc7; }
 .ev-grid .ovw-ev-row { user-select: none; }
+
+/* days with no noon report for a vessel */
+.ev-grid thead tr:nth-child(2) th { height: 46px; }
+.ev-missing-tag {
+  display: block; margin-top: 2px; font-size: 9px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: #dc2626;
+}
+.ev-grid .ovw-ev-cell.missing,
+.ev-grid .ovw-ev-cell.missing.grp-odd { background-color: #fff5f5; color: #f3b4b4; }
+.ev-grid .ovw-row:hover .ovw-ev-cell.missing { background-color: #ffecec; }
+
+/* while the next/previous days are loading */
+.ovw-table-scroll.ev-loading { opacity: .55; transition: opacity .15s; pointer-events: none; }

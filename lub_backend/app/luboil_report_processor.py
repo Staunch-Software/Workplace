@@ -232,7 +232,7 @@ async def save_luboil_report(
 
     # 1. EXTRACT DATA
     try:
-        extracted_data = extract_lube_oil_report_data(pdf_file_stream)
+        extracted_data = extract_lube_oil_report_data(pdf_file_stream, read_continuation=True, shell_continuation=True)
     except Exception as e:
         logger.error(f"PDF Extraction Failed: {e}", exc_info=True)
         raise
@@ -247,7 +247,7 @@ async def save_luboil_report(
             from app.services.pdf_extractors import gulf_extractor
             pdf_file_stream.seek(0)
             with pdfplumber.open(pdf_file_stream) as _retry_pdf:
-                gulf_retry = gulf_extractor.extract(_retry_pdf, skip_file_check=True)
+                gulf_retry = gulf_extractor.extract(_retry_pdf, skip_file_check=True, read_continuation=True)
             if gulf_retry and gulf_retry.get('machineries'):
                 logger.info("Single-page upload: Gulf extractor fallback found the sample.")
                 extracted_data = gulf_retry
@@ -267,8 +267,8 @@ async def save_luboil_report(
         page_machines = extracted_data.get('machineries', [])
         if len(page_machines) != 1:
             raise ValueError(
-                f"Expected a single report page containing one sample, but found {len(page_machines)}. "
-                "Please drop one page of a Lube Oil report."
+                f"Expected a report containing one sample, but found {len(page_machines)}. "
+                "Please drop a Lube Oil report with one sample only."
             )
         page_info = page_machines[0].get('sample_info', {}) or {}
         report_date_str = report_date_str or page_info.get('report_date') or page_info.get('date')

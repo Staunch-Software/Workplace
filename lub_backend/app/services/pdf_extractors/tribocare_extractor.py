@@ -301,15 +301,56 @@ def _parse_tribocare_block(block: str, page_idx: int, seen_samples: set) -> Opti
     return machine
 
 
+# Continuation marker: a page that follows a data page without its own machine header is taken
+# only if it carries result rows, i.e. "<label>[unit]" or "<label> (Fe)" followed by numbers
+# (e.g. "KV@40°C[mm²/s] 81.39 100.4", "Iron (Fe) 12 14"). Graph, summary and explanation pages
+# have no such rows.
+_CONT_ROW_RE = re.compile(
+    r"^(?:[<>]?\d+(?:\.\d+)?\s+)?[A-Za-z][^\n]*?(?:\[[^\]\n]+\]|\([A-Z][a-z]?\))"
+    r"(?:\s+[<>]?\d+(?:\.\d+)?)+\s*$",
+    re.MULTILINE,
+)
+_CONT_MIN_ROWS = 2
+_CONT_MAX_PAGES = 4
+
+
+def _is_continuation_page(page_text: str) -> bool:
+    return len(_CONT_ROW_RE.findall(page_text or "")) >= _CONT_MIN_ROWS
+
+
+def _is_data_page_text(page_text: str) -> bool:
+    """True for a page carrying its own machine header (a new data page, never a continuation)."""
+    t = page_text or ""
+    return bool(re.search(r"Manufacturer\s*:", t, re.IGNORECASE)) or (
+        "oil rating:" in t.lower() and "unit rating:" in t.lower()
+    )
+
+
+def _find_continuation_pages(pdf, data_page_idx: int) -> List[Tuple[int, str]]:
+    found: List[Tuple[int, str]] = []
+    for next_idx in range(data_page_idx + 1, min(len(pdf.pages), data_page_idx + 1 + _CONT_MAX_PAGES)):
+        next_text = _visible_page(pdf.pages[next_idx]).extract_text() or ""
+        if not next_text.strip() or _is_data_page_text(next_text):
+            break
+        if not _is_continuation_page(next_text):
+            break
+        found.append((next_idx, next_text))
+    return found
+
+
 # ─── Main Extractor ──────────────────────────────────────────────────────────
 
-def extract(pdf) -> Optional[Dict[str, Any]]:
+def extract(pdf, read_continuation: bool = False) -> Optional[Dict[str, Any]]:
     """
     Receives an open pdfplumber PDF object and returns the standard
     extracted-report dictionary used by luboil_report_processor.py.
 
     Returns None if this PDF cannot be identified as containing any
     Tribocare report pages.
+
+    read_continuation is True ONLY for the single-sample matrix-cell upload: the pages right
+    after a Format B data page that pass the continuation marker are appended to its text, so
+    fields missing from the data page are filled from them (first match wins).
 
     Every page mentioning "tribocare" is inspected (not just page 1) since a
     Tribocare page can appear anywhere in a file that otherwise uses a
@@ -397,11 +438,19 @@ def extract(pdf) -> Optional[Dict[str, Any]]:
                 machineries.append(machine)
 
     # ── Format B: one self-contained machine per physical page ─────────────
+    continuation_used: set = set()
     for page_idx, text in tribocare_pages:
-        if page_idx in consumed_pages:
+        if page_idx in consumed_pages or page_idx in continuation_used:
             continue
+        continuation = _find_continuation_pages(pdf, page_idx) if read_continuation else []
+        for _, cont_text in continuation:
+            text = text + "\n" + cont_text
         machine = _parse_tribocare_block(text, page_idx, seen_samples)
         if machine is not None:
+            if continuation:
+                # Saved with the report's full_json_data so the viewer can show these pages too.
+                machine["continuation_pages"] = [idx for idx, _ in continuation]
+                continuation_used.update(machine["continuation_pages"])
             machineries.append(machine)
 
     if not machineries:

@@ -595,15 +595,17 @@ async def upload_luboil_report_page(
         if len(contents) > 10 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File size exceeds the 10MB limit.")
 
-        # Count pages up front so a multi-page file gets a clear message
+        # A sample's values can continue onto the next page(s), so more than one page is allowed.
+        # Whether the file holds exactly one sample is checked after extraction; the cap here only
+        # stops an unrelated large file from being processed.
         try:
             page_total = len(PdfReader(io.BytesIO(contents)).pages)
         except Exception:
             raise HTTPException(status_code=400, detail="Could not read this PDF.")
-        if page_total != 1:
+        if page_total < 1 or page_total > 5:
             raise HTTPException(
                 status_code=400,
-                detail=f"Please drop a single-page PDF (this file has {page_total} pages)."
+                detail=f"Please drop a report with one sample only (this file has {page_total} pages)."
             )
 
         folder_path = f"lube_oil/raw/{datetime.utcnow().strftime('%Y-%m')}"
@@ -2070,6 +2072,22 @@ async def get_specific_page_pdf(
         # Clamp to valid page range
         page_idx = min(sample.pdf_page_index, len(reader.pages) - 1)
         writer.add_page(reader.pages[page_idx])
+
+        # Continuation pages recorded at upload time (matrix-cell upload only). Reports without
+        # the key, i.e. every older report, show just the one page as before.
+        try:
+            report_machines = (report.full_json_data or {}).get("machineries") or []
+            own_machine = next(
+                (m for m in report_machines
+                 if str((m.get("sample_info") or {}).get("number")) == str(sample.sample_number)
+                 and m.get("page_index") == sample.pdf_page_index),
+                None,
+            )
+            for extra_idx in (own_machine or {}).get("continuation_pages") or []:
+                if isinstance(extra_idx, int) and extra_idx != page_idx and 0 <= extra_idx < len(reader.pages):
+                    writer.add_page(reader.pages[extra_idx])
+        except Exception as cont_err:
+            logger.warning(f"Continuation pages skipped for sample {sample_id}: {cont_err}")
 
         output_stream = io.BytesIO()
         writer.write(output_stream)

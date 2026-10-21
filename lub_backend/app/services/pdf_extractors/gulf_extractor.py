@@ -585,7 +585,96 @@ def _parse_block_by_tokens(block: str, page_idx: int, seen_samples: set) -> Opti
 
 # ─── Main Extractor ──────────────────────────────────────────────────────────
 
-def extract(pdf, skip_file_check: bool = False) -> Optional[Dict[str, Any]]:
+# ─── Continuation pages (single-sample matrix-cell upload only) ─────────────
+# A sample's values can run onto the next page(s), which carry no "Machinery Unit"/"Results"
+# header and no "Sampled Date" row. Such a page is read with the SAME sample-column x-position
+# found on the data page, so it is taken only if it has result rows (a label followed by a number
+# sitting in that column). Graph, summary and explanation pages have no such rows, and a page whose
+# columns do not line up with the data page's sample column simply does not match.
+_CONT_MIN_ROWS = 2
+_CONT_MAX_PAGES = 4
+
+# (category, key, label pattern, divide-by) — same labels/scaling as _parse_block_by_position.
+_CONT_FIELDS = [
+    ("wear", "iron", r"Iron\s*\(Fe\)", None),
+    ("wear", "copper", r"Copper\s*\(Cu\)", None),
+    ("wear", "lead", r"Lead\s*\(Pb\)", None),
+    ("wear", "tin", r"Tin\s*\(Sn\)", None),
+    ("wear", "chromium", r"Chromium\s*\(Cr\)", None),
+    ("wear", "aluminium", r"Aluminium\s*\(Al\)", None),
+    ("wear", "nickel", r"Nickel\s*\(Ni\)", None),
+    ("wear", "wpi_index", r"PQ\s*Index/2ml", None),
+    ("contamination", "water_pct", r"Water\s*\[%wt\]", None),
+    ("contamination", "soot_pct", r"Soot/Insoluble\s*\[%wt\]", None),
+    ("contamination", "sodium", r"Sodium\s*\(Na\)", None),
+    ("contamination", "silicon", r"Silicon\s*\(Si\)", None),
+    ("additives", "calcium", r"Calcium\s*\(Ca\)", 10000.0),
+    ("additives", "zinc", r"Zinc\s*\(Zn\)", 10000.0),
+    ("additives", "phosphorus", r"Phosphorus\s*\(P\)", 10000.0),
+    ("additives", "boron", r"Boron\s*\(B\)", None),
+    ("additives", "magnesium", r"Magnesium\s*\(Mg\)", None),
+    ("physical", "viscosity_40c", r"KV@40\S+C\s*\[mm\S/s\]", None),
+    ("physical", "viscosity_100c", r"KV@100\S+C\s*\[mm\S/s\]", None),
+    ("physical", "tbn", r"BN\s*\[mgKOH/g\]", None),
+    ("physical", "tan", r"(?:TAN|AN|Acid Number)\s*\[mgKOH/g\]", None),
+]
+
+
+def _continuation_row_count(rows: List[List[Dict]], target_x: float, tol: float) -> int:
+    """Rows that start with a label word and carry a number in the data page's sample column."""
+    count = 0
+    for row in rows:
+        if len(row) < 2 or not re.match(r"^[A-Za-z]", row[0]['text']):
+            continue
+        for w in row[1:]:
+            if _NUM_RE.match(w['text'].strip()) and abs((w['x0'] + w['x1']) / 2.0 - target_x) <= tol:
+                count += 1
+                break
+    return count
+
+
+def _read_continuation_pages(pdf, data_page_idx: int, machine: Dict[str, Any]) -> None:
+    """
+    Fills fields still empty on `machine` from the pages right after its data page.
+    Never overwrites a value the data page already read. Records the pages used in
+    machine["continuation_pages"].
+    """
+    data_rows = _extract_word_rows(pdf.pages[data_page_idx])
+    target_x = _column_target_x(data_rows)
+    if target_x is None:
+        return
+    tol = _avg_column_spacing(data_rows)
+
+    used: List[int] = []
+    last = min(len(pdf.pages), data_page_idx + 1 + _CONT_MAX_PAGES)
+    for next_idx in range(data_page_idx + 1, last):
+        next_page = pdf.pages[next_idx]
+        next_text = _visible_page(next_page).extract_text() or ""
+        if not next_text.strip():
+            break
+        if "Machinery Unit" in next_text and "Results" in next_text:
+            break  # the next sample's own data page
+        rows = _extract_word_rows(next_page)
+        if _continuation_row_count(rows, target_x, tol) < _CONT_MIN_ROWS:
+            break
+        for category, key, label, divisor in _CONT_FIELDS:
+            bucket = machine["chemistry"].setdefault(category, {})
+            if bucket.get(key) is not None:
+                continue
+            raw = _nearest_token(rows, label, target_x, _NUM_RE, tol)
+            num = _clean_number(raw)
+            if num is None:
+                continue
+            bucket[key] = round(num / divisor, 3) if divisor else num
+        used.append(next_idx)
+    # drop buckets that stayed empty so the shape matches what the data page produces
+    machine["chemistry"] = {k: v for k, v in machine["chemistry"].items() if v}
+    if used:
+        # Saved with the report's full_json_data so the viewer can show these pages too.
+        machine["continuation_pages"] = used
+
+
+def extract(pdf, skip_file_check: bool = False, read_continuation: bool = False) -> Optional[Dict[str, Any]]:
     """
     skip_file_check (default False = unchanged behaviour) is used ONLY by the single-page
     matrix-cell upload as a fallback. A lone Gulf cylinder-oil page has neither the text
@@ -674,6 +763,11 @@ def extract(pdf, skip_file_check: bool = False) -> Optional[Dict[str, Any]]:
             # columns can never shift later values into the wrong column.
             machine = _parse_block_by_position(page, visible_text, page_idx, seen_samples)
             if machine is not None:
+                if read_continuation:
+                    try:
+                        _read_continuation_pages(pdf, page_idx, machine)
+                    except Exception as cont_err:
+                        logger.warning(f"Gulf continuation pages skipped for page {page_idx}: {cont_err}")
                 machineries.append(machine)
         else:
             # Legacy case: multiple machines stacked on one physical page.
