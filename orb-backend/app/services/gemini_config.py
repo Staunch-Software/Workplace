@@ -20,3 +20,15 @@ def gemini_thinking_config(types):
     if gemini_model().startswith("gemini-2.5"):
         return types.ThinkingConfig(thinking_budget=0)
     return None
+
+
+def gemini_max_output_tokens(base: int) -> int:
+    """Output-token limit for a SMALL call (a few hundred tokens of JSON).
+
+    On the 3.x models "thinking" tokens are counted against max_output_tokens, so a limit of
+    500 is used up by thinking and the JSON comes back cut off ("Unterminated string ...").
+    Confirmed on gemini-3.8-flash: every value re-read failed that way, and the same cut-off
+    would silently disable the vessel-name and stacked-page checks. The 2.5 family has
+    thinking switched off, so it keeps the original limit.
+    """
+    return base if gemini_model().startswith("gemini-2.5") else base + 8192

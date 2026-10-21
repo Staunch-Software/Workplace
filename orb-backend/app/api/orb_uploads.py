@@ -176,7 +176,12 @@ async def reprocess_upload(
     if not upload:
         raise HTTPException(status_code=404, detail="Upload not found")
     if upload.status in ("pending", "processing"):
-        raise HTTPException(status_code=409, detail="This upload is already being processed")
+        # A run that has shown no activity for a long time is dead (worker restarted, connection
+        # dropped...) and would otherwise stay "processing" forever with no way to retry it.
+        from datetime import datetime, timezone, timedelta
+        last = upload.updated_at or upload.created_at
+        if last is not None and (datetime.now(timezone.utc) - last) < timedelta(minutes=30):
+            raise HTTPException(status_code=409, detail="This upload is still being processed (activity within the last 30 minutes)")
 
     # The extractor reads the PDF from disk; restore it from blob storage if the
     # local copy is gone.

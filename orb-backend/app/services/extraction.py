@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy import select as sa_select
 
 from app.config import get_settings
-from app.services.gemini_config import gemini_model, gemini_thinking_config
+from app.services.gemini_config import gemini_model, gemini_thinking_config, gemini_max_output_tokens
 from app.models.orb_upload import OrbUpload
 from app.models.orb_entry import OrbEntry
 from app.models.orb_entry_quantity import OrbEntryQuantity
@@ -1169,7 +1169,7 @@ def _detect_vessel_name(client, page_image) -> str | None:
             ],
             config=types.GenerateContentConfig(
                 temperature=0.0,
-                max_output_tokens=500,
+                max_output_tokens=gemini_max_output_tokens(500),
                 response_mime_type="application/json",
                 thinking_config=gemini_thinking_config(types),
             ),
@@ -1221,7 +1221,7 @@ def _detect_stacked_pages(client, page_image) -> tuple[int, float | None]:
             ],
             config=types.GenerateContentConfig(
                 temperature=0.0,
-                max_output_tokens=2000,
+                max_output_tokens=gemini_max_output_tokens(2000),
                 response_mime_type="application/json",
             ),
         )
@@ -1346,7 +1346,7 @@ def _call_boundary_recheck(client, page_image) -> dict | None:
             ],
             config=types.GenerateContentConfig(
                 temperature=0.0,
-                max_output_tokens=2000,
+                max_output_tokens=gemini_max_output_tokens(2000),
                 response_mime_type="application/json",
                 thinking_config=gemini_thinking_config(types),
             ),
@@ -1526,7 +1526,7 @@ def _call_targeted_orphan_recheck(client, page_image, orphan: dict) -> dict | No
             ],
             config=types.GenerateContentConfig(
                 temperature=0.0,
-                max_output_tokens=2000,
+                max_output_tokens=gemini_max_output_tokens(2000),
                 response_mime_type="application/json",
                 thinking_config=gemini_thinking_config(types),
             ),
@@ -4053,6 +4053,12 @@ async def run_extraction(
 
             vessel_result = await db.execute(sa_select(Vessel).where(Vessel.id == vessel_id))
             vessel = vessel_result.scalar_one_or_none()
+            # End this read transaction NOW. Left open it sat "idle in transaction" for the whole
+            # extraction (25+ minutes on a slow model), the database dropped that connection, and the
+            # first query after extraction died with asyncpg InterfaceError -- the upload then stayed
+            # "processing" forever. Objects stay usable (expire_on_commit=False); the next statement
+            # opens a fresh transaction on a checked (pool_pre_ping) connection.
+            await db.commit()
 
             failed_pages: list[int] = []
             if settings.USE_MOCK_EXTRACTION:
@@ -4523,13 +4529,17 @@ async def run_extraction(
 
         except Exception as e:
             logger.error(f"Extraction failed for upload {upload_id}: {e}")
+            # Record the failure on a FRESH session: the one above may be the very thing that broke
+            # (dropped connection), and reusing it made this handler fail silently, leaving the
+            # upload stuck in "processing".
             try:
-                result = await db.execute(sa_select(OrbUpload).where(OrbUpload.id == upload_id))
-                upload = result.scalar_one_or_none()
-                if upload:
-                    upload.status = "failed"
-                    upload.error_message = str(e)
-                    upload.updated_at = datetime.now(timezone.utc)
-                    await db.commit()
+                async with session_factory() as fresh:
+                    result = await fresh.execute(sa_select(OrbUpload).where(OrbUpload.id == upload_id))
+                    failed_upload = result.scalar_one_or_none()
+                    if failed_upload:
+                        failed_upload.status = "failed"
+                        failed_upload.error_message = f"Extraction failed: {str(e)[:400]}"
+                        failed_upload.updated_at = datetime.now(timezone.utc)
+                        await fresh.commit()
             except Exception:
-                pass
+                logger.exception("Could not record the failure of upload %s", upload_id)

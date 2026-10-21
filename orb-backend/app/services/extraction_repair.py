@@ -16,7 +16,7 @@ import asyncio
 import logging
 import re
 
-from app.services.gemini_config import gemini_model, gemini_thinking_config
+from app.services.gemini_config import gemini_model, gemini_thinking_config, gemini_max_output_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -332,7 +332,7 @@ def _call_value_reread(client, page_image, tank: str, date_str: str) -> dict | N
             ],
             config=types.GenerateContentConfig(
                 temperature=0.0,
-                max_output_tokens=500,
+                max_output_tokens=gemini_max_output_tokens(500),
                 response_mime_type="application/json",
                 thinking_config=gemini_thinking_config(types),
             ),

@@ -212,10 +212,10 @@ export default function UploadDetail() {
                       <FileText size={15} />
                       Preview PDF
                     </button>
-                    {isAdmin && ['completed', 'failed'].includes(upload.status) && (
+                    {isAdmin && ['completed', 'failed', 'processing'].includes(upload.status) && (
                       <button className="ud-btn ud-btn--secondary" onClick={reprocess} disabled={reprocessing}
                               title="Temporary testing option: rebuild this upload's entries from the PDF">
-                        <RefreshCw size={15} />{reprocessing ? 'Starting…' : 'Re-run extraction'}
+                        <RefreshCw size={15} />{reprocessing ? 'Starting…' : (upload.status === 'processing' ? 'Re-run (if stuck)' : 'Re-run extraction')}
                       </button>
                     )}
                     {upload.status === 'completed' && (
