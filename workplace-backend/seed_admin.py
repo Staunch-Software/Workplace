@@ -11,7 +11,7 @@ async def main():
             password_hash=hash_password("admin123"),
             role="ADMIN",
             is_active=True,
-            permissions={"drs": True, "jira": True, "voyage": True, "lubeoil": True, "engine_performance": True},
+            permissions={"drs": True, "jira": True, "voyage": True, "lubeoil": True, "engine_performance": True, "orb": True},
         )
         db.add(admin)
         await db.commit()

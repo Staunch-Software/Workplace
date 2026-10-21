@@ -1,0 +1,111 @@
+.orb-root *, .orb-root *::before, .orb-root *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+.orb-root { font-size: 16px; }
+
+/* ── Thin scrollbars (all scrollable elements) ─────────────────────────── */
+.orb-root * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.orb-root *::-webkit-scrollbar { width: 6px; height: 6px; }
+.orb-root *::-webkit-scrollbar-track { background: transparent; }
+.orb-root *::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+.orb-root *::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+.orb-root *::-webkit-scrollbar-corner { background: transparent; }
+
+.orb-root {
+  font-family: var(--font-sans);
+  background: var(--background);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.orb-root a { color: var(--accent); text-decoration: none; }
+.orb-root a:hover { text-decoration: underline; }
+
+.orb-root h1, .orb-root h2, .orb-root h3, .orb-root h4 { font-weight: 600; color: var(--text-primary); }
+.orb-root h1 { font-size: 1.75rem; }
+.orb-root h2 { font-size: 1.375rem; }
+.orb-root h3 { font-size: 1.125rem; }
+
+.orb-root p { margin-bottom: 0.5rem; }
+
+.orb-root input, .orb-root select, .orb-root textarea {
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.orb-root button { cursor: pointer; font-family: inherit; }
+
+/* Layout */
+.orb-root .app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.orb-root .main-content {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.orb-root .page-body {
+  padding: 2rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Filter bar — button aligns flush with input bottom, no label gap */
+.orb-root .filters-bar .form-group { margin-bottom: 0; flex: 1 1 0; min-width: 0; }
+
+/* Cards */
+.orb-root .card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+}
+
+/* Page header */
+.orb-root .page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.orb-root .page-header h1 { font-size: 1.5rem; }
+
+/* Filters bar — flex with flex-basis:0 + min-width:0 forces every field to the
+   same width regardless of its content (native date inputs etc. can't force
+   their column wider), and keeps gaps/heights identical across all children. */
+.orb-root .filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: flex-end;
+}
+.orb-root .filters-bar .btn { flex: 0 0 auto; height: 38px; box-sizing: border-box; }
+
+/* Empty state */
+.orb-root .empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-muted);
+}
+
+/* Error / success messages */
+.orb-root .alert-banner {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+.orb-root .alert-banner.error { background: var(--danger-light); color: #9b2335; border-left: 4px solid var(--danger); }
+.orb-root .alert-banner.success { background: #d4edda; color: #155724; border-left: 4px solid var(--success); }

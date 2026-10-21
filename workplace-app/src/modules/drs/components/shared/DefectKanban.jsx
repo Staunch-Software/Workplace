@@ -35,6 +35,35 @@ const sortCards = (a, b) => {
   return ad - bd;
 };
 
+const reportTime = (d) => {
+  const t = new Date(d.date_identified || d.created_at).getTime();
+  return Number.isNaN(t) ? 0 : t;
+};
+
+// User-chosen card order. 'default' keeps the original priority-then-due-date order.
+const SORT_OPTIONS = [
+  { id: 'newest', label: 'Newest', title: 'Newest report date first' },
+  { id: 'oldest', label: 'Oldest', title: 'Oldest report date first' },
+  { id: 'priority_desc', label: 'Priority \u2193', title: 'Highest priority first' },
+  { id: 'priority_asc', label: 'Priority \u2191', title: 'Lowest priority first' },
+];
+
+const comparatorFor = (mode) => {
+  const byPriority = (a, b) => (PRIORITY_WEIGHT[b.priority] || 0) - (PRIORITY_WEIGHT[a.priority] || 0);
+  switch (mode) {
+    case 'newest':
+      return (a, b) => (reportTime(b) - reportTime(a)) || byPriority(a, b);
+    case 'oldest':
+      return (a, b) => (reportTime(a) - reportTime(b)) || byPriority(a, b);
+    case 'priority_desc':
+      return (a, b) => byPriority(a, b) || (reportTime(b) - reportTime(a));
+    case 'priority_asc':
+      return (a, b) => -byPriority(a, b) || (reportTime(b) - reportTime(a));
+    default:
+      return sortCards;
+  }
+};
+
 // Returns { action } for an allowed drop, or { blocked } with a reason.
 const resolveDrop =(isShore, from, to) => {
   if (from === to) return {};
@@ -232,6 +261,7 @@ const DefectKanban = ({
   const [partyFilter, setPartyFilter] = useState([]);
   const [groupBy, setGroupBy] = useState('vessel');
   const [showClosed, setShowClosed] = useState(false);
+  const [sortMode, setSortMode] = useState('default');
   const byVessel = groupBy === 'vessel';
 
   const vesselOptions = useMemo(
@@ -284,8 +314,9 @@ const DefectKanban = ({
         if (g[v]) g[v].push(d);
       });
       const statusRank = { OPEN: 0, PENDING_CLOSURE: 1, CLOSED: 2 };
+      const cmp = comparatorFor(sortMode);
       Object.values(g).forEach((list) =>
-        list.sort((a, b) => (statusRank[a.status] - statusRank[b.status]) || sortCards(a, b))
+        list.sort((a, b) => (statusRank[a.status] - statusRank[b.status]) || cmp(a, b))
       );
       return g;
     }
@@ -293,9 +324,9 @@ const DefectKanban = ({
     visibleDefects.forEach((d) => {
       if (g[d.status]) g[d.status].push(d);
     });
-    Object.values(g).forEach((list) => list.sort(sortCards));
+    Object.values(g).forEach((list) => list.sort(comparatorFor(sortMode)));
     return g;
-  }, [visibleDefects, byVessel, vesselOptions]);
+  }, [visibleDefects, byVessel, vesselOptions, sortMode]);
 
   const columns = byVessel
     ? vesselOptions
@@ -359,6 +390,22 @@ const DefectKanban = ({
               </button>
             );
           })}
+        </div>
+      </div>
+      <div className="kanban-filters__field">
+        <span>Sort</span>
+        <div className="kanban-toggle">
+          {SORT_OPTIONS.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              title={o.title}
+              className={sortMode === o.id ? 'is-active' : ''}
+              onClick={() => setSortMode((m) => (m === o.id ? 'default' : o.id))}
+            >
+              {o.label}
+            </button>
+          ))}
         </div>
       </div>
       <div className="kanban-filters__field">

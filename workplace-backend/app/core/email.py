@@ -68,6 +68,10 @@ MODULE_INFO = {
         "name": "Engine Performance",
         "desc": "Track engine metrics, monitor health indicators and performance trends.",
     },
+    "orb": {
+        "name": "Oil Record Book (ORB)",
+        "desc": "Upload Oil Record Book PDFs, review the digitised entries and resolve compliance alerts.",
+    },
 }
 
 # ROLE_RESPONSIBILITIES = {
