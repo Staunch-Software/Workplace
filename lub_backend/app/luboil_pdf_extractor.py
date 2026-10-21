@@ -51,6 +51,22 @@ def clean_number(value: Any) -> Optional[float]:
         return None
 
 
+# Second marker: a continuation page (no "Equipment - Component" header) is taken only if it
+# carries result rows, i.e. a label, a unit and trailing numbers ("Boron (B) ppm 16 6",
+# "Life Remaining % 63.9"). Graph, summary and explanation pages have no such rows.
+_CONT_ROW_RE = re.compile(
+    r"^[A-Za-z][^\n]*?(?:ppm|%|cSt|Abs|Ruler|KOH/g|\bmm\b|\bum\b)[^\n\d]*?"
+    r"(?:\s[<>]?\d+(?:\.\d+)?)+\s*$",
+    re.MULTILINE,
+)
+_CONT_MIN_ROWS = 2
+_CONT_MAX_PAGES = 4
+
+
+def is_continuation_page(page_text: str) -> bool:
+    return len(_CONT_ROW_RE.findall(page_text or "")) >= _CONT_MIN_ROWS
+
+
 def extract_value_by_regex(text: str, pattern: str) -> Optional[float]:
     """
     Helper to find a number based on a Regex pattern.
@@ -192,9 +208,14 @@ def extract_alert_parameters(page) -> list:
 # 2. MAIN EXTRACTOR LOGIC
 # ==========================================
 
-def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str, Any]]:
+def extract_lube_oil_report_data(pdf_file_stream: BinaryIO, read_continuation: bool = False) -> Optional[Dict[str, Any]]:
     """
     Reads a Shell LubeAnalyst PDF stream and returns a structured dictionary.
+
+    read_continuation is True ONLY for the single-sample matrix-cell upload: a sample's values
+    can run onto the following page(s), which have no "Equipment - Component" header. When set,
+    those pages' text is appended after the data page's text so fields missing from the data page
+    are filled from them (the first match wins, so data-page values are never overwritten).
     """
     logger.info("Starting Lube Oil PDF Extraction...")
 
@@ -292,6 +313,19 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
                 if not text: continue
                 if "Equipment - Component" not in text: continue
 
+                continuation_pages = []
+                if read_continuation:
+                    # Pages right after the data page that carry its continued values. Stop at the
+                    # next sample's data page, or at the first page that is not a continuation.
+                    for next_idx in range(i + 1, min(len(pdf.pages), i + 1 + _CONT_MAX_PAGES)):
+                        next_text = pdf.pages[next_idx].extract_text() or ""
+                        if "Equipment - Component" in next_text:
+                            break
+                        if not is_continuation_page(next_text):
+                            break
+                        text = text + "\n" + next_text
+                        continuation_pages.append(next_idx)
+
                 machine = {
                     "page_index": i,
                     "name": None,
@@ -313,6 +347,9 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
                         "physical": {}
                     }
                 }
+                if continuation_pages:
+                    # Saved with the report's full_json_data so the viewer can show these pages too.
+                    machine["continuation_pages"] = continuation_pages
 
                 # ── 1. EXTRACT MACHINERY NAME ──────────────────────────────
                 lines = text.split('\n')

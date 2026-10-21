@@ -3557,7 +3557,7 @@ const LuboilAnalysis = () => {
     if (!file || !target) return;
     const isPdf = file.type === "application/pdf" || (file.name || "").toLowerCase().endsWith(".pdf");
     if (!isPdf) {
-      setPageUploadToast({ type: "error", text: "Only a single-page PDF can be uploaded here." });
+      setPageUploadToast({ type: "error", text: "Only a PDF report with one sample can be uploaded here." });
       return;
     }
     setPageUpload({ stage: "confirm", file, target, existing: null });
@@ -3625,7 +3625,7 @@ const LuboilAnalysis = () => {
         setIsFileDragActive(false);
         const files = Array.from(e.dataTransfer.files || []);
         if (files.length !== 1) {
-          setPageUploadToast({ type: "error", text: "Please drop one single-page PDF at a time." });
+          setPageUploadToast({ type: "error", text: "Please drop one PDF report (one sample) at a time." });
           return;
         }
         beginPageUpload(files[0], target);
@@ -7102,8 +7102,8 @@ const LuboilAnalysis = () => {
                                 </span>
                               </div>
                               <iframe
-                                   src={`/lub/api/luboil/view-specific-page/${targetId}`}
-                                    // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
+                                  src={`/lub/api/luboil/view-specific-page/${targetId}`}
+                                  //  src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${targetId}`}
                                 style={{
                                   width: "100%",
                                   flex: 1,
@@ -7117,8 +7117,8 @@ const LuboilAnalysis = () => {
                       </div>
                     ) : selectedCell.data.report_url ? (
                       <iframe
-                            src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
-                          // src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                             src={`/lub/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
+                          //  src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8002"}/api/luboil/view-specific-page/${selectedCell.data.sample_id}`}
                         style={{ width: "100%", flex: 1, border: "none" }}
                         title="Original Report"
                       />

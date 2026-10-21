@@ -25,6 +25,7 @@ factory no longer picks exactly one extractor for the whole file. Instead:
 Usage (from luboil_report_processor.py):
     from app.services.pdf_extractors.factory import extract_lube_oil_report_data
 """
+import inspect
 import logging
 import pdfplumber
 from typing import Any, Dict, List, Optional, BinaryIO
@@ -113,7 +114,8 @@ _SPECIALIST_EXTRACTORS = (
 )
 
 
-def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str, Any]]:
+def extract_lube_oil_report_data(pdf_file_stream: BinaryIO, read_continuation: bool = False,
+                                 shell_continuation: bool = False) -> Optional[Dict[str, Any]]:
     """
     Drop-in replacement for the original extract_lube_oil_report_data().
     Accepts a binary file stream and returns the standard extracted-report dict.
@@ -143,7 +145,11 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
 
             for lab_name, extractor_module in _SPECIALIST_EXTRACTORS:
                 try:
-                    result = extractor_module.extract(pdf)
+                    # Only labs whose extract() takes read_continuation get it (Gulf is unchanged).
+                    if read_continuation and "read_continuation" in inspect.signature(extractor_module.extract).parameters:
+                        result = extractor_module.extract(pdf, read_continuation=True)
+                    else:
+                        result = extractor_module.extract(pdf)
                 except Exception as e:
                     logger.error(f"[Factory] {lab_name} extractor error: {e}", exc_info=True)
                     continue
@@ -204,4 +210,6 @@ def extract_lube_oil_report_data(pdf_file_stream: BinaryIO) -> Optional[Dict[str
     # ── Shell (default) path — unchanged ────────────────────────────────────
     pdf_file_stream.seek(0)
     logger.info("[Factory] No specialist extractor matched — running Shell extractor.")
-    return _shell_extract(pdf_file_stream)
+    # shell_continuation turns continuation reading on for the Shell extractor in full reports too;
+    # the other labs read continuation pages only when read_continuation is set (single-cell upload).
+    return _shell_extract(pdf_file_stream, read_continuation=read_continuation or shell_continuation)
