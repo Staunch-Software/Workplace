@@ -61,7 +61,7 @@ export default function EventsGrid({ vessels, search, setSearch }) {
   const activeEndIso = anchor || todayIso;
   const isAtLatest = !anchor || anchor >= todayIso;
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isPlaceholderData, error } = useQuery({
     queryKey: ['events-logbook', source, activeEndIso],
     queryFn: () => reportsApi.getEventsLogbook({ source, days: DAYS, end_date: activeEndIso }),
     refetchInterval: 60000,
@@ -232,7 +232,7 @@ export default function EventsGrid({ vessels, search, setSearch }) {
             <p className="ovw-state-sub">Try another source or clear the filter</p>
           </div>
         ) : (
-          <div className="ovw-table-scroll">
+          <div className={`ovw-table-scroll${isPlaceholderData ? ' ev-loading' : ''}`}>
             <table className="ovw-table ev-grid" style={{ width: `${280 + totalCols * 112}px` }}>
               <colgroup>
                 <col style={{ width: 280, minWidth: 280, maxWidth: 280 }} />
@@ -263,7 +263,8 @@ export default function EventsGrid({ vessels, search, setSearch }) {
                 <tr className="ovw-thead-row2">
                   {vessels.map((v, vi) =>
                     dayCols[v.imo].map((d) => {
-                      const missing = d !== todayIso && !byImo[v.imo]?.[d]; // today is not marked: report may still be due
+                      // not marked while the new window is still loading, nor for today (report may still be due)
+                      const missing = !isPlaceholderData && d !== todayIso && !byImo[v.imo]?.[d];
                       return (
                         <th
                           key={`${v.imo}-${d}`}
@@ -303,7 +304,7 @@ export default function EventsGrid({ vessels, search, setSearch }) {
                         </td>
                         {vessels.map((v, vi) =>
                           dayCols[v.imo].map((d, i) => {
-                            const missingDay = d !== todayIso && !byImo[v.imo]?.[d];
+                            const missingDay = !isPlaceholderData && d !== todayIso && !byImo[v.imo]?.[d];
                             const val = fmtValue(byImo[v.imo]?.[d]?.[c.db_column]);
                             const empty = val === '-';
                             const isNum = !empty && /^-?\d+(\.\d+)?$/.test(val);
