@@ -6,13 +6,15 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, Query
 from fastapi.responses import StreamingResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 import io
 
 from app.config import get_settings
 from app.database import get_db, AsyncSessionLocal
 from app.models.orb_upload import OrbUpload
 from app.models.orb_entry import OrbEntry
+from app.models.orb_entry_quantity import OrbEntryQuantity
+from app.models.orb_alert import OrbAlert
 from app.models.vessel import Vessel
 from app.models.user import User as OrbHistoryUser
 from app.models.control_user import ControlUser
@@ -20,7 +22,7 @@ from app.control_database import get_control_db
 from app.schemas.orb_upload import UploadResponse, UploadDetail
 from app.schemas.orb_entry import EntryResponse
 from app.schemas.common import success
-from app.dependencies import get_current_user, allowed_vessel_ids, scope_vessel_ids, assert_vessel_access
+from app.dependencies import get_current_user, require_admin, allowed_vessel_ids, scope_vessel_ids, assert_vessel_access
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 settings = get_settings()
@@ -156,6 +158,54 @@ async def get_upload(
     data["vessel_name"] = vessel.name if vessel else None
     data["uploader_name"] = uploader_name
     return success(data=data)
+
+
+# ── TEMPORARY (testing only) ─────────────────────────────────────────────────
+# Re-run extraction on an existing upload so older uploads pick up newer
+# extraction rules (e.g. item_lines / item-number alerts). Remove once testing
+# is done: it deletes the upload's entries and the alerts attached to them.
+@router.post("/{upload_id}/reprocess")
+async def reprocess_upload(
+    upload_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    user: ControlUser = Depends(require_admin),
+):
+    result = await db.execute(select(OrbUpload).where(OrbUpload.id == upload_id))
+    upload = result.scalar_one_or_none()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    if upload.status in ("pending", "processing"):
+        raise HTTPException(status_code=409, detail="This upload is already being processed")
+
+    # The extractor reads the PDF from disk; restore it from blob storage if the
+    # local copy is gone.
+    if not (upload.storage_path and os.path.exists(upload.storage_path)):
+        if not upload.pdf_blob_url:
+            raise HTTPException(status_code=404, detail="Original PDF is no longer available")
+        from app.services.azure_storage import download_iopp_document
+        content, _ = await download_iopp_document(upload.pdf_blob_url)
+        os.makedirs(os.path.dirname(upload.storage_path) or ".", exist_ok=True)
+        with open(upload.storage_path, "wb") as f:
+            f.write(content)
+
+    # Entries first: extraction de-duplicates against every existing entry of the
+    # vessel, so leaving the old ones would turn the whole re-run into duplicates.
+    entry_ids = select(OrbEntry.id).where(OrbEntry.upload_id == upload_id)
+    await db.execute(delete(OrbAlert).where(OrbAlert.entry_id.in_(entry_ids)))
+    await db.execute(delete(OrbEntryQuantity).where(OrbEntryQuantity.entry_id.in_(entry_ids)))
+    await db.execute(delete(OrbEntry).where(OrbEntry.upload_id == upload_id))
+    upload.status = "pending"
+    upload.error_message = None
+    upload.pages_processed = 0
+    upload.extracted_entries_count = 0
+    upload.duplicate_entries_skipped = 0
+    await db.commit()
+
+    from app.services.extraction import run_extraction
+    background_tasks.add_task(run_extraction, upload_id, upload.storage_path, upload.vessel_id, AsyncSessionLocal)
+    logger.warning("Upload %s re-queued for extraction by %s (temporary reprocess endpoint)", upload_id, user.id)
+    return success(message="Re-extraction queued")
 
 
 @router.get("/{upload_id}/pdf")
