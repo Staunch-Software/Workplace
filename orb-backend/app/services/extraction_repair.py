@@ -344,28 +344,54 @@ def _call_value_reread(client, page_image, tank: str, date_str: str) -> dict | N
         return None
 
 
-async def verify_suspect_readings(client, pages: list, entries: list[dict], timeout: float = 120, call_fn=None) -> dict:
-    """Re-read suspect retained figures on the page image. Never raises; returns counts."""
+REREAD_BUDGET_SECONDS = 300   # total time the whole pass may take
+REREAD_CONCURRENCY = 3        # calls in flight at once
+
+
+async def verify_suspect_readings(client, pages: list, entries: list[dict], timeout: float = 120, call_fn=None,
+                                  budget_seconds: float = REREAD_BUDGET_SECONDS,
+                                  concurrency: int = REREAD_CONCURRENCY) -> dict:
+    """Re-read suspect retained figures on the page image. Never raises; returns counts.
+
+    The pass has a total time budget: a slow model must not keep an upload in "processing"
+    for tens of minutes at the very end. Suspects not reached in time are left exactly as
+    extracted ("skipped") -- the alerts still flag them.
+    """
+    import time
+
     call = call_fn or _call_value_reread
-    stats = {"suspects": 0, "confirmed": 0, "corrected": 0, "flagged": 0, "unchanged": 0}
-    for s in find_suspect_readings(entries):
+    stats = {"suspects": 0, "confirmed": 0, "corrected": 0, "flagged": 0, "unchanged": 0, "skipped": 0}
+    deadline = time.monotonic() + budget_seconds
+    sem = asyncio.Semaphore(max(1, concurrency))
+
+    async def one(s: dict) -> None:
         entry = entries[s["entry_idx"]]
         page_no = entry.get("page_number") or 0
-        if not (1 <= page_no <= len(pages)):
-            continue
-        stats["suspects"] += 1
-        try:
-            reread = await asyncio.wait_for(
-                asyncio.to_thread(call, client, pages[page_no - 1], entry.get("tank_location") or s["tank"],
-                                  str(entry.get("entry_date") or "")),
-                timeout=timeout,
-            )
-        except Exception as e:
-            logger.warning("Re-read of %r on page %s skipped: %s", s["tank"], page_no, e)
-            stats["unchanged"] += 1
-            continue
+        async with sem:
+            remaining = deadline - time.monotonic()
+            if remaining <= 1:
+                stats["skipped"] += 1
+                return
+            try:
+                reread = await asyncio.wait_for(
+                    asyncio.to_thread(call, client, pages[page_no - 1], entry.get("tank_location") or s["tank"],
+                                      str(entry.get("entry_date") or "")),
+                    timeout=min(timeout, remaining),
+                )
+            except Exception as e:
+                logger.warning("Re-read of %r on page %s skipped: %s", s["tank"], page_no, e)
+                stats["unchanged"] += 1
+                return
         outcome = apply_reread(entry, s["qty"], s["value"], s["expected"], reread)
         stats[outcome] += 1
-    if stats["suspects"]:
-        logger.info("Suspect-reading re-read: %s", stats)
+
+    todo = []
+    for s in find_suspect_readings(entries):
+        page_no = entries[s["entry_idx"]].get("page_number") or 0
+        if 1 <= page_no <= len(pages):
+            stats["suspects"] += 1
+            todo.append(s)
+    if todo:
+        await asyncio.gather(*(one(s) for s in todo), return_exceptions=True)
+        logger.warning("Suspect-reading re-read: %s", stats)   # warning: visible at the service's log level
     return stats
