@@ -288,6 +288,8 @@ def apply_reread(entry: dict, qty: dict, original: float, expected: float, rerea
         qty["qty_value"] = expected
         for field in ("operation_description", "raw_text"):
             entry[field], _ = _rewrite(entry.get(field) or "", original, expected)
+        for line in entry.get("item_lines") or []:      # the exports render these rows
+            line["text"], _ = _rewrite(line.get("text") or "", original, expected)
         note = (f" [re-read corrected {_fmt(original)} -> {_fmt(expected)}: a second reading of the page "
                 f"matches the preceding balance]")
         entry["operation_description"] = (entry.get("operation_description") or "") + note

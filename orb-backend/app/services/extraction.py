@@ -3964,10 +3964,18 @@ def _dedupe_cross_date_duplicates(entries_data: list[dict]) -> list[dict]:
                 return True
 
         consistent = [e for e, _ in dated if _signature_date_matches(e)]
-        keep_pool = consistent if consistent else [e for e, _ in dated]
-        keep = keep_pool[0]
-        for e, _ in dated:
-            if e is not keep and id(e) not in to_drop:
+        consistent_ids = {id(e) for e in consistent}
+        inconsistent = [e for e, _ in dated if id(e) not in consistent_ids]
+        # Evidence of a mis-dated copy is a signature date that contradicts the entry's own date.
+        # With no such copy (every copy is internally consistent) these are genuine repeats of the
+        # same routine operation -- e.g. AM KIRTI "0.8 m3 from OILY BILGE TANK, RETD 3.9 m3 -> 0.8 m3"
+        # on both 02-Sep and 05-Sep -- and dropping one silently lost a real entry. With no
+        # consistent copy to keep there is nothing to compare against either. Keep everything then.
+        if not consistent or not inconsistent:
+            continue
+        keep = consistent[0]
+        for e in inconsistent:
+            if id(e) not in to_drop:
                 to_drop.add(id(e))
                 logger.warning(
                     f"Dropped cross-date duplicate entry: code={key[0]} item={key[1]} "
