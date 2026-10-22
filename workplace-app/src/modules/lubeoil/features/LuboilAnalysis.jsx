@@ -778,7 +778,7 @@ const PremiumVesselDropdown = ({
   };
 
   return (
-    <div ref={dropdownRef} style={{ position: "relative", zIndex: 90 }}>
+    <div ref={dropdownRef} className="lub-vessel-dropdown-wrapper" style={{ position: "relative", zIndex: 90 }}>
       {/* TRIGGER BUTTON */}
       <button
         type="button"
@@ -792,8 +792,6 @@ const PremiumVesselDropdown = ({
           display: "flex",
           alignItems: "center",
           gap: "8px",
-          height: "38px",
-          padding: "0 14px",
           backgroundColor: "#ffffff",
           border: isOpen ? "1.5px solid #10b981" : "1px solid #e2e8f0",
           borderRadius: "10px",
@@ -802,7 +800,6 @@ const PremiumVesselDropdown = ({
             : "0 1px 2px rgba(15, 23, 42, 0.04)",
           cursor: "pointer",
           transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-          minWidth: "260px",
         }}
       >
         <Ship
@@ -858,11 +855,11 @@ const PremiumVesselDropdown = ({
       {isOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
+          className="lub-vessel-select-menu"
           style={{
             position: "absolute",
             left: 0,
             top: "calc(100% + 6px)",
-            width: "320px",
             backgroundColor: "#ffffff",
             borderRadius: "12px",
             border: "1px solid #e2e8f0",

@@ -11905,6 +11905,94 @@ button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
 }
 
 
+
+/* ============================================================
+   VESSEL MULTI-SELECT DROPDOWN RESPONSIVE MEDIA QUERIES
+   ============================================================ */
+
+/* ── Mobile (<=600px) ──────────────────────────────────────── */
+@media (max-width: 600px) {
+  div.dashboard-container-enhanced .lub-matrix-header-left {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  div.dashboard-container-enhanced .lub-vessel-dropdown-wrapper {
+    width: 100% !important;
+  }
+
+  div.dashboard-container-enhanced .lub-vessel-select-btn {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 36px !important;
+    padding: 0 10px !important;
+    font-size: 0.74rem !important;
+    border-radius: 8px !important;
+    justify-content: space-between !important;
+  }
+
+  div.dashboard-container-enhanced .lub-vessel-select-menu {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    max-height: 280px !important;
+    border-radius: 10px !important;
+  }
+
+  div.dashboard-container-enhanced .vessel-dropdown-scroll {
+    max-height: 180px !important;
+  }
+}
+
+/* ── Tablet (600px - 1200px) ───────────────────────────────── */
+@media (min-width: 600.02px) and (max-width: 1200px) {
+  div.dashboard-container-enhanced .lub-matrix-header-left {
+    flex-wrap: wrap !important;
+    gap: 12px !important;
+  }
+
+  div.dashboard-container-enhanced .lub-vessel-select-btn {
+    min-width: 210px !important;
+    height: 36px !important;
+    padding: 0 12px !important;
+    font-size: 0.76rem !important;
+  }
+
+  div.dashboard-container-enhanced .lub-vessel-select-menu {
+    width: 300px !important;
+    max-width: calc(100vw - 40px) !important;
+    max-height: 300px !important;
+  }
+
+  div.dashboard-container-enhanced .vessel-dropdown-scroll {
+    max-height: 200px !important;
+  }
+}
+
+/* ── Standard Desktop (1200px - 1800px) ────────────────────── */
+@media (min-width: 1200.02px) and (max-width: 1800px) {
+  div.dashboard-container-enhanced .lub-vessel-select-btn {
+    min-width: 240px !important;
+    height: 38px !important;
+    padding: 0 14px !important;
+    font-size: 0.78rem !important;
+  }
+
+  div.dashboard-container-enhanced .lub-vessel-select-menu {
+    width: 320px !important;
+    max-height: 320px !important;
+  }
+
+  div.dashboard-container-enhanced .vessel-dropdown-scroll {
+    max-height: 230px !important;
+  }
+}
+
 /* ============================================================
    2K & 4K FLUID SCALING
    Uses clamp() to proportionally scale all components between
@@ -12018,9 +12106,19 @@ button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
   }
 
   div.dashboard-container-enhanced .lub-vessel-select-btn {
-    height: clamp(36px, 2.5vw, 44px) !important;
-    font-size: clamp(0.84rem, 0.75vw, 0.95rem) !important;
-    padding: 0 clamp(14px, 1.1vw, 20px) !important;
+    height: clamp(38px, 1.6vw, 44px) !important;
+    font-size: clamp(0.82rem, 0.7vw, 0.94rem) !important;
+    padding: 0 clamp(12px, 1.0vw, 18px) !important;
+    min-width: clamp(240px, 11vw, 290px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-vessel-select-menu {
+    width: clamp(320px, 14vw, 380px) !important;
+    max-height: clamp(280px, 20vh, 380px) !important;
+  }
+
+  div.dashboard-container-enhanced .vessel-dropdown-scroll {
+    max-height: clamp(200px, 16vh, 280px) !important;
   }
 
   /* ── Sticky Column (Machinery) ───────────────────────────── */
@@ -12305,6 +12403,22 @@ button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
 
   div.dashboard-container-enhanced .lub-matrix-card-title {
     font-size: clamp(1.08rem, 0.59vw, 1.35rem) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-vessel-select-btn {
+    height: clamp(42px, 1.2vw, 50px) !important;
+    font-size: clamp(0.92rem, 0.45vw, 1.1rem) !important;
+    padding: 0 clamp(16px, 0.75vw, 22px) !important;
+    min-width: clamp(280px, 8.5vw, 360px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-vessel-select-menu {
+    width: clamp(360px, 11vw, 440px) !important;
+    max-height: clamp(340px, 22vh, 460px) !important;
+  }
+
+  div.dashboard-container-enhanced .vessel-dropdown-scroll {
+    max-height: clamp(240px, 18vh, 340px) !important;
   }
 
   /* ── Sticky Column ───────────────────────────────────────── */
