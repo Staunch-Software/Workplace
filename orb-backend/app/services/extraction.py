@@ -909,6 +909,10 @@ def parse_entry_date(date_str: str) -> date:
     # _TRAILING_DATE_RE-based signature-date checks (_signature_date_matches,
     # _reconcile_entry_date_vs_own_signature) silently never matched any
     # 2-digit-year signature at all, since this function raised on them.
+    # "SEPT" is a common written form of September that strptime's %b does not accept; a model that
+    # transcribes the page literally (gemini-3.5-flash-lite) returns it, and every such entry was
+    # dropped as "unparseable date".
+    date_str = re.sub(r"(?i)(?<=[\d\-\s/])SEPT(?=[\d\-\s/]|$)", "SEP", date_str or "")
     for fmt in ("%d-%b-%Y", "%d/%m/%Y", "%Y-%m-%d", "%d-%B-%Y", "%d-%m-%Y",
                 "%d-%b-%y", "%d-%B-%y", "%d/%m/%y", "%d-%m-%y"):
         try:
@@ -3703,7 +3707,7 @@ def _qty_content_signature(qty_dicts: list[dict]) -> tuple:
     return tuple(sorted(sig, key=lambda t: (t[0], t[1] is None, t[1] if t[1] is not None else 0.0, t[2])))
 
 
-_TRAILING_DATE_RE = re.compile(r"(\d{1,2})[\-\s]([A-Z]{3})[\-\s](\d{4}|\d{2})")
+_TRAILING_DATE_RE = re.compile(r"(\d{1,2})[\-\s](SEPT|[A-Z]{3})[\-\s](\d{4}|\d{2})")
 
 
 def _reconcile_entry_date_vs_own_header(entries_data: list[dict]) -> list[dict]:
