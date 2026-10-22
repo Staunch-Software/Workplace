@@ -10805,15 +10805,15 @@ div.section-header-enhanced > div:last-child {
   }
 }
 
-/* --- Desktops & Laptops from 1200px: ALL ON THE EXACT SAME ROW --- */
-@media (min-width: 1200px) {
+/* --- Compact Laptops (1200px - 1440px): ALL ON THE SAME ROW, TIGHT FIT --- */
+@media (min-width: 1200px) and (max-width: 1440px) {
   div.section-header-enhanced {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     justify-content: space-between !important;
     align-items: center !important;
-    gap: 12px !important;
+    gap: 10px !important;
   }
 
   /* 1. Title Block */
@@ -10826,23 +10826,23 @@ div.section-header-enhanced > div:last-child {
   }
 
   div.section-header-enhanced .lub-header-badge-icon {
-    width: 36px !important;
-    height: 36px !important;
+    width: 38px !important;
+    height: 38px !important;
     border-radius: 10px !important;
   }
 
   div.section-header-enhanced .lub-header-badge-icon svg {
-    width: 18px !important;
-    height: 18px !important;
+    width: 19px !important;
+    height: 19px !important;
   }
 
   div.section-header-enhanced .section-title-main {
-    font-size: 1.05rem !important;
+    font-size: 1.10rem !important;
     line-height: 1.15 !important;
   }
 
   div.section-header-enhanced .section-subtitle {
-    font-size: 0.68rem !important;
+    font-size: 0.70rem !important;
     margin-top: 1px !important;
   }
 
@@ -10859,7 +10859,7 @@ div.section-header-enhanced > div:last-child {
   div.section-header-enhanced .stat-card {
     flex-shrink: 0 !important;
     min-width: max-content !important;
-    height: 38px !important;
+    height: 40px !important;
     padding: 4px 14px 4px 6px !important;
     gap: 7px !important;
     border-radius: 9999px !important;
@@ -10868,22 +10868,22 @@ div.section-header-enhanced > div:last-child {
   }
 
   div.section-header-enhanced .stat-icon-wrapper {
-    width: 28px !important;
-    height: 28px !important;
+    width: 30px !important;
+    height: 30px !important;
   }
 
   div.section-header-enhanced .stat-icon-wrapper svg {
-    width: 14px !important;
-    height: 14px !important;
+    width: 15px !important;
+    height: 15px !important;
   }
 
   div.section-header-enhanced .lub-stat-value {
-    font-size: 1.0rem !important;
+    font-size: 1.08rem !important;
     line-height: 1.05 !important;
   }
 
   div.section-header-enhanced .lub-stat-label {
-    font-size: 0.60rem !important;
+    font-size: 0.62rem !important;
     white-space: nowrap !important;
     overflow-wrap: normal !important;
     word-break: keep-all !important;
@@ -10900,7 +10900,7 @@ div.section-header-enhanced > div:last-child {
   }
 
   div.section-header-enhanced .premium-owner-dropdown-root {
-    width: 165px !important;
+    width: 175px !important;
     flex-shrink: 0 !important;
   }
 
@@ -10913,8 +10913,126 @@ div.section-header-enhanced > div:last-child {
   div.section-header-enhanced .lub-upload-btn,
   div.section-header-enhanced button.nav-pill-btn.active-nav-btn.lub-upload-btn {
     height: 38px !important;
-    padding: 0 14px !important;
+    padding: 0 15px !important;
+    font-size: 0.80rem !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+}
+
+/* --- Standard Desktop & Main Screen (1440.02px - 1999.98px): FULL PROMINENT SIZING --- */
+@media (min-width: 1440.02px) and (max-width: 1999.98px) {
+  div.section-header-enhanced {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 20px !important;
+  }
+
+  /* 1. Title Block - Full Size */
+  div.section-header-enhanced .lub-header-title-block {
+    order: 1 !important;
+    flex: 0 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
+
+  div.section-header-enhanced .lub-header-badge-icon {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 12px !important;
+  }
+
+  div.section-header-enhanced .lub-header-badge-icon svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  div.section-header-enhanced .section-title-main {
+    font-size: 1.25rem !important;
+    font-weight: 800 !important;
+    line-height: 1.2 !important;
+  }
+
+  div.section-header-enhanced .section-subtitle {
     font-size: 0.78rem !important;
+    margin-top: 3px !important;
+  }
+
+  /* 2. Middle KPI Cards (Pill UI) - Full Prominent Size */
+  div.section-header-enhanced .lub-stats-grid-container {
+    order: 2 !important;
+    flex: 0 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    max-width: none !important;
+  }
+
+  div.section-header-enhanced .stat-card {
+    flex-shrink: 0 !important;
+    min-width: max-content !important;
+    height: 48px !important;
+    padding: 6px 18px 6px 8px !important;
+    gap: 10px !important;
+    border-radius: 9999px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+  }
+
+  div.section-header-enhanced .stat-icon-wrapper {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  div.section-header-enhanced .stat-icon-wrapper svg {
+    width: 17px !important;
+    height: 17px !important;
+  }
+
+  div.section-header-enhanced .lub-stat-value {
+    font-size: 1.22rem !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+  }
+
+  div.section-header-enhanced .lub-stat-label {
+    font-size: 0.68rem !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+    letter-spacing: 0.03em !important;
+  }
+
+  /* 3. Right Actions Block - Full Size */
+  div.section-header-enhanced .lub-header-actions-block {
+    order: 3 !important;
+    flex: 0 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+
+  div.section-header-enhanced .premium-owner-dropdown-root {
+    width: 220px !important;
+    flex-shrink: 0 !important;
+  }
+
+  div.section-header-enhanced .lub-header-actions-inner {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+
+  div.section-header-enhanced .lub-upload-btn,
+  div.section-header-enhanced button.nav-pill-btn.active-nav-btn.lub-upload-btn {
+    height: 40px !important;
+    padding: 0 18px !important;
+    font-size: 0.82rem !important;
     white-space: nowrap !important;
     flex-shrink: 0 !important;
   }
