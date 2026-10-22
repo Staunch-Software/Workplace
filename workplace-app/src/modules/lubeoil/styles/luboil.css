@@ -1516,7 +1516,7 @@ div.dashboard-container-enhanced td.machinery-sticky-cell,
   z-index: 20 !important;
   background-color: #ffffff !important;
   border-right: 1px solid #e2e8f0 !important;
-  border-bottom: 1px solid #e2e8f0 !important;
+  border-bottom: 1px solid #cbd5e1 !important;
   border-left: 3px solid transparent !important;
   box-shadow: 4px 0 10px -1px rgba(15, 23, 42, 0.08), 2px 0 4px -1px rgba(15, 23, 42, 0.04) !important;
   padding: 10px 16px !important;
@@ -1537,7 +1537,7 @@ div.dashboard-container-enhanced tr.matrix-table-row:hover td.machinery-sticky-c
 div.dashboard-container-enhanced td.lub-data-cell {
   background-color: #ffffff !important;
   border-right: 1px solid #e2e8f0 !important;
-  border-bottom: 1px solid #f1f5f9 !important;
+  border-bottom: 1px solid #cbd5e1 !important;
 }
 
 div.dashboard-container-enhanced td.lub-data-cell.missing-cell {
