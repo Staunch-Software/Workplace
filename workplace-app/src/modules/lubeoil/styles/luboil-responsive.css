@@ -10774,9 +10774,9 @@ div.section-header-enhanced > div:last-child {
   }
 }
 
-/* --- Tablets & Laptops (601px - 1380px): title + actions on the
-       first line, the three KPI cards on the second line with full width --- */
-@media (min-width: 601px) and (max-width: 1380px) {
+/* --- Tablets & Mid-size screens (601px - 1199.98px): title + actions on first line,
+       the three KPI cards on the second line --- */
+@media (min-width: 601px) and (max-width: 1199.98px) {
   div.section-header-enhanced {
     flex-wrap: wrap !important;
     row-gap: 12px !important;
@@ -10802,6 +10802,121 @@ div.section-header-enhanced > div:last-child {
     justify-content: flex-start !important;
     align-items: center !important;
     gap: 12px !important;
+  }
+}
+
+/* --- Desktops & Laptops from 1200px: ALL ON THE EXACT SAME ROW --- */
+@media (min-width: 1200px) {
+  div.section-header-enhanced {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
+
+  /* 1. Title Block */
+  div.section-header-enhanced .lub-header-title-block {
+    order: 1 !important;
+    flex: 0 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  div.section-header-enhanced .lub-header-badge-icon {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 10px !important;
+  }
+
+  div.section-header-enhanced .lub-header-badge-icon svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  div.section-header-enhanced .section-title-main {
+    font-size: 1.05rem !important;
+    line-height: 1.15 !important;
+  }
+
+  div.section-header-enhanced .section-subtitle {
+    font-size: 0.68rem !important;
+    margin-top: 1px !important;
+  }
+
+  /* 2. Middle KPI Cards (Pill UI) */
+  div.section-header-enhanced .lub-stats-grid-container {
+    order: 2 !important;
+    flex: 0 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    max-width: none !important;
+  }
+
+  div.section-header-enhanced .stat-card {
+    flex-shrink: 0 !important;
+    min-width: max-content !important;
+    height: 38px !important;
+    padding: 4px 14px 4px 6px !important;
+    gap: 7px !important;
+    border-radius: 9999px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+  }
+
+  div.section-header-enhanced .stat-icon-wrapper {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  div.section-header-enhanced .stat-icon-wrapper svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  div.section-header-enhanced .lub-stat-value {
+    font-size: 1.0rem !important;
+    line-height: 1.05 !important;
+  }
+
+  div.section-header-enhanced .lub-stat-label {
+    font-size: 0.60rem !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+    letter-spacing: 0.02em !important;
+  }
+
+  /* 3. Right Actions Block */
+  div.section-header-enhanced .lub-header-actions-block {
+    order: 3 !important;
+    flex: 0 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  div.section-header-enhanced .premium-owner-dropdown-root {
+    width: 165px !important;
+    flex-shrink: 0 !important;
+  }
+
+  div.section-header-enhanced .lub-header-actions-inner {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  div.section-header-enhanced .lub-upload-btn,
+  div.section-header-enhanced button.nav-pill-btn.active-nav-btn.lub-upload-btn {
+    height: 38px !important;
+    padding: 0 14px !important;
+    font-size: 0.78rem !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
   }
 }
 

@@ -611,7 +611,7 @@ const PremiumOwnerDropdown = ({ selectedOwner, setSelectedOwner, ownersList, hei
   }, []);
 
   return (
-    <div ref={dropdownRef} className="premium-owner-dropdown-root" style={{ position: "relative", width: "260px", flexShrink: 0, zIndex: 100 }}>
+    <div ref={dropdownRef} className="premium-owner-dropdown-root" style={{ position: "relative", flexShrink: 0, zIndex: 100 }}>
       <div 
         onClick={() => setIsOpen(!isOpen)}
         style={{
