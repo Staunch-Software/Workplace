@@ -16,14 +16,43 @@ logger = logging.getLogger("cron_mail_fetcher")
 LOCK_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "cron_mail_fetcher.lock")
 
 
-def _acquire_lock() -> bool:
-    try:
-        fd = os.open(LOCK_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        os.write(fd, str(os.getpid()).encode())
-        os.close(fd)
-        return True
-    except FileExistsError:
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
         return False
+    if os.name == "nt":
+        import ctypes
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return True
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _acquire_lock() -> bool:
+    for _ in range(2):
+        try:
+            fd = os.open(LOCK_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, str(os.getpid()).encode())
+            os.close(fd)
+            return True
+        except FileExistsError:
+            # A crashed/killed run leaves its lock behind and blocks every later
+            # cycle; only honour the lock while the owning process is alive.
+            try:
+                with open(LOCK_PATH) as f:
+                    owner = int(f.read().strip() or 0)
+            except (OSError, ValueError):
+                owner = 0
+            if owner and owner != os.getpid() and _pid_alive(owner):
+                return False
+            logger.warning(f"[MAIL-CRON] Removing stale lock left by pid {owner}.")
+            _release_lock()
+    return False
 
 
 def _release_lock():
