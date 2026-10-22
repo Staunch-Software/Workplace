@@ -1185,9 +1185,13 @@ div.dashboard-container-enhanced .lub-vessel-select-btn svg {
   transition: transform 0.2s ease, color 0.2s ease !important;
 }
 
-div.dashboard-container-enhanced .lub-vessel-select-btn.active svg {
+div.dashboard-container-enhanced .lub-vessel-select-btn.active .lub-vessel-chevron {
   color: #059669 !important;
   transform: rotate(180deg) !important;
+}
+
+div.dashboard-container-enhanced .lub-vessel-select-btn .lub-vessel-ship-icon {
+  transform: none !important;
 }
 
 div.dashboard-container-enhanced .lub-vessel-select-menu {

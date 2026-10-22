@@ -10736,11 +10736,16 @@ div.section-header-enhanced .lub-stats-grid-container {
 }
 
 div.section-header-enhanced .stat-card {
-  min-width: 0 !important;
+  min-width: max-content !important;
+  flex-shrink: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
 }
 
 div.section-header-enhanced .lub-stat-label {
-  overflow-wrap: anywhere;
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: keep-all !important;
 }
 
 /* Title block keeps its natural width, actions never shrink */
@@ -10769,27 +10774,34 @@ div.section-header-enhanced > div:last-child {
   }
 }
 
-/* --- Tablets / small laptops (601px - 1099px): title + actions on the
-       first line, the three cards full-width on the second line --- */
-@media (min-width: 601px) and (max-width: 1099px) {
+/* --- Tablets & Laptops (601px - 1380px): title + actions on the
+       first line, the three KPI cards on the second line with full width --- */
+@media (min-width: 601px) and (max-width: 1380px) {
   div.section-header-enhanced {
     flex-wrap: wrap !important;
-    row-gap: 10px !important;
+    row-gap: 12px !important;
+    justify-content: space-between !important;
+    align-items: center !important;
   }
 
   div.section-header-enhanced > div:first-child {
-    order: 1;
-    flex: 1 1 auto !important;
+    order: 1 !important;
+    flex: 0 1 auto !important;
   }
 
   div.section-header-enhanced > div:last-child {
-    order: 2;
+    order: 2 !important;
+    flex: 0 0 auto !important;
   }
 
   div.section-header-enhanced .lub-stats-grid-container {
-    order: 3;
+    order: 3 !important;
     flex: 1 1 100% !important;
     max-width: 100% !important;
+    display: flex !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 12px !important;
   }
 }
 

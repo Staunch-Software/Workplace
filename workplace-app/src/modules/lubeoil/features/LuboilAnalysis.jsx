@@ -805,10 +805,9 @@ const PremiumVesselDropdown = ({
         <Ship
           size={15}
           color="#059669"
+          className="lub-vessel-ship-icon"
           style={{
             flexShrink: 0,
-            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
         />
 
@@ -843,6 +842,7 @@ const PremiumVesselDropdown = ({
         <ChevronDown
           size={14}
           color={isOpen ? "#059669" : "#64748b"}
+          className="lub-vessel-chevron"
           style={{
             transform: isOpen ? "rotate(180deg)" : "none",
             transition: "transform 0.2s ease",
