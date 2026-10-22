@@ -253,6 +253,39 @@ async def reprocess_saved(
     return success(message="Re-processing from the saved extraction queued")
 
 
+@router.get("/{upload_id}/alerts")
+async def get_upload_alerts(
+    upload_id: uuid.UUID,
+    is_resolved: Optional[bool] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    user: ControlUser = Depends(get_current_user),
+):
+    """Alerts that belong to THIS upload (its own entries, plus batch-level alerts raised while it
+    was processed). The vessel-wide list is /api/alerts; the upload page used to show that one, so
+    a brand-new upload with no entries displayed every open alert the vessel ever had."""
+    from app.models.orb_alert import OrbAlert  # noqa: F401  (typing aid)
+    from app.schemas.orb_alert import AlertResponse
+    from app.services.report_alerts import alerts_for_upload
+
+    result = await db.execute(select(OrbUpload).where(OrbUpload.id == upload_id))
+    upload = result.scalar_one_or_none()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    await assert_vessel_access(user, db, upload.vessel_id)
+
+    entries = (await db.execute(select(OrbEntry).where(OrbEntry.upload_id == upload_id))).scalars().all()
+    pages = {e.id: e.page_number for e in entries}
+    alerts = await alerts_for_upload(db, upload, list(entries))
+    data = []
+    for a in alerts:
+        if is_resolved is not None and a.is_resolved != is_resolved:
+            continue
+        d = AlertResponse.model_validate(a).model_dump()
+        d["page_number"] = pages.get(a.entry_id)
+        data.append(d)
+    return success(data=data)
+
+
 @router.get("/{upload_id}/pdf")
 async def get_upload_pdf(
     upload_id: uuid.UUID,

@@ -70,11 +70,11 @@ export default function UploadDetail() {
       const [u, e, a] = await Promise.all([
         api.get(`/api/uploads/${id}`),
         api.get(`/api/uploads/${id}/entries`),
-        api.get(`/api/alerts?is_resolved=false`),
+        api.get(`/api/uploads/${id}/alerts?is_resolved=false`),
       ]);
       setUpload(u.data.data);
       setEntries(e.data.data || []);
-      setAlerts((a.data.data || []).filter(al => al.vessel_id === u.data.data?.vessel_id));
+      setAlerts(a.data.data || []);
     } finally {
       setLoading(false);
     }
@@ -402,7 +402,7 @@ export default function UploadDetail() {
                 {alerts.length === 0 ? (
                   <div className="ud-empty">
                     <span className="ud-empty__icon"><CheckCircle2 size={24} /></span>
-                    No open alerts for this vessel.
+                    No open alerts for this upload.
                   </div>
                 ) : (
                   <div className="ud-alerts">
