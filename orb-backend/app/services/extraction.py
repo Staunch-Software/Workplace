@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy import select as sa_select
 
 from app.config import get_settings
-from app.services.gemini_config import generate as gemini_generate, gemini_model
+from app.services.gemini_config import generate as gemini_generate, gemini_model, create_prompt_cache, delete_prompt_cache
 from app.services.gemini_usage import start_collection
 from app.models.orb_upload_raw import OrbUploadRaw
 from app.models.orb_upload import OrbUpload
@@ -2024,10 +2024,14 @@ async def extract_with_gemini(
         prompt_text = f"Extract all ORB entries from page {page_num}."
         if roster_hint:
             prompt_text += f"\n\n{roster_hint}"
-        response = gemini_generate(
-            client, "extract",
-            [types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"), prompt_text],
-            system_instruction=EXTRACTION_SYSTEM_PROMPT,
+        contents = [types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"), prompt_text]
+        # With a prompt cache the instructions are referenced, not re-sent; a cache that has
+        # expired or vanished drops us back to sending them (the call is then just full price).
+        instructions = (
+            {"cached_content": prompt_cache["name"]} if prompt_cache["name"]
+            else {"system_instruction": EXTRACTION_SYSTEM_PROMPT}
+        )
+        extra = dict(
             # A page with several dense entries (verbatim raw_text, quantities, positions, officer
             # info per entry) can approach/exceed 8192 tokens, silently truncating the JSON and
             # dropping the last entries on the page (the 08-Mar case) -- hence the large limit.
@@ -2038,7 +2042,20 @@ async def extract_with_gemini(
             temperature=0.1,
             response_mime_type="application/json",
         )
+        try:
+            response = gemini_generate(client, "extract", contents, **instructions, **extra)
+        except Exception as e:
+            if not prompt_cache["name"]:
+                raise
+            logger.warning("Extraction call with prompt cache failed (%s); sending instructions directly", e)
+            prompt_cache["name"] = None
+            response = gemini_generate(client, "extract", contents,
+                                       system_instruction=EXTRACTION_SYSTEM_PROMPT, **extra)
         return response.text.strip()
+
+    prompt_cache = {"name": await asyncio.to_thread(create_prompt_cache, client, EXTRACTION_SYSTEM_PROMPT)}
+    if prompt_cache["name"]:
+        logger.warning("Extraction instructions cached for this upload (%s)", prompt_cache["name"])
 
     all_entries = []
     failed_pages = FailedPages()
@@ -2466,6 +2483,8 @@ async def extract_with_gemini(
             continue
 
         await _write_progress(session_factory, upload_id, pages_processed=page_num)
+
+    await asyncio.to_thread(delete_prompt_cache, client, prompt_cache["name"])
 
     # One focused re-read of retained figures that disagree with the running balance (see
     # extraction_repair). Failure here must never cost the extraction itself.

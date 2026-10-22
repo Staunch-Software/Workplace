@@ -51,6 +51,38 @@ def gemini_max_output_tokens(base: int, model: str | None = None) -> int:
     return base if _is_25(model or gemini_model()) else base + 8192
 
 
+def create_prompt_cache(client, system_prompt: str, ttl_seconds: int = 1200) -> str | None:
+    """Store the long, unchanging extraction instructions on Gemini's side once per upload, so each
+    page call reuses them at the (much lower) cached-input price instead of re-sending ~11k tokens.
+
+    Off unless GEMINI_PROMPT_CACHE is true. Returns the cache name, or None when caching is off or
+    cannot be created (too few tokens, model without caching, API error) -- callers then simply send
+    the instructions with every call as before. The TTL cleans up after a crashed upload.
+    """
+    import logging
+    if not get_settings().GEMINI_PROMPT_CACHE:
+        return None
+    from google.genai import types
+    try:
+        cache = client.caches.create(
+            model=gemini_model(),
+            config=types.CreateCachedContentConfig(system_instruction=system_prompt, ttl=f"{ttl_seconds}s"),
+        )
+        return cache.name
+    except Exception as e:
+        logging.getLogger(__name__).warning("Prompt cache not created, sending instructions per call: %s", e)
+        return None
+
+
+def delete_prompt_cache(client, name: str | None) -> None:
+    if not name:
+        return
+    try:
+        client.caches.delete(name=name)
+    except Exception:
+        pass            # the TTL removes it anyway
+
+
 def generate(client, kind: str, contents, *, light: bool = False, small_output: int | None = None, **config_kwargs):
     """One Gemini call: picks the model, applies thinking + output limits, records token usage.
 

@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     # Thinking level for non-2.5 models: minimal | low | medium | high. Empty = model default.
     # Thinking tokens are billed as output, so a lower level is the main cost lever.
     GEMINI_THINKING_LEVEL: str = ""
+    # Cache the extraction instructions on Gemini's side for the duration of one upload (cheaper input).
+    GEMINI_PROMPT_CACHE: bool = False
     # Prices (USD per 1M tokens) used ONLY for the per-upload cost estimate in the log.
     GEMINI_PRICE_IN_PER_M: float = 0.75
     GEMINI_PRICE_OUT_PER_M: float = 3.75
