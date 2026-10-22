@@ -12101,37 +12101,37 @@ button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
     transform: none !important;
   }
 
-  /* Shell status icon: 23px SVG yields ~18.2px circle (balanced with 16px vessel name & 14.4px due badge) */
+  /* Shell status icon: 25px SVG yields ~19.8px circle (bumped up slightly for enhanced clarity) */
   div.dashboard-container-enhanced .lub-shell-status-icon {
-    width: clamp(20px, 0.9vw, 23px) !important;
-    height: clamp(20px, 0.9vw, 23px) !important;
-    max-width: 23px !important;
-    max-height: 23px !important;
+    width: clamp(22px, 0.98vw, 25px) !important;
+    height: clamp(22px, 0.98vw, 25px) !important;
+    max-width: 25px !important;
+    max-height: 25px !important;
     transform: none !important;
   }
 
-  /* File action button: matching 23px height */
+  /* File action button: matching 25px height */
   div.dashboard-container-enhanced .lub-status-action-btn {
-    width: clamp(20px, 0.9vw, 23px) !important;
-    height: clamp(20px, 0.9vw, 23px) !important;
+    width: clamp(22px, 0.98vw, 25px) !important;
+    height: clamp(22px, 0.98vw, 25px) !important;
     border-radius: 5px !important;
     transform: none !important;
   }
 
   div.dashboard-container-enhanced .lub-status-action-icon,
   div.dashboard-container-enhanced .lub-status-action-btn svg {
-    width: clamp(12px, 0.52vw, 14px) !important;
-    height: clamp(12px, 0.52vw, 14px) !important;
+    width: clamp(13px, 0.55vw, 15px) !important;
+    height: clamp(13px, 0.55vw, 15px) !important;
     transform: none !important;
   }
 
-  /* Compact spacing inside cell: no oversized gaps */
+  /* Spacing inside cell */
   div.dashboard-container-enhanced .lub-status-dots-container {
-    gap: clamp(2px, 0.18vw, 4px) !important;
+    gap: clamp(3px, 0.2vw, 5px) !important;
   }
 
   div.dashboard-container-enhanced .lub-status-row-one {
-    gap: clamp(4px, 0.25vw, 6px) !important;
+    gap: clamp(5px, 0.25vw, 7px) !important;
   }
 
   div.dashboard-container-enhanced .lub-status-dots-group {
@@ -12140,14 +12140,14 @@ button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
 
   /* Due badge */
   div.dashboard-container-enhanced .lub-status-due-badge {
-    font-size: clamp(0.75rem, 0.68vw, 0.90rem) !important;
+    font-size: clamp(0.78rem, 0.72vw, 0.96rem) !important;
     gap: clamp(4px, 0.35vw, 6px) !important;
     margin-top: clamp(3px, 0.22vw, 5px) !important;
   }
 
   div.dashboard-container-enhanced .lub-status-due-badge svg {
-    width: clamp(12px, 0.95vw, 15px) !important;
-    height: clamp(12px, 0.95vw, 15px) !important;
+    width: clamp(13px, 1.0vw, 16px) !important;
+    height: clamp(13px, 1.0vw, 16px) !important;
   }
 
   div.dashboard-container-enhanced .lub-status-due-badge .due-label-red,
@@ -12384,53 +12384,53 @@ button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
     transform: none !important;
   }
 
-  /* Shell status icon: 26px SVG yields ~20.5px circle in 4K */
+  /* Shell status icon: 28px SVG yields ~22.2px circle in 4K */
   div.dashboard-container-enhanced .lub-shell-status-icon {
-    width: clamp(23px, 0.7vw, 27px) !important;
-    height: clamp(23px, 0.7vw, 27px) !important;
-    max-width: 27px !important;
-    max-height: 27px !important;
+    width: clamp(25px, 0.75vw, 29px) !important;
+    height: clamp(25px, 0.75vw, 29px) !important;
+    max-width: 29px !important;
+    max-height: 29px !important;
     transform: none !important;
   }
 
-  /* File action button */
+  /* File action button in 4K */
   div.dashboard-container-enhanced .lub-status-action-btn {
-    width: clamp(23px, 0.7vw, 27px) !important;
-    height: clamp(23px, 0.7vw, 27px) !important;
+    width: clamp(25px, 0.75vw, 29px) !important;
+    height: clamp(25px, 0.75vw, 29px) !important;
     border-radius: 6px !important;
     transform: none !important;
   }
 
   div.dashboard-container-enhanced .lub-status-action-icon,
   div.dashboard-container-enhanced .lub-status-action-btn svg {
-    width: clamp(13px, 0.42vw, 16px) !important;
-    height: clamp(13px, 0.42vw, 16px) !important;
+    width: clamp(14px, 0.44vw, 17px) !important;
+    height: clamp(14px, 0.44vw, 17px) !important;
     transform: none !important;
   }
 
   /* Compact spacing inside cell in 4K */
   div.dashboard-container-enhanced .lub-status-dots-container {
-    gap: clamp(3px, 0.15vw, 5px) !important;
+    gap: clamp(4px, 0.16vw, 6px) !important;
   }
 
   div.dashboard-container-enhanced .lub-status-row-one {
-    gap: clamp(5px, 0.18vw, 8px) !important;
+    gap: clamp(6px, 0.2vw, 9px) !important;
   }
 
   div.dashboard-container-enhanced .lub-status-dots-group {
     gap: 4px !important;
   }
 
-  /* Due badge */
+  /* Due badge in 4K */
   div.dashboard-container-enhanced .lub-status-due-badge {
-    font-size: clamp(0.86rem, 0.52vw, 1.10rem) !important;
+    font-size: clamp(0.92rem, 0.56vw, 1.18rem) !important;
     gap: clamp(5px, 0.28vw, 8px) !important;
     margin-top: clamp(4px, 0.25vw, 7px) !important;
   }
 
   div.dashboard-container-enhanced .lub-status-due-badge svg {
-    width: clamp(14px, 0.75vw, 18px) !important;
-    height: clamp(14px, 0.75vw, 18px) !important;
+    width: clamp(15px, 0.8vw, 19px) !important;
+    height: clamp(15px, 0.8vw, 19px) !important;
   }
 
   div.dashboard-container-enhanced .lub-status-due-badge .due-label-red,
