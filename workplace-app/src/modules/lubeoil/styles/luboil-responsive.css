@@ -11156,22 +11156,22 @@ div.dashboard-container-enhanced .lub-status-action-btn:hover {
 div.dashboard-container-enhanced .lub-status-due-badge {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 3px !important;
+  gap: 4px !important;
   background: transparent !important;
   background-color: transparent !important;
   border: none !important;
   box-shadow: none !important;
   padding: 1px 2px !important;
-  font-size: 0.62rem !important;
-  line-height: 1 !important;
+  font-size: 0.72rem !important;
+  line-height: 1.2 !important;
   white-space: nowrap !important;
-  margin-top: 2px !important;
+  margin-top: 3px !important;
   color: #64748b !important;
 }
 
 div.dashboard-container-enhanced .lub-status-due-badge svg {
-  width: 10px !important;
-  height: 10px !important;
+  width: 12px !important;
+  height: 12px !important;
   flex-shrink: 0 !important;
 }
 
@@ -11188,25 +11188,25 @@ div.dashboard-container-enhanced .lub-status-due-badge.is-overdue .due-label-red
 }
 
 div.dashboard-container-enhanced .lub-status-due-badge.is-overdue .due-text-normal {
-  color: #475569 !important;
-  font-weight: 500 !important;
+  color: #334155 !important;
+  font-weight: 600 !important;
 }
 
 /* Upcoming / On-Schedule: Normal Slate Colors */
 div.dashboard-container-enhanced .lub-status-due-badge.is-upcoming svg {
-  color: #94a3b8 !important;
-  stroke: #94a3b8 !important;
+  color: #64748b !important;
+  stroke: #64748b !important;
 }
 
 div.dashboard-container-enhanced .lub-status-due-badge.is-upcoming .due-label-normal {
-  color: #64748b !important;
-  font-weight: 500 !important;
+  color: #475569 !important;
+  font-weight: 600 !important;
   margin-right: 2px !important;
 }
 
 div.dashboard-container-enhanced .lub-status-due-badge.is-upcoming .due-text-normal {
-  color: #64748b !important;
-  font-weight: 500 !important;
+  color: #475569 !important;
+  font-weight: 600 !important;
 }
 
 
@@ -12078,10 +12078,11 @@ button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
   }
 
   div.dashboard-container-enhanced .vessel-due-countdown-txt {
-    font-size: clamp(0.58rem, 0.5vw, 0.70rem) !important;
-    padding: clamp(2px, 0.18vw, 4px) clamp(8px, 0.6vw, 12px) !important;
-    margin-top: clamp(2px, 0.18vw, 4px) !important;
-    gap: 4px !important;
+    font-size: clamp(0.70rem, 0.62vw, 0.84rem) !important;
+    padding: clamp(3px, 0.22vw, 5px) clamp(10px, 0.75vw, 14px) !important;
+    margin-top: clamp(3px, 0.22vw, 6px) !important;
+    gap: 5px !important;
+    font-weight: 700 !important;
   }
 
   /* ── Data Cells ──────────────────────────────────────────── */
@@ -12116,19 +12117,30 @@ button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
 
   /* Due badge */
   div.dashboard-container-enhanced .lub-status-due-badge {
-    font-size: clamp(0.60rem, 0.52vw, 0.72rem) !important;
-    gap: 3px !important;
+    font-size: clamp(0.75rem, 0.68vw, 0.90rem) !important;
+    gap: clamp(4px, 0.35vw, 6px) !important;
+    margin-top: clamp(3px, 0.22vw, 5px) !important;
   }
 
   div.dashboard-container-enhanced .lub-status-due-badge svg {
-    width: clamp(9px, 0.7vw, 11px) !important;
-    height: clamp(9px, 0.7vw, 11px) !important;
+    width: clamp(12px, 0.95vw, 15px) !important;
+    height: clamp(12px, 0.95vw, 15px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-status-due-badge .due-label-red,
+  div.dashboard-container-enhanced .lub-status-due-badge .due-label-normal {
+    font-weight: 700 !important;
+  }
+
+  div.dashboard-container-enhanced .lub-status-due-badge .due-text-normal {
+    font-weight: 600 !important;
   }
 
   /* Missing label */
   div.dashboard-container-enhanced .missing-label {
-    font-size: clamp(0.60rem, 0.52vw, 0.72rem) !important;
-    padding: clamp(2px, 0.18vw, 3.5px) clamp(6px, 0.5vw, 9px) !important;
+    font-size: clamp(0.72rem, 0.64vw, 0.86rem) !important;
+    padding: clamp(3px, 0.22vw, 5px) clamp(8px, 0.65vw, 12px) !important;
+    font-weight: 700 !important;
   }
 
   /* N/A text */
@@ -12322,7 +12334,11 @@ button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
   }
 
   div.dashboard-container-enhanced .vessel-due-countdown-txt {
-    font-size: clamp(0.62rem, 0.35vw, 0.76rem) !important;
+    font-size: clamp(0.78rem, 0.44vw, 0.96rem) !important;
+    padding: clamp(4px, 0.25vw, 7px) clamp(12px, 0.8vw, 18px) !important;
+    margin-top: clamp(4px, 0.25vw, 8px) !important;
+    gap: 6px !important;
+    font-weight: 700 !important;
   }
 
   /* ── Data Cells ──────────────────────────────────────────── */
@@ -12357,18 +12373,30 @@ button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
 
   /* Due badge */
   div.dashboard-container-enhanced .lub-status-due-badge {
-    font-size: clamp(0.64rem, 0.35vw, 0.78rem) !important;
+    font-size: clamp(0.86rem, 0.52vw, 1.10rem) !important;
+    gap: clamp(5px, 0.28vw, 8px) !important;
+    margin-top: clamp(4px, 0.25vw, 7px) !important;
   }
 
   div.dashboard-container-enhanced .lub-status-due-badge svg {
-    width: clamp(10px, 0.47vw, 12px) !important;
-    height: clamp(10px, 0.47vw, 12px) !important;
+    width: clamp(14px, 0.75vw, 18px) !important;
+    height: clamp(14px, 0.75vw, 18px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-status-due-badge .due-label-red,
+  div.dashboard-container-enhanced .lub-status-due-badge .due-label-normal {
+    font-weight: 700 !important;
+  }
+
+  div.dashboard-container-enhanced .lub-status-due-badge .due-text-normal {
+    font-weight: 600 !important;
   }
 
   /* Missing label */
   div.dashboard-container-enhanced .missing-label {
-    font-size: clamp(0.64rem, 0.35vw, 0.78rem) !important;
-    padding: clamp(2.5px, 0.12vw, 4px) clamp(7px, 0.35vw, 10px) !important;
+    font-size: clamp(0.82rem, 0.50vw, 1.05rem) !important;
+    padding: clamp(4px, 0.25vw, 7px) clamp(10px, 0.65vw, 16px) !important;
+    font-weight: 700 !important;
   }
 
   /* N/A text */

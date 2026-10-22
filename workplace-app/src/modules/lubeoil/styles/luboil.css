@@ -1392,22 +1392,22 @@ div.dashboard-container-enhanced .lub-data-cell.missing-cell:hover .missing-labe
 div.dashboard-container-enhanced .lub-status-due-badge {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 3px !important;
+  gap: 4px !important;
   background: transparent !important;
   background-color: transparent !important;
   border: none !important;
   box-shadow: none !important;
   padding: 1px 2px !important;
-  font-size: 0.62rem !important;
-  line-height: 1 !important;
+  font-size: 0.72rem !important;
+  line-height: 1.2 !important;
   white-space: nowrap !important;
-  margin-top: 2px !important;
+  margin-top: 3px !important;
   color: #64748b !important;
 }
 
 div.dashboard-container-enhanced .lub-status-due-badge svg {
-  width: 10px !important;
-  height: 10px !important;
+  width: 12px !important;
+  height: 12px !important;
   flex-shrink: 0 !important;
 }
 
@@ -1424,25 +1424,25 @@ div.dashboard-container-enhanced .lub-status-due-badge.is-overdue .due-label-red
 }
 
 div.dashboard-container-enhanced .lub-status-due-badge.is-overdue .due-text-normal {
-  color: #475569 !important;
-  font-weight: 500 !important;
+  color: #334155 !important;
+  font-weight: 600 !important;
 }
 
 /* Upcoming / On-Schedule: Normal Slate Colors */
 div.dashboard-container-enhanced .lub-status-due-badge.is-upcoming svg {
-  color: #94a3b8 !important;
-  stroke: #94a3b8 !important;
+  color: #64748b !important;
+  stroke: #64748b !important;
 }
 
 div.dashboard-container-enhanced .lub-status-due-badge.is-upcoming .due-label-normal {
-  color: #64748b !important;
-  font-weight: 500 !important;
+  color: #475569 !important;
+  font-weight: 600 !important;
   margin-right: 2px !important;
 }
 
 div.dashboard-container-enhanced .lub-status-due-badge.is-upcoming .due-text-normal {
-  color: #64748b !important;
-  font-weight: 500 !important;
+  color: #475569 !important;
+  font-weight: 600 !important;
 }
 
 
