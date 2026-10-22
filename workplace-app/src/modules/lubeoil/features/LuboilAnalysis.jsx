@@ -6014,27 +6014,15 @@ const LuboilAnalysis = () => {
                       {/* ðŸ”¥ FULLY UPDATED STICKY FOOTER WITH CHECKLIST POPOVER */}
                       <tfoot className="matrix-footer-sticky">
                         <tr>
-                          <td 
-                            className="lub-matrix-footer-label"
-                            style={{
-                              position: "sticky",
-                              left: 0,
-                              bottom: "-1px",
-                              zIndex: 120,
-                              backgroundColor: "#f8fafc",
-                              borderRight: "1px solid #e2e8f0",
-                              borderTop: "1px solid #e2e8f0",
-                              borderLeft: "3px solid #3b82f6",
-                              boxShadow: "4px -2px 10px -1px rgba(15, 23, 42, 0.08), 2px 0 4px -1px rgba(15, 23, 42, 0.04)",
-                              padding: "10px 16px",
-                              verticalAlign: "middle",
-                            }}
-                          >
-                            <div className="lub-matrix-footer-label-inner" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              <FileText size={13} className="lub-footer-label-icon" style={{ color: "#2563eb", flexShrink: 0 }} />
-                              <span className="lub-footer-label-text" style={{ fontWeight: 800, color: "#1e293b", letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                                PDF REPORTS
-                              </span>
+                          <td className="lub-matrix-footer-label">
+                            <div className="lub-matrix-footer-label-inner">
+                              <div className="lub-footer-label-icon-box">
+                                <FileText size={14} className="lub-footer-label-icon" />
+                              </div>
+                              <div className="lub-footer-label-text-group">
+                                <span className="lub-footer-label-title">PDF REPORTS</span>
+                                <span className="lub-footer-label-subtitle">Fleet Archives</span>
+                              </div>
                             </div>
                           </td>
 
@@ -6061,6 +6049,7 @@ const LuboilAnalysis = () => {
                                   className="footer-popover-wrapper"
                                 >
                                   <button
+                                    type="button"
                                     onClick={() => {
                                       if (isOpen) {
                                         setFooterReportVessel(null);
@@ -6073,24 +6062,63 @@ const LuboilAnalysis = () => {
                                       }
                                     }}
                                     className={`lub-footer-select-btn ${isOpen ? "active" : ""}`}
+                                    title={`View & download PDF reports for ${vesselName}`}
                                   >
-                                    <FileText size={14} />
-                                    {isOpen ? "CLOSE" : "SELECT"}
+                                    <span className="lub-footer-btn-icon-wrap">
+                                      <FileText size={13} className="lub-footer-btn-icon" />
+                                    </span>
+                                    <span className="lub-footer-btn-text">
+                                      {isOpen ? "Close" : "Reports"}
+                                    </span>
+                                    <ChevronDown
+                                      size={12}
+                                      className={`lub-footer-btn-chevron ${isOpen ? "rotate-open" : ""}`}
+                                    />
                                   </button>
 
-                                  {/* ðŸ”¥ CHECKLIST POPOVER CONTAINER */}
+                                  {/* 🔥 REDESIGNED CHECKLIST POPOVER CONTAINER */}
                                   {isOpen && (
-                                    <div className="lub-footer-popover">
+                                    <div
+                                      className="lub-footer-popover"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
                                       {/* Popover Header */}
                                       <div className="lub-footer-popover-header">
-                                        <span className="popover-title">
-                                          SELECT REPORTS
-                                        </span>
-                                        {selectedFooterReports.length > 0 && (
-                                          <span className="popover-count-badge">
-                                            {selectedFooterReports.length}{" "}
-                                            Selected
+                                        <div className="lub-footer-popover-header-top">
+                                          <div className="lub-footer-vessel-badge">
+                                            <Ship size={12} className="lub-footer-vessel-icon" />
+                                            <span className="lub-footer-vessel-name">{vesselName}</span>
+                                          </div>
+                                          <span className={`lub-footer-count-badge ${selectedFooterReports.length > 0 ? "has-selected" : ""}`}>
+                                            {selectedFooterReports.length > 0
+                                              ? `${selectedFooterReports.length} of ${footerReports.length} selected`
+                                              : `${footerReports.length} ${footerReports.length === 1 ? 'report' : 'reports'}`}
                                           </span>
+                                        </div>
+
+                                        {footerReports.length > 0 && !isFooterLoading && (
+                                          <div className="lub-footer-toolbar">
+                                            <button
+                                              type="button"
+                                              className="lub-footer-action-link select-all"
+                                              onClick={() =>
+                                                setSelectedFooterReports(
+                                                  footerReports.map((r) => r.report_id)
+                                                )
+                                              }
+                                            >
+                                              Select All
+                                            </button>
+                                            <span className="lub-footer-toolbar-divider">•</span>
+                                            <button
+                                              type="button"
+                                              className="lub-footer-action-link clear-all"
+                                              onClick={() => setSelectedFooterReports([])}
+                                              disabled={selectedFooterReports.length === 0}
+                                            >
+                                              Clear Selection
+                                            </button>
+                                          </div>
                                         )}
                                       </div>
 
@@ -6099,93 +6127,101 @@ const LuboilAnalysis = () => {
                                         {isFooterLoading ? (
                                           <div className="popover-loading-box">
                                             <div className="loading-spinner-small"></div>
+                                            <span className="popover-loading-text">Fetching reports...</span>
+                                          </div>
+                                        ) : footerReports.length === 0 ? (
+                                          <div className="popover-empty-box">
+                                            <FileText size={24} className="popover-empty-icon" />
+                                            <span className="popover-empty-text">No reports uploaded yet</span>
                                           </div>
                                         ) : (
-                                          footerReports
-                                            // unified view includes all reports
-                                            .map((report, idx) => (
-                                              <label
-                                                key={idx}
-                                                className="lub-footer-popover-item"
+                                          footerReports.map((report, idx) => {
+                                            const isChecked = selectedFooterReports.includes(report.report_id);
+                                            const formattedDate = report.report_date
+                                              ? new Date(report.report_date).toLocaleDateString("en-GB", {
+                                                  day: "2-digit",
+                                                  month: "short",
+                                                  year: "numeric",
+                                                })
+                                              : "Unknown Date";
+
+                                            return (
+                                              <div
+                                                key={report.report_id || idx}
+                                                className={`lub-footer-popover-item ${isChecked ? "item-checked" : ""}`}
+                                                onClick={() => {
+                                                  setSelectedFooterReports((prev) =>
+                                                    prev.includes(report.report_id)
+                                                      ? prev.filter((id) => id !== report.report_id)
+                                                      : [...prev, report.report_id]
+                                                  );
+                                                }}
                                               >
-                                                <input
-                                                  type="checkbox"
-                                                  className="popover-checkbox"
-                                                  checked={selectedFooterReports.includes(
-                                                    report.report_id,
-                                                  )}
-                                                  onChange={() => {
-                                                    setSelectedFooterReports(
-                                                      (prev) =>
-                                                        prev.includes(
-                                                          report.report_id,
-                                                        )
-                                                          ? prev.filter(
-                                                            (id) =>
-                                                              id !==
-                                                              report.report_id,
-                                                          )
-                                                          : [
-                                                            ...prev,
-                                                            report.report_id,
-                                                          ],
-                                                    );
-                                                  }}
-                                                  style={{
-                                                    width: "15px",
-                                                    height: "15px",
-                                                    cursor: "pointer",
-                                                  }}
-                                                />
-                                                <span className="popover-item-date">
-                                                  {report.report_date
-                                                    ? new Date(
-                                                      report.report_date,
-                                                    ).toLocaleDateString(
-                                                      "en-GB",
-                                                      {
-                                                        day: "2-digit",
-                                                        month: "short",
-                                                        year: "numeric",
-                                                      },
-                                                    )
-                                                    : "Unknown Date"}
-                                                </span>
-                                              </label>
-                                            ))
+                                                <div className="lub-footer-item-left">
+                                                  <input
+                                                    type="checkbox"
+                                                    className="popover-checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() => {}}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                  />
+                                                  <div className="lub-footer-item-details">
+                                                    <span className="popover-item-date">{formattedDate}</span>
+                                                    {report.oil_source && (
+                                                      <span className="popover-oil-tag">{report.oil_source}</span>
+                                                    )}
+                                                  </div>
+                                                </div>
+
+                                                {report.report_url && (
+                                                  <button
+                                                    type="button"
+                                                    className="popover-direct-view-btn"
+                                                    title="View PDF report"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      window.open(report.report_url, "_blank");
+                                                    }}
+                                                  >
+                                                    <Eye size={13} />
+                                                  </button>
+                                                )}
+                                              </div>
+                                            );
+                                          })
                                         )}
                                       </div>
 
-                                      {/* Popover Footer (Common Download Button) */}
+                                      {/* Popover Footer (Download Button) */}
                                       <div className="lub-footer-popover-footer">
                                         <button
+                                          type="button"
                                           disabled={
-                                            selectedFooterReports.length ===
-                                            0 || isFooterDownloading
+                                            selectedFooterReports.length === 0 ||
+                                            isFooterDownloading
                                           }
                                           onClick={() =>
-                                            handleFooterBatchDownload(
-                                              vesselName,
-                                            )
+                                            handleFooterBatchDownload(vesselName)
                                           }
-                                          className="lub-footer-download-btn"
-                                          style={{
-                                            backgroundColor:
-                                              selectedFooterReports.length > 0
-                                                ? "#10b981"
-                                                : "#cbd5e1",
-                                            cursor:
-                                              selectedFooterReports.length > 0
-                                                ? "pointer"
-                                                : "not-allowed",
-                                          }}
+                                          className={`lub-footer-download-btn ${
+                                            selectedFooterReports.length > 0
+                                              ? "active"
+                                              : "disabled"
+                                          }`}
                                         >
                                           {isFooterDownloading ? (
-                                            "PREPARING ZIP..."
+                                            <>
+                                              <div className="loading-spinner-small spinner-white"></div>
+                                              <span>Preparing ZIP Archive...</span>
+                                            </>
                                           ) : (
                                             <>
                                               <Download size={14} />
-                                              DOWNLOAD SELECTED
+                                              <span>
+                                                {selectedFooterReports.length > 0
+                                                  ? `Download (${selectedFooterReports.length}) ZIP`
+                                                  : "Select Reports to Download"}
+                                              </span>
                                             </>
                                           )}
                                         </button>
