@@ -421,9 +421,9 @@ div.section-header-enhanced {
     margin-top: 12px !important;
   }
 
-  /* Make status icons 40% larger */
+  /* Status icons: transform scale removed to prevent oversized 2K/4K icons */
   .lub-data-cell svg {
-    transform: scale(1.4) !important;
+    transform: none !important;
   }
 }
 
@@ -728,10 +728,9 @@ div.section-header-enhanced {
     /* Massive height for 4K */
   }
 
-  /* Scale icons and text inside the big cells */
+  /* Status icons: transform scale removed to prevent oversized 2K/4K icons */
   .lub-data-cell svg {
-    transform: scale(1.6) !important;
-    /* Scale icons by 60% */
+    transform: none !important;
   }
 
   /* Target the 'Due' text badge inside your StatusDots component */
@@ -2615,11 +2614,9 @@ div.section-header-enhanced {
     /* Taller rows for high-res monitors */
   }
 
-  /* SCALE ICONS: This makes the small dots/icons big on 4K */
+  /* Status icons: transform scale removed to prevent oversized 2K/4K icons */
   .lub-data-cell svg {
-    transform: scale(1.65) !important;
-    /* Icons grow by 65% */
-    /* margin-bottom: 10px !important; */
+    transform: none !important;
   }
 
   /* Scale the 'Due Date' badge text */
@@ -2904,8 +2901,7 @@ div.section-header-enhanced {
   }
 
   .lub-data-cell svg {
-    transform: scale(1.65) !important;
-    /* margin-bottom: 10px !important; */
+    transform: none !important;
   }
 
   .lub-data-cell span[style*="Due:"] {
@@ -3549,29 +3545,29 @@ div.section-header-enhanced {
     gap: 12px !important;
   }
 
-  /* Scale the Dots */
+  /* Dots & Actions: cleanly sized without transform scale */
   .lub-dot-item svg {
-    transform: scale(1.6) !important;
+    transform: none !important;
   }
 
-  /* Scale Actions */
   .lub-status-actions-group {
-    padding-left: 15px !important;
-    border-left-width: 2px !important;
+    padding-left: 6px !important;
+    border-left-width: 1px !important;
   }
 
   .lub-status-action-btn {
-    width: 44px !important;
-    height: 44px !important;
-    border-radius: 8px !important;
+    width: 22px !important;
+    height: 22px !important;
+    border-radius: 5px !important;
+    transform: none !important;
   }
 
   .lub-status-action-btn svg {
-    transform: scale(2.6) !important;
+    transform: none !important;
   }
 
   .action-icon-svg {
-    transform: scale(1.6) !important;
+    transform: none !important;
   }
 
   /* Scale Popover */
@@ -12096,23 +12092,50 @@ button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
     gap: clamp(4px, 0.35vw, 7px) !important;
   }
 
-  /* Shell status icon: stays near 20px, barely scales */
-  div.dashboard-container-enhanced .lub-shell-status-icon {
-    width: clamp(18px, 1.4vw, 22px) !important;
-    height: clamp(18px, 1.4vw, 22px) !important;
+  /* Neutralize all scale transforms on cell SVGs */
+  div.dashboard-container-enhanced .lub-data-cell svg,
+  div.dashboard-container-enhanced .lub-dot-item svg,
+  div.dashboard-container-enhanced .lub-shell-status-icon,
+  div.dashboard-container-enhanced .lub-status-action-btn svg,
+  div.dashboard-container-enhanced .action-icon-svg {
+    transform: none !important;
   }
 
-  /* File action button: stays compact */
+  /* Shell status icon: 23px SVG yields ~18.2px circle (balanced with 16px vessel name & 14.4px due badge) */
+  div.dashboard-container-enhanced .lub-shell-status-icon {
+    width: clamp(20px, 0.9vw, 23px) !important;
+    height: clamp(20px, 0.9vw, 23px) !important;
+    max-width: 23px !important;
+    max-height: 23px !important;
+    transform: none !important;
+  }
+
+  /* File action button: matching 23px height */
   div.dashboard-container-enhanced .lub-status-action-btn {
-    width: clamp(18px, 1.4vw, 22px) !important;
-    height: clamp(18px, 1.4vw, 22px) !important;
+    width: clamp(20px, 0.9vw, 23px) !important;
+    height: clamp(20px, 0.9vw, 23px) !important;
     border-radius: 5px !important;
+    transform: none !important;
   }
 
   div.dashboard-container-enhanced .lub-status-action-icon,
   div.dashboard-container-enhanced .lub-status-action-btn svg {
-    width: clamp(11px, 0.85vw, 13px) !important;
-    height: clamp(11px, 0.85vw, 13px) !important;
+    width: clamp(12px, 0.52vw, 14px) !important;
+    height: clamp(12px, 0.52vw, 14px) !important;
+    transform: none !important;
+  }
+
+  /* Compact spacing inside cell: no oversized gaps */
+  div.dashboard-container-enhanced .lub-status-dots-container {
+    gap: clamp(2px, 0.18vw, 4px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-status-row-one {
+    gap: clamp(4px, 0.25vw, 6px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-status-dots-group {
+    gap: 3px !important;
   }
 
   /* Due badge */
@@ -12352,23 +12375,50 @@ button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
     gap: clamp(5px, 0.25vw, 8px) !important;
   }
 
-  /* Shell status icon */
+  /* Neutralize all scale transforms on cell SVGs in 4K */
+  div.dashboard-container-enhanced .lub-data-cell svg,
+  div.dashboard-container-enhanced .lub-dot-item svg,
+  div.dashboard-container-enhanced .lub-shell-status-icon,
+  div.dashboard-container-enhanced .lub-status-action-btn svg,
+  div.dashboard-container-enhanced .action-icon-svg {
+    transform: none !important;
+  }
+
+  /* Shell status icon: 26px SVG yields ~20.5px circle in 4K */
   div.dashboard-container-enhanced .lub-shell-status-icon {
-    width: clamp(20px, 0.94vw, 24px) !important;
-    height: clamp(20px, 0.94vw, 24px) !important;
+    width: clamp(23px, 0.7vw, 27px) !important;
+    height: clamp(23px, 0.7vw, 27px) !important;
+    max-width: 27px !important;
+    max-height: 27px !important;
+    transform: none !important;
   }
 
   /* File action button */
   div.dashboard-container-enhanced .lub-status-action-btn {
-    width: clamp(20px, 0.94vw, 24px) !important;
-    height: clamp(20px, 0.94vw, 24px) !important;
+    width: clamp(23px, 0.7vw, 27px) !important;
+    height: clamp(23px, 0.7vw, 27px) !important;
     border-radius: 6px !important;
+    transform: none !important;
   }
 
   div.dashboard-container-enhanced .lub-status-action-icon,
   div.dashboard-container-enhanced .lub-status-action-btn svg {
-    width: clamp(12px, 0.55vw, 14px) !important;
-    height: clamp(12px, 0.55vw, 14px) !important;
+    width: clamp(13px, 0.42vw, 16px) !important;
+    height: clamp(13px, 0.42vw, 16px) !important;
+    transform: none !important;
+  }
+
+  /* Compact spacing inside cell in 4K */
+  div.dashboard-container-enhanced .lub-status-dots-container {
+    gap: clamp(3px, 0.15vw, 5px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-status-row-one {
+    gap: clamp(5px, 0.18vw, 8px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-status-dots-group {
+    gap: 4px !important;
   }
 
   /* Due badge */
