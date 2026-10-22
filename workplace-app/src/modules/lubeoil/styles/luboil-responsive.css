@@ -103,9 +103,13 @@ div.section-header-enhanced {
     min-width: fit-content !important;
   }
 
-  /* Hide the icon on mobile to save space so row doesn't break */
-  button.nav-pill-btn.active-nav-btn svg {
-    display: none !important;
+  /* Responsive Upload icon on mobile */
+  button.nav-pill-btn.active-nav-btn svg,
+  .lub-upload-icon {
+    display: inline-flex !important;
+    width: 15px !important;
+    height: 15px !important;
+    margin-right: 4px !important;
   }
 }
 
@@ -10457,31 +10461,82 @@ div.dashboard-container-enhanced .lub-matrix-card.enhanced-card,
   max-width: calc((100cqw - 220px) / 5) !important;
 }
 
-/* --- 1. TABLETS / COMPACT (< 1200px) --- */
-@media (max-width: 1199.98px) {
+/* --- 1. MOBILE PHONES (<= 600px: 2 VESSELS SHOWN) --- */
+@media (max-width: 600px) {
   :root, div.dashboard-container-enhanced {
-    --matrix-sticky-width: 180px;
-    --matrix-vessel-width: calc((100cqw - 180px) / 5);
+    --matrix-sticky-width: 125px;
+    --matrix-vessel-width: calc((100cqw - 125px) / 2);
   }
 
   .matrix-corner-header,
   .machinery-sticky-cell,
   .lub-matrix-footer-label {
-    width: 180px !important;
-    min-width: 180px !important;
-    max-width: 180px !important;
+    width: 125px !important;
+    min-width: 125px !important;
+    max-width: 125px !important;
+    padding: 6px 8px !important;
   }
 
   .vessel-header-cell,
   .lub-data-cell,
   .lub-matrix-footer-cell {
-    width: calc((100cqw - 180px) / 5) !important;
-    min-width: calc((100cqw - 180px) / 5) !important;
-    max-width: calc((100cqw - 180px) / 5) !important;
+    width: calc((100cqw - 125px) / 2) !important;
+    min-width: calc((100cqw - 125px) / 2) !important;
+    max-width: calc((100cqw - 125px) / 2) !important;
   }
 }
 
-/* --- 2. LAPTOPS (1200px to 1400px) --- */
+/* Very Small Mobile (< 480px: 2 vessels with compact sticky column) */
+@media (max-width: 479.98px) {
+  :root, div.dashboard-container-enhanced {
+    --matrix-sticky-width: 110px;
+    --matrix-vessel-width: calc((100cqw - 110px) / 2);
+  }
+
+  .matrix-corner-header,
+  .machinery-sticky-cell,
+  .lub-matrix-footer-label {
+    width: 110px !important;
+    min-width: 110px !important;
+    max-width: 110px !important;
+    padding: 4px 6px !important;
+  }
+
+  .vessel-header-cell,
+  .lub-data-cell,
+  .lub-matrix-footer-cell {
+    width: calc((100cqw - 110px) / 2) !important;
+    min-width: calc((100cqw - 110px) / 2) !important;
+    max-width: calc((100cqw - 110px) / 2) !important;
+  }
+}
+
+/* --- 2. TABLETS (600.02px to 1199.98px: 4 VESSELS SHOWN) --- */
+@media (min-width: 600.02px) and (max-width: 1199.98px) {
+  :root, div.dashboard-container-enhanced {
+    --matrix-sticky-width: 175px;
+    --matrix-vessel-width: calc((100cqw - 175px) / 4);
+  }
+
+  .matrix-corner-header,
+  .machinery-sticky-cell,
+  .lub-matrix-footer-label {
+    width: 175px !important;
+    min-width: 175px !important;
+    max-width: 175px !important;
+    padding: 8px 10px !important;
+  }
+
+  .vessel-header-cell,
+  .lub-data-cell,
+  .lub-matrix-footer-cell {
+    width: calc((100cqw - 175px) / 4) !important;
+    min-width: calc((100cqw - 175px) / 4) !important;
+    max-width: calc((100cqw - 175px) / 4) !important;
+  }
+}
+
+/* --- 3. LAPTOPS (1200px to 1400px: 5 VESSELS SHOWN) --- */
 @media (min-width: 1200px) and (max-width: 1400px) {
   :root, div.dashboard-container-enhanced {
     --matrix-sticky-width: 200px;
@@ -10505,7 +10560,7 @@ div.dashboard-container-enhanced .lub-matrix-card.enhanced-card,
   }
 }
 
-/* --- 3. DESKTOP / 1080p (1400px to 1900px) --- */
+/* --- 4. DESKTOP / 1080p (1400px to 1900px: 5 VESSELS SHOWN) --- */
 @media (min-width: 1400.02px) and (max-width: 1900px) {
   :root, div.dashboard-container-enhanced {
     --matrix-sticky-width: 220px;
@@ -10529,59 +10584,111 @@ div.dashboard-container-enhanced .lub-matrix-card.enhanced-card,
   }
 }
 
-/* --- 4. LARGE MONITORS / 1440p / 2K (1900px to 2560px) --- */
-@media (min-width: 1900.02px) and (max-width: 2560px) {
+/* --- 5. LARGE MONITORS / 2K (1800px to 2560px: 5 VESSELS SHOWN) --- */
+@media (min-width: 1800px) and (max-width: 2560px) {
   :root, div.dashboard-container-enhanced {
-    --matrix-sticky-width: 260px;
-    --matrix-vessel-width: calc((100cqw - 260px) / 5);
+    --matrix-sticky-width: 240px;
+    --matrix-vessel-width: calc((100cqw - 240px) / 5);
   }
 
   .matrix-corner-header,
   .machinery-sticky-cell,
   .lub-matrix-footer-label {
-    width: 260px !important;
-    min-width: 260px !important;
-    max-width: 260px !important;
+    width: 240px !important;
+    min-width: 240px !important;
+    max-width: 240px !important;
   }
 
   .vessel-header-cell,
   .lub-data-cell,
   .lub-matrix-footer-cell {
-    width: calc((100cqw - 260px) / 5) !important;
-    min-width: calc((100cqw - 260px) / 5) !important;
-    max-width: calc((100cqw - 260px) / 5) !important;
+    width: calc((100cqw - 240px) / 5) !important;
+    min-width: calc((100cqw - 240px) / 5) !important;
+    max-width: calc((100cqw - 240px) / 5) !important;
   }
 }
 
-/* --- 5. ULTRA-WIDE & 4K (2560px to 3840px+) --- */
+/* --- 6. ULTRA-WIDE & 4K (2560.02px+: 5 VESSELS SHOWN) --- */
 @media (min-width: 2560.02px) {
   :root, div.dashboard-container-enhanced {
-    --matrix-sticky-width: 360px;
-    --matrix-vessel-width: calc((100cqw - 360px) / 5);
+    --matrix-sticky-width: 280px;
+    --matrix-vessel-width: calc((100cqw - 280px) / 5);
   }
 
   .matrix-corner-header,
   .machinery-sticky-cell,
   .lub-matrix-footer-label {
-    width: 360px !important;
-    min-width: 360px !important;
-    max-width: 360px !important;
+    width: 280px !important;
+    min-width: 280px !important;
+    max-width: 280px !important;
   }
 
   .vessel-header-cell,
   .lub-data-cell,
   .lub-matrix-footer-cell {
-    width: calc((100cqw - 360px) / 5) !important;
-    min-width: calc((100cqw - 360px) / 5) !important;
-    max-width: calc((100cqw - 360px) / 5) !important;
+    width: calc((100cqw - 280px) / 5) !important;
+    min-width: calc((100cqw - 280px) / 5) !important;
+    max-width: calc((100cqw - 280px) / 5) !important;
+  }
+}
+
+/* --- CONTAINER QUERY DIRECT ADAPTATIONS --- */
+@container (max-width: 600px) {
+  .matrix-corner-header,
+  .machinery-sticky-cell,
+  .lub-matrix-footer-label {
+    width: 125px !important;
+    min-width: 125px !important;
+    max-width: 125px !important;
+  }
+  .vessel-header-cell,
+  .lub-data-cell,
+  .lub-matrix-footer-cell {
+    width: calc((100cqw - 125px) / 2) !important;
+    min-width: calc((100cqw - 125px) / 2) !important;
+    max-width: calc((100cqw - 125px) / 2) !important;
+  }
+}
+
+@container (min-width: 600.02px) and (max-width: 1199.98px) {
+  .matrix-corner-header,
+  .machinery-sticky-cell,
+  .lub-matrix-footer-label {
+    width: 175px !important;
+    min-width: 175px !important;
+    max-width: 175px !important;
+  }
+  .vessel-header-cell,
+  .lub-data-cell,
+  .lub-matrix-footer-cell {
+    width: calc((100cqw - 175px) / 4) !important;
+    min-width: calc((100cqw - 175px) / 4) !important;
+    max-width: calc((100cqw - 175px) / 4) !important;
+  }
+}
+
+@container (min-width: 1200px) {
+  .vessel-header-cell,
+  .lub-data-cell,
+  .lub-matrix-footer-cell {
+    width: calc((100cqw - var(--matrix-sticky-width, 220px)) / 5) !important;
+    min-width: calc((100cqw - var(--matrix-sticky-width, 220px)) / 5) !important;
+    max-width: calc((100cqw - var(--matrix-sticky-width, 220px)) / 5) !important;
   }
 }
 
 /* --- FALLBACK FOR BROWSERS WITHOUT CONTAINER QUERIES --- */
 @supports not (container-type: inline-size) {
-  @media (max-width: 1199.98px) {
+  @media (max-width: 600px) {
     .vessel-header-cell, .lub-data-cell, .lub-matrix-footer-cell {
-      width: 190px !important; min-width: 190px !important; max-width: 190px !important;
+      width: calc((100vw - 125px) / 2) !important;
+      min-width: 120px !important;
+    }
+  }
+  @media (min-width: 600.02px) and (max-width: 1199.98px) {
+    .vessel-header-cell, .lub-data-cell, .lub-matrix-footer-cell {
+      width: calc((100vw - 175px) / 4) !important;
+      min-width: 155px !important;
     }
   }
   @media (min-width: 1200px) and (max-width: 1400px) {
@@ -10594,14 +10701,14 @@ div.dashboard-container-enhanced .lub-matrix-card.enhanced-card,
       width: 275px !important; min-width: 275px !important; max-width: 275px !important;
     }
   }
-  @media (min-width: 1900.02px) and (max-width: 2560px) {
+  @media (min-width: 1800px) and (max-width: 2560px) {
     .vessel-header-cell, .lub-data-cell, .lub-matrix-footer-cell {
-      width: 380px !important; min-width: 380px !important; max-width: 380px !important;
+      width: calc((100vw - 240px) / 5) !important; min-width: 200px !important; max-width: 480px !important;
     }
   }
   @media (min-width: 2560.02px) {
     .vessel-header-cell, .lub-data-cell, .lub-matrix-footer-cell {
-      width: 650px !important; min-width: 650px !important; max-width: 650px !important;
+      width: calc((100vw - 280px) / 5) !important; min-width: 240px !important; max-width: 660px !important;
     }
   }
 }
@@ -10650,16 +10757,19 @@ div.section-header-enhanced > div:last-child {
   flex: 0 0 auto !important;
 }
 
-/* --- Big screens (2000px+) --- */
-@media (min-width: 2000px) {
+/* --- Big screens (1440px+): compact, no over-sizing --- */
+@media (min-width: 1440px) {
   div.section-header-enhanced {
-    gap: 32px !important;
-    margin-bottom: 20px !important;
+    gap: 16px !important;
+    margin-bottom: 10px !important;
+    justify-content: space-between !important;
+    align-items: center !important;
   }
 
   div.section-header-enhanced .lub-stats-grid-container {
-    max-width: 1300px !important;
-    gap: 24px !important;
+    justify-content: center !important;
+    flex: 1 1 auto !important;
+    gap: 12px !important;
   }
 }
 
@@ -11291,4 +11401,1017 @@ div.dashboard-container-enhanced td.lub-matrix-footer-cell {
   background-color: #f8fafc !important;
   border-right: 1px solid #e2e8f0 !important;
   border-top: 1px solid #e2e8f0 !important;
+}
+
+
+/* ============================================================
+   RESPONSIVE UPLOAD BUTTON & ICON MEDIA QUERIES
+   ============================================================ */
+
+/* Base / Standard Desktop styling */
+.lub-upload-btn,
+button.nav-pill-btn.active-nav-btn.lub-upload-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 38px !important;
+  padding: 0 16px !important;
+  border-radius: 10px !important;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.lub-upload-btn .lub-upload-icon,
+button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
+  display: inline-flex !important;
+  width: 16px !important;
+  height: 16px !important;
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+}
+
+.lub-upload-btn-text {
+  display: inline !important;
+  white-space: nowrap !important;
+}
+
+/* 4K & Ultra-wide (2000px+) */
+@media (min-width: 2000px) {
+  .lub-upload-btn,
+  button.nav-pill-btn.active-nav-btn.lub-upload-btn {
+    height: 48px !important;
+    padding: 0 24px !important;
+    font-size: 1.05rem !important;
+    border-radius: 12px !important;
+    gap: 10px !important;
+  }
+  .lub-upload-btn .lub-upload-icon,
+  button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
+    width: 22px !important;
+    height: 22px !important;
+    display: inline-flex !important;
+  }
+}
+
+/* Tablets (600.02px to 1199.98px) */
+@media (min-width: 600.02px) and (max-width: 1199.98px) {
+  .lub-upload-btn,
+  button.nav-pill-btn.active-nav-btn.lub-upload-btn {
+    height: 36px !important;
+    padding: 0 12px !important;
+    font-size: 0.75rem !important;
+    gap: 6px !important;
+  }
+  .lub-upload-btn .lub-upload-icon,
+  button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
+    width: 16px !important;
+    height: 16px !important;
+    display: inline-flex !important;
+  }
+}
+
+/* Mobile Phones (<= 600px) */
+@media (max-width: 600px) {
+  .lub-upload-btn,
+  button.nav-pill-btn.active-nav-btn.lub-upload-btn {
+    height: 36px !important;
+    padding: 0 12px !important;
+    font-size: 0.72rem !important;
+    gap: 6px !important;
+    justify-content: center !important;
+  }
+  .lub-upload-btn .lub-upload-icon,
+  button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
+    display: inline-flex !important;
+    width: 16px !important;
+    height: 16px !important;
+    visibility: visible !important;
+  }
+}
+
+/* Compact Mobile (< 480px) */
+@media (max-width: 480px) {
+  .lub-upload-btn,
+  button.nav-pill-btn.active-nav-btn.lub-upload-btn {
+    height: 34px !important;
+    padding: 0 10px !important;
+    font-size: 0.68rem !important;
+    gap: 5px !important;
+    justify-content: center !important;
+  }
+  .lub-upload-btn .lub-upload-icon,
+  button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
+    display: inline-flex !important;
+    width: 15px !important;
+    height: 15px !important;
+    visibility: visible !important;
+  }
+}
+
+
+/* ============================================================
+   PAGE HEADER, KPI CARDS & FULL HEADER ROW (TABLET & MOBILE ONLY)
+   ============================================================ */
+
+/* --- 1. TABLETS (600.02px to 1199.98px) --- */
+@media (min-width: 600.02px) and (max-width: 1199.98px) {
+  /* Full Row: 2-Row Layout (Row 1: Title + Actions, Row 2: 3 KPI Cards Full Width) */
+  div.section-header-enhanced {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    row-gap: 14px !important;
+    column-gap: 12px !important;
+    margin-top: 12px !important;
+    margin-bottom: 18px !important;
+    padding: 0 4px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Left Header Block (Order 1) */
+  div.section-header-enhanced .lub-header-title-block,
+  div.section-header-enhanced > div:first-child {
+    order: 1 !important;
+    flex: 1 1 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    min-width: 0 !important;
+  }
+
+  div.section-header-enhanced .lub-header-badge-icon {
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 10px !important;
+    flex-shrink: 0 !important;
+  }
+
+  div.section-header-enhanced .lub-header-badge-icon svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  div.section-header-enhanced h1.section-title-main {
+    font-size: 1.1rem !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+  }
+
+  div.section-header-enhanced p.section-subtitle {
+    font-size: 0.72rem !important;
+    margin-top: 2px !important;
+  }
+
+  /* Right Action Toolbar (Order 2) */
+  div.section-header-enhanced .lub-header-actions-block,
+  div.section-header-enhanced > div:last-child {
+    order: 2 !important;
+    flex: 0 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  div.section-header-enhanced .lub-header-actions-inner,
+  div.section-header-enhanced > div:last-child > div {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  div.section-header-enhanced .premium-owner-dropdown-root,
+  div.section-header-enhanced div[style*="width: 260px"],
+  div.section-header-enhanced div[style*="width: 300px"] {
+    width: 200px !important;
+    max-width: 200px !important;
+    flex-shrink: 0 !important;
+  }
+
+  div.section-header-enhanced .lub-upload-btn {
+    height: 36px !important;
+    padding: 0 14px !important;
+    font-size: 0.75rem !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Middle 3 KPI Cards: Row 2, 3-column equal grid */
+  div.section-header-enhanced .lub-stats-grid-container {
+    order: 3 !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    margin-top: 2px !important;
+    box-sizing: border-box !important;
+  }
+
+  div.section-header-enhanced .stat-card {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    border-radius: 9999px !important;
+    padding: 7px 14px 7px 8px !important;
+    gap: 9px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  div.section-header-enhanced .stat-icon-wrapper {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 50% !important;
+    flex-shrink: 0 !important;
+  }
+
+  div.section-header-enhanced .stat-icon-wrapper svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  div.section-header-enhanced .lub-stat-value {
+    font-size: 1.05rem !important;
+    line-height: 1.1 !important;
+  }
+
+  div.section-header-enhanced .lub-stat-label {
+    font-size: 0.64rem !important;
+    white-space: nowrap !important;
+  }
+}
+
+/* --- 2. MOBILE PHONES (<= 600px) --- */
+@media (max-width: 600px) {
+  /* Full Row: Clean 3-Section Vertical Stack */
+  div.section-header-enhanced {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
+    margin-top: 10px !important;
+    margin-bottom: 16px !important;
+    padding: 0 2px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Section 1: Page Header Title Block */
+  div.section-header-enhanced .lub-header-title-block,
+  div.section-header-enhanced > div:first-child {
+    order: 1 !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    min-width: 0 !important;
+  }
+
+  div.section-header-enhanced .lub-header-badge-icon {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 8px !important;
+    flex-shrink: 0 !important;
+  }
+
+  div.section-header-enhanced .lub-header-badge-icon svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  div.section-header-enhanced h1.section-title-main {
+    font-size: 1.02rem !important;
+    line-height: 1.2 !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+  }
+
+  div.section-header-enhanced p.section-subtitle {
+    font-size: 0.68rem !important;
+    margin-top: 2px !important;
+    line-height: 1.25 !important;
+  }
+
+  /* Section 2: 3 KPI Cards Grid (Compact Stacked Tiles) */
+  div.section-header-enhanced .lub-stats-grid-container {
+    order: 2 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    box-sizing: border-box !important;
+  }
+
+  div.section-header-enhanced .stat-card {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    border-radius: 10px !important;
+    padding: 8px 4px !important;
+    gap: 4px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  div.section-header-enhanced .stat-icon-wrapper {
+    width: 26px !important;
+    height: 26px !important;
+    border-radius: 50% !important;
+    margin: 0 auto !important;
+  }
+
+  div.section-header-enhanced .stat-icon-wrapper svg {
+    width: 13px !important;
+    height: 13px !important;
+  }
+
+  div.section-header-enhanced .stat-text-column {
+    align-items: center !important;
+    text-align: center !important;
+    width: 100% !important;
+  }
+
+  div.section-header-enhanced .lub-stat-value {
+    font-size: 0.95rem !important;
+    line-height: 1.1 !important;
+    text-align: center !important;
+  }
+
+  div.section-header-enhanced .lub-stat-label {
+    font-size: 0.58rem !important;
+    letter-spacing: 0.02em !important;
+    text-align: center !important;
+    white-space: normal !important;
+    line-height: 1.15 !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+
+  /* Section 3: Action Toolbar (Owner Dropdown + Upload) */
+  div.section-header-enhanced .lub-header-actions-block,
+  div.section-header-enhanced > div:last-child {
+    order: 3 !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    box-sizing: border-box !important;
+  }
+
+  div.section-header-enhanced .lub-header-actions-inner,
+  div.section-header-enhanced > div:last-child > div {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    box-sizing: border-box !important;
+  }
+
+  div.section-header-enhanced .premium-owner-dropdown-root,
+  div.section-header-enhanced div[style*="width: 260px"],
+  div.section-header-enhanced div[style*="width: 300px"] {
+    flex: 1 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  div.section-header-enhanced .lub-upload-btn {
+    flex: 0 0 auto !important;
+    height: 36px !important;
+    padding: 0 12px !important;
+    font-size: 0.72rem !important;
+    gap: 6px !important;
+  }
+
+  div.section-header-enhanced .lub-upload-icon {
+    display: inline-flex !important;
+    width: 16px !important;
+    height: 16px !important;
+    visibility: visible !important;
+  }
+}
+
+/* --- 3. COMPACT MOBILE (< 440px) --- */
+@media (max-width: 440px) {
+  div.section-header-enhanced {
+    gap: 10px !important;
+  }
+
+  div.section-header-enhanced h1.section-title-main {
+    font-size: 0.95rem !important;
+  }
+
+  div.section-header-enhanced p.section-subtitle {
+    font-size: 0.65rem !important;
+  }
+
+  div.section-header-enhanced .stat-card {
+    padding: 6px 2px !important;
+    gap: 3px !important;
+  }
+
+  div.section-header-enhanced .lub-stat-value {
+    font-size: 0.9rem !important;
+  }
+
+  div.section-header-enhanced .lub-stat-label {
+    font-size: 0.54rem !important;
+  }
+
+  div.section-header-enhanced .lub-upload-btn {
+    padding: 0 8px !important;
+    font-size: 0.68rem !important;
+    gap: 4px !important;
+  }
+
+  div.section-header-enhanced .lub-upload-icon {
+    width: 14px !important;
+    height: 14px !important;
+  }
+}
+
+
+/* ============================================================
+   HIGH-RESOLUTION ENGINE: 2K (1900px to 2560px) & 4K (2560px+)
+   Proportional scaling for Page Header, KPI Cards, Matrix Table,
+   Status Icons, Vessel Columns & Footer Actions
+   ============================================================ */
+
+/* --- 1. BASE STYLES FOR OVERRIDABLE ELEMENTS (Default 1080p) --- */
+.matrix-corner-header-title {
+  font-size: 0.70rem;
+}
+.matrix-corner-header-subtitle {
+  font-size: 0.58rem;
+}
+.vessel-name-txt {
+  font-size: 0.84rem;
+}
+.m-code-label {
+  font-size: 0.78rem;
+}
+.m-desc-label {
+  font-size: 0.65rem;
+}
+.lub-shell-status-icon {
+  width: 20px;
+  height: 20px;
+}
+.lub-status-action-btn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.lub-status-action-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+.lub-status-action-icon {
+  width: 12px;
+  height: 12px;
+}
+.lub-footer-label-text {
+  font-size: 0.70rem;
+}
+.lub-footer-label-icon {
+  width: 13px;
+  height: 13px;
+}
+.lub-matrix-subtitle {
+  font-size: 0.72rem;
+}
+
+
+/* ============================================================
+   2K & 4K FLUID SCALING
+   Uses clamp() to proportionally scale all components between
+   1440px (reference design) and 2560px+.
+   5 vessel columns always. Content density mirrors 1440px exactly.
+   ============================================================ */
+
+/* ── 2K (1800px – 2560px) ─────────────────────────────────── */
+@media (min-width: 1800px) and (max-width: 2560px) {
+
+  /* Vessel column layout: 5 columns, 240px sticky */
+  :root, div.dashboard-container-enhanced {
+    --matrix-sticky-width: 240px;
+    --matrix-vessel-width: calc((100cqw - 240px) / 5);
+  }
+
+  /* ── Page Header ────────────────────────────────────────── */
+  div.dashboard-container-enhanced div.section-header-enhanced {
+    margin-top: clamp(12px, 0.83vw, 20px) !important;
+    margin-bottom: clamp(10px, 0.7vw, 16px) !important;
+    gap: clamp(14px, 1vw, 24px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .lub-header-badge-icon {
+    width: clamp(38px, 2.6vw, 48px) !important;
+    height: clamp(38px, 2.6vw, 48px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .lub-header-badge-icon svg {
+    width: clamp(18px, 1.3vw, 24px) !important;
+    height: clamp(18px, 1.3vw, 24px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced h1.section-title-main {
+    font-size: clamp(1.25rem, 1.25vw, 1.5rem) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced p.section-subtitle {
+    font-size: clamp(0.78rem, 0.65vw, 0.9rem) !important;
+  }
+
+  /* ── KPI Summary Cards ───────────────────────────────────── */
+  div.dashboard-container-enhanced div.section-header-enhanced .lub-stats-grid-container {
+    gap: clamp(10px, 0.8vw, 18px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .stat-card {
+    padding: clamp(6px, 0.45vw, 9px) clamp(16px, 1.3vw, 24px) clamp(6px, 0.45vw, 9px) clamp(8px, 0.65vw, 12px) !important;
+    gap: clamp(9px, 0.7vw, 14px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .stat-icon-wrapper {
+    width: clamp(30px, 2.2vw, 38px) !important;
+    height: clamp(30px, 2.2vw, 38px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .stat-icon-wrapper svg {
+    width: clamp(15px, 1.1vw, 19px) !important;
+    height: clamp(15px, 1.1vw, 19px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .lub-stat-value {
+    font-size: clamp(1.15rem, 1.1vw, 1.4rem) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .lub-stat-label {
+    font-size: clamp(0.68rem, 0.58vw, 0.8rem) !important;
+  }
+
+  /* ── Actions Toolbar ─────────────────────────────────────── */
+  div.dashboard-container-enhanced div.section-header-enhanced .lub-header-actions-inner {
+    gap: clamp(10px, 0.8vw, 16px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .lub-upload-btn,
+  div.dashboard-container-enhanced button.nav-pill-btn.active-nav-btn.lub-upload-btn {
+    height: clamp(36px, 2.5vw, 44px) !important;
+    padding: 0 clamp(16px, 1.4vw, 24px) !important;
+    font-size: clamp(0.84rem, 0.75vw, 0.95rem) !important;
+    gap: clamp(7px, 0.55vw, 10px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .lub-upload-icon,
+  div.dashboard-container-enhanced button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
+    width: clamp(14px, 1vw, 18px) !important;
+    height: clamp(14px, 1vw, 18px) !important;
+  }
+
+  /* ── Matrix Card Header ──────────────────────────────────── */
+  div.dashboard-container-enhanced .lub-matrix-card-header {
+    padding: clamp(10px, 0.75vw, 16px) clamp(18px, 1.4vw, 24px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-matrix-icon-box {
+    width: clamp(30px, 2.1vw, 38px) !important;
+    height: clamp(30px, 2.1vw, 38px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-matrix-icon-box svg,
+  div.dashboard-container-enhanced .matrix-droplet-icon {
+    width: clamp(15px, 1.05vw, 19px) !important;
+    height: clamp(15px, 1.05vw, 19px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-matrix-card-title {
+    font-size: clamp(1rem, 0.9vw, 1.2rem) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-matrix-subtitle {
+    font-size: clamp(0.72rem, 0.62vw, 0.85rem) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-vessel-select-btn {
+    height: clamp(36px, 2.5vw, 44px) !important;
+    font-size: clamp(0.84rem, 0.75vw, 0.95rem) !important;
+    padding: 0 clamp(14px, 1.1vw, 20px) !important;
+  }
+
+  /* ── Sticky Column (Machinery) ───────────────────────────── */
+  div.dashboard-container-enhanced th.matrix-corner-header,
+  div.dashboard-container-enhanced td.machinery-sticky-cell,
+  div.dashboard-container-enhanced td.lub-matrix-footer-label {
+    width: 240px !important;
+    min-width: 240px !important;
+    max-width: 240px !important;
+    padding: clamp(8px, 0.6vw, 12px) clamp(14px, 1.1vw, 20px) !important;
+  }
+
+  div.dashboard-container-enhanced .matrix-corner-header-title {
+    font-size: clamp(0.70rem, 0.6vw, 0.84rem) !important;
+    font-weight: 800 !important;
+  }
+
+  div.dashboard-container-enhanced .matrix-corner-header-subtitle {
+    font-size: clamp(0.58rem, 0.5vw, 0.70rem) !important;
+  }
+
+  div.dashboard-container-enhanced .m-code-label {
+    font-size: clamp(0.78rem, 0.68vw, 0.92rem) !important;
+    font-weight: 800 !important;
+  }
+
+  div.dashboard-container-enhanced .m-desc-label {
+    font-size: clamp(0.65rem, 0.56vw, 0.78rem) !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    margin-top: 2px !important;
+  }
+
+  /* ── Vessel Column Widths ────────────────────────────────── */
+  div.dashboard-container-enhanced th.vessel-header-cell,
+  div.dashboard-container-enhanced td.lub-data-cell,
+  div.dashboard-container-enhanced td.lub-matrix-footer-cell {
+    width: calc((100cqw - 240px) / 5) !important;
+    min-width: calc((100cqw - 240px) / 5) !important;
+    max-width: calc((100cqw - 240px) / 5) !important;
+  }
+
+  div.dashboard-container-enhanced th.vessel-header-cell {
+    padding: clamp(8px, 0.6vw, 12px) clamp(10px, 0.8vw, 16px) !important;
+  }
+
+  div.dashboard-container-enhanced .vessel-name-txt {
+    font-size: clamp(0.84rem, 0.75vw, 1rem) !important;
+    font-weight: 800 !important;
+  }
+
+  div.dashboard-container-enhanced .vessel-due-countdown-txt {
+    font-size: clamp(0.58rem, 0.5vw, 0.70rem) !important;
+    padding: clamp(2px, 0.18vw, 4px) clamp(8px, 0.6vw, 12px) !important;
+    margin-top: clamp(2px, 0.18vw, 4px) !important;
+    gap: 4px !important;
+  }
+
+  /* ── Data Cells ──────────────────────────────────────────── */
+  div.dashboard-container-enhanced td.lub-data-cell {
+    height: clamp(82px, 6.2vw, 100px) !important;
+    min-height: clamp(82px, 6.2vw, 100px) !important;
+    padding: clamp(6px, 0.5vw, 10px) clamp(8px, 0.65vw, 14px) !important;
+  }
+
+  div.dashboard-container-enhanced .cell-content-wrapper {
+    gap: clamp(4px, 0.35vw, 7px) !important;
+  }
+
+  /* Shell status icon: stays near 20px, barely scales */
+  div.dashboard-container-enhanced .lub-shell-status-icon {
+    width: clamp(18px, 1.4vw, 22px) !important;
+    height: clamp(18px, 1.4vw, 22px) !important;
+  }
+
+  /* File action button: stays compact */
+  div.dashboard-container-enhanced .lub-status-action-btn {
+    width: clamp(18px, 1.4vw, 22px) !important;
+    height: clamp(18px, 1.4vw, 22px) !important;
+    border-radius: 5px !important;
+  }
+
+  div.dashboard-container-enhanced .lub-status-action-icon,
+  div.dashboard-container-enhanced .lub-status-action-btn svg {
+    width: clamp(11px, 0.85vw, 13px) !important;
+    height: clamp(11px, 0.85vw, 13px) !important;
+  }
+
+  /* Due badge */
+  div.dashboard-container-enhanced .lub-status-due-badge {
+    font-size: clamp(0.60rem, 0.52vw, 0.72rem) !important;
+    gap: 3px !important;
+  }
+
+  div.dashboard-container-enhanced .lub-status-due-badge svg {
+    width: clamp(9px, 0.7vw, 11px) !important;
+    height: clamp(9px, 0.7vw, 11px) !important;
+  }
+
+  /* Missing label */
+  div.dashboard-container-enhanced .missing-label {
+    font-size: clamp(0.60rem, 0.52vw, 0.72rem) !important;
+    padding: clamp(2px, 0.18vw, 3.5px) clamp(6px, 0.5vw, 9px) !important;
+  }
+
+  /* N/A text */
+  div.dashboard-container-enhanced .na-text {
+    font-size: clamp(0.9rem, 0.8vw, 1.1rem) !important;
+  }
+
+  /* Cell drop upload button */
+  div.dashboard-container-enhanced .page-drop-btn {
+    width: clamp(18px, 1.4vw, 22px) !important;
+    height: clamp(18px, 1.4vw, 22px) !important;
+    bottom: 4px !important;
+    right: 4px !important;
+  }
+
+  div.dashboard-container-enhanced .page-drop-btn svg {
+    width: clamp(10px, 0.78vw, 13px) !important;
+    height: clamp(10px, 0.78vw, 13px) !important;
+  }
+
+  /* ── Sticky Footer ───────────────────────────────────────── */
+  div.dashboard-container-enhanced .lub-footer-label-text {
+    font-size: clamp(0.70rem, 0.6vw, 0.84rem) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-footer-label-icon {
+    width: clamp(13px, 1vw, 16px) !important;
+    height: clamp(13px, 1vw, 16px) !important;
+  }
+
+  div.dashboard-container-enhanced td.lub-matrix-footer-cell {
+    padding: clamp(7px, 0.55vw, 11px) clamp(10px, 0.8vw, 16px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-footer-select-btn {
+    height: clamp(32px, 2.3vw, 40px) !important;
+    padding: 0 clamp(14px, 1.1vw, 20px) !important;
+    font-size: clamp(0.78rem, 0.68vw, 0.9rem) !important;
+    gap: clamp(5px, 0.4vw, 8px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-footer-select-btn svg {
+    width: clamp(12px, 0.9vw, 15px) !important;
+    height: clamp(12px, 0.9vw, 15px) !important;
+  }
+}
+
+/* ── 4K (2560.02px+) ───────────────────────────────────────── */
+@media (min-width: 2560.02px) {
+
+  /* Vessel column layout: 5 columns, 280px sticky */
+  :root, div.dashboard-container-enhanced {
+    --matrix-sticky-width: 280px;
+    --matrix-vessel-width: calc((100cqw - 280px) / 5);
+  }
+
+  /* ── Page Header ────────────────────────────────────────── */
+  div.dashboard-container-enhanced div.section-header-enhanced {
+    margin-top: clamp(16px, 0.63vw, 22px) !important;
+    margin-bottom: clamp(12px, 0.47vw, 18px) !important;
+    gap: clamp(18px, 0.7vw, 28px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .lub-header-badge-icon {
+    width: clamp(44px, 1.7vw, 56px) !important;
+    height: clamp(44px, 1.7vw, 56px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .lub-header-badge-icon svg {
+    width: clamp(22px, 0.86vw, 28px) !important;
+    height: clamp(22px, 0.86vw, 28px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced h1.section-title-main {
+    font-size: clamp(1.4rem, 0.82vw, 1.75rem) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced p.section-subtitle {
+    font-size: clamp(0.86rem, 0.43vw, 1rem) !important;
+  }
+
+  /* ── KPI Summary Cards ───────────────────────────────────── */
+  div.dashboard-container-enhanced div.section-header-enhanced .lub-stats-grid-container {
+    gap: clamp(12px, 0.55vw, 20px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .stat-card {
+    padding: clamp(7px, 0.31vw, 10px) clamp(18px, 0.82vw, 26px) clamp(7px, 0.31vw, 10px) clamp(10px, 0.47vw, 14px) !important;
+    gap: clamp(10px, 0.47vw, 15px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .stat-icon-wrapper {
+    width: clamp(34px, 1.5vw, 44px) !important;
+    height: clamp(34px, 1.5vw, 44px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .stat-icon-wrapper svg {
+    width: clamp(17px, 0.74vw, 22px) !important;
+    height: clamp(17px, 0.74vw, 22px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .lub-stat-value {
+    font-size: clamp(1.25rem, 0.74vw, 1.6rem) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .lub-stat-label {
+    font-size: clamp(0.72rem, 0.39vw, 0.88rem) !important;
+  }
+
+  /* ── Actions Toolbar ─────────────────────────────────────── */
+  div.dashboard-container-enhanced div.section-header-enhanced .lub-upload-btn,
+  div.dashboard-container-enhanced button.nav-pill-btn.active-nav-btn.lub-upload-btn {
+    height: clamp(38px, 1.6vw, 48px) !important;
+    font-size: clamp(0.88rem, 0.51vw, 1.05rem) !important;
+    padding: 0 clamp(18px, 0.86vw, 28px) !important;
+  }
+
+  div.dashboard-container-enhanced div.section-header-enhanced .lub-upload-icon,
+  div.dashboard-container-enhanced button.nav-pill-btn.active-nav-btn.lub-upload-btn svg {
+    width: clamp(15px, 0.67vw, 19px) !important;
+    height: clamp(15px, 0.67vw, 19px) !important;
+  }
+
+  /* ── Matrix Card Header ──────────────────────────────────── */
+  div.dashboard-container-enhanced .lub-matrix-card-header {
+    padding: clamp(12px, 0.51vw, 18px) clamp(20px, 0.86vw, 28px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-matrix-icon-box {
+    width: clamp(32px, 1.4vw, 42px) !important;
+    height: clamp(32px, 1.4vw, 42px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-matrix-icon-box svg,
+  div.dashboard-container-enhanced .matrix-droplet-icon {
+    width: clamp(16px, 0.7vw, 21px) !important;
+    height: clamp(16px, 0.7vw, 21px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-matrix-card-title {
+    font-size: clamp(1.08rem, 0.59vw, 1.35rem) !important;
+  }
+
+  /* ── Sticky Column ───────────────────────────────────────── */
+  div.dashboard-container-enhanced th.matrix-corner-header,
+  div.dashboard-container-enhanced td.machinery-sticky-cell,
+  div.dashboard-container-enhanced td.lub-matrix-footer-label {
+    width: 280px !important;
+    min-width: 280px !important;
+    max-width: 280px !important;
+    padding: clamp(10px, 0.43vw, 14px) clamp(16px, 0.67vw, 22px) !important;
+  }
+
+  div.dashboard-container-enhanced .matrix-corner-header-title {
+    font-size: clamp(0.78rem, 0.43vw, 0.94rem) !important;
+    font-weight: 800 !important;
+  }
+
+  div.dashboard-container-enhanced .matrix-corner-header-subtitle {
+    font-size: clamp(0.64rem, 0.35vw, 0.78rem) !important;
+  }
+
+  div.dashboard-container-enhanced .m-code-label {
+    font-size: clamp(0.84rem, 0.47vw, 1rem) !important;
+    font-weight: 800 !important;
+  }
+
+  div.dashboard-container-enhanced .m-desc-label {
+    font-size: clamp(0.70rem, 0.39vw, 0.84rem) !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+
+  /* ── Vessel Column Widths ────────────────────────────────── */
+  div.dashboard-container-enhanced th.vessel-header-cell,
+  div.dashboard-container-enhanced td.lub-data-cell,
+  div.dashboard-container-enhanced td.lub-matrix-footer-cell {
+    width: calc((100cqw - 280px) / 5) !important;
+    min-width: calc((100cqw - 280px) / 5) !important;
+    max-width: calc((100cqw - 280px) / 5) !important;
+  }
+
+  div.dashboard-container-enhanced th.vessel-header-cell {
+    padding: clamp(10px, 0.43vw, 14px) clamp(12px, 0.51vw, 18px) !important;
+  }
+
+  div.dashboard-container-enhanced .vessel-name-txt {
+    font-size: clamp(0.9rem, 0.51vw, 1.1rem) !important;
+    font-weight: 800 !important;
+  }
+
+  div.dashboard-container-enhanced .vessel-due-countdown-txt {
+    font-size: clamp(0.62rem, 0.35vw, 0.76rem) !important;
+  }
+
+  /* ── Data Cells ──────────────────────────────────────────── */
+  div.dashboard-container-enhanced td.lub-data-cell {
+    height: clamp(90px, 4.1vw, 110px) !important;
+    min-height: clamp(90px, 4.1vw, 110px) !important;
+    padding: clamp(8px, 0.35vw, 12px) clamp(10px, 0.43vw, 16px) !important;
+  }
+
+  div.dashboard-container-enhanced .cell-content-wrapper {
+    gap: clamp(5px, 0.25vw, 8px) !important;
+  }
+
+  /* Shell status icon */
+  div.dashboard-container-enhanced .lub-shell-status-icon {
+    width: clamp(20px, 0.94vw, 24px) !important;
+    height: clamp(20px, 0.94vw, 24px) !important;
+  }
+
+  /* File action button */
+  div.dashboard-container-enhanced .lub-status-action-btn {
+    width: clamp(20px, 0.94vw, 24px) !important;
+    height: clamp(20px, 0.94vw, 24px) !important;
+    border-radius: 6px !important;
+  }
+
+  div.dashboard-container-enhanced .lub-status-action-icon,
+  div.dashboard-container-enhanced .lub-status-action-btn svg {
+    width: clamp(12px, 0.55vw, 14px) !important;
+    height: clamp(12px, 0.55vw, 14px) !important;
+  }
+
+  /* Due badge */
+  div.dashboard-container-enhanced .lub-status-due-badge {
+    font-size: clamp(0.64rem, 0.35vw, 0.78rem) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-status-due-badge svg {
+    width: clamp(10px, 0.47vw, 12px) !important;
+    height: clamp(10px, 0.47vw, 12px) !important;
+  }
+
+  /* Missing label */
+  div.dashboard-container-enhanced .missing-label {
+    font-size: clamp(0.64rem, 0.35vw, 0.78rem) !important;
+    padding: clamp(2.5px, 0.12vw, 4px) clamp(7px, 0.35vw, 10px) !important;
+  }
+
+  /* N/A text */
+  div.dashboard-container-enhanced .na-text {
+    font-size: clamp(0.96rem, 0.55vw, 1.15rem) !important;
+  }
+
+  /* Cell drop button */
+  div.dashboard-container-enhanced .page-drop-btn {
+    width: clamp(20px, 0.94vw, 24px) !important;
+    height: clamp(20px, 0.94vw, 24px) !important;
+    bottom: 5px !important;
+    right: 5px !important;
+  }
+
+  div.dashboard-container-enhanced .page-drop-btn svg {
+    width: clamp(11px, 0.51vw, 14px) !important;
+    height: clamp(11px, 0.51vw, 14px) !important;
+  }
+
+  /* ── Sticky Footer ───────────────────────────────────────── */
+  div.dashboard-container-enhanced .lub-footer-label-text {
+    font-size: clamp(0.76rem, 0.43vw, 0.92rem) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-footer-label-icon {
+    width: clamp(14px, 0.67vw, 18px) !important;
+    height: clamp(14px, 0.67vw, 18px) !important;
+  }
+
+  div.dashboard-container-enhanced td.lub-matrix-footer-cell {
+    padding: clamp(9px, 0.4vw, 13px) clamp(12px, 0.51vw, 18px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-footer-select-btn {
+    height: clamp(34px, 1.56vw, 42px) !important;
+    padding: 0 clamp(16px, 0.74vw, 22px) !important;
+    font-size: clamp(0.82rem, 0.47vw, 0.96rem) !important;
+    gap: clamp(6px, 0.31vw, 9px) !important;
+  }
+
+  div.dashboard-container-enhanced .lub-footer-select-btn svg {
+    width: clamp(13px, 0.59vw, 16px) !important;
+    height: clamp(13px, 0.59vw, 16px) !important;
+  }
 }

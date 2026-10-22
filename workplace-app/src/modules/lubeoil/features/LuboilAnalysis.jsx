@@ -532,6 +532,7 @@ const ShellStatusIcon = ({ status, size = 20 }) => {
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      className="lub-shell-status-icon"
       style={{
         display: "block",
         flexShrink: 0,
@@ -610,7 +611,7 @@ const PremiumOwnerDropdown = ({ selectedOwner, setSelectedOwner, ownersList, hei
   }, []);
 
   return (
-    <div ref={dropdownRef} style={{ position: "relative", width: "260px", flexShrink: 0, zIndex: 100 }}>
+    <div ref={dropdownRef} className="premium-owner-dropdown-root" style={{ position: "relative", width: "260px", flexShrink: 0, zIndex: 100 }}>
       <div 
         onClick={() => setIsOpen(!isOpen)}
         style={{
@@ -4463,9 +4464,8 @@ const LuboilAnalysis = () => {
                 }}
                 className="lub-status-action-btn"
                 title="View Reports & Trend Graph"
-                style={{ width: "20px", height: "20px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
               >
-                <FileText size={12} />
+                <FileText size={12} className="lub-status-action-icon" />
               </button>
             </div>
           )}
@@ -4732,8 +4732,9 @@ const LuboilAnalysis = () => {
           }}
         >
           {/* LEFT SIDE: Title and Subtitle with Premium Droplet Icon Badge */}
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div className="lub-header-title-block" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <div
+              className="lub-header-badge-icon"
               style={{
                 width: "44px",
                 height: "44px",
@@ -4838,7 +4839,7 @@ const LuboilAnalysis = () => {
           </div>
 
           {/* RIGHT SIDE: Grouped Actions (Bell, Feed, Upload) */}
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div className="lub-header-actions-block" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             {/* 1. NOTIFICATION BELL */}
             {/* <div style={{ position: "relative" }} ref={notifRef}>
             <button
@@ -5070,7 +5071,7 @@ const LuboilAnalysis = () => {
 
             {/* 3. UPLOAD BUTTON AREA — only for shore/admin, not vessel users */}
             {amIShore && (
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div className="lub-header-actions-inner" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 {/* --- PREMIUM OWNER DROPDOWN --- */}
                 <PremiumOwnerDropdown 
                   selectedOwner={selectedOwner}
@@ -5089,7 +5090,8 @@ const LuboilAnalysis = () => {
                   onChange={handleFileUpload}
                 />
                 <Button
-                  className="nav-pill-btn active-nav-btn"
+                  className="nav-pill-btn active-nav-btn lub-upload-btn"
+                  title="Upload Report (PDF)"
                   style={{
                     backgroundColor: "#2563eb",
                     color: "white",
@@ -5118,12 +5120,14 @@ const LuboilAnalysis = () => {
                   onClick={() => document.getElementById("luboil-upload").click()}
                   disabled={uploading}
                 >
-                  <Upload size={16} style={{ marginRight: "8px" }} />
-                  {uploading && uploadProgress.total > 0
-                    ? `${uploadProgress.current}/${uploadProgress.total} Processing...`
-                    : uploading
-                      ? "Processing..."
-                      : "Upload Report (PDF)"}
+                  <Upload size={16} className="lub-upload-icon" />
+                  <span className="lub-upload-btn-text">
+                    {uploading && uploadProgress.total > 0
+                      ? `${uploadProgress.current}/${uploadProgress.total} Processing...`
+                      : uploading
+                        ? "Processing..."
+                        : "Upload Report (PDF)"}
+                  </span>
                 </Button>
               </div>
               </div>
@@ -5385,8 +5389,8 @@ const LuboilAnalysis = () => {
                       Latest Report Matrix
                     </CardTitle>
                     <span
+                      className="lub-matrix-subtitle"
                       style={{
-                        fontSize: "0.72rem",
                         color: "#64748b",
                         fontWeight: 500,
                         display: "block",
@@ -5507,7 +5511,6 @@ const LuboilAnalysis = () => {
                               <span
                                 className="matrix-corner-header-title"
                                 style={{
-                                  fontSize: "0.70rem",
                                   fontWeight: 800,
                                   color: "#334155",
                                   letterSpacing: "0.04em",
@@ -5520,7 +5523,6 @@ const LuboilAnalysis = () => {
                               <span
                                 className="matrix-corner-header-subtitle"
                                 style={{
-                                  fontSize: "0.58rem",
                                   fontWeight: 600,
                                   color: "#64748b",
                                   letterSpacing: "0.03em",
@@ -5663,7 +5665,6 @@ const LuboilAnalysis = () => {
                                       width: "100%",
                                       display: "block",
                                       fontWeight: 800,
-                                      fontSize: "0.84rem",
                                       color: isFocused ? "#059669" : "#0f172a",
                                       letterSpacing: "-0.01em",
                                       lineHeight: 1.2,
@@ -5778,7 +5779,6 @@ const LuboilAnalysis = () => {
                                       className="m-code-label"
                                       style={{
                                         fontWeight: 800,
-                                        fontSize: "0.78rem",
                                         color: "#0f172a",
                                         letterSpacing: "-0.01em",
                                         lineHeight: 1.25,
@@ -5794,7 +5794,6 @@ const LuboilAnalysis = () => {
                                     <span 
                                       className="m-desc-label"
                                       style={{
-                                        fontSize: "0.65rem",
                                         fontWeight: 500,
                                         color: "#64748b",
                                         lineHeight: 1.2,
@@ -6034,9 +6033,9 @@ const LuboilAnalysis = () => {
                               verticalAlign: "middle",
                             }}
                           >
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              <FileText size={13} style={{ color: "#2563eb", flexShrink: 0 }} />
-                              <span style={{ fontSize: "0.70rem", fontWeight: 800, color: "#1e293b", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                            <div className="lub-matrix-footer-label-inner" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <FileText size={13} className="lub-footer-label-icon" style={{ color: "#2563eb", flexShrink: 0 }} />
+                              <span className="lub-footer-label-text" style={{ fontWeight: 800, color: "#1e293b", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                                 PDF REPORTS
                               </span>
                             </div>
