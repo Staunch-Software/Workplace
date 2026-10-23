@@ -1760,10 +1760,27 @@ async def _save_report(db: AsyncSession, data: dict):
 
         if existing:
             # We already have this exact Job Order in the DB. Update it.
-            old_blob_paths = {att.blob_path for att in existing.attachments}
+            # blob_path embeds the scrape date (reports/<imo>/<code>/<date>_<idx>_<name>),
+            # so it differs on every daily re-scrape of the same job order. Matching on
+            # it re-flagged the same files PENDING and re-emailed them daily. Match on
+            # file_name instead and carry over the existing email status, so only
+            # genuinely new files get emailed.
+            # Only COMPLETED jobs are emailed; pending-job files are not.
+            is_completed = data.get("job_status") == "COMPLETED"
+            old_status_by_name = {att.file_name: att.email_status for att in existing.attachments}
             existing.attachments.clear()
             for att in data.get("attachments", []):
-                email_status = EmailStatus.PENDING if is_target_vessel and att["blob_path"] not in old_blob_paths else EmailStatus.NOT_REQUIRED
+                old = old_status_by_name.get(att["file_name"])
+                if old is not None and old != EmailStatus.NOT_REQUIRED.value and old != EmailStatus.NOT_REQUIRED:
+                    email_status = old  # already queued/sent/failed: keep
+                elif is_target_vessel and is_completed and (
+                        old is None or existing.job_status != "COMPLETED"):
+                    # new file, or the job just flipped PENDING -> COMPLETED
+                    email_status = EmailStatus.PENDING
+                else:
+                    email_status = EmailStatus.NOT_REQUIRED
+                if att["blob_path"].startswith("MISSING:"):
+                    email_status = EmailStatus.NOT_REQUIRED
                 existing.attachments.append(ReportAttachment(
                     id=uuid4(),
                     file_name=att["file_name"],
@@ -1824,7 +1841,7 @@ async def _save_report(db: AsyncSession, data: dict):
             )
             
             for att in data.get("attachments", []):
-                email_status = EmailStatus.PENDING if is_target_vessel else EmailStatus.NOT_REQUIRED
+                email_status = EmailStatus.PENDING if is_target_vessel and data.get("job_status") == "COMPLETED" and not att["blob_path"].startswith("MISSING:") else EmailStatus.NOT_REQUIRED
                 new_report.attachments.append(ReportAttachment(
                     id=uuid4(),
                     file_name=att["file_name"],
