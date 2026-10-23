@@ -136,7 +136,7 @@ function App() {
 
           {/* ── ORB MODULE (Oil Record Book) ─────────────────── */}
           <Route path="/orb/*" element={
-            <ProtectedRoute allowedRoles={['SHORE', 'ADMIN']}>
+            <ProtectedRoute allowedRoles={['SHORE', 'ADMIN', 'VESSEL']}>
               <Suspense fallback={<ModuleLoader label="Loading ORB..." />}>
                 <OrbModule />
               </Suspense>

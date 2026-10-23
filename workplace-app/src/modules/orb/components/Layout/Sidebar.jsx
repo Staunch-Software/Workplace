@@ -3,26 +3,33 @@ import { NavLink, useNavigate as useRouterNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebar } from '../../context/SidebarContext';
 import {
-  LayoutDashboard, Ship, Upload, FileText, Bell,
-  BookOpen, Settings, ArrowLeft,
+  LayoutDashboard, Upload, FileText, Bell,
+  BookOpen, ArrowLeft,
 } from 'lucide-react';
 import api from '../../api/axiosOrb';
+import { useOrbBase } from '../../hooks/useOrbNavigate';
 
-const MAIN_LINKS = [
+// Shore View and Vessel View each get their own menu. Vessel Config is not here: it lives in the
+// profile menu (admin only), as in the Lube Oil module.
+const SHORE_LINKS = [
   { to: '/dashboard',  label: 'Dashboard',   Icon: LayoutDashboard },
-  { to: '/vessels',    label: 'Vessels',      Icon: Ship },
   { to: '/uploads',    label: 'ORB Uploads',  Icon: Upload },
   { to: '/entries',    label: 'ORB Entries',  Icon: FileText },
   { to: '/alerts',     label: 'Alerts',       Icon: Bell },
   { to: '/daily-log',  label: 'Daily Log',    Icon: BookOpen },
 ];
 
-const ADMIN_LINKS = [
-  { to: '/admin/vessels', label: 'Vessel Config',   Icon: Settings },
+const VESSEL_LINKS = [
+  { to: '/dashboard',  label: 'Dashboard',   Icon: LayoutDashboard },
+  { to: '/entries',    label: 'ORB Entries',  Icon: FileText },
+  { to: '/alerts',     label: 'Alerts',       Icon: Bell },
+  { to: '/daily-log',  label: 'Daily Log',    Icon: BookOpen },
 ];
 
 export default function Sidebar() {
-  const { isAdmin } = useAuth();
+  const { isVessel } = useAuth();
+  const base = useOrbBase();
+  const MAIN_LINKS = isVessel ? VESSEL_LINKS : SHORE_LINKS;
   const goToWorkplace = useRouterNavigate();
   const { isOpen, close } = useSidebar();
   const [alertCount, setAlertCount] = useState(0);
@@ -57,11 +64,11 @@ export default function Sidebar() {
           </div>
         </div>
         <nav className="sidebar-nav">
-          <div className="sidebar-section">Main</div>
+          <div className="sidebar-section">{isVessel ? 'Vessel' : 'Shore'}</div>
           {MAIN_LINKS.map(({ to, label, Icon }) => (
             <NavLink
               key={to}
-              to={`/orb${to}`}
+              to={`${base}${to}`}
               className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
               onClick={close}
             >
@@ -75,22 +82,6 @@ export default function Sidebar() {
             </NavLink>
           ))}
 
-          {isAdmin && (
-            <>
-              <div className="sidebar-section sidebar-section--admin">Admin</div>
-              {ADMIN_LINKS.map(({ to, label, Icon }) => (
-                <NavLink
-                  key={to}
-                  to={`/orb${to}`}
-                  className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-                  onClick={close}
-                >
-                  <Icon size={18} className="sidebar-icon" />
-                  {label}
-                </NavLink>
-              ))}
-            </>
-          )}
         </nav>
         <nav className="sidebar-nav" style={{ flex: 'none', paddingTop: 0 }}>
           <button type="button" className="sidebar-link" onClick={() => goToWorkplace('/dashboard')} style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left' }}>

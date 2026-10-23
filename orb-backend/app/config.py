@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     AZURE_STORAGE_CONTAINER: str = "iopp-documents"
     # Separate container for original ORB upload PDFs (preview feature).
     AZURE_STORAGE_ORB_CONTAINER: str = "orb-uploads"
+    # Container for files attached to alert chat messages (falls back to UPLOAD_DIR/chat when Azure is not configured).
+    AZURE_STORAGE_ORB_CHAT_CONTAINER: str = "orb-chat"
+    # Largest file accepted as an alert chat attachment, enforced on the server.
+    MAX_CHAT_ATTACHMENT_MB: int = 10
 
     # ── WNI Fuel Scraper (Check 7 support) ─────────────────────────────────
     # Separate, standalone scraper — see app/scrapers/wni_fuel_scraper.py.

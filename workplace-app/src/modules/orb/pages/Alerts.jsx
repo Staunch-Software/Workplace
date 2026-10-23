@@ -1,11 +1,14 @@
-import { Fragment, useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
-  ShieldAlert, AlertTriangle, AlertCircle, Eye, RefreshCw, Check, FileText, BellOff, Filter,
+  ShieldAlert, AlertTriangle, AlertCircle, Eye, RefreshCw, Check, BellOff, Filter, MessageSquare,
 } from 'lucide-react';
 import Sidebar from '../components/Layout/Sidebar';
 import Header from '../components/Layout/Header';
 import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
+import AlertModal from '../components/alerts/AlertModal';
+import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import Dropdown from '../components/shared/Dropdown';
 import MultiSelectDropdown from '../components/shared/MultiSelectDropdown';
@@ -38,6 +41,9 @@ const ALERT_TYPES = [
   'erasure_detected',                // 12 Observation
   'item_number_missing',             // 14 Minor  — a line's item number (e.g. 11.2) not written
   'item_value_missing',              // 14 Major  — nothing recorded for an item (e.g. capacity)
+  'capacity_reading_mismatch',
+  'bunker_quantity_mismatch',
+  'gap_between_entries',
   'reading_needs_review',            // Observation — figure looks wrong but the entry is uncertain
 ];
 
@@ -49,19 +55,9 @@ export default function Alerts() {
   const [filters, setFilters] = useState({ vessel_id: [], severity: '', is_resolved: '', alert_type: '' });
   const [resolving, setResolving] = useState(null);
   const [recalculating, setRecalculating] = useState(false);
-  const [expandedId, setExpandedId] = useState(null);
-  const [entryCache, setEntryCache] = useState({}); // entry_id -> EntryResponse
-  const [entryLoading, setEntryLoading] = useState(null); // entry_id currently fetching
-  const expandedRowRef = useRef(null);
-
-  // Auto-scroll the expanded "Source ORB Entry" panel into view — it can render
-  // below the fold (especially for the 3rd+ row), and once the entry data loads
-  // the panel grows taller, so re-run after loading finishes too.
-  useEffect(() => {
-    if (expandedId && expandedRowRef.current) {
-      expandedRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  }, [expandedId, entryLoading]);
+  const [selected, setSelected] = useState(null);   // alert open in the popup
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user, isShore } = useAuth();
 
   useEffect(() => { api.get('/api/vessels').then(r => setVessels(r.data.data || [])); }, []);
 
@@ -84,26 +80,22 @@ export default function Alerts() {
 
   useEffect(() => { load(); }, []);
 
+  // Opened from a notification or the activity feed: /alerts?alert=<id>
+  const linkedAlertId = searchParams.get('alert');
+  useEffect(() => {
+    if (!linkedAlertId) return;
+    api.get(`/api/alerts/${linkedAlertId}`)
+      .then(r => setSelected(r.data.data))
+      .catch(() => {})
+      .finally(() => setSearchParams({}, { replace: true }));
+  }, [linkedAlertId]);
+
   const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
   const handleSeverityClick = (s) => {
     const newSeverity = filters.severity === s ? '' : s;
     setFilters(f => ({ ...f, severity: newSeverity }));
     load({ severity: newSeverity });
-  };
-
-  const toggleExpand = async (alert) => {
-    if (expandedId === alert.id) { setExpandedId(null); return; }
-    setExpandedId(alert.id);
-    if (alert.entry_id && !entryCache[alert.entry_id]) {
-      setEntryLoading(alert.entry_id);
-      try {
-        const r = await api.get(`/api/entries/${alert.entry_id}`);
-        setEntryCache(c => ({ ...c, [alert.entry_id]: r.data.data }));
-      } finally {
-        setEntryLoading(null);
-      }
-    }
   };
 
   const handleResolve = async () => {
@@ -199,7 +191,7 @@ export default function Alerts() {
                 </div>
                 <div className="al-filters__actions">
                   <button className="al-btn al-btn--primary" onClick={load}>Apply</button>
-                  <button
+                  {isShore && <button
                     className="al-btn al-btn--secondary"
                     onClick={handleRecalculate}
                     disabled={filters.vessel_id.length !== 1 || recalculating}
@@ -207,7 +199,7 @@ export default function Alerts() {
                   >
                     <RefreshCw size={15} className={recalculating ? 'al-spin' : ''} />
                     {recalculating ? 'Recalculating…' : 'Recalculate Alerts'}
-                  </button>
+                  </button>}
                 </div>
               </div>
             </div>
@@ -234,18 +226,24 @@ export default function Alerts() {
                           </td>
                         </tr>
                       ) : alerts.map(a => {
-                        const expanded = expandedId === a.id;
-                        const entry = a.entry_id ? entryCache[a.entry_id] : null;
                         return (
-                          <Fragment key={a.id}>
                             <tr
-                              onClick={() => toggleExpand(a)}
-                              className={`al-row al-row--${a.severity}${expanded ? ' al-row--open' : ''}${a.is_resolved ? ' al-row--resolved' : ''}`}
+                              key={a.id}
+                              onClick={() => setSelected(a)}
+                              className={`al-row al-row--${a.severity}${a.is_resolved ? ' al-row--resolved' : ''}`}
+                              title="Open alert"
                             >
                               <td data-label="Severity" className="al-td-sev"><Badge value={a.severity} /></td>
                               <td data-label="Vessel" className="al-vessel">{vessels.find(v => v.id === a.vessel_id)?.name || '—'}</td>
                               <td data-label="Type"><span className="al-type">{a.alert_type.replace(/_/g, ' ')}</span></td>
-                              <td data-label="Message" className="al-msg"><span className="al-msg__text">{a.message}</span></td>
+                              <td data-label="Message" className="al-msg">
+                                <span className="al-msg__text">{a.message}</span>
+                                {a.thread_count > 0 && (
+                                  <span className={`al-chat${a.unread_count > 0 ? ' al-chat--new' : ''}`}>
+                                    <MessageSquare size={12} /> {a.thread_count}{a.unread_count > 0 ? ` · ${a.unread_count} new` : ''}
+                                  </span>
+                                )}
+                              </td>
                               <td data-label="Page" className="al-center al-muted">{a.page_number ?? '—'}</td>
                               <td data-label="Created" className="al-muted">
                                 {new Date(a.created_at).toLocaleDateString()}
@@ -264,82 +262,30 @@ export default function Alerts() {
                               </td>
                               <td data-label="Status"><Badge value={a.is_resolved ? 'Resolved' : 'Open'} type={a.is_resolved ? 'completed' : 'pending'} /></td>
                               <td className="al-td-actions">
-                                {!a.is_resolved && (
+                                {isShore && !a.is_resolved && (
                                   <button className="al-btn al-btn--ghost al-btn--sm" onClick={(e) => { e.stopPropagation(); setResolving(a.id); }}>
                                     <Check size={14} /> Resolve
                                   </button>
                                 )}
                               </td>
                             </tr>
-                            {expanded && (
-                              <tr key={`${a.id}-exp`} ref={expandedRowRef} className="al-exprow">
-                                <td colSpan={8}>
-                                  <div className="al-detail">
-                                    {!a.entry_id ? (
-                                      <span className="al-muted">
-                                        No specific entry — this is a vessel-level aggregate alert.
-                                      </span>
-                                    ) : entryLoading === a.entry_id ? (
-                                      <LoadingSpinner />
-                                    ) : !entry ? (
-                                      <span className="al-muted">Source entry not found.</span>
-                                    ) : (
-                                      <>
-                                        <div className="al-detail__title"><FileText size={15} /> Source ORB Entry</div>
-                                        <div className="al-detail__grid">
-                                          <div><span className="al-k">Date:</span> {entry.entry_date}</div>
-                                          <div><span className="al-k">Code:</span> <strong>{entry.orb_code}</strong></div>
-                                          <div><span className="al-k">Item:</span> {entry.item_number || '—'}</div>
-                                          <div><span className="al-k">Tank/Location:</span> {entry.tank_location || '—'}</div>
-                                          <div className="al-detail__wide"><span className="al-k">Operation:</span> {entry.operation_description}</div>
-                                          {entry.item_lines?.length > 0 && (
-                                            <div className="al-detail__wide">
-                                              <span className="al-k">Lines as written:</span>
-                                              {entry.item_lines.map((l, i) => (
-                                                <div key={i} className="en-mono">
-                                                  <strong style={l.item ? undefined : { color: '#c00000' }}>{l.item || '(blank)'}</strong> {l.text}
-                                                </div>
-                                              ))}
-                                            </div>
-                                          )}
-                                          <div><span className="al-k">Officer 1:</span> {entry.officer_1_name || '—'} {entry.officer_1_rank ? `(${entry.officer_1_rank})` : ''}</div>
-                                          <div><span className="al-k">Officer 2:</span> {entry.officer_2_name || '—'} {entry.officer_2_rank ? `(${entry.officer_2_rank})` : ''}</div>
-                                          <div><span className="al-k">Confidence:</span> {entry.confidence_score != null ? `${(entry.confidence_score * 100).toFixed(0)}%` : '—'}</div>
-                                        </div>
-                                        <div className="al-detail__qty">
-                                          <div className="al-detail__title">Quantities</div>
-                                          {entry.quantities?.length ? (
-                                            <div className="al-qty-wrap">
-                                              <table className="al-qty">
-                                                <thead><tr><th>Type</th><th>Value</th><th>Unit</th><th>From</th><th>To</th></tr></thead>
-                                                <tbody>
-                                                  {entry.quantities.map(q => (
-                                                    <tr key={q.id}>
-                                                      <td>{q.qty_type}</td>
-                                                      <td>{q.qty_value}</td>
-                                                      <td>{q.qty_unit}</td>
-                                                      <td>{q.from_tank || '—'}</td>
-                                                      <td>{q.to_tank || '—'}</td>
-                                                    </tr>
-                                                  ))}
-                                                </tbody>
-                                              </table>
-                                            </div>
-                                          ) : <span className="al-muted"> None</span>}
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </Fragment>
                         );
                       })}
                     </tbody>
                   </table>
                 </div>
               </div>
+            )}
+
+            {selected && (
+              <AlertModal
+                alert={selected}
+                vesselName={vessels.find(v => v.id === selected.vessel_id)?.name}
+                isShore={isShore}
+                currentUserId={user?.id}
+                onClose={() => { setSelected(null); load(); }}
+                onChanged={() => load()}
+              />
             )}
 
             {resolving && (

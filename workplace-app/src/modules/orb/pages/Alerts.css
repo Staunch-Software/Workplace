@@ -222,3 +222,8 @@
   .orb-root .al-filters__grid { grid-template-columns: 1fr; }
   .orb-root .al .modal-footer .al-btn { flex: 1; }
 }
+
+/* chat badge on an alert row */
+.orb-root .al-chat { display: inline-flex; align-items: center; gap: 0.25rem; margin-left: 0.5rem; font-size: 0.72rem; color: #7a7066; background: #F3EBE2; border-radius: 999px; padding: 0 0.45rem; white-space: nowrap; vertical-align: middle; }
+.orb-root .al-chat--new { background: #FFE9D3; color: #A34509; font-weight: 700; }
+.orb-root .al-row { cursor: pointer; }

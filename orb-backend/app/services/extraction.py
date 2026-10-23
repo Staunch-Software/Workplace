@@ -1088,6 +1088,24 @@ class FailedPages(list):
     def __init__(self, *args):
         super().__init__(*args)
         self.reasons: dict[int, str] = {}
+        # How the raw PDF pages were split (see _page_map_from_manifest); carried out of the
+        # extractor with the result so run_extraction can store it on the upload.
+        self.page_map: list | None = None
+
+
+def _page_map_from_manifest(manifest: list | None) -> list | None:
+    """[{"raw_page": 7, "path": "stacked_split", "outputs": 2}, ...] from the split manifest.
+
+    An entry's page_number counts the pages AFTER splitting; this is what maps it back to the
+    page of the uploaded PDF (services/alert_pages.py)."""
+    if not manifest:
+        return None
+    out = []
+    for m in manifest:
+        path = m.get("path")
+        outputs = m.get("output_count") or (2 if path == "stacked_split" else 1)
+        out.append({"raw_page": m.get("raw_page_index"), "path": path, "outputs": int(outputs)})
+    return out
 
 
 def _is_billing_error(exc: Exception) -> bool:
@@ -2009,7 +2027,7 @@ async def extract_with_gemini(
         if detected_name and not _vessel_names_plausibly_match(detected_name, expected_vessel_name):
             raise VesselMismatchError(detected_name, expected_vessel_name)
 
-    split_manifest: list = [] if debug_dir is not None else None
+    split_manifest: list = []        # always kept: it is what maps entry pages back to PDF pages
     pages = await _split_pages_for_gemini(pages, client, split_manifest=split_manifest)
     if debug_dir is not None:
         import json as _json_debug
@@ -2063,6 +2081,7 @@ async def extract_with_gemini(
 
     all_entries = []
     failed_pages = FailedPages()
+    failed_pages.page_map = _page_map_from_manifest(split_manifest)
     # Running per-rank tally of confidently-read officer names, built up as
     # pages are processed in order and fed to each subsequent page's call as
     # a spelling-reference hint (see OFFICER NAME CONSISTENCY in the prompt
@@ -4032,6 +4051,25 @@ async def _save_raw_extraction(session_factory, upload_id, entries_data, failed_
         logger.exception("Could not save the raw extraction of upload %s", upload_id)
 
 
+async def _notify_upload_done(db, upload, entry_count: int, failed: bool = False, error: str = "") -> None:
+    """Bell + feed for a finished or failed upload. Never raises: it must not affect the upload itself."""
+    try:
+        from app.models.vessel import Vessel
+        from app.services import orb_notify
+        from app.services.report_alerts import alerts_for_upload
+        vessel = (await db.execute(sa_select(Vessel).where(Vessel.id == upload.vessel_id))).scalar_one_or_none()
+        counts: dict = {}
+        if not failed:
+            entries = (await db.execute(sa_select(OrbEntry).where(OrbEntry.upload_id == upload.id))).scalars().all()
+            for a in await alerts_for_upload(db, upload, list(entries)):
+                if not a.is_resolved:
+                    counts[a.severity] = counts.get(a.severity, 0) + 1
+        await orb_notify.on_upload_finished(db, upload=upload, vessel_name=vessel.name if vessel else "",
+                                            entries=entry_count, alert_counts=counts, failed=failed, error=error)
+    except Exception:
+        logger.exception("Could not send the finish notification of upload %s", getattr(upload, "id", None))
+
+
 async def _load_raw_extraction(session_factory, upload_id):
     """(entries, FailedPages) saved for this upload, or None."""
     async with session_factory() as s:
@@ -4127,6 +4165,9 @@ async def run_extraction(
             if not use_saved:
                 # Before ANY post-processing: this is the expensive part, keep it.
                 await _save_raw_extraction(session_factory, upload_id, entries_data, failed_pages, usage.summary())
+                page_map = getattr(failed_pages, "page_map", None)
+                if page_map:
+                    upload.page_map = page_map
 
             entries_data = _merge_split_entries(entries_data)
             entries_data = reattach_split_blocks(entries_data)
@@ -4553,6 +4594,8 @@ async def run_extraction(
             upload.updated_at = datetime.now(timezone.utc)
             await db.commit()
             if entry_count == 0:
+                if upload.status == "failed":
+                    await _notify_upload_done(db, upload, 0, failed=True, error=upload.error_message or "")
                 return
 
             # Run compliance checks
@@ -4561,6 +4604,8 @@ async def run_extraction(
                 await run_all_checks(vessel_id, upload_id, db)
             except Exception as e:
                 logger.error(f"Calculations failed: {e}")
+
+            await _notify_upload_done(db, upload, entry_count)
 
         except Exception as e:
             logger.error(f"Extraction failed for upload {upload_id}: {e}")
@@ -4576,5 +4621,6 @@ async def run_extraction(
                         failed_upload.error_message = f"Extraction failed: {str(e)[:400]}"
                         failed_upload.updated_at = datetime.now(timezone.utc)
                         await fresh.commit()
+                        await _notify_upload_done(fresh, failed_upload, 0, failed=True, error=str(e))
             except Exception:
                 logger.exception("Could not record the failure of upload %s", upload_id)

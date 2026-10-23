@@ -27,7 +27,7 @@ async def list_entries(
     db: AsyncSession = Depends(get_db),
     user: ControlUser = Depends(get_current_user),
 ):
-    q = select(OrbEntry).order_by(OrbEntry.entry_date.desc())
+    q = select(OrbEntry).order_by(OrbEntry.entry_date.desc(), OrbEntry.page_number.desc().nulls_last(), OrbEntry.created_at.desc())
     scoped = scope_vessel_ids(vessel_id, await allowed_vessel_ids(user, db))
     if scoped is not None:
         q = q.where(OrbEntry.vessel_id.in_(scoped))

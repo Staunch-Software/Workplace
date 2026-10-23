@@ -236,3 +236,6 @@
   .orb-root .db-sev__row { grid-template-columns: 76px minmax(0, 1fr) 26px; gap: 0.5rem; }
   .orb-root .db-list__date { display: none; }
 }
+
+/* Vessel View: a single card instead of the alerts + uploads pair */
+.orb-root .db-grid--single { grid-template-columns: minmax(0, 1fr); }

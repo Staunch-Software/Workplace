@@ -12,7 +12,11 @@ from app.models.orb_upload import OrbUpload
 from app.models.control_user import ControlUser
 from app.schemas.orb_alert import AlertResponse, ResolveRequest, AlertSummary
 from app.schemas.common import success
-from app.dependencies import get_current_user, allowed_vessel_ids, scope_vessel_ids, assert_vessel_access
+from app.dependencies import get_current_user, require_shore, allowed_vessel_ids, scope_vessel_ids, assert_vessel_access
+from app.models.orb_alert_thread import OrbAlertThread
+from app.services.alert_chat import thread_stats
+from app.services import orb_notify
+from app.models.vessel import Vessel
 from app.services.calculations import run_all_checks
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
@@ -54,7 +58,7 @@ async def list_alerts(
     user: ControlUser = Depends(get_current_user),
 ):
     q = (
-        select(OrbAlert, OrbEntry.page_number)
+        select(OrbAlert, OrbEntry.page_number, OrbEntry.upload_id)
         .outerjoin(OrbEntry, OrbAlert.entry_id == OrbEntry.id)
         .order_by(OrbAlert.created_at.desc())
     )
@@ -70,10 +74,13 @@ async def list_alerts(
 
     result = await db.execute(q)
     rows = result.all()
+    stats = await thread_stats(db, user, [a.id for a, _, _ in rows])
     data = []
-    for alert, page_number in rows:
+    for alert, page_number, upload_id in rows:
         d = AlertResponse.model_validate(alert).model_dump()
         d["page_number"] = page_number
+        d["upload_id"] = upload_id
+        d["thread_count"], d["unread_count"] = stats.get(alert.id, (0, 0))
         data.append(d)
     return success(data=data)
 
@@ -85,17 +92,20 @@ async def get_alert(
     user: ControlUser = Depends(get_current_user),
 ):
     result = await db.execute(
-        select(OrbAlert, OrbEntry.page_number)
+        select(OrbAlert, OrbEntry.page_number, OrbEntry.upload_id)
         .outerjoin(OrbEntry, OrbAlert.entry_id == OrbEntry.id)
         .where(OrbAlert.id == alert_id)
     )
     row = result.first()
     if not row:
         raise HTTPException(status_code=404, detail="Alert not found")
-    alert, page_number = row
+    alert, page_number, upload_id = row
     await assert_vessel_access(user, db, alert.vessel_id)
+    stats = await thread_stats(db, user, [alert.id])
     d = AlertResponse.model_validate(alert).model_dump()
     d["page_number"] = page_number
+    d["upload_id"] = upload_id
+    d["thread_count"], d["unread_count"] = stats.get(alert.id, (0, 0))
     return success(data=d)
 
 
@@ -103,15 +113,19 @@ async def get_alert(
 async def recalculate_alerts(
     vessel_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: ControlUser = Depends(get_current_user),
+    current_user: ControlUser = Depends(require_shore),
 ):
-    """Delete all unresolved alerts for a vessel and rerun all compliance checks."""
+    """Delete the unresolved alerts of a vessel that have no chat and rerun all compliance checks.
+
+    An alert with messages is kept (the checks do not create a second copy of it), so a recalculation
+    never throws away a conversation."""
     await assert_vessel_access(current_user, db, vessel_id)
     # 1. Delete all unresolved alerts for the vessel
     deleted = await db.execute(
         delete(OrbAlert).where(
             OrbAlert.vessel_id == vessel_id,
             OrbAlert.is_resolved == False,
+            OrbAlert.id.not_in(select(OrbAlertThread.alert_id)),
         )
     )
     await db.flush()
@@ -136,7 +150,7 @@ async def resolve_alert(
     alert_id: uuid.UUID,
     body: ResolveRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: ControlUser = Depends(get_current_user),
+    current_user: ControlUser = Depends(require_shore),
 ):
     result = await db.execute(select(OrbAlert).where(OrbAlert.id == alert_id))
     alert = result.scalar_one_or_none()
@@ -151,4 +165,6 @@ async def resolve_alert(
     alert.resolved_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(alert)
+    vessel = (await db.execute(select(Vessel).where(Vessel.id == alert.vessel_id))).scalar_one()
+    await orb_notify.on_alert_resolved(db, alert=alert, vessel=vessel, actor=current_user)
     return success(data=AlertResponse.model_validate(alert).model_dump(), message="Alert resolved")

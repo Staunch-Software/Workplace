@@ -28,7 +28,7 @@ async def get_current_user(
     control_db: AsyncSession = Depends(get_control_db),
 ) -> ControlUser:
     """Decode the workplace JWT, load the user from the control DB and require
-    ORB access: ADMIN, or SHORE with the `orb` permission switched on."""
+    ORB access: ADMIN, or SHORE / VESSEL with the `orb` permission switched on."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -49,7 +49,7 @@ async def get_current_user(
         raise credentials_exception
 
     permissions = user.permissions or {}
-    has_access = user.role == "ADMIN" or (user.role == "SHORE" and permissions.get(ORB_PERMISSION_KEY) is True)
+    has_access = user.role == "ADMIN" or (user.role in ("SHORE", "VESSEL") and permissions.get(ORB_PERMISSION_KEY) is True)
     if not has_access:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ORB module access not granted")
 
@@ -71,8 +71,19 @@ async def require_admin(current_user: ControlUser = Depends(get_current_user)) -
     return current_user
 
 
+async def require_shore(current_user: ControlUser = Depends(get_current_user)) -> ControlUser:
+    """Shore-side routes (uploads, resolving alerts). Vessel users get Vessel View only."""
+    if current_user.role not in ("ADMIN", "SHORE"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Shore access required")
+    return current_user
+
+
+def is_shore(user: ControlUser) -> bool:
+    return user.role in ("ADMIN", "SHORE")
+
+
 # ── Vessel scoping ───────────────────────────────────────────────────────────
-# ADMIN sees every vessel; SHORE only the vessels assigned to them in the
+# ADMIN sees every vessel; SHORE and VESSEL users only the vessels assigned to them in the
 # control database. ORB's own `vessels` table is matched to those by IMO.
 
 async def allowed_vessel_ids(user: ControlUser, db: AsyncSession) -> Optional[List[uuid.UUID]]:

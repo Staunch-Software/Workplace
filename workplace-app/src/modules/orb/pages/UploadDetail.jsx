@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useNavigate } from '../hooks/useOrbNavigate';
-import { RefreshCw, FileText, FileSpreadsheet, Download, Ship, User, CalendarClock, ListChecks, Layers, Copy, AlertTriangle, CheckCircle2, XCircle, Table2, ClipboardList, Anchor } from 'lucide-react';
+import { MessageSquare, RefreshCw, FileText, FileSpreadsheet, Download, Ship, User, CalendarClock, ListChecks, Layers, Copy, AlertTriangle, CheckCircle2, XCircle, Table2, ClipboardList, Anchor } from 'lucide-react';
 import Sidebar from '../components/Layout/Sidebar';
 import Header from '../components/Layout/Header';
 import Badge from '../components/shared/Badge';
@@ -9,6 +9,8 @@ import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import api from '../api/axiosOrb';
 import { useAuth } from '../context/AuthContext';
+import AlertModal from '../components/alerts/AlertModal';
+import SourceEntryDetail from '../components/alerts/SourceEntryDetail';
 import './UploadDetail.css';
 
 const TABS = ['Entries', 'Alerts', 'Daily Log'];
@@ -61,11 +63,13 @@ export default function UploadDetail() {
   const [logLoading, setLogLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('Entries');
   const [preview, setPreview] = useState(null); // { url, loading }
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
+  const [openAlertId, setOpenAlertId] = useState(null);   // alert whose Source ORB Entry is expanded
+  const [modalAlert, setModalAlert] = useState(null);     // alert open in the popup
   const [reprocessing, setReprocessing] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
       const [u, e, a] = await Promise.all([
         api.get(`/api/uploads/${id}`),
@@ -101,7 +105,7 @@ export default function UploadDetail() {
 
   const resolveAlert = async (alertId) => {
     await api.patch(`/api/alerts/${alertId}/resolve`, { notes: '' });
-    load();
+    load(true);
   };
 
   const openPreview = async () => {
@@ -406,24 +410,53 @@ export default function UploadDetail() {
                   </div>
                 ) : (
                   <div className="ud-alerts">
-                    {alerts.map(a => (
-                      <div key={a.id} className={`ud-alert ${a.severity === 'critical' ? 'ud-alert--critical' : a.severity === 'major' ? 'ud-alert--major' : ''}`}>
-                        <div className="ud-alert__body">
-                          <div className="ud-alert__head">
-                            <Badge value={a.severity} />
-                            <span className="ud-alert__type">{a.alert_type.replace(/_/g, ' ')}</span>
-                            {a.page_number != null && (
-                              <span className="ud-alert__page">· Page {a.page_number}</span>
-                            )}
+                    {alerts.map(a => {
+                      const open = openAlertId === a.id;
+                      return (
+                        <div key={a.id} className="ud-alert-wrap">
+                          <div
+                            className={`ud-alert ${a.severity === 'critical' ? 'ud-alert--critical' : a.severity === 'major' ? 'ud-alert--major' : ''}${open ? ' ud-alert--open' : ''}`}
+                            role="button" tabIndex={0} aria-expanded={open}
+                            onClick={() => setOpenAlertId(open ? null : a.id)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenAlertId(open ? null : a.id); } }}
+                          >
+                            <div className="ud-alert__body">
+                              <div className="ud-alert__head">
+                                <Badge value={a.severity} />
+                                <span className="ud-alert__type">{a.alert_type.replace(/_/g, ' ')}</span>
+                                {a.page_number != null && (
+                                  <span className="ud-alert__page">· Page {a.page_number}</span>
+                                )}
+                              </div>
+                              <p className="ud-alert__msg">{a.message}</p>
+                            </div>
+                            <div className="ud-alert__actions">
+                              <button className="ud-btn ud-btn--secondary ud-btn--sm" title="Open the pages and the conversation"
+                                      onClick={(e) => { e.stopPropagation(); setModalAlert(a); }}>
+                                <MessageSquare size={13} />
+                                {a.thread_count > 0 ? ` ${a.thread_count}${a.unread_count > 0 ? ` · ${a.unread_count} new` : ''}` : ' Open'}
+                              </button>
+                              <button className="ud-btn ud-btn--secondary ud-btn--sm" onClick={(e) => { e.stopPropagation(); resolveAlert(a.id); }}>Resolve</button>
+                            </div>
                           </div>
-                          <p className="ud-alert__msg">{a.message}</p>
+                          {open && <SourceEntryDetail alert={a} />}
                         </div>
-                        <button className="ud-btn ud-btn--secondary ud-btn--sm" onClick={() => resolveAlert(a.id)}>Resolve</button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
+            )}
+
+            {modalAlert && (
+              <AlertModal
+                alert={modalAlert}
+                vesselName={upload?.vessel_name}
+                isShore
+                currentUserId={user?.id}
+                onClose={() => { setModalAlert(null); load(true); }}
+                onChanged={() => load(true)}
+              />
             )}
 
             {/* ── Tab: Daily Log ── */}
