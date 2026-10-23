@@ -201,7 +201,7 @@ export default function ReportConfigPage() {
             className="rcfg-btn rcfg-btn--primary" 
             onClick={handleAssignAll} 
             disabled={isAssigningAll || coreVesselsLoading}
-            title="Bulk assign all 45 master default reports to all vessels"
+            title="Bulk assign all 72 master default reports to all vessels"
           >
             <Zap size={14} /> {isAssigningAll ? 'Assigning All...' : 'Assign Defaults to All Vessels'}
           </button>
@@ -283,7 +283,7 @@ export default function ReportConfigPage() {
                     onClick={() => registerMutation.mutate({ vessel_imo: activeVessel.imo, vessel_name: activeVessel.name })}
                     disabled={registerMutation.isPending}
                   >
-                    <Zap size={14} /> {registerMutation.isPending ? 'Assigning...' : 'Assign Defaults (45)'}
+                    <Zap size={14} /> {registerMutation.isPending ? 'Assigning...' : 'Assign Defaults (72)'}
                   </button>
                   <button className="rcfg-btn rcfg-btn--ghost" onClick={() => setShowAddForm(!showAddForm)}>
                     <Plus size={14} /> Add Custom Target
@@ -323,7 +323,9 @@ export default function ReportConfigPage() {
                           { value: 'DECK', label: 'Deck' },
                           { value: 'ENGINE', label: 'Engine' },
                           { value: 'MARPOL', label: 'Marpol' },
-                          { value: 'ELECTRICAL', label: 'Electrical' }
+                          { value: 'ELECTRICAL', label: 'Electrical' },
+                          { value: 'CARGO', label: 'Cargo' },
+                          { value: 'BALLAST', label: 'Ballast' }
                         ]}
                         placeholder="Select Department"
                       />
@@ -387,6 +389,8 @@ export default function ReportConfigPage() {
                                       <option value="ENGINE">Engine</option>
                                       <option value="MARPOL">Marpol</option>
                                       <option value="ELECTRICAL">Electrical</option>
+                                      <option value="CARGO">Cargo</option>
+                                      <option value="BALLAST">Ballast</option>
                                     </select>
                                   </td>
                                   <td>—</td>
