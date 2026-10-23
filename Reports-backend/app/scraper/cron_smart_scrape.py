@@ -7,7 +7,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from app.core.database import SessionLocal           # FIX: was AsyncSessionLocal (does not exist)
-from app.scraper.smartpal_scraper import run_scraper, run_halfyearly_scraper
+from app.scraper.smartpal_scraper import run_scraper
 from app.scraper.mail_graph_fetcher import run_mail_fetcher
 from app.services.aepms_push import push_pending_reports
 from app.services.mail_service import process_and_email_pending_attachments
@@ -56,18 +56,6 @@ async def main():
         # run_scraper with smart_cron=True handles querying latest rows and filtering them.
         await run_scraper(db, smart_cron=True)
     logger.info("Smart Scrape Cron Job COMPLETE.")
-
-    # Half-yearly Cargo Hold / Water Ballast Tank reports have their own flow.
-    # smart_cron=True: scrapes configs with no report yet (first time), a
-    # still-PENDING job, or whose next due date has arrived. Isolated so a
-    # failure here can never block the email / AEPMS steps below.
-    logger.info("Starting Half-Yearly Smart Scrape...")
-    try:
-        async with SessionLocal() as db:
-            await run_halfyearly_scraper(db, smart_cron=True)
-    except Exception as e:
-        logger.error(f"Half-Yearly smart scrape step failed: {e}")
-    logger.info("Half-Yearly Smart Scrape COMPLETE.")
 
     logger.info("Starting batch email processing for new attachments...")
     async with SessionLocal() as db:
