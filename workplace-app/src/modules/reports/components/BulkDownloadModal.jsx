@@ -14,6 +14,7 @@ const FREQUENCIES = [
   { id: 'WEEKLY',    label: 'Weekly' },
   { id: 'MONTHLY',   label: 'Monthly' },
   { id: 'QUARTERLY', label: 'Quarterly' },
+  { id: 'HALF_YEARLY', label: 'Half-Yearly' },
 ];
 
 function normalizeFreq(f) {

@@ -25,6 +25,7 @@ const FREQUENCIES = [
   { id: 'WEEKLY',    label: 'Weekly' },
   { id: 'MONTHLY',  label: 'Monthly' },
   { id: 'QUARTERLY',label: 'Quarterly' },
+  { id: 'HALF_YEARLY', label: 'Half-Yearly' },
 ];
 
 const MONTH_NAMES = [
@@ -43,6 +44,11 @@ const QUARTERS = [
   { id: 1, label: 'Q2', sub: 'Apr – Jun' },
   { id: 2, label: 'Q3', sub: 'Jul – Sep' },
   { id: 3, label: 'Q4', sub: 'Oct – Dec' },
+];
+
+const HALVES = [
+  { id: 0, label: 'H1', sub: 'Jan – Jun' },
+  { id: 1, label: 'H2', sub: 'Jul – Dec' },
 ];
 
 /* ─── Helpers ───────────────────────────────────────────────────────────── */
@@ -127,7 +133,7 @@ function toIsoDate(d) {
   return `${y}-${m}-${day}`;
 }
 
-function buildBuckets(frequency, year, monthIdx, quarterIdx, dailyEndDate = null, isAtLatest = true) {
+function buildBuckets(frequency, year, monthIdx, quarterIdx, dailyEndDate = null, isAtLatest = true, halfIdx = 0) {
   if (frequency === 'DAILY') {
     const refDate = dailyEndDate instanceof Date ? dailyEndDate : new Date();
 
@@ -166,6 +172,17 @@ function buildBuckets(frequency, year, monthIdx, quarterIdx, dailyEndDate = null
       label: MONTH_NAMES[monthIdx],
       start: new Date(year, monthIdx, 1),
       end: new Date(year, monthIdx, lastDay, 23, 59, 59),
+    }];
+  }
+  if (frequency === 'HALF_YEARLY') {
+    const startMonth = halfIdx * 6;
+    const endMonth = startMonth + 5;
+    const lastDay = new Date(year, endMonth + 1, 0).getDate();
+    return [{
+      key: 'h1',
+      label: `H${halfIdx + 1}`,
+      start: new Date(year, startMonth, 1),
+      end: new Date(year, endMonth, lastDay, 23, 59, 59),
     }];
   }
   const startMonth = quarterIdx * 3;
@@ -429,6 +446,7 @@ export default function OverviewPage() {
   const [year] = useState(now.getFullYear());
   const [monthIdx, setMonthIdx] = useState(now.getMonth());
   const [quarterIdx, setQuarterIdx] = useState(Math.floor(now.getMonth() / 3));
+  const [halfIdx, setHalfIdx] = useState(Math.floor(now.getMonth() / 6));
   const [search, setSearch] = useState('');
   const [previewReport, setPreviewReport] = useState(null);
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
@@ -567,8 +585,8 @@ export default function OverviewPage() {
   }, [configs, frequency]);
 
   const buckets = useMemo(
-    () => buildBuckets(frequency, year, monthIdx, quarterIdx, activeDailyEnd, isAtLatestDaily),
-    [frequency, year, monthIdx, quarterIdx, activeDailyEnd, isAtLatestDaily]
+    () => buildBuckets(frequency, year, monthIdx, quarterIdx, activeDailyEnd, isAtLatestDaily, halfIdx),
+    [frequency, year, monthIdx, quarterIdx, activeDailyEnd, isAtLatestDaily, halfIdx]
   );
 
   const instanceIndex = useMemo(() => {
@@ -613,9 +631,11 @@ export default function OverviewPage() {
 
   const handleMonthChange = useCallback((v) => setMonthIdx(v), []);
   const handleQuarterChange = useCallback((v) => setQuarterIdx(v), []);
+  const handleHalfChange = useCallback((v) => setHalfIdx(v), []);
 
   const monthOptions = MONTH_NAMES.map((m, i) => ({ id: i, label: m }));
   const quarterOptions = QUARTERS.map(q => ({ id: q.id, label: q.label, sub: q.sub }));
+  const halfOptions = HALVES.map(h => ({ id: h.id, label: h.label, sub: h.sub }));
 
   /* ── Stat counts ── */
   const isDaily = frequency === 'DAILY';
@@ -661,6 +681,7 @@ export default function OverviewPage() {
         return `${m.getFullYear()}-${pad(m.getMonth() + 1)}-${pad(m.getDate())}`;
       }
       if (frequency === 'MONTHLY') return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+      if (frequency === 'HALF_YEARLY') return `${d.getFullYear()}-H${Math.floor(d.getMonth() / 6)}`;
       return `${d.getFullYear()}-Q${Math.floor(d.getMonth() / 3)}`;
     };
     const step = d => {
@@ -668,6 +689,7 @@ export default function OverviewPage() {
       if (frequency === 'DAILY') n.setDate(n.getDate() + 1);
       else if (frequency === 'WEEKLY') n.setDate(n.getDate() + 7);
       else if (frequency === 'MONTHLY') { n.setDate(1); n.setMonth(n.getMonth() + 1); }
+      else if (frequency === 'HALF_YEARLY') { n.setDate(1); n.setMonth(n.getMonth() + 6); }
       else { n.setDate(1); n.setMonth(n.getMonth() + 3); }
       return n;
     };
@@ -680,6 +702,7 @@ export default function OverviewPage() {
         return `${fmtDateShort(m)} – ${fmtDateShort(e)}`;
       }
       if (frequency === 'MONTHLY') return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+      if (frequency === 'HALF_YEARLY') return `H${Math.floor(d.getMonth() / 6) + 1} ${d.getFullYear()}`;
       return `Q${Math.floor(d.getMonth() / 3) + 1} ${d.getFullYear()}`;
     };
     const today = new Date();
@@ -725,7 +748,7 @@ export default function OverviewPage() {
     Object.keys(stats).forEach(k => { stats[k] = withPct(stats[k]); life[k] = withPct(life[k]); });
     Object.values(stats).forEach(st => { overall.done += st.done; overall.expected += st.expected; });
     Object.values(stats).forEach(st => st.items.sort((x, y) => y.labels.length - x.labels.length));
-    const prefix = { DAILY: 'Today', WEEKLY: 'This week', MONTHLY: 'This month', QUARTERLY: 'This quarter' }[frequency];
+    const prefix = { DAILY: 'Today', WEEKLY: 'This week', MONTHLY: 'This month', QUARTERLY: 'This quarter', HALF_YEARLY: 'This half-year' }[frequency];
     return { overall: withPct(overall), byVessel: stats, lifeByVessel: life, periodTitle: prefix, periodLabel: labelOf(today) };
   }, [frequency, reportNames, vessels, instanceIndex, configuredPairs]);
 
@@ -856,6 +879,13 @@ export default function OverviewPage() {
               value={quarterIdx}
               options={quarterOptions}
               onChange={handleQuarterChange}
+            />
+          ) : frequency === 'HALF_YEARLY' ? (
+            <CompactSelect
+              icon={<CalendarDays size={13} />}
+              value={halfIdx}
+              options={halfOptions}
+              onChange={handleHalfChange}
             />
           ) : frequency === 'DAILY' ? (
             <div className="ovw-daily-nav-group">
