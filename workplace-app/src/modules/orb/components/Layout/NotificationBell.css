@@ -28,3 +28,9 @@
 .orb-root .nb-item__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #E8701A; margin-top: 0.4rem; }
 .orb-root .header-actions { display: flex; align-items: center; gap: 0.4rem; }
 @media (max-width: 600px) { .orb-root .nb-panel { position: fixed; left: 12px; right: 12px; top: 64px; width: auto; } }
+
+/* Bell panel across screen sizes */
+@media (min-width: 1600px) { .orb-root .nb-panel { width: 460px; } .orb-root .nb-item__title { font-size: 0.9rem; } .orb-root .nb-item__msg { font-size: 0.84rem; } }
+@media (min-width: 2200px) { .orb-root .nb-panel { width: 560px; } .orb-root .nb-btn { width: 46px; height: 46px; } .orb-root .nb-item__title { font-size: 1rem; } .orb-root .nb-item__msg { font-size: 0.94rem; } }
+@media (max-width: 480px) { .orb-root .nb-panel { top: 58px; } .orb-root .nb-list { max-height: calc(100vh - 160px); } .orb-root .nb-all { font-size: 0.7rem; } .orb-root .nb-tab { padding: 0.5rem 0.5rem; font-size: 0.78rem; } }
+@media (max-height: 520px) { .orb-root .nb-list { max-height: calc(100vh - 130px); } }

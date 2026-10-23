@@ -56,7 +56,7 @@ function Pane({ icon: Icon, title, note, collapsed, onToggle, wide, children }) 
 function PdfView({ state, title }) {
   if (state.loading) return <div className="am-state"><Loader2 size={22} className="am-spin" /><span>Loading page…</span></div>;
   if (state.error) return <div className="am-state am-state--error"><AlertTriangle size={20} /><span>{state.error}</span></div>;
-  return <iframe className="am-frame" title={title} src={`${state.url}#toolbar=0&navpanes=0&view=FitH`} />;
+  return <iframe className="am-frame" title={title} src={state.url} />;
 }
 
 export default function AlertModal({ alert: initial, vesselName, isShore, currentUserId, onClose, onChanged }) {

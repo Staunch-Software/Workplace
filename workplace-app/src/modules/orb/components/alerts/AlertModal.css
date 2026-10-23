@@ -94,3 +94,78 @@
   .orb-root .am-frame { min-height: 340px; }
   .orb-root .am-nopage { min-height: 120px; }
 }
+
+/* ── Responsive: every size the popup is used at ─────────────────────────────────────────────── */
+
+/* Large desktops, 2K and 4K: a bigger popup and type, so the PDFs and chat do not look small */
+@media (min-width: 1600px) {
+  .orb-root .am { width: min(1760px, 100%); height: min(960px, 100%); font-size: 0.92rem; }
+  .orb-root .am-pane--chat { flex-basis: 440px; }
+  .orb-root .am-title { font-size: 1.15rem; }
+}
+@media (min-width: 2200px) {
+  .orb-root .am { width: min(2200px, 100%); height: min(1240px, 100%); font-size: 1.05rem; }
+  .orb-root .am-pane--chat { flex-basis: 560px; }
+  .orb-root .am-title { font-size: 1.3rem; }
+  .orb-root .am-head { padding: 1.25rem 1.6rem; }
+  .orb-root .ac-msg { max-width: 88%; }
+}
+
+/* Laptops: a slightly narrower chat so the two PDFs keep their width */
+@media (min-width: 861px) and (max-width: 1280px) {
+  .orb-root .am-backdrop { padding: 0.75rem; }
+  .orb-root .am-pane--chat { flex-basis: 320px; }
+  .orb-root .am-head { padding: 0.8rem 1rem; }
+}
+
+/* Tablets in portrait: panes stacked, each one tall enough to read */
+@media (max-width: 860px) and (min-width: 561px) {
+  .orb-root .am-pane, .orb-root .am-pane--chat { min-height: 440px; }
+  .orb-root .am-head__actions { align-self: flex-start; }
+}
+
+/* Phones */
+@media (max-width: 560px) {
+  .orb-root .am-head { padding: 0.75rem 0.85rem; gap: 0.6rem; }
+  .orb-root .am-title { font-size: 0.98rem; }
+  .orb-root .am-msg { font-size: 0.82rem; }
+  .orb-root .am-meta { gap: 0.25rem 0.7rem; font-size: 0.72rem; }
+  .orb-root .am-head__actions { flex-direction: column-reverse; align-items: flex-end; gap: 0.35rem; }
+  .orb-root .am-warn, .orb-root .am-error { padding-left: 0.85rem; padding-right: 0.85rem; }
+  .orb-root .am-pane__head { padding: 0.5rem 0.75rem; }
+  .orb-root .am-pane, .orb-root .am-pane--chat { min-height: 380px; }
+  .orb-root .am-frame { min-height: 360px; }
+  .orb-root .ac-tabs { padding: 0.45rem 0.6rem 0; }
+  .orb-root .ac-list { padding: 0.6rem; }
+  .orb-root .ac-msg { max-width: 96%; }
+  .orb-root .ac-composer { padding: 0.6rem; }
+  .orb-root .ac-actions { flex-wrap: wrap; gap: 0.45rem; }
+  .orb-root .ac-hint { display: none; }
+  .orb-root .ac-btn--send { margin-left: auto; }
+  .orb-root .ac-picker { left: 0.6rem; right: 0.6rem; }
+  .orb-root .ac-input { font-size: 16px; }   /* stops iOS zooming the page when the box is focused */
+}
+
+/* Small phones */
+@media (max-width: 360px) {
+  .orb-root .am-sev { font-size: 0.66rem; padding: 0.15rem 0.5rem; }
+  .orb-root .am-btn { padding: 0.4rem 0.7rem; font-size: 0.78rem; }
+  .orb-root .ac-tab { padding: 0.3rem 0.55rem; font-size: 0.74rem; }
+  .orb-root .ac-btn { padding: 0.4rem 0.65rem; font-size: 0.76rem; }
+}
+
+/* Short screens (phones in landscape, small laptops): keep the header from eating the view */
+@media (max-height: 640px) {
+  .orb-root .am-head { padding: 0.5rem 0.9rem; }
+  .orb-root .am-msg { display: none; }
+  .orb-root .am-warn { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+}
+@media (max-height: 520px) and (min-width: 561px) {
+  .orb-root .am-backdrop { padding: 0; }
+  .orb-root .am { height: 100%; border-radius: 0; }
+  .orb-root .am-meta { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orb-root .am-spin, .orb-root .ac-spin { animation: none; }
+}
