@@ -22,7 +22,8 @@ class OrbNotification(Base):
     alert_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
     sender_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.orb_utc_now(), nullable=False, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.orb_utc_now(), onupdate=func.orb_utc_now(), nullable=False)
 
 
 class OrbFeedEvent(Base):
@@ -43,7 +44,8 @@ class OrbFeedEvent(Base):
     actor_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)   # who caused it; never unread for them
     shore_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     meta: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.orb_utc_now(), nullable=False, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.orb_utc_now(), onupdate=func.orb_utc_now(), nullable=False)
 
 
 class OrbFeedRead(Base):
@@ -52,4 +54,7 @@ class OrbFeedRead(Base):
     event_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("orb_feed_events.id", ondelete="CASCADE"), primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
-    read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.orb_utc_now(), nullable=False)
+    # "Mark as unread" flips this instead of deleting the row, so the choice can sync between vessel and shore.
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.orb_utc_now(), onupdate=func.orb_utc_now(), nullable=False)

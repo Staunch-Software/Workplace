@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import AlertModal from '../components/alerts/AlertModal';
 import SourceEntryDetail from '../components/alerts/SourceEntryDetail';
 import './UploadDetail.css';
+import { fmtDateTime } from '../utils/time';
 
 const TABS = ['Entries', 'Alerts', 'Daily Log'];
 
@@ -217,7 +218,7 @@ export default function UploadDetail() {
                       <div className="ud-meta">
                         <span className="ud-meta__item"><Ship size={15} />Vessel: <strong>{upload.vessel_name}</strong></span>
                         <span className="ud-meta__item"><User size={15} />Uploaded by: <strong>{upload.uploader_name}</strong></span>
-                        <span className="ud-meta__item"><CalendarClock size={15} />{new Date(upload.created_at).toLocaleString()}</span>
+                        <span className="ud-meta__item"><CalendarClock size={15} />{fmtDateTime(upload.created_at)}</span>
                       </div>
                     </div>
                   </div>

@@ -11,7 +11,7 @@ from app.models.vessel import Vessel
 from app.models.control_user import ControlUser
 from app.schemas.vessel import VesselCreate, VesselUpdate, VesselResponse
 from app.schemas.common import success
-from app.dependencies import get_current_user, require_admin, allowed_vessel_ids, assert_vessel_access
+from app.dependencies import get_current_user, require_admin, allowed_vessel_ids, assert_vessel_access, shore_instance_only
 
 router = APIRouter(prefix="/vessels", tags=["vessels"])
 
@@ -30,7 +30,7 @@ async def list_vessels(
     return success(data=[VesselResponse.model_validate(v).model_dump() for v in vessels])
 
 
-@router.post("")
+@router.post("", dependencies=[Depends(shore_instance_only)])
 async def create_vessel(
     body: VesselCreate,
     db: AsyncSession = Depends(get_db),
@@ -95,7 +95,7 @@ async def get_vessel_daily_log(
     return success(data=log_data)
 
 
-@router.put("/{vessel_id}")
+@router.put("/{vessel_id}", dependencies=[Depends(shore_instance_only)])
 async def update_vessel(
     vessel_id: uuid.UUID,
     body: VesselUpdate,

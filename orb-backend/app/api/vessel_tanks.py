@@ -10,7 +10,7 @@ from app.models.vessel_tank import VesselTank
 from app.models.control_user import ControlUser
 from app.schemas.vessel_tank import TankResponse
 from app.schemas.common import success
-from app.dependencies import get_current_user, require_admin, assert_vessel_access
+from app.dependencies import get_current_user, require_admin, assert_vessel_access, shore_instance_only
 from app.services.azure_storage import upload_iopp_document, download_iopp_document
 
 router = APIRouter(prefix="/vessels", tags=["vessel_tanks"])
@@ -68,7 +68,7 @@ async def _store_iopp_docs(iopp_doc1: Optional[UploadFile], iopp_doc2: Optional[
     return doc1_url, doc2_url
 
 
-@router.post("/{vessel_id}/tanks")
+@router.post("/{vessel_id}/tanks", dependencies=[Depends(shore_instance_only)])
 async def add_tank(
     vessel_id: uuid.UUID,
     tank_name: str = Form(...),
@@ -120,7 +120,7 @@ async def add_tank(
     return success(data=TankResponse.model_validate(tank).model_dump(), message="Tank added")
 
 
-@router.put("/{vessel_id}/tanks/{tank_id}")
+@router.put("/{vessel_id}/tanks/{tank_id}", dependencies=[Depends(shore_instance_only)])
 async def update_tank(
     vessel_id: uuid.UUID,
     tank_id: uuid.UUID,
@@ -194,7 +194,7 @@ async def get_iopp_doc(
     return Response(content=content, media_type=content_type)
 
 
-@router.patch("/{vessel_id}/tanks/{tank_id}/deactivate")
+@router.patch("/{vessel_id}/tanks/{tank_id}/deactivate", dependencies=[Depends(shore_instance_only)])
 async def deactivate_tank(
     vessel_id: uuid.UUID,
     tank_id: uuid.UUID,

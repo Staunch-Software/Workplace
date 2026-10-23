@@ -22,4 +22,4 @@ class OrbUploadRaw(Base):
     failed_pages: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)   # {"pages": [..], "reasons": {"5": ".."}}
     usage: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)           # token usage / cost estimate of the run
     model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.orb_utc_now(), nullable=False)

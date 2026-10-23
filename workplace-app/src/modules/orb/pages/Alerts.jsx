@@ -13,6 +13,7 @@ import Dropdown from '../components/shared/Dropdown';
 import MultiSelectDropdown from '../components/shared/MultiSelectDropdown';
 import api from '../api/axiosOrb';
 import './Alerts.css';
+import { fmtDate, daysSince } from '../utils/time';
 
 const SEVERITIES = ['critical', 'major', 'minor', 'observation'];
 
@@ -239,9 +240,9 @@ export default function Alerts() {
                               </td>
                               <td data-label="Page" className="al-center al-muted">{a.page_number ?? '—'}</td>
                               <td data-label="Created" className="al-muted">
-                                {new Date(a.created_at).toLocaleDateString()}
+                                {fmtDate(a.created_at)}
                                 {!a.is_resolved && (() => {
-                                  const days = Math.floor((Date.now() - new Date(a.created_at)) / 86400000);
+                                  const days = daysSince(a.created_at);
                                   const color = days < 7 ? '#22c55e' : days < 30 ? '#f59e0b' : '#ef4444';
                                   return (
                                     <span

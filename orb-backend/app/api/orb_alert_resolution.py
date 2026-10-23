@@ -18,7 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.control_database import get_control_db
 from app.database import get_db
-from app.dependencies import assert_vessel_access, get_current_user, is_shore, require_shore
+from app.config import get_settings
+from app.dependencies import assert_vessel_access, get_current_user, is_shore, require_shore, shore_instance_only
 from app.models.control_user import ControlUser
 from app.models.orb_alert import OrbAlert
 from app.models.orb_alert_thread import OrbAlertThread
@@ -26,6 +27,10 @@ from app.models.vessel import Vessel
 from app.schemas.common import success
 from app.schemas.orb_alert import AlertResponse, ResolveRequest
 from app.services import orb_notify
+from app.services.clock import utc_now
+from app.services.sync_outbox import enqueue
+
+settings = get_settings()
 
 router = APIRouter(prefix="/alerts", tags=["alert-resolution"])
 
@@ -64,18 +69,39 @@ async def _load(db: AsyncSession, user: ControlUser, alert_id: uuid.UUID) -> tup
     return alert, vessel
 
 
-def _system_line(alert: OrbAlert, actor: ControlUser, body: str) -> OrbAlertThread:
-    return OrbAlertThread(
-        id=uuid.uuid4(), alert_id=alert.id, vessel_id=alert.vessel_id, author_id=actor.id, author_name=actor.full_name,
+def system_line(alert: OrbAlert, actor, body: str, *, thread_id: Optional[uuid.UUID] = None,
+                created_at: Optional[datetime] = None) -> OrbAlertThread:
+    line = OrbAlertThread(
+        id=thread_id or uuid.uuid4(), alert_id=alert.id, vessel_id=alert.vessel_id, author_id=actor.id, author_name=actor.full_name,
         author_role=actor.role, body=body, is_internal=False, is_system=True, tagged_user_ids=[],
     )
+    if created_at is not None:
+        line.created_at = created_at
+    return line
+
+
+_system_line = system_line
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return utc_now()
+
+
+def apply_request(alert: OrbAlert, actor, notes: str, when: datetime, *, bump: bool) -> None:
+    """OPEN -> PENDING_APPROVAL. `bump` is True on the VM (the authoritative copy) and False for a vessel's own
+    offline request, so a vessel never outranks a step the VM took meanwhile."""
+    alert.status = PENDING
+    alert.resolution_notes = notes
+    alert.resolution_requested_by = actor.id
+    alert.resolution_requested_by_name = actor.full_name
+    alert.resolution_requested_at = when
+    alert.rejection_reason = alert.rejected_by_name = alert.rejected_at = None
+    if bump:
+        alert.version = (alert.version or 1) + 1
 
 
 def _resolve(alert: OrbAlert, actor: ControlUser, notes: str) -> None:
+    alert.version = (alert.version or 1) + 1
     alert.status = RESOLVED
     alert.is_resolved = True
     alert.resolved_by = actor.id
@@ -100,20 +126,25 @@ async def request_resolution(
         raise HTTPException(status_code=409, detail="A resolution request is already waiting for shore approval")
     notes = _notes(body.notes, True, "Resolution notes")
 
-    alert.status = PENDING
-    alert.resolution_notes = notes
-    alert.resolution_requested_by = user.id
-    alert.resolution_requested_by_name = user.full_name
-    alert.resolution_requested_at = _now()
-    alert.rejection_reason = alert.rejected_by_name = alert.rejected_at = None
-    db.add(_system_line(alert, user, f"Resolution requested by {user.full_name}: {notes}"))
+    when = _now()
+    apply_request(alert, user, notes, when, bump=not settings.is_offline_vessel)
+    line = system_line(alert, user, f"Resolution requested by {user.full_name}: {notes}", created_at=when)
+    db.add(line)
+    await db.flush()
+    # On a vessel the request goes to the VM as a command; the VM applies it (if the alert is still open there),
+    # tells the shore users and sends the result back. The vessel does not notify anyone itself.
+    enqueue(db, "alert_resolution_request", alert.id, {
+        "alert_id": str(alert.id), "notes": notes, "requested_at": when.isoformat(), "system_thread_id": str(line.id),
+        "requester_id": str(user.id), "requester_name": user.full_name, "requester_role": user.role,
+    })
     await db.commit()
     await db.refresh(alert)
-    await orb_notify.on_resolution_event(db, control_db, kind="REQUESTED", alert=alert, vessel=vessel, actor=user, notes=notes)
+    if not settings.is_offline_vessel:
+        await orb_notify.on_resolution_event(db, control_db, kind="REQUESTED", alert=alert, vessel=vessel, actor=user, notes=notes)
     return success(data=AlertResponse.model_validate(alert).model_dump(), message="Resolution requested")
 
 
-@router.post("/{alert_id}/accept-resolution")
+@router.post("/{alert_id}/accept-resolution", dependencies=[Depends(shore_instance_only)])
 async def accept_resolution(
     alert_id: uuid.UUID, body: AcceptResolution,
     db: AsyncSession = Depends(get_db), control_db: AsyncSession = Depends(get_control_db),
@@ -133,7 +164,7 @@ async def accept_resolution(
     return success(data=AlertResponse.model_validate(alert).model_dump(), message="Resolution accepted")
 
 
-@router.post("/{alert_id}/reject-resolution")
+@router.post("/{alert_id}/reject-resolution", dependencies=[Depends(shore_instance_only)])
 async def reject_resolution(
     alert_id: uuid.UUID, body: RejectResolution,
     db: AsyncSession = Depends(get_db), control_db: AsyncSession = Depends(get_control_db),
@@ -145,6 +176,7 @@ async def reject_resolution(
         raise HTTPException(status_code=409, detail="There is no resolution request waiting for approval")
     reason = _notes(body.reason, False, "Reason")
     requester = alert.resolution_requested_by
+    alert.version = (alert.version or 1) + 1
     alert.status = OPEN
     alert.rejection_reason = reason or None
     alert.rejected_by_name = user.full_name
@@ -158,7 +190,7 @@ async def reject_resolution(
     return success(data=AlertResponse.model_validate(alert).model_dump(), message="Resolution rejected")
 
 
-@router.patch("/{alert_id}/resolve")
+@router.patch("/{alert_id}/resolve", dependencies=[Depends(shore_instance_only)])
 async def resolve_alert(
     alert_id: uuid.UUID, body: ResolveRequest,
     db: AsyncSession = Depends(get_db), control_db: AsyncSession = Depends(get_control_db),

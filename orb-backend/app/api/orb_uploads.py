@@ -23,7 +23,7 @@ from app.control_database import get_control_db
 from app.schemas.orb_upload import UploadResponse, UploadDetail
 from app.schemas.orb_entry import EntryResponse
 from app.schemas.common import success
-from app.dependencies import get_current_user, require_shore, require_admin, allowed_vessel_ids, scope_vessel_ids, assert_vessel_access
+from app.dependencies import get_current_user, require_shore, require_admin, allowed_vessel_ids, scope_vessel_ids, assert_vessel_access, shore_instance_only
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 settings = get_settings()
@@ -45,7 +45,7 @@ async def list_uploads(
     return success(data=[UploadResponse.model_validate(u).model_dump() for u in uploads])
 
 
-@router.post("")
+@router.post("", dependencies=[Depends(shore_instance_only)])
 async def create_upload(
     background_tasks: BackgroundTasks,
     vessel_id: uuid.UUID = Form(...),
@@ -165,7 +165,7 @@ async def get_upload(
 # Re-run extraction on an existing upload so older uploads pick up newer
 # extraction rules (e.g. item_lines / item-number alerts). Remove once testing
 # is done: it deletes the upload's entries and the alerts attached to them.
-@router.post("/{upload_id}/reprocess")
+@router.post("/{upload_id}/reprocess", dependencies=[Depends(shore_instance_only)])
 async def reprocess_upload(
     upload_id: uuid.UUID,
     background_tasks: BackgroundTasks,
@@ -221,7 +221,7 @@ async def reprocess_upload(
 # ── TEMPORARY (testing only) ─────────────────────────────────────────────────
 # Re-apply post-processing (repairs, de-duplication, checks) to the extraction saved for this
 # upload, WITHOUT calling Gemini. Remove together with /reprocess once testing is done.
-@router.post("/{upload_id}/reprocess-saved")
+@router.post("/{upload_id}/reprocess-saved", dependencies=[Depends(shore_instance_only)])
 async def reprocess_saved(
     upload_id: uuid.UUID,
     background_tasks: BackgroundTasks,

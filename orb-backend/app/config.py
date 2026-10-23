@@ -97,6 +97,29 @@ class Settings(BaseSettings):
     # the VM has memory headroom to spare.
     MAX_CONCURRENT_EXTRACTIONS: int = 1
 
+    # ── Offline (vessel) sync ───────────────────────────────────────────────
+    # The same code runs on the VM (online = shore) and on the vessel PC under C:\WORKPLACE (offline).
+    # A vessel pushes its outbox to the VM and pulls what changed there; it never calls Gemini, runs
+    # extraction or creates alerts (see app/services/sync_processor.py).
+    STORAGE_MODE: str = "online"            # online | offline
+    VESSEL_IMO: str = ""                    # offline only: which vessel this install belongs to
+    SYNC_API_KEY: str = "change-me-in-production"   # same key on the VM and every vessel
+    CLOUD_BASE_URL: str = "https://workplace.ozellar.com/orb"   # the VM's ORB root (offline only)
+    CLOUD_HEALTH_URL: str = ""                  # empty = CLOUD_BASE_URL + "/health"
+    NETWORK_TIMEOUT_SECONDS: float = 15.0
+    SYNC_INTERVAL_SECONDS: int = 60
+    SYNC_BATCH_SIZE: int = 50
+    SYNC_PULL_PAGE_SIZE: int = 500
+    MAX_SYNC_RETRIES: int = 5
+    SYNC_VERIFY_TLS: bool = True
+    # Azure account of the VM, used by the vessel to copy files (PDFs, chat attachments) up and down.
+    # AZURE_STORAGE_CONNECTION_STRING is then the vessel's local Azurite.
+    CLOUD_STORAGE_CONNECTION_STRING: str = ""
+
+    @property
+    def is_offline_vessel(self) -> bool:
+        return self.STORAGE_MODE.strip().lower() == "offline"
+
 
 @lru_cache
 def get_settings() -> Settings:

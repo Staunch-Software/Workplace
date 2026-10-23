@@ -11,6 +11,7 @@ import LoadingSpinner from '../components/shared/LoadingSpinner';
 import api from '../api/axiosOrb';
 import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
+import { istWall, fmtDate } from '../utils/time';
 
 const SEVERITIES = ['critical', 'major', 'minor', 'observation'];
 
@@ -103,9 +104,9 @@ export default function Dashboard() {
   const recentAlerts = openAlerts.slice(0, 5);
   const configuredVesselCount = vessels.filter(v => (vesselTankCounts[v.id] || 0) > 0).length;
 
-  const now = new Date();
+  const now = istWall();
   const uploadsThisMonth = uploads.filter((u) => {
-    const d = new Date(u.created_at);
+    const d = istWall(u.created_at);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
 
@@ -412,7 +413,7 @@ export default function Dashboard() {
                                   <span className="db-list__title">{a.alert_type.replace(/_/g, ' ')}</span>
                                   <span className="db-list__sub">{vesselName(a.vessel_id)}</span>
                                 </div>
-                                <span className="db-list__date">{new Date(a.created_at).toLocaleDateString()}</span>
+                                <span className="db-list__date">{fmtDate(a.created_at)}</span>
                               </li>
                             ))}
                           </ul>
@@ -440,7 +441,7 @@ export default function Dashboard() {
                                   <span className="db-list__sub">{vesselName(u.vessel_id)}</span>
                                 </div>
                                 <Badge value={u.status} />
-                                <span className="db-list__date">{new Date(u.created_at).toLocaleDateString()}</span>
+                                <span className="db-list__date">{fmtDate(u.created_at)}</span>
                               </li>
                             ))}
                           </ul>

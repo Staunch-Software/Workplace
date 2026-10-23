@@ -13,8 +13,30 @@ from app.models.orb_alert import OrbAlert
 from app.models.orb_notification import OrbFeedEvent, OrbFeedRead, OrbNotification
 from app.models.vessel import Vessel
 from app.schemas.common import success
+from app.services.clock import utc_now
+from app.services.sync_outbox import enqueue
 
 router = APIRouter(tags=["notifications"])
+
+# Not read yet: no row, or a row marked unread. (Unread is a state, not a deleted row, so it can sync.)
+_unread = or_(OrbFeedRead.event_id.is_(None), OrbFeedRead.is_read == False)  # noqa: E712
+
+
+async def _set_feed_read(db: AsyncSession, user_id: uuid.UUID, event_id: uuid.UUID, is_read: bool) -> None:
+    """Mark one event read / unread for a user; the caller commits. Queued for the VM when this is a vessel."""
+    now = utc_now()
+    rec = await db.get(OrbFeedRead, (event_id, user_id))
+    if rec is None:
+        db.add(OrbFeedRead(event_id=event_id, user_id=user_id, is_read=is_read, read_at=now, updated_at=now))
+    elif rec.is_read == is_read:
+        return
+    else:
+        rec.is_read = is_read
+        rec.updated_at = now
+        if is_read:
+            rec.read_at = now
+    enqueue(db, "feed_read", event_id, {"event_id": str(event_id), "user_id": str(user_id), "is_read": is_read,
+                                        "read_at": now.isoformat(), "updated_at": now.isoformat()})
 
 KEEP_DAYS = 60   # older items are not listed
 
@@ -32,7 +54,7 @@ async def list_notifications(
     user: ControlUser = Depends(get_current_user),
 ):
     """The caller's own notifications, newest first, with the unread count for the bell badge."""
-    since = datetime.now(timezone.utc) - timedelta(days=KEEP_DAYS)
+    since = utc_now() - timedelta(days=KEEP_DAYS)
     base = (OrbNotification.user_id == user.id, OrbNotification.created_at >= since)
     items = (await db.execute(select(OrbNotification).where(*base).order_by(OrbNotification.created_at.desc()).limit(limit))).scalars().all()
     unread = (await db.execute(select(func.count(OrbNotification.id)).where(*base, OrbNotification.is_read == False))).scalar() or 0  # noqa: E712
@@ -41,7 +63,10 @@ async def list_notifications(
 
 @router.post("/notifications/read-all")
 async def read_all_notifications(db: AsyncSession = Depends(get_db), user: ControlUser = Depends(get_current_user)):
+    unread_ids = (await db.execute(select(OrbNotification.id).where(OrbNotification.user_id == user.id, OrbNotification.is_read == False))).scalars().all()  # noqa: E712
     await db.execute(update(OrbNotification).where(OrbNotification.user_id == user.id, OrbNotification.is_read == False).values(is_read=True))  # noqa: E712
+    for nid in unread_ids:
+        enqueue(db, "notification", nid, {"id": str(nid), "is_read": True})
     await db.commit()
     return success(message="All notifications marked as read")
 
@@ -51,13 +76,14 @@ async def read_notification(notification_id: uuid.UUID, db: AsyncSession = Depen
     res = await db.execute(update(OrbNotification).where(OrbNotification.id == notification_id, OrbNotification.user_id == user.id).values(is_read=True))
     if res.rowcount == 0:
         raise HTTPException(status_code=404, detail="Notification not found")
+    enqueue(db, "notification", notification_id, {"id": str(notification_id), "is_read": True})
     await db.commit()
     return success(message="Marked as read")
 
 
 async def _visible_events(db: AsyncSession, user: ControlUser):
     """SQL conditions for the feed events this user may see: their vessels, and no shore-only events for vessel users."""
-    since = datetime.now(timezone.utc) - timedelta(days=KEEP_DAYS)
+    since = utc_now() - timedelta(days=KEEP_DAYS)
     conds = [OrbFeedEvent.created_at >= since]
     allowed = await allowed_vessel_ids(user, db)
     if allowed is not None:
@@ -83,7 +109,7 @@ async def list_feed(
         conds.append(OrbFeedEvent.vessel_id == vessel_id)
     read = (OrbFeedRead.event_id == OrbFeedEvent.id) & (OrbFeedRead.user_id == user.id)
     rows = (await db.execute(
-        select(OrbFeedEvent, OrbFeedRead.event_id, Vessel.name, OrbAlert.severity, OrbAlert.alert_type, OrbAlert.status)
+        select(OrbFeedEvent, OrbFeedRead.is_read, Vessel.name, OrbAlert.severity, OrbAlert.alert_type, OrbAlert.status)
         .outerjoin(OrbFeedRead, read)
         .join(Vessel, Vessel.id == OrbFeedEvent.vessel_id)
         .outerjoin(OrbAlert, OrbAlert.id == OrbFeedEvent.alert_id)
@@ -91,7 +117,7 @@ async def list_feed(
     )).all()
     not_mine = or_(OrbFeedEvent.actor_id.is_(None), OrbFeedEvent.actor_id != user.id)   # your own activity is never "new" to you
     unread = (await db.execute(
-        select(func.count(OrbFeedEvent.id)).outerjoin(OrbFeedRead, read).where(*conds, not_mine, OrbFeedRead.event_id.is_(None))
+        select(func.count(OrbFeedEvent.id)).outerjoin(OrbFeedRead, read).where(*conds, not_mine, _unread)
     )).scalar() or 0
     me = str(user.id)
     items = []
@@ -106,7 +132,7 @@ async def list_feed(
             "alert_type": alert_type, "severity": severity, "alert_status": alert_status,
             "title": e.title, "message": e.message, "link": e.link, "actor_name": e.actor_name, "own": own,
             "shore_only": e.shore_only, "for_me": me in recipients, "mentioned_me": me in mentioned, "meta": meta,
-            "is_read": read_id is not None or own, "created_at": e.created_at.isoformat(),
+            "is_read": bool(read_id) or own, "created_at": e.created_at.isoformat(),
         })
     return success(data={"items": items, "unread_count": unread})
 
@@ -115,9 +141,9 @@ async def list_feed(
 async def read_all_feed(db: AsyncSession = Depends(get_db), user: ControlUser = Depends(get_current_user)):
     conds = await _visible_events(db, user)
     read = (OrbFeedRead.event_id == OrbFeedEvent.id) & (OrbFeedRead.user_id == user.id)
-    ids = (await db.execute(select(OrbFeedEvent.id).outerjoin(OrbFeedRead, read).where(*conds, OrbFeedRead.event_id.is_(None)))).scalars().all()
+    ids = (await db.execute(select(OrbFeedEvent.id).outerjoin(OrbFeedRead, read).where(*conds, _unread))).scalars().all()
     for eid in ids:
-        db.add(OrbFeedRead(event_id=eid, user_id=user.id))
+        await _set_feed_read(db, user.id, eid, True)
     await db.commit()
     return success(message=f"{len(ids)} events marked as read")
 
@@ -128,9 +154,8 @@ async def read_feed_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db
     visible = (await db.execute(select(OrbFeedEvent.id).where(OrbFeedEvent.id == event_id, *conds))).scalar_one_or_none()
     if visible is None:
         raise HTTPException(status_code=404, detail="Event not found")
-    if await db.get(OrbFeedRead, (event_id, user.id)) is None:
-        db.add(OrbFeedRead(event_id=event_id, user_id=user.id))
-        await db.commit()
+    await _set_feed_read(db, user.id, event_id, True)
+    await db.commit()
     return success(message="Marked as read")
 
 
@@ -143,8 +168,6 @@ async def unread_feed_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_
         raise HTTPException(status_code=404, detail="Event not found")
     if event.actor_id == user.id:
         raise HTTPException(status_code=400, detail="Your own activity is always read")
-    rec = await db.get(OrbFeedRead, (event_id, user.id))
-    if rec is not None:
-        await db.delete(rec)
-        await db.commit()
+    await _set_feed_read(db, user.id, event_id, False)
+    await db.commit()
     return success(message="Marked as unread")
