@@ -97,6 +97,13 @@ async def post_thread(
 ):
     alert = await _alert_for(db, user, alert_id)
 
+    # The conversation is locked once the alert is resolved (for everyone), and for the vessel while shore
+    # reviews its resolution request (shore may still write, to ask questions or explain a decision).
+    if alert.status == "RESOLVED" or alert.is_resolved:
+        raise HTTPException(status_code=409, detail="This alert is resolved; the conversation is locked")
+    if alert.status == "PENDING_APPROVAL" and not is_shore(user):
+        raise HTTPException(status_code=409, detail="The conversation is locked while shore reviews your resolution request")
+
     if is_internal and not is_shore(user):
         raise HTTPException(status_code=403, detail="Only shore users can write internal notes")
     body = (body or "").strip()

@@ -1,28 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  X, Check, FileText, FileSearch, MessageSquare, ChevronsLeftRight, Loader2, AlertTriangle, Send, Clock, Ban, CheckCircle2,
+  X, Check, FileText, FileSearch, MessageSquare, ChevronsLeftRight, Loader2, AlertTriangle, Clock,
+  ChevronLeft, ChevronRight, MailOpen, ExternalLink,
 } from 'lucide-react';
 import api from '../../api/axiosOrb';
 import AlertChatPanel from './AlertChatPanel';
+import ResolutionDialog, { ACTIONS } from './ResolutionDialog';
 import './AlertModal.css';
 
 const SEVERITY_LABEL = { critical: 'Critical', major: 'Major', minor: 'Minor', observation: 'Observation' };
-const MIN_NOTES = 20;   // characters, for a resolution request and for a direct resolve (same rule as the API)
 
 const fmtWhen = (iso) => (iso ? new Date(iso).toLocaleString([], { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
-
-// What each resolution action asks for and calls.
-const ACTIONS = {
-  request: { title: 'Request resolution', hint: 'Explain what was done to fix this. Shore will accept or reject your request.', label: 'Notes', required: true,
-             submit: 'Send request', call: (id, text) => api.post(`/api/alerts/${id}/request-resolution`, { notes: text }) },
-  resolve: { title: 'Resolve alert', hint: 'Record why this alert can be closed. It is saved with the alert and shown in the exports.', label: 'Resolution notes', required: true,
-             submit: 'Resolve', call: (id, text) => api.patch(`/api/alerts/${id}/resolve`, { notes: text }) },
-  accept:  { title: 'Accept resolution', hint: 'The alert will be marked resolved. You can add a note for the vessel.', label: 'Note (optional)', required: false,
-             submit: 'Accept', call: (id, text) => api.post(`/api/alerts/${id}/accept-resolution`, { notes: text }) },
-  reject:  { title: 'Reject resolution', hint: 'The alert goes back to open and the vessel is told. A reason helps them fix it.', label: 'Reason (optional)', required: false,
-             submit: 'Reject', call: (id, text) => api.post(`/api/alerts/${id}/reject-resolution`, { reason: text }) },
-};
 
 // A PDF served by the API as a blob (an iframe cannot send the bearer token itself).
 function usePdfBlob(path, enabled) {
@@ -76,74 +65,7 @@ function PdfView({ state, title }) {
   return <iframe className="am-frame" title={title} src={state.url} />;
 }
 
-// The notes box for a resolution step.
-function ActionPanel({ action, busy, error, onSubmit, onCancel }) {
-  const cfg = ACTIONS[action];
-  const [text, setText] = useState('');
-  const short = cfg.required && text.trim().length < MIN_NOTES;
-  return (
-    <form className="am-act" onSubmit={(e) => { e.preventDefault(); if (!short && !busy) onSubmit(text.trim()); }}>
-      <div className="am-act__title">{cfg.title}</div>
-      <p className="am-act__hint">{cfg.hint}</p>
-      <label className="am-act__label" htmlFor="am-act-text">{cfg.label}</label>
-      <textarea id="am-act-text" className="am-act__input" rows={3} value={text} maxLength={2000} autoFocus
-                onChange={e => setText(e.target.value)} disabled={busy} />
-      <div className="am-act__row">
-        {cfg.required && (
-          <span className={`am-act__count${short ? ' am-act__count--short' : ''}`}>
-            {text.trim().length}/{MIN_NOTES} characters minimum
-          </span>
-        )}
-        {error && <span className="am-act__error" role="alert">{error}</span>}
-        <span className="am-act__spacer" />
-        <button type="button" className="am-btn am-btn--ghost" onClick={onCancel} disabled={busy}>Cancel</button>
-        <button type="submit" className={`am-btn${action === 'reject' ? ' am-btn--danger' : ''}`} disabled={short || busy}>
-          {busy ? <Loader2 size={14} className="am-spin" /> : action === 'request' ? <Send size={14} /> : action === 'reject' ? <Ban size={14} /> : <Check size={14} />} {cfg.submit}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-// What happened to the alert so far, in words.
-function StatusNote({ alert }) {
-  if (alert.status === 'PENDING_APPROVAL') {
-    return (
-      <div className="am-note am-note--pending">
-        <Clock size={15} />
-        <div>
-          <strong>Awaiting shore approval.</strong> Requested by {alert.resolution_requested_by_name} on {fmtWhen(alert.resolution_requested_at)}.
-          {alert.resolution_notes && <div className="am-note__text">{alert.resolution_notes}</div>}
-        </div>
-      </div>
-    );
-  }
-  if (alert.status === 'RESOLVED' || alert.is_resolved) {
-    return (
-      <div className="am-note am-note--resolved">
-        <CheckCircle2 size={15} />
-        <div>
-          <strong>Resolved</strong>{alert.resolved_by_name ? ` by ${alert.resolved_by_name}` : ''}{alert.resolved_at ? ` on ${fmtWhen(alert.resolved_at)}` : ''}.
-          {alert.resolution_notes && <div className="am-note__text">{alert.resolution_notes}</div>}
-        </div>
-      </div>
-    );
-  }
-  if (alert.rejection_reason || alert.rejected_at) {
-    return (
-      <div className="am-note am-note--rejected">
-        <Ban size={15} />
-        <div>
-          <strong>Resolution rejected</strong> by {alert.rejected_by_name} on {fmtWhen(alert.rejected_at)}.
-          {alert.rejection_reason && <div className="am-note__text">{alert.rejection_reason}</div>}
-        </div>
-      </div>
-    );
-  }
-  return null;
-}
-
-export default function AlertModal({ alert: initial, vesselName, isShore, currentUserId, onClose, onChanged, startAction }) {
+export default function AlertModal({ alert: initial, vesselName, isShore, currentUserId, onClose, onChanged, startAction, viewer }) {
   const [alert, setAlert] = useState(initial);
   const [info, setInfo] = useState(null);
   const [action, setAction] = useState(startAction && ACTIONS[startAction] ? startAction : null);
@@ -163,6 +85,18 @@ export default function AlertModal({ alert: initial, vesselName, isShore, curren
     document.body.style.overflow = 'hidden';
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
   }, [onClose, action]);
+
+  // Opened from the feed: the arrow keys walk through the list, as in DRS.
+  useEffect(() => {
+    if (!viewer || action) return undefined;
+    const onKey = (e) => {
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '') || e.target?.isContentEditable) return;
+      if (e.key === 'ArrowLeft' && viewer.hasPrev) viewer.onPrev();
+      if (e.key === 'ArrowRight' && viewer.hasNext) viewer.onNext();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [viewer, action]);
 
   useEffect(() => {
     let live = true;
@@ -240,19 +174,28 @@ export default function AlertModal({ alert: initial, vesselName, isShore, curren
             </div>
           </div>
           <div className="am-head__actions">
-            {!action && buttons.map(([key, label, cls]) => (
+            {viewer && (
+              <div className="am-viewer">
+                <button type="button" className="am-iconbtn" onClick={viewer.onPrev} disabled={!viewer.hasPrev} aria-label="Previous" title="Previous (←)"><ChevronLeft size={16} /></button>
+                <span className="am-viewer__pos">{viewer.position}</span>
+                <button type="button" className="am-iconbtn" onClick={viewer.onNext} disabled={!viewer.hasNext} aria-label="Next" title="Next (→)"><ChevronRight size={16} /></button>
+                {viewer.canMarkUnread && (
+                  <button type="button" className="am-btn am-btn--ghost" onClick={viewer.onMarkUnread}><MailOpen size={14} /> Mark as unread</button>
+                )}
+                <button type="button" className="am-btn am-btn--ghost" onClick={viewer.onGoToAlert}><ExternalLink size={14} /> Go to alert</button>
+              </div>
+            )}
+            {buttons.map(([key, label, cls]) => (
               <button key={key} type="button" className={`am-btn ${cls}`} onClick={() => open(key)}>{label}</button>
             ))}
             <button type="button" className="am-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
           </div>
         </header>
-        <StatusNote alert={alert} />
-        {action && <ActionPanel key={action} action={action} busy={busy} error={error} onSubmit={submit} onCancel={() => { setAction(null); setError(''); }} />}
         {info?.approximate && (
           <div className="am-warn"><AlertTriangle size={14} /> This upload predates page tracking, so the PDF page shown may be off by a split page.</div>
         )}
 
-        <div className="am-body">
+        <div className={`am-body${collapsed.extracted && collapsed.raw ? ' am-body--chatonly' : ''}`}>
           {info === null ? (
             <div className="am-state am-state--grow"><Loader2 size={22} className="am-spin" /></div>
           ) : hasPage ? (
@@ -271,12 +214,22 @@ export default function AlertModal({ alert: initial, vesselName, isShore, curren
             </div>
           )}
           <Pane icon={MessageSquare} title="Conversation" collapsed={collapsed.chat} onToggle={() => toggle('chat')} wide>
-            <AlertChatPanel alertId={alert.id} isShore={isShore} currentUserId={currentUserId} resolved={resolved} refreshKey={chatTick} />
+            <AlertChatPanel alertId={alert.id} isShore={isShore} currentUserId={currentUserId} alert={alert} onAction={open} refreshKey={chatTick} />
           </Pane>
         </div>
       </div>
     </div>
   );
 
-  return createPortal(modal, document.querySelector('.orb-root') || document.body);
+  return (
+    <>
+      {createPortal(modal, document.querySelector('.orb-root') || document.body)}
+      {action && (
+        <ResolutionDialog
+          key={action} action={action} alert={alert} vesselName={vesselName} busy={busy} error={error}
+          onSubmit={submit} onCancel={() => { setAction(null); setError(''); }}
+        />
+      )}
+    </>
+  );
 }

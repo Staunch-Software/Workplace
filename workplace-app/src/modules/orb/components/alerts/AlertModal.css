@@ -175,35 +175,44 @@
 .orb-root .am-btn--danger { background: #fff; border-color: #E2A3A3; color: #B42318; }
 .orb-root .am-btn--danger:hover:not(:disabled) { background: #FDE8E8; }
 .orb-root .am-pendingchip { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; font-weight: 600; color: #1f5f9a; background: #E7F1FB; border-radius: 999px; padding: 0.18rem 0.55rem; }
-.orb-root .am-note { display: flex; align-items: flex-start; gap: 0.55rem; padding: 0.6rem 1.25rem; font-size: 0.82rem; line-height: 1.45; border-bottom: 1px solid #EADFD2; }
-.orb-root .am-note svg { flex: none; margin-top: 0.15rem; }
-.orb-root .am-note__text { margin-top: 0.15rem; white-space: pre-wrap; word-break: break-word; }
-.orb-root .am-note--pending { background: #EEF5FC; color: #1f4f7f; }
-.orb-root .am-note--resolved { background: #EAF7EF; color: #17653a; }
-.orb-root .am-note--rejected { background: #FDEEEE; color: #8f1d14; }
-.orb-root .am-act { padding: 0.85rem 1.25rem 1rem; background: #FFFBF6; border-bottom: 1px solid #EADFD2; }
-.orb-root .am-act__title { font-weight: 700; font-size: 0.92rem; }
-.orb-root .am-act__hint { margin: 0.2rem 0 0.55rem; color: #7a7066; font-size: 0.8rem; }
-.orb-root .am-act__label { display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #5c534a; margin-bottom: 0.25rem; }
-.orb-root .am-act__input { width: 100%; box-sizing: border-box; resize: vertical; border: 1px solid #D9CFC3; border-radius: 10px; padding: 0.55rem 0.7rem; font: inherit; line-height: 1.4; }
-.orb-root .am-act__input:focus { outline: none; border-color: #E8701A; box-shadow: 0 0 0 3px rgba(232, 112, 26, 0.16); }
-.orb-root .am-act__row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.55rem; }
-.orb-root .am-act__spacer { flex: 1; }
-.orb-root .am-act__count { font-size: 0.74rem; color: #1d7a46; }
-.orb-root .am-act__count--short { color: #9a9187; }
-.orb-root .am-act__error { font-size: 0.78rem; color: #B42318; }
-@media (max-width: 560px) {
-  .orb-root .am-note, .orb-root .am-act { padding-left: 0.85rem; padding-right: 0.85rem; }
-  .orb-root .am-act__row .am-btn { flex: 1 1 auto; justify-content: center; }
-  .orb-root .am-act__input { font-size: 16px; }
-  .orb-root .am-head__actions { flex-wrap: wrap; justify-content: flex-end; }
-}
-@media (max-height: 640px) { .orb-root .am-act__hint { display: none; } .orb-root .am-note { padding-top: 0.35rem; padding-bottom: 0.35rem; } }
-@media (min-width: 1600px) { .orb-root .am-note, .orb-root .am-act { font-size: 0.92rem; } }
-@media (min-width: 2200px) { .orb-root .am-note, .orb-root .am-act { padding-left: 1.6rem; padding-right: 1.6rem; font-size: 1.02rem; } }
+@media (max-width: 560px) { .orb-root .am-head__actions { flex-wrap: wrap; justify-content: flex-end; } }
 
 /* system lines in the conversation */
 .orb-root .ac-sys { align-self: center; max-width: 94%; text-align: center; background: #EAF0F6; color: #3b4d5e; border-radius: 12px; padding: 0.4rem 0.8rem; font-size: 0.78rem; line-height: 1.4; }
 .orb-root .ac-sys--rejected { background: #FDEEEE; color: #8f1d14; }
 .orb-root .ac-sys--ok { background: #EAF7EF; color: #17653a; }
 .orb-root .ac-sys__when { display: block; font-size: 0.68rem; opacity: 0.7; margin-top: 0.1rem; }
+
+/* ── Resolution cards and the locked thread (as in DRS) ─────────────────────────────────────── */
+.orb-root .ac-res { margin: 0 0.8rem 0.6rem; padding: 0.7rem 0.85rem; border-radius: 12px; border: 1px solid; max-height: 38%; overflow-y: auto; flex: none; }
+.orb-root .ac-res__head { display: flex; align-items: center; gap: 0.45rem; font-size: 0.86rem; }
+.orb-root .ac-res__meta { margin: 0.1rem 0 0 1.45rem; font-size: 0.72rem; opacity: 0.8; }
+.orb-root .ac-res__text { margin-top: 0.45rem; font-size: 0.85rem; line-height: 1.5; font-style: italic; white-space: pre-wrap; word-break: break-word; }
+.orb-root .ac-res__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.65rem; }
+.orb-root .ac-res__wait { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.55rem; font-size: 0.78rem; font-weight: 600; }
+.orb-root .ac-res--pending { background: #FFF7ED; border-color: #FDBA74; color: #9A3412; }
+.orb-root .ac-res--pending .ac-res__text { color: #334155; }
+.orb-root .ac-res--resolved { background: #EAF7EF; border-color: #A7DDBB; color: #17653A; }
+.orb-root .ac-res--resolved .ac-res__text { color: #264a37; }
+.orb-root .ac-res--rejected { background: #FDEEEE; border-color: #F1B4AE; color: #8F1D14; }
+.orb-root .ac-res--rejected .ac-res__text { color: #4a2321; }
+.orb-root .ac-btn--ok { background: #16a34a; color: #fff; }
+.orb-root .ac-btn--no { background: #fff; color: #B42318; border-color: #E2A3A3; }
+.orb-root .ac-btn--no:hover:not(:disabled) { background: #FDE8E8; }
+.orb-root .ac-locked { display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.95rem 0.8rem; background: #F8FAFC; border-top: 1px solid #E2E8F0; color: #64748B; font-size: 0.83rem; font-weight: 600; text-align: center; flex: none; }
+@media (max-width: 560px) { .orb-root .ac-res { margin: 0 0.6rem 0.5rem; max-height: none; } .orb-root .ac-res__actions .ac-btn { flex: 1 1 auto; justify-content: center; } }
+@media (max-height: 640px) { .orb-root .ac-res { max-height: 45%; } }
+@media (min-width: 1600px) { .orb-root .ac-res__text, .orb-root .ac-locked { font-size: 0.92rem; } }
+@media (min-width: 2200px) { .orb-root .ac-res { padding: 0.9rem 1.1rem; } .orb-root .ac-res__head { font-size: 0.98rem; } .orb-root .ac-res__text, .orb-root .ac-locked { font-size: 1.02rem; } }
+
+/* both PDF panes folded away: the conversation takes the room */
+.orb-root .am-body--chatonly .am-pane--chat:not(.am-pane--collapsed) { flex: 1 1 0; }
+.orb-root .am-body--chatonly .am-pane--chat .ac { max-width: 860px; width: 100%; margin: 0 auto; }
+
+/* viewer controls when the popup is opened from the feed */
+.orb-root .am-viewer { display: inline-flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.orb-root .am-viewer__pos { font-size: 0.78rem; font-weight: 600; color: #7a7066; min-width: 3.2rem; text-align: center; }
+.orb-root .am-iconbtn { width: 32px; height: 32px; border-radius: 9px; border: 1px solid #D9CFC3; background: #fff; color: #5c534a; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.orb-root .am-iconbtn:hover:not(:disabled) { background: #F6EEE4; }
+.orb-root .am-iconbtn:disabled { opacity: 0.4; cursor: default; }
+@media (max-width: 560px) { .orb-root .am-viewer { width: 100%; justify-content: space-between; } .orb-root .am-head__actions { width: 100%; } }

@@ -86,7 +86,8 @@ async def on_message_posted(db: AsyncSession, control_db: AsyncSession, *, alert
 
         _add_feed(db, event_type="MENTION" if mention_ids else "MESSAGE", vessel_id=vessel.id, alert_id=alert.id,
                   title=f"{author.full_name} {'wrote an internal note' if thread.is_internal else 'wrote'} on {where}",
-                  message=snippet, link=alert_link(alert.id), actor_name=author.full_name, actor_id=author.id, shore_only=thread.is_internal)
+                  message=snippet, link=alert_link(alert.id), actor_name=author.full_name, actor_id=author.id, shore_only=thread.is_internal,
+                  meta={"recipient_ids": [str(u) for u in (audience | mention_ids)], "mentioned_user_ids": [str(u) for u in mention_ids]})
         await db.commit()
     except Exception:
         logger.exception("Could not create notifications for a message on alert %s", alert.id)
@@ -122,7 +123,8 @@ async def on_resolution_event(db: AsyncSession, control_db: AsyncSession, *, kin
         _add_notifications(db, audience, type=ntype, title=title, message=msg, vessel_id=vessel.id, alert_id=alert.id,
                            sender_name=actor.full_name, link=alert_link(alert.id))
         _add_feed(db, event_type=etype, vessel_id=vessel.id, alert_id=alert.id, title=etitle, message=snippet or alert.message,
-                  link=alert_link(alert.id), actor_name=actor.full_name, actor_id=actor.id, shore_only=False)
+                  link=alert_link(alert.id), actor_name=actor.full_name, actor_id=actor.id, shore_only=False,
+                  meta={"recipient_ids": [str(u) for u in audience]})
         await db.commit()
     except Exception:
         logger.exception("Could not create notifications for a resolution step on alert %s", alert.id)

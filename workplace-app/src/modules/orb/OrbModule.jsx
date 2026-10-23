@@ -20,6 +20,7 @@ import UploadDetail from './pages/UploadDetail';
 import Entries from './pages/Entries';
 import Alerts from './pages/Alerts';
 import DailyLog from './pages/DailyLog';
+import Feed from './pages/Feed';
 import VesselConfiguration from './pages/admin/VesselConfiguration';
 import AdminLayout from './pages/admin/AdminLayout';
 
@@ -51,6 +52,7 @@ function ShoreRoutes() {
       <Route path="uploads/:id" element={<UploadDetail />} />
       <Route path="entries" element={<Entries />} />
       <Route path="alerts" element={<Alerts />} />
+      <Route path="feed" element={<Feed />} />
       <Route path="daily-log" element={<DailyLog />} />
       <Route
         path="admin/vessels"
@@ -75,6 +77,7 @@ function VesselRoutes() {
       <Route path="dashboard" element={<Dashboard />} />
       <Route path="entries" element={<Entries />} />
       <Route path="alerts" element={<Alerts />} />
+      <Route path="feed" element={<Feed />} />
       <Route path="daily-log" element={<DailyLog />} />
       <Route path="*" element={<Navigate to={`${ORB_ROOT}/vessel/dashboard`} replace />} />
     </Routes>

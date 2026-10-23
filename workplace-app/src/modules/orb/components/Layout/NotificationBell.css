@@ -36,3 +36,6 @@
 @media (max-height: 520px) { .orb-root .nb-list { max-height: calc(100vh - 130px); } }
 .orb-root .nb-item__icon--request, .orb-root .nb-item__icon--resolution_requested { background: #E7F1FB; color: #1f5f9a; }
 .orb-root .nb-item__icon--rejected, .orb-root .nb-item__icon--resolution_rejected { background: #FDE8E8; color: #B42318; }
+.orb-root .nb-title { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.5rem; font-size: 0.86rem; font-weight: 700; color: #A34509; }
+.orb-root .nb-foot { width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.4rem; border: 0; border-top: 1px solid #EADFD2; background: #FAF5EE; color: #A34509; font: inherit; font-size: 0.8rem; font-weight: 700; padding: 0.65rem; cursor: pointer; }
+.orb-root .nb-foot:hover { background: #F6EBDD; }

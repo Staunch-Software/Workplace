@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Send, Paperclip, X, Download, Lock, Loader2, MessageSquare } from 'lucide-react';
+import { Send, Paperclip, X, Download, Lock, Loader2, MessageSquare, ClipboardCheck, CheckCircle2, Ban, Clock } from 'lucide-react';
 import api from '../../api/axiosOrb';
 
 const MAX_FILES = 5;
@@ -27,7 +27,7 @@ function MessageBody({ text, names }) {
   );
 }
 
-export default function AlertChatPanel({ alertId, isShore, currentUserId, resolved, refreshKey = 0 }) {
+export default function AlertChatPanel({ alertId, isShore, currentUserId, alert, onAction, refreshKey = 0 }) {
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -44,6 +44,13 @@ export default function AlertChatPanel({ alertId, isShore, currentUserId, resolv
   const lastCount = useRef(0);
 
   const internal = isShore && mode === 'internal';
+
+  // Locked like a closed DRS thread: for everyone once the alert is resolved, and for the vessel while shore
+  // reviews its resolution request (shore may still write). The API refuses the message as well.
+  const status = alert.status || (alert.is_resolved ? 'RESOLVED' : 'OPEN');
+  const resolved = status === 'RESOLVED';
+  const pending = status === 'PENDING_APPROVAL';
+  const locked = resolved || (pending && !isShore);
 
   const load = useCallback(async () => {
     try {
@@ -234,6 +241,43 @@ export default function AlertChatPanel({ alertId, isShore, currentUserId, resolv
 
       {error && <div className="ac-error" role="alert">{error}</div>}
 
+      {/* The resolution notes live in the conversation, as the closure remarks do in DRS */}
+      {pending && (
+        <div className="ac-res ac-res--pending">
+          <div className="ac-res__head"><ClipboardCheck size={16} /><strong>Resolution requested</strong></div>
+          <div className="ac-res__meta">{alert.resolution_requested_by_name} · {fmtWhen(alert.resolution_requested_at)}</div>
+          <div className="ac-res__text">{alert.resolution_notes || 'No notes provided.'}</div>
+          {isShore ? (
+            <div className="ac-res__actions">
+              <button type="button" className="ac-btn ac-btn--ok" onClick={() => onAction?.('accept')}>Accept</button>
+              <button type="button" className="ac-btn ac-btn--no" onClick={() => onAction?.('reject')}>Reject</button>
+            </div>
+          ) : (
+            <div className="ac-res__wait"><Clock size={13} /> Awaiting shore approval</div>
+          )}
+        </div>
+      )}
+      {resolved && (
+        <div className="ac-res ac-res--resolved">
+          <div className="ac-res__head"><CheckCircle2 size={16} /><strong>Alert resolved</strong></div>
+          <div className="ac-res__meta">{alert.resolved_by_name}{alert.resolved_at ? ` · ${fmtWhen(alert.resolved_at)}` : ''}</div>
+          <div className="ac-res__text">{alert.resolution_notes || 'No notes were recorded.'}</div>
+        </div>
+      )}
+      {status === 'OPEN' && (alert.rejection_reason || alert.rejected_at) && (
+        <div className="ac-res ac-res--rejected">
+          <div className="ac-res__head"><Ban size={16} /><strong>Resolution request rejected</strong></div>
+          <div className="ac-res__meta">{alert.rejected_by_name} · {fmtWhen(alert.rejected_at)}</div>
+          {alert.rejection_reason && <div className="ac-res__text">{alert.rejection_reason}</div>}
+        </div>
+      )}
+
+      {locked ? (
+        <div className="ac-locked" role="status">
+          <Lock size={14} />
+          <span>{resolved ? 'Thread locked (alert resolved)' : 'Thread locked while shore reviews your resolution request'}</span>
+        </div>
+      ) : (
       <div className="ac-composer">
         {picker.open && pickerMatches.length > 0 && (
           <ul className="ac-picker" role="listbox">
@@ -272,12 +316,13 @@ export default function AlertChatPanel({ alertId, isShore, currentUserId, resolv
           <button type="button" className="ac-btn ac-btn--ghost" onClick={() => fileRef.current?.click()} disabled={sending || files.length >= MAX_FILES}>
             <Paperclip size={14} /> Attach
           </button>
-          <span className="ac-hint">{resolved ? 'Alert resolved · ' : ''}Ctrl+Enter to send</span>
+          <span className="ac-hint">Ctrl+Enter to send</span>
           <button type="button" className="ac-btn ac-btn--send" onClick={send} disabled={sending || (!draft.trim() && files.length === 0)}>
             {sending ? <Loader2 size={14} className="ac-spin" /> : <Send size={14} />} Send
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 }

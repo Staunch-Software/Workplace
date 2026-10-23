@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSidebar } from '../../context/SidebarContext';
 import {
   LayoutDashboard, Upload, FileText, Bell,
-  BookOpen, ArrowLeft,
+  BookOpen, ArrowLeft, Rss,
 } from 'lucide-react';
 import api from '../../api/axiosOrb';
 import { useOrbBase } from '../../hooks/useOrbNavigate';
@@ -16,6 +16,7 @@ const SHORE_LINKS = [
   { to: '/uploads',    label: 'ORB Uploads',  Icon: Upload },
   { to: '/entries',    label: 'ORB Entries',  Icon: FileText },
   { to: '/alerts',     label: 'Alerts',       Icon: Bell },
+  { to: '/feed',       label: 'Feed',         Icon: Rss },
   { to: '/daily-log',  label: 'Daily Log',    Icon: BookOpen },
 ];
 
@@ -23,6 +24,7 @@ const VESSEL_LINKS = [
   { to: '/dashboard',  label: 'Dashboard',   Icon: LayoutDashboard },
   { to: '/entries',    label: 'ORB Entries',  Icon: FileText },
   { to: '/alerts',     label: 'Alerts',       Icon: Bell },
+  { to: '/feed',       label: 'Feed',         Icon: Rss },
   { to: '/daily-log',  label: 'Daily Log',    Icon: BookOpen },
 ];
 
@@ -33,12 +35,17 @@ export default function Sidebar() {
   const goToWorkplace = useRouterNavigate();
   const { isOpen, close } = useSidebar();
   const [alertCount, setAlertCount] = useState(0);
+  const [feedCount, setFeedCount] = useState(0);
 
   useEffect(() => {
-    const fetch = () => api.get('/api/alerts/summary').then(r => setAlertCount(r.data.data?.total || 0)).catch(() => {});
+    const fetch = () => {
+      api.get('/api/alerts/summary').then(r => setAlertCount(r.data.data?.total || 0)).catch(() => {});
+      api.get('/api/feed', { params: { limit: 1 } }).then(r => setFeedCount(r.data.data?.unread_count || 0)).catch(() => {});
+    };
     fetch();
     const id = setInterval(fetch, 30000);
-    return () => clearInterval(id);
+    window.addEventListener('orb:feed-changed', fetch);
+    return () => { clearInterval(id); window.removeEventListener('orb:feed-changed', fetch); };
   }, []);
 
   return (
@@ -77,6 +84,11 @@ export default function Sidebar() {
               {label === 'Alerts' && alertCount > 0 && (
                 <span className="sidebar-badge">
                   {alertCount > 99 ? '99+' : alertCount}
+                </span>
+              )}
+              {label === 'Feed' && feedCount > 0 && (
+                <span className="sidebar-badge">
+                  {feedCount > 99 ? '99+' : feedCount}
                 </span>
               )}
             </NavLink>
