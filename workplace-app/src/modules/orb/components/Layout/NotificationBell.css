@@ -34,3 +34,5 @@
 @media (min-width: 2200px) { .orb-root .nb-panel { width: 560px; } .orb-root .nb-btn { width: 46px; height: 46px; } .orb-root .nb-item__title { font-size: 1rem; } .orb-root .nb-item__msg { font-size: 0.94rem; } }
 @media (max-width: 480px) { .orb-root .nb-panel { top: 58px; } .orb-root .nb-list { max-height: calc(100vh - 160px); } .orb-root .nb-all { font-size: 0.7rem; } .orb-root .nb-tab { padding: 0.5rem 0.5rem; font-size: 0.78rem; } }
 @media (max-height: 520px) { .orb-root .nb-list { max-height: calc(100vh - 130px); } }
+.orb-root .nb-item__icon--request, .orb-root .nb-item__icon--resolution_requested { background: #E7F1FB; color: #1f5f9a; }
+.orb-root .nb-item__icon--rejected, .orb-root .nb-item__icon--resolution_rejected { background: #FDE8E8; color: #B42318; }

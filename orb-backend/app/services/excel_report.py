@@ -16,7 +16,7 @@ from app.models.orb_alert import OrbAlert
 from app.models.vessel import Vessel
 from app.models.vessel_tank import VesselTank
 from app.services.report_lines import entry_line_rows
-from app.services.report_alerts import alerts_for_upload, alert_entry_date
+from app.services.report_alerts import alerts_for_upload, alert_entry_date, alert_status_label
 
 
 HEADER_FILL = PatternFill("solid", fgColor="1F4E79")
@@ -128,7 +128,7 @@ async def generate_excel(upload_id: uuid.UUID, db: AsyncSession) -> bytes:
 
     # ── Sheet 2: Discrepancy Register ─────────────────────────────────────────
     ws2 = wb.create_sheet("Discrepancy Register")
-    headers2 = ["Sr.No.", "Severity", "Alert Type", "Message", "Entry Date", "Raised At", "Status"]
+    headers2 = ["Sr.No.", "Severity", "Alert Type", "Message", "Entry Date", "Raised At", "Status", "Resolution Notes"]
     ws2.append(headers2)
     for col_num, h in enumerate(headers2, 1):
         cell = ws2.cell(row=1, column=col_num)
@@ -143,7 +143,8 @@ async def generate_excel(upload_id: uuid.UUID, db: AsyncSession) -> bytes:
             alert.message,
             alert_entry_date(alert, entry_dates),
             alert.created_at.strftime("%Y-%m-%d %H:%M") if alert.created_at else "",
-            "Resolved" if alert.is_resolved else "Open",
+            alert_status_label(alert),
+            alert.resolution_notes or "",
         ]
         ws2.append(row)
         fill = SEVERITY_FILLS.get(alert.severity, WHITE_FILL)

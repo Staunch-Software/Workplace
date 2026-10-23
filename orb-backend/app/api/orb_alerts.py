@@ -1,5 +1,4 @@
 import uuid
-from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,13 +9,11 @@ from app.models.orb_alert import OrbAlert
 from app.models.orb_entry import OrbEntry
 from app.models.orb_upload import OrbUpload
 from app.models.control_user import ControlUser
-from app.schemas.orb_alert import AlertResponse, ResolveRequest, AlertSummary
+from app.schemas.orb_alert import AlertResponse
 from app.schemas.common import success
 from app.dependencies import get_current_user, require_shore, allowed_vessel_ids, scope_vessel_ids, assert_vessel_access
 from app.models.orb_alert_thread import OrbAlertThread
 from app.services.alert_chat import thread_stats
-from app.services import orb_notify
-from app.models.vessel import Vessel
 from app.services.calculations import run_all_checks
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
@@ -37,13 +34,16 @@ async def alert_summary(
 
     by_type = {}
     counts = {"critical": 0, "major": 0, "minor": 0, "observation": 0}
+    pending = 0
     for a in alerts:
+        pending += a.status == "PENDING_APPROVAL"
         counts[a.severity] = counts.get(a.severity, 0) + 1
         by_type[a.alert_type] = by_type.get(a.alert_type, 0) + 1
 
     return success(data={
         "total": len(alerts),
         **counts,
+        "pending_approval": pending,        # open alerts a vessel has asked shore to resolve
         "by_type": by_type,
     })
 
@@ -54,6 +54,7 @@ async def list_alerts(
     severity: Optional[str] = None,
     is_resolved: Optional[bool] = None,
     alert_type: Optional[str] = None,
+    status: Optional[str] = Query(None, pattern="^(OPEN|PENDING_APPROVAL|RESOLVED)$"),
     db: AsyncSession = Depends(get_db),
     user: ControlUser = Depends(get_current_user),
 ):
@@ -71,6 +72,8 @@ async def list_alerts(
         q = q.where(OrbAlert.is_resolved == is_resolved)
     if alert_type:
         q = q.where(OrbAlert.alert_type == alert_type)
+    if status:
+        q = q.where(OrbAlert.status == status)
 
     result = await db.execute(q)
     rows = result.all()
@@ -143,28 +146,3 @@ async def recalculate_alerts(
         await run_all_checks(vessel_id, upload.id, db)
 
     return success(message=f"Recalculated alerts for vessel. Cleared {deleted.rowcount} stale alerts, processed {len(uploads)} upload(s).")
-
-
-@router.patch("/{alert_id}/resolve")
-async def resolve_alert(
-    alert_id: uuid.UUID,
-    body: ResolveRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: ControlUser = Depends(require_shore),
-):
-    result = await db.execute(select(OrbAlert).where(OrbAlert.id == alert_id))
-    alert = result.scalar_one_or_none()
-    if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
-    await assert_vessel_access(current_user, db, alert.vessel_id)
-    if alert.is_resolved:
-        raise HTTPException(status_code=400, detail="Alert already resolved")
-
-    alert.is_resolved = True
-    alert.resolved_by = current_user.id
-    alert.resolved_at = datetime.now(timezone.utc)
-    await db.commit()
-    await db.refresh(alert)
-    vessel = (await db.execute(select(Vessel).where(Vessel.id == alert.vessel_id))).scalar_one()
-    await orb_notify.on_alert_resolved(db, alert=alert, vessel=vessel, actor=current_user)
-    return success(data=AlertResponse.model_validate(alert).model_dump(), message="Alert resolved")

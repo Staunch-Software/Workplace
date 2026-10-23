@@ -93,18 +93,39 @@ async def on_message_posted(db: AsyncSession, control_db: AsyncSession, *, alert
         await db.rollback()
 
 
-async def on_alert_resolved(db: AsyncSession, *, alert: OrbAlert, vessel, actor) -> None:
+async def on_resolution_event(db: AsyncSession, control_db: AsyncSession, *, kind: str, alert: OrbAlert, vessel, actor,
+                              notes: str = "", requester_id: Optional[uuid.UUID] = None) -> None:
+    """A resolution step happened. kind: REQUESTED (vessel asked) | ACCEPTED | REJECTED | RESOLVED (shore, directly).
+
+    REQUESTED tells the shore users assigned to the vessel; the others tell the vessel user who asked and
+    everyone else in the conversation."""
     try:
-        where = f"{_alert_title(alert)} · {vessel.name}"
+        where = f"{_alert_title(alert)} \u00b7 {vessel.name}"
+        snippet = _snippet(notes, False)
         audience = await _participants(db, alert.id, shore_side_only=False)
+        if kind == "REQUESTED":
+            audience |= set(await fetch_assigned_shore(control_db, vessel.imo_number))
+        elif requester_id:
+            audience.add(requester_id)
         audience.discard(actor.id)
-        _add_notifications(db, audience, type="RESOLVED", title=f"Alert resolved: {where}", message=f"Resolved by {actor.full_name}",
-                           vessel_id=vessel.id, alert_id=alert.id, sender_name=actor.full_name, link=alert_link(alert.id))
-        _add_feed(db, event_type="RESOLVED", vessel_id=vessel.id, alert_id=alert.id, title=f"{actor.full_name} resolved {where}",
-                  message=alert.message, link=alert_link(alert.id), actor_name=actor.full_name, actor_id=actor.id, shore_only=False)
+
+        if kind == "REQUESTED":
+            ntype, title, msg = "REQUEST", f"Resolution requested: {where}", f"{actor.full_name}: {snippet}"
+            etype, etitle = "RESOLUTION_REQUESTED", f"{actor.full_name} asked to resolve {where}"
+        elif kind == "REJECTED":
+            ntype, title, msg = "REJECTED", f"Resolution rejected: {where}", f"{actor.full_name}" + (f": {snippet}" if snippet else "")
+            etype, etitle = "RESOLUTION_REJECTED", f"{actor.full_name} rejected the resolution of {where}"
+        else:
+            verb = "accepted the resolution of" if kind == "ACCEPTED" else "resolved"
+            ntype, title, msg = "RESOLVED", f"Alert resolved: {where}", f"{'Accepted' if kind == 'ACCEPTED' else 'Resolved'} by {actor.full_name}" + (f": {snippet}" if snippet else "")
+            etype, etitle = "RESOLVED", f"{actor.full_name} {verb} {where}"
+        _add_notifications(db, audience, type=ntype, title=title, message=msg, vessel_id=vessel.id, alert_id=alert.id,
+                           sender_name=actor.full_name, link=alert_link(alert.id))
+        _add_feed(db, event_type=etype, vessel_id=vessel.id, alert_id=alert.id, title=etitle, message=snippet or alert.message,
+                  link=alert_link(alert.id), actor_name=actor.full_name, actor_id=actor.id, shore_only=False)
         await db.commit()
     except Exception:
-        logger.exception("Could not create notifications for resolved alert %s", alert.id)
+        logger.exception("Could not create notifications for a resolution step on alert %s", alert.id)
         await db.rollback()
 
 

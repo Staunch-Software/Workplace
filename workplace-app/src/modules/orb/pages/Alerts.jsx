@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  ShieldAlert, AlertTriangle, AlertCircle, Eye, RefreshCw, Check, BellOff, Filter, MessageSquare,
+  ShieldAlert, AlertTriangle, AlertCircle, Eye, RefreshCw, BellOff, Filter, MessageSquare, Check, Send,
 } from 'lucide-react';
 import Sidebar from '../components/Layout/Sidebar';
 import Header from '../components/Layout/Header';
 import Badge from '../components/shared/Badge';
-import Modal from '../components/shared/Modal';
 import AlertModal from '../components/alerts/AlertModal';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
@@ -52,10 +51,10 @@ export default function Alerts() {
   const [vessels, setVessels] = useState([]);
   const [summary, setSummary] = useState({});
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ vessel_id: [], severity: '', is_resolved: '', alert_type: '' });
-  const [resolving, setResolving] = useState(null);
+  const [filters, setFilters] = useState({ vessel_id: [], severity: '', status: '', alert_type: '' });
   const [recalculating, setRecalculating] = useState(false);
   const [selected, setSelected] = useState(null);   // alert open in the popup
+  const [startAction, setStartAction] = useState(null);   // resolution box to open with it
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, isShore } = useAuth();
 
@@ -96,12 +95,6 @@ export default function Alerts() {
     const newSeverity = filters.severity === s ? '' : s;
     setFilters(f => ({ ...f, severity: newSeverity }));
     load({ severity: newSeverity });
-  };
-
-  const handleResolve = async () => {
-    await api.patch(`/api/alerts/${resolving}/resolve`, { notes: '' });
-    setResolving(null);
-    load();
   };
 
   const handleRecalculate = async () => {
@@ -176,9 +169,9 @@ export default function Alerts() {
                 <div className="form-group">
                   <label>Status</label>
                   <Dropdown
-                    value={filters.is_resolved}
-                    onChange={v => setFilter('is_resolved', v)}
-                    options={[{ value: '', label: 'All' }, { value: 'false', label: 'Open' }, { value: 'true', label: 'Resolved' }]}
+                    value={filters.status}
+                    onChange={v => setFilter('status', v)}
+                    options={[{ value: '', label: 'All' }, { value: 'OPEN', label: 'Open' }, { value: 'PENDING_APPROVAL', label: 'Pending approval' }, { value: 'RESOLVED', label: 'Resolved' }]}
                   />
                 </div>
                 <div className="form-group">
@@ -229,7 +222,7 @@ export default function Alerts() {
                         return (
                             <tr
                               key={a.id}
-                              onClick={() => setSelected(a)}
+                              onClick={() => { setStartAction(null); setSelected(a); }}
                               className={`al-row al-row--${a.severity}${a.is_resolved ? ' al-row--resolved' : ''}`}
                               title="Open alert"
                             >
@@ -260,11 +253,16 @@ export default function Alerts() {
                                   );
                                 })()}
                               </td>
-                              <td data-label="Status"><Badge value={a.is_resolved ? 'Resolved' : 'Open'} type={a.is_resolved ? 'completed' : 'pending'} /></td>
+                              <td data-label="Status">
+                                {a.status === 'PENDING_APPROVAL'
+                                  ? <Badge value="Pending approval" type="review" />
+                                  : <Badge value={a.is_resolved ? 'Resolved' : 'Open'} type={a.is_resolved ? 'completed' : 'pending'} />}
+                              </td>
                               <td className="al-td-actions">
-                                {isShore && !a.is_resolved && (
-                                  <button className="al-btn al-btn--ghost al-btn--sm" onClick={(e) => { e.stopPropagation(); setResolving(a.id); }}>
-                                    <Check size={14} /> Resolve
+                                {!a.is_resolved && (isShore || a.status !== 'PENDING_APPROVAL') && (
+                                  <button className="al-btn al-btn--ghost al-btn--sm"
+                                          onClick={(e) => { e.stopPropagation(); setStartAction(isShore ? (a.status === 'PENDING_APPROVAL' ? null : 'resolve') : 'request'); setSelected(a); }}>
+                                    {isShore ? <><Check size={14} /> {a.status === 'PENDING_APPROVAL' ? 'Review' : 'Resolve'}</> : <><Send size={14} /> Request</>}
                                   </button>
                                 )}
                               </td>
@@ -283,25 +281,12 @@ export default function Alerts() {
                 vesselName={vessels.find(v => v.id === selected.vessel_id)?.name}
                 isShore={isShore}
                 currentUserId={user?.id}
-                onClose={() => { setSelected(null); load(); }}
+                startAction={startAction}
+                onClose={() => { setSelected(null); setStartAction(null); load(); }}
                 onChanged={() => load()}
               />
             )}
 
-            {resolving && (
-              <Modal
-                title="Resolve Alert"
-                onClose={() => setResolving(null)}
-                footer={
-                  <>
-                    <button className="al-btn al-btn--secondary" onClick={() => setResolving(null)}>Cancel</button>
-                    <button className="al-btn al-btn--primary" onClick={handleResolve}>Confirm Resolve</button>
-                  </>
-                }
-              >
-                <p>Mark this alert as resolved? This action will record your name and timestamp.</p>
-              </Modal>
-            )}
           </div>
         </div>
       </div>

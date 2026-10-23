@@ -34,7 +34,7 @@ def _thread_dict(t: OrbAlertThread, attachments: list) -> dict:
     return {
         "id": str(t.id), "alert_id": str(t.alert_id), "author_id": str(t.author_id), "author_name": t.author_name,
         "author_role": t.author_role, "body": t.body, "is_internal": t.is_internal,
-        "tagged_user_ids": t.tagged_user_ids or [], "created_at": t.created_at.isoformat() if t.created_at else None,
+        "is_system": t.is_system, "tagged_user_ids": t.tagged_user_ids or [], "created_at": t.created_at.isoformat() if t.created_at else None,
         "attachments": [{"id": str(a.id), "file_name": a.file_name, "file_size": a.file_size, "content_type": a.content_type}
                         for a in attachments],
     }

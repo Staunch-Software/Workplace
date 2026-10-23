@@ -25,6 +25,8 @@ class OrbAlertThread(Base):
     author_role: Mapped[str] = mapped_column(String(20), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False, default="")
     is_internal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    # A line written by the system for a resolution step (requested / accepted / rejected / resolved).
+    is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     tagged_user_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     # Client-generated id so a retried send never posts the same message twice.
     client_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, unique=True)

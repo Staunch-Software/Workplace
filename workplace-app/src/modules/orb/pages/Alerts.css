@@ -227,3 +227,5 @@
 .orb-root .al-chat { display: inline-flex; align-items: center; gap: 0.25rem; margin-left: 0.5rem; font-size: 0.72rem; color: #7a7066; background: #F3EBE2; border-radius: 999px; padding: 0 0.45rem; white-space: nowrap; vertical-align: middle; }
 .orb-root .al-chat--new { background: #FFE9D3; color: #A34509; font-weight: 700; }
 .orb-root .al-row { cursor: pointer; }
+.orb-root .al .badge-review { background: #E7F1FB; color: #1f5f9a; border-color: #C5DBF2; }
+.orb-root .badge-review { background: #E7F1FB; color: #1f5f9a; border-color: #C5DBF2; }

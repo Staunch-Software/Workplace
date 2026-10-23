@@ -66,6 +66,7 @@ export default function UploadDetail() {
   const { isAdmin, user } = useAuth();
   const [openAlertId, setOpenAlertId] = useState(null);   // alert whose Source ORB Entry is expanded
   const [modalAlert, setModalAlert] = useState(null);     // alert open in the popup
+  const [modalAction, setModalAction] = useState(null);     // resolution box to open with it
   const [reprocessing, setReprocessing] = useState(false);
 
   const load = async (quiet = false) => {
@@ -102,11 +103,6 @@ export default function UploadDetail() {
   useEffect(() => {
     if (activeTab === 'Daily Log') loadDailyLog();
   }, [activeTab]);
-
-  const resolveAlert = async (alertId) => {
-    await api.patch(`/api/alerts/${alertId}/resolve`, { notes: '' });
-    load(true);
-  };
 
   const openPreview = async () => {
     setPreview({ url: null, loading: true });
@@ -424,6 +420,7 @@ export default function UploadDetail() {
                               <div className="ud-alert__head">
                                 <Badge value={a.severity} />
                                 <span className="ud-alert__type">{a.alert_type.replace(/_/g, ' ')}</span>
+                                {a.status === 'PENDING_APPROVAL' && <Badge value="Pending approval" type="review" />}
                                 {a.page_number != null && (
                                   <span className="ud-alert__page">· Page {a.page_number}</span>
                                 )}
@@ -432,11 +429,14 @@ export default function UploadDetail() {
                             </div>
                             <div className="ud-alert__actions">
                               <button className="ud-btn ud-btn--secondary ud-btn--sm" title="Open the pages and the conversation"
-                                      onClick={(e) => { e.stopPropagation(); setModalAlert(a); }}>
+                                      onClick={(e) => { e.stopPropagation(); setModalAction(null); setModalAlert(a); }}>
                                 <MessageSquare size={13} />
                                 {a.thread_count > 0 ? ` ${a.thread_count}${a.unread_count > 0 ? ` · ${a.unread_count} new` : ''}` : ' Open'}
                               </button>
-                              <button className="ud-btn ud-btn--secondary ud-btn--sm" onClick={(e) => { e.stopPropagation(); resolveAlert(a.id); }}>Resolve</button>
+                              <button className="ud-btn ud-btn--secondary ud-btn--sm"
+                                      onClick={(e) => { e.stopPropagation(); setModalAction(a.status === 'PENDING_APPROVAL' ? null : 'resolve'); setModalAlert(a); }}>
+                                {a.status === 'PENDING_APPROVAL' ? 'Review' : 'Resolve'}
+                              </button>
                             </div>
                           </div>
                           {open && <SourceEntryDetail alert={a} />}
@@ -454,7 +454,8 @@ export default function UploadDetail() {
                 vesselName={upload?.vessel_name}
                 isShore
                 currentUserId={user?.id}
-                onClose={() => { setModalAlert(null); load(true); }}
+                startAction={modalAction}
+                onClose={() => { setModalAlert(null); setModalAction(null); load(true); }}
                 onChanged={() => load(true)}
               />
             )}

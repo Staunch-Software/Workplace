@@ -47,6 +47,12 @@ async def alerts_for_upload(db: AsyncSession, upload: OrbUpload, entries: list[O
     return list(result.scalars().all())
 
 
+def alert_status_label(alert) -> str:
+    """Open / Pending approval / Resolved, for the Excel and PDF exports."""
+    status = getattr(alert, "status", None) or ("RESOLVED" if alert.is_resolved else "OPEN")
+    return {"RESOLVED": "Resolved", "PENDING_APPROVAL": "Pending approval"}.get(status, "Open")
+
+
 def alert_entry_date(alert: OrbAlert, entry_dates: dict[uuid.UUID, object]) -> str:
     """The date the alert is about: its entry's date, else the [date] in its message."""
     if alert.entry_id is not None and alert.entry_id in entry_dates:

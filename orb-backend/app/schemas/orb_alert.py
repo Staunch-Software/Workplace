@@ -18,8 +18,16 @@ class AlertResponse(BaseModel):
     severity: str
     message: str
     is_resolved: bool
+    status: str = "OPEN"                       # OPEN | PENDING_APPROVAL | RESOLVED
     resolved_by: Optional[uuid.UUID] = None
+    resolved_by_name: Optional[str] = None
     resolved_at: Optional[datetime] = None
+    resolution_notes: Optional[str] = None
+    resolution_requested_by_name: Optional[str] = None
+    resolution_requested_at: Optional[datetime] = None
+    rejection_reason: Optional[str] = None
+    rejected_by_name: Optional[str] = None
+    rejected_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

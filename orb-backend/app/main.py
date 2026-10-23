@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.api import vessels, vessel_tanks, orb_uploads, orb_entries, orb_alerts, orb_alert_threads, orb_alert_pages, orb_notifications
+from app.api import vessels, vessel_tanks, orb_uploads, orb_entries, orb_alerts, orb_alert_threads, orb_alert_pages, orb_notifications, orb_alert_resolution
 
 settings = get_settings()
 
@@ -49,6 +49,7 @@ app.include_router(orb_alerts.router, prefix="/api")
 app.include_router(orb_alert_threads.router, prefix="/api")
 app.include_router(orb_alert_pages.router, prefix="/api")
 app.include_router(orb_notifications.router, prefix="/api")
+app.include_router(orb_alert_resolution.router, prefix="/api")
 
 @app.get("/")
 async def root():

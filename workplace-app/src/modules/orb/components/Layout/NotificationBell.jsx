@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, AtSign, MessageSquare, CheckCircle2, FileText, AlertTriangle, CheckCheck, Inbox } from 'lucide-react';
+import { Bell, AtSign, MessageSquare, CheckCircle2, FileText, AlertTriangle, CheckCheck, Inbox, ClipboardCheck, XCircle } from 'lucide-react';
 import api from '../../api/axiosOrb';
 import { useNavigate } from '../../hooks/useOrbNavigate';
 import './NotificationBell.css';
@@ -8,6 +8,7 @@ const POLL_MS = 15000;
 
 const ICONS = {
   MENTION: AtSign, MESSAGE: MessageSquare, RESOLVED: CheckCircle2, UPLOAD: FileText, ALERTS_RAISED: AlertTriangle,
+  REQUEST: ClipboardCheck, REJECTED: XCircle, RESOLUTION_REQUESTED: ClipboardCheck, RESOLUTION_REJECTED: XCircle,
 };
 
 function ago(iso) {

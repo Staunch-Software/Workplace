@@ -27,7 +27,7 @@ function MessageBody({ text, names }) {
   );
 }
 
-export default function AlertChatPanel({ alertId, isShore, currentUserId, resolved }) {
+export default function AlertChatPanel({ alertId, isShore, currentUserId, resolved, refreshKey = 0 }) {
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -65,6 +65,9 @@ export default function AlertChatPanel({ alertId, isShore, currentUserId, resolv
     return () => clearInterval(id);
   }, [load]);
 
+  // The popup changed something (a resolution step wrote a system line): show it now, not at the next poll.
+  useEffect(() => { if (refreshKey > 0) load(); }, [refreshKey, load]);
+
   // Opening the chat marks it read (other people's new messages stop counting as unread).
   useEffect(() => {
     if (!loading && threads.length !== lastCount.current) {
@@ -81,7 +84,7 @@ export default function AlertChatPanel({ alertId, isShore, currentUserId, resolv
 
   const visible = useMemo(() => threads.filter(t => (isShore ? t.is_internal === internal : !t.is_internal)), [threads, isShore, internal]);
   const internalCount = threads.filter(t => t.is_internal).length;
-  const externalCount = threads.length - internalCount;
+  const externalCount = threads.filter(t => !t.is_internal && !t.is_system).length;
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -201,6 +204,15 @@ export default function AlertChatPanel({ alertId, isShore, currentUserId, resolv
         ) : visible.length === 0 ? (
           <div className="ac-empty"><MessageSquare size={26} /><span>{internal ? 'No internal notes yet.' : 'No messages yet. Start the conversation.'}</span></div>
         ) : visible.map(t => {
+          if (t.is_system) {
+            const tone = /rejected/i.test(t.body) ? ' ac-sys--rejected' : /accepted|resolved by/i.test(t.body) ? ' ac-sys--ok' : '';
+            return (
+              <div key={t.id} className={`ac-sys${tone}`}>
+                {t.body}
+                <span className="ac-sys__when">{fmtWhen(t.created_at)}</span>
+              </div>
+            );
+          }
           const mine = t.author_id === currentUserId;
           return (
             <div key={t.id} className={`ac-msg${mine ? ' ac-msg--mine' : ''}${t.is_internal ? ' ac-msg--internal' : ''}`}>

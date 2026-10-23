@@ -62,7 +62,7 @@ async def thread_stats(db: AsyncSession, user: ControlUser, alert_ids: Iterable[
             ),
         )
         .outerjoin(OrbAlertThreadRead, (OrbAlertThreadRead.alert_id == OrbAlertThread.alert_id) & (OrbAlertThreadRead.user_id == user.id))
-        .where(OrbAlertThread.alert_id.in_(ids))
+        .where(OrbAlertThread.alert_id.in_(ids), OrbAlertThread.is_system == False)  # noqa: E712  (system lines are not messages)
         .group_by(OrbAlertThread.alert_id)
     )
     if cond is not True:

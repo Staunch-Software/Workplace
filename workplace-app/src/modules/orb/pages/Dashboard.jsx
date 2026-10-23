@@ -237,7 +237,7 @@ export default function Dashboard() {
                   <KpiCard
                     label="Open Alerts"
                     value={totalAlerts}
-                    sub={`${critical} critical · ${major} major · ${minor} minor`}
+                    sub={`${critical} critical · ${major} major · ${minor} minor${alertSummary?.pending_approval ? ` · ${alertSummary.pending_approval} awaiting approval` : ''}`}
                     tone={alertTone}
                     icon={AlertTriangle}
                   >
