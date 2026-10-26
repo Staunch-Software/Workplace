@@ -123,9 +123,9 @@ async def post_thread(
     cid = None
     if client_id:
         try:
-            cid = uuid.UUID(client_id)
+            cid = uuid.UUID(str(client_id).strip())
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid client_id")
+            cid = uuid.uuid5(uuid.NAMESPACE_OID, str(client_id).strip())
         existing = (await db.execute(select(OrbAlertThread).where(OrbAlertThread.client_id == cid))).scalar_one_or_none()
         if existing is not None:
             if existing.alert_id != alert_id or existing.author_id != user.id:

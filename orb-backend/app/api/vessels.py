@@ -113,3 +113,101 @@ async def update_vessel(
     await db.commit()
     await db.refresh(vessel)
     return success(data=VesselResponse.model_validate(vessel).model_dump(), message="Vessel updated")
+
+
+@router.get("/sync-status/all")
+async def get_all_vessel_sync_status(
+    db: AsyncSession = Depends(get_db),
+    control_db: AsyncSession = Depends(get_control_db),
+):
+    try:
+        from sqlalchemy import table, column, String, JSON
+        from app.models.sync import SyncState
+
+        vessels_t = table(
+            "vessels",
+            column("imo", String),
+            column("name", String),
+            column("module_error_counts", JSON),
+            column("last_sync_error", String),
+        )
+        v_res = await control_db.execute(select(vessels_t))
+        vessels = v_res.mappings().all()
+
+        ss_res = await db.execute(
+            select(SyncState).where(SyncState.sync_scope == "vessel")
+        )
+        sync_states = {s.vessel_imo: s for s in ss_res.scalars().all()}
+
+        result = {}
+        for v in vessels:
+            imo = v["imo"]
+            state = sync_states.get(imo)
+            active_errors = state.active_errors if (state and state.active_errors) else []
+            counts_map = v["module_error_counts"] or {}
+            orb_count = counts_map.get("orb", 0)
+
+            result[imo] = {
+                "name": v["name"],
+                "last_sync_success": (orb_count == 0 and len(active_errors) == 0),
+                "failed_items_count": max(orb_count, len(active_errors)),
+                "latest_error": active_errors[0] if active_errors else None,
+                "vessel_reported_push": state.last_push_at if state else None,
+                "vessel_reported_pull": state.last_pull_at if state else None,
+            }
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{imo}/sync-log")
+async def get_vessel_sync_log(
+    imo: str,
+    db: AsyncSession = Depends(get_db),
+    control_db: AsyncSession = Depends(get_control_db),
+):
+    from sqlalchemy import table, column, String, JSON
+    from app.models.sync import SyncState
+    import json
+
+    vessels_t = table(
+        "vessels",
+        column("imo", String),
+        column("name", String),
+        column("module_error_counts", JSON),
+        column("last_sync_error", String),
+    )
+    v_res = await control_db.execute(select(vessels_t).where(vessels_t.c.imo == imo))
+    vessel = v_res.mappings().first()
+    if not vessel:
+        raise HTTPException(status_code=404, detail=f"Vessel {imo} not found")
+
+    ss_res = await db.execute(
+        select(SyncState).where(
+            SyncState.vessel_imo == imo,
+            SyncState.sync_scope == "vessel",
+        )
+    )
+    sync_state = ss_res.scalar_one_or_none()
+
+    active_errors = sync_state.active_errors if (sync_state and sync_state.active_errors) else []
+    counts_map = vessel["module_error_counts"] or {}
+    orb_count = counts_map.get("orb", 0)
+
+    error_history = []
+    if vessel["last_sync_error"]:
+        try:
+            error_history = json.loads(vessel["last_sync_error"])
+        except Exception:
+            pass
+
+    return {
+        "imo": imo,
+        "name": vessel["name"],
+        "last_sync_success": (orb_count == 0 and len(active_errors) == 0),
+        "vessel_reported_push": sync_state.last_push_at if sync_state else None,
+        "vessel_reported_pull": sync_state.last_pull_at if sync_state else None,
+        "active_errors": active_errors,
+        "failed_items_count": max(orb_count, len(active_errors)),
+        "error_history": error_history,
+    }

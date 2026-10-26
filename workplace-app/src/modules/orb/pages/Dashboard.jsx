@@ -156,6 +156,31 @@ export default function Dashboard() {
 
   const today = now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
+  const recentAlertsCard = (
+                      <section className="db-card">
+                        <div className="db-card__head">
+                          <h3 className="db-card__title"><BellOff size={16} /> Recent Alerts</h3>
+                          <button className="db-link" onClick={() => navigate('/alerts')}>View all <ArrowRight size={13} /></button>
+                        </div>
+                        {recentAlerts.length === 0 ? (
+                          <div className="db-empty"><span className="db-empty__icon db-empty__icon--ok"><CheckCircle2 size={22} /></span>No open alerts.</div>
+                        ) : (
+                          <ul className="db-list">
+                            {recentAlerts.map((a) => (
+                              <li key={a.id} className="db-list__item" onClick={() => navigate('/alerts')}>
+                                <Badge value={a.severity} />
+                                <div className="db-list__main">
+                                  <span className="db-list__title">{a.alert_type.replace(/_/g, ' ')}</span>
+                                  <span className="db-list__sub">{vesselName(a.vessel_id)}</span>
+                                </div>
+                                <span className="db-list__date">{fmtDate(a.created_at)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </section>
+  );
+
   return (
     <div className="app-shell">
       <Sidebar />
@@ -199,7 +224,7 @@ export default function Dashboard() {
                 )}
 
                 {/* KPI cards */}
-                <div className="db-kpis">
+                <div className={`db-kpis${isVessel ? ' db-kpis--4' : ''}`}>
                   <KpiCard
                     label={isVessel ? 'My Vessels' : 'Total Vessels'}
                     value={vessels.length}
@@ -243,6 +268,24 @@ export default function Dashboard() {
                     icon={AlertTriangle}
                   >
                   </KpiCard>
+                  {isVessel && (<>
+                  <KpiCard
+                    label="Critical Alerts"
+                    value={critical}
+                    sub={`${major} major alert${major === 1 ? '' : 's'} open`}
+                    tone={critical > 0 ? 'bad' : 'ok'}
+                    icon={ShieldAlert}
+                    onClick={() => navigate('/alerts')}
+                  />
+                  <KpiCard
+                    label="Awaiting Approval"
+                    value={alertSummary?.pending_approval || 0}
+                    sub="Resolution requests sent to shore"
+                    tone={alertSummary?.pending_approval ? 'warn' : undefined}
+                    icon={CheckCircle2}
+                    onClick={() => navigate('/alerts')}
+                  />
+                  </>)}
                 </div>
 
                 {showPlainVesselList ? (
@@ -314,8 +357,8 @@ export default function Dashboard() {
                 ) : (
                   <>
                     <div className="db-grid db-grid--main">
-                      {/* Vessel compliance overview */}
-                      <section className="db-card">
+                      {isVessel ? recentAlertsCard : (
+<section className="db-card">
                         <div className="db-card__head">
                           <h3 className="db-card__title"><Activity size={16} /> Vessel Compliance Overview</h3>
                           <span className="db-card__meta">{vessels.length} {vessels.length === 1 ? 'vessel' : 'vessels'}</span>
@@ -358,6 +401,7 @@ export default function Dashboard() {
                           </div>
                         )}
                       </section>
+)}
 
                       {/* Alert breakdown */}
                       <section className="db-card">
@@ -396,31 +440,10 @@ export default function Dashboard() {
                       </section>
                     </div>
 
-                    <div className={`db-grid db-grid--pair${isVessel ? ' db-grid--single' : ''}`}>
-                      <section className="db-card">
-                        <div className="db-card__head">
-                          <h3 className="db-card__title"><BellOff size={16} /> Recent Alerts</h3>
-                          <button className="db-link" onClick={() => navigate('/alerts')}>View all <ArrowRight size={13} /></button>
-                        </div>
-                        {recentAlerts.length === 0 ? (
-                          <div className="db-empty"><span className="db-empty__icon db-empty__icon--ok"><CheckCircle2 size={22} /></span>No open alerts.</div>
-                        ) : (
-                          <ul className="db-list">
-                            {recentAlerts.map((a) => (
-                              <li key={a.id} className="db-list__item" onClick={() => navigate('/alerts')}>
-                                <Badge value={a.severity} />
-                                <div className="db-list__main">
-                                  <span className="db-list__title">{a.alert_type.replace(/_/g, ' ')}</span>
-                                  <span className="db-list__sub">{vesselName(a.vessel_id)}</span>
-                                </div>
-                                <span className="db-list__date">{fmtDate(a.created_at)}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </section>
+                    {!isVessel && (
+                    <div className="db-grid db-grid--pair">
+                      {recentAlertsCard}
 
-                      {!isVessel && (
                       <section className="db-card">
                         <div className="db-card__head">
                           <h3 className="db-card__title"><Inbox size={16} /> Recent Uploads</h3>
@@ -447,8 +470,8 @@ export default function Dashboard() {
                           </ul>
                         )}
                       </section>
-                      )}
                     </div>
+                    )}
                   </>
                 )}
               </>

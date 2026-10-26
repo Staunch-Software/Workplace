@@ -46,7 +46,8 @@ class SyncProcessor:
         self.headers = {"X-Sync-API-Key": settings.SYNC_API_KEY}
 
     def _client(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(verify=settings.SYNC_VERIFY_TLS, timeout=60.0, headers=self.headers)
+        transport = httpx.AsyncHTTPTransport(retries=3, verify=settings.SYNC_VERIFY_TLS)
+        return httpx.AsyncClient(transport=transport, timeout=httpx.Timeout(120.0, connect=30.0), headers=self.headers)
 
     # ── Push ─────────────────────────────────────────────────────────────────
 
@@ -115,8 +116,18 @@ class SyncProcessor:
                 data["storage_path"] = data.pop("_cloud_url")
         data.pop("_cloud_url", None)
 
-        resp = await client.post(f"{self.base}/push/{r.entity_type}", json={
-            "entity_id": str(r.entity_id), "vessel_imo": settings.VESSEL_IMO, "data": data})
+        resp = None
+        for attempt in range(3):
+            try:
+                resp = await client.post(f"{self.base}/push/{r.entity_type}", json={
+                    "entity_id": str(r.entity_id), "vessel_imo": settings.VESSEL_IMO, "data": data})
+                break
+            except (httpx.RemoteProtocolError, httpx.ReadTimeout, httpx.ConnectError) as exc:
+                if attempt == 2:
+                    raise
+                logger.warning("Push %s attempt %d/3 dropped (%s: %s). Reconnecting...", r.entity_type, attempt + 1, type(exc).__name__, exc)
+                await asyncio.sleep(1.0)
+
         if resp.status_code == 200:
             return self._done(r)
         detail = resp.text[:300]
@@ -168,8 +179,18 @@ class SyncProcessor:
         limit = settings.SYNC_PULL_PAGE_SIZE
         received = 0
         while True:
-            resp = await client.get(f"{self.base}/pull/{key}", params={
-                "vessel_imo": settings.VESSEL_IMO, "since": cursor.isoformat(), "limit": limit})
+            resp = None
+            for attempt in range(3):
+                try:
+                    resp = await client.get(f"{self.base}/pull/{key}", params={
+                        "vessel_imo": settings.VESSEL_IMO, "since": cursor.isoformat(), "limit": limit})
+                    break
+                except (httpx.RemoteProtocolError, httpx.ReadTimeout, httpx.ConnectError) as exc:
+                    if attempt == 2:
+                        raise
+                    logger.warning("Pull %s attempt %d/3 dropped (%s: %s). Reconnecting...", key, attempt + 1, type(exc).__name__, exc)
+                    await asyncio.sleep(1.0)
+
             if resp.status_code != 200:
                 raise RuntimeError(f"Pull {key} failed: HTTP {resp.status_code} {resp.text[:200]}")
             body = resp.json()

@@ -5,6 +5,11 @@ import certifi
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import logging
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logging.getLogger("orb.sync").setLevel(logging.INFO)
+logging.getLogger("orb.network").setLevel(logging.INFO)
 
 from app.config import get_settings
 from app.services.clock import load_offset, utc_now
@@ -25,6 +30,19 @@ async def lifespan(app: FastAPI):
     # A vessel install pushes its outbox to the VM and pulls what changed there (app/services/sync_processor.py).
     sync_task = None
     if settings.is_offline_vessel:
+        # Ensure local Azurite storage containers exist on startup
+        try:
+            from app.services.azure_storage import _client
+            c = _client(settings.AZURE_STORAGE_CONNECTION_STRING)
+            for cnt in (settings.AZURE_STORAGE_ORB_CONTAINER, settings.AZURE_STORAGE_CONTAINER, settings.AZURE_STORAGE_ORB_CHAT_CONTAINER):
+                if cnt:
+                    try:
+                        c.create_container(cnt)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
         from app.database import AsyncSessionLocal
         async with AsyncSessionLocal() as db:
             await load_offset(db)            # keep stamping corrected times after a restart, even while offline
@@ -65,6 +83,7 @@ app.include_router(orb_alert_resolution.router, prefix="/api")
 app.include_router(sync_endpoints.router, prefix="/api")
 
 @app.get("/health")
+@app.get("/api/health")
 async def health():
     # server_time lets a vessel measure how far its own clock is from the VM (services/clock.py).
     return {"status": "ok", "mode": settings.STORAGE_MODE, "server_time": utc_now().isoformat()}

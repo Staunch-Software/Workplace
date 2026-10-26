@@ -59,14 +59,26 @@ async def download_iopp_document(blob_url: str) -> tuple[bytes, str]:
     blob_url directly — the backend fetches it (using the connection string's
     credentials) and streams it back to the authenticated frontend instead.
     """
+    import asyncio
     container_name, blob_name = parse_blob_url(blob_url)
     client = _client(settings.AZURE_STORAGE_CONNECTION_STRING)
     container = client.get_container_client(container_name)
+    try:
+        container.create_container()
+    except Exception:
+        pass
     blob = container.get_blob_client(blob_name)
+    if not blob.exists():
+        if settings.is_offline_vessel and settings.CLOUD_STORAGE_CONNECTION_STRING:
+            try:
+                await asyncio.to_thread(copy_blob_to_local, blob_url)
+            except Exception:
+                pass
+    if not blob.exists():
+        raise FileNotFoundError(f"Blob '{blob_name}' is not in local storage yet")
     downloader = blob.download_blob()
     content_type = downloader.properties.content_settings.content_type or "application/octet-stream"
     return downloader.readall(), content_type
-
 
 # ── Vessel <-> VM file copy (offline sync) ───────────────────────────────────
 # A vessel keeps the same container and blob name as the VM, so a URL stored by either side resolves on both
