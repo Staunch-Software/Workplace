@@ -49,6 +49,7 @@
 .orb-root .en-filters__title svg { color: var(--en-orange-500); }
 .orb-root .en-filters__badge { padding: 2px 10px; background: var(--en-orange-100); color: var(--en-orange-700); border: 1px solid #F8D2B0; border-radius: 999px; font-size: 0.7rem; font-weight: 700; }
 .orb-root .en-filters__grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.9fr) minmax(160px, 1fr) minmax(160px, 1fr) minmax(0, 1fr); gap: 0.6rem 0.75rem; }
+.orb-root .en-filters__grid--vessel { grid-template-columns: minmax(0, 0.9fr) minmax(160px, 1fr) minmax(160px, 1fr) minmax(0, 1fr); }
 .orb-root .en-filters input[type="date"].form-control { padding-left: 0.6rem; padding-right: 0.4rem; }
 .orb-root .en-filters .form-group { margin-bottom: 0; min-width: 0; gap: 0.2rem; }
 .orb-root .en-filters .form-group label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--en-soft); }
