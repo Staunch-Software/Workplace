@@ -247,7 +247,9 @@ async def _check_ownership(db: AsyncSession, vessel: Vessel, entity: str, data: 
             raise HTTPException(status_code=409, detail="Thread is not on the VM yet")
     elif entity == "thread_read":
         alert = await db.get(OrbAlert, _uid(data["alert_id"]))
-        if alert is None or alert.vessel_id != vessel.id:
+        if alert is None:
+            return {"status": "skipped", "detail": "Alert already deleted on Shore"}
+        if alert.vessel_id != vessel.id:
             raise HTTPException(status_code=403, detail="Alert belongs to another vessel")
     elif entity == "notification":
         n = await db.get(OrbNotification, _uid(data["id"]))
