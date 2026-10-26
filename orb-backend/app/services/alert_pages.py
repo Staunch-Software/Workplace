@@ -37,10 +37,12 @@ async def load_upload_pdf(upload) -> bytes:
             return f.read()
     if upload.pdf_blob_url:
         from app.services.azure_storage import download_iopp_document
-        content, _ = await download_iopp_document(upload.pdf_blob_url)
-        return content
+        try:
+            content, _ = await download_iopp_document(upload.pdf_blob_url)
+            return content
+        except Exception as e:
+            raise FileNotFoundError(f"Original PDF is not available: {e}")
     raise FileNotFoundError("Original PDF is no longer available")
-
 
 def locate_raw_page(page_map, entry_page: int | None, total_pages: int | None, pdf_pages: int) -> dict | None:
     """{"raw_page", "part", "approximate"} for an entry's post-split page number, or None.

@@ -248,7 +248,7 @@ async def run_all_checks(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: 
     try:
         cfg = await alert_config.load_run_config(db, vessel_id)
     except Exception:
-        # Configuration tables not there yet (migration 017 pending): run with the built-in defaults.
+        # Configuration tables not there yet (migration 019 pending): run with the built-in defaults.
         logger.exception("Alert configuration unavailable, using defaults")
         await db.rollback()
         cfg = alert_config.RunConfig()

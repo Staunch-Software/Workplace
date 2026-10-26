@@ -1,14 +1,14 @@
 """Alert and threshold configuration, equipment register, tank/vessel master data, upload link on batch alerts.
 
-Revision ID: 017
-Revises: 016
+Revision ID: 019
+Revises: 018
 """
 from alembic import op
 
 from app.services.alert_catalog import CATALOG, BUILT, PARAMS
 
-revision = "017"
-down_revision = "016"
+revision = "019"
+down_revision = "018"
 branch_labels = None
 depends_on = None
 

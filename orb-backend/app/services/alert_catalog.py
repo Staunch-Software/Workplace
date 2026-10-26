@@ -4,7 +4,7 @@ One row per alert of the Alert Register: 25 are enabled (14 existing + 11 new) a
 kept disabled, never deleted. `BUILT` lists the alert codes that have a check in calculations.py; the
 accepted alerts that are not in it yet are waiting for their data (see the build order in the plan).
 
-This module only seeds the configuration tables (migration 017). After that the database is the source of
+This module only seeds the configuration tables (migration 019). After that the database is the source of
 truth and an administrator edits it; the defaults here are also the safety net when a row is missing.
 """
 
@@ -86,5 +86,5 @@ PARAMS = [
     ("bdn_qty_tolerance", "bunker_bdn_mismatch", "Bunker quantity may differ from the BDN by", "+/-", 0.5, "%", None),
 ]
 
-# Safety net when the parameter table has no row (e.g. before migration 017 is applied).
+# Safety net when the parameter table has no row (e.g. before migration 019 is applied).
 PARAM_DEFAULTS = {code: value for code, _a, _l, _c, value, _u, _n in PARAMS}

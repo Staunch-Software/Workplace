@@ -6,6 +6,7 @@ import LoadingSpinner from '../components/shared/LoadingSpinner';
 import Dropdown from '../components/shared/Dropdown';
 import api from '../api/axiosOrb';
 import './DailyLog.css';
+import { dateKey, istToday } from '../utils/time';
 
 const DAILY_COLS = [
   { key: 'date',                   label: 'Date',                          isArray: false },
@@ -121,7 +122,7 @@ function MonthStepper({ date, onChange, disabled }) {
 export default function DailyLog() {
   const [vessels, setVessels] = useState([]);
 
-  const toDateStr = (d) => d.toISOString().slice(0, 10);
+  const toDateStr = dateKey;
   const monthRange = (date) => [
     toDateStr(new Date(date.getFullYear(), date.getMonth(), 1)),
     toDateStr(new Date(date.getFullYear(), date.getMonth() + 1, 0)),
@@ -138,7 +139,7 @@ export default function DailyLog() {
   // Monthly summary filter state (own vessel + date range)
   const [summaryVessel,  setSummaryVessel]  = useState('');
   const [summaryMode,    setSummaryMode]    = useState('month'); // 'month' | 'custom'
-  const [summaryMonth,   setSummaryMonth]   = useState(new Date());
+  const [summaryMonth,   setSummaryMonth]   = useState(istToday());
   const [summaryFrom,    setSummaryFrom]    = useState('');
   const [summaryTo,      setSummaryTo]      = useState('');
   const [summaryData,    setSummaryData]    = useState(null);
@@ -158,7 +159,7 @@ export default function DailyLog() {
       const list = r.data.data || [];
       setVessels(list);
 
-      const today = new Date();
+      const today = istToday();
       const todayStr = toDateStr(today);
       const from7 = toDateStr(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7));
       const [monthFrom, monthTo] = monthRange(today);

@@ -3,6 +3,7 @@ import { Bell, AtSign, MessageSquare, CheckCircle2, FileText, AlertTriangle, Che
 import api from '../../api/axiosOrb';
 import { useNavigate } from '../../hooks/useOrbNavigate';
 import './NotificationBell.css';
+import { nowMs, parseTs, fmtDate } from '../../utils/time';
 
 const POLL_MS = 15000;
 
@@ -12,12 +13,12 @@ const ICONS = {
 };
 
 function ago(iso) {
-  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  const s = Math.max(0, (nowMs() - parseTs(iso).getTime()) / 1000);
   if (s < 60) return 'just now';
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   if (s < 7 * 86400) return `${Math.floor(s / 86400)}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return fmtDate(iso);
 }
 
 // Bell in the ORB header: the user's own notifications (mentions, replies, resolution steps, finished

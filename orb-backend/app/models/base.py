@@ -10,12 +10,12 @@ class Base(DeclarativeBase):
 class TimestampMixin:
     created_at: MappedColumn[datetime] = mapped_column(
         DateTime(timezone=True),
-        server_default=func.now(),
+        server_default=func.orb_utc_now(),
         nullable=False,
     )
     updated_at: MappedColumn[datetime] = mapped_column(
         DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
+        server_default=func.orb_utc_now(),
+        onupdate=func.orb_utc_now(),
         nullable=False,
     )

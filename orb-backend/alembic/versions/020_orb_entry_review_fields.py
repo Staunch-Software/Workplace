@@ -1,12 +1,12 @@
 """Per-entry officer signature, entry order on the page, page language (alerts 30, 31, 36).
 
-Revision ID: 018
-Revises: 017
+Revision ID: 020
+Revises: 019
 """
 from alembic import op
 
-revision = "018"
-down_revision = "017"
+revision = "020"
+down_revision = "019"
 branch_labels = None
 depends_on = None
 

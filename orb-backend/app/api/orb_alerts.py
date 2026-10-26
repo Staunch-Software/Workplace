@@ -11,7 +11,7 @@ from app.models.orb_upload import OrbUpload
 from app.models.control_user import ControlUser
 from app.schemas.orb_alert import AlertResponse
 from app.schemas.common import success
-from app.dependencies import get_current_user, require_shore, allowed_vessel_ids, scope_vessel_ids, assert_vessel_access
+from app.dependencies import get_current_user, require_shore, allowed_vessel_ids, scope_vessel_ids, assert_vessel_access, shore_instance_only
 from app.models.orb_alert_thread import OrbAlertThread
 from app.services.alert_chat import thread_stats
 from app.services.calculations import run_all_checks
@@ -117,7 +117,7 @@ async def get_alert(
     return success(data=d)
 
 
-@router.post("/recalculate")
+@router.post("/recalculate", dependencies=[Depends(shore_instance_only)])
 async def recalculate_alerts(
     vessel_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -128,7 +128,7 @@ async def recalculate_alerts(
     An alert with messages is kept (the checks do not create a second copy of it), so a recalculation
     never throws away a conversation."""
     await assert_vessel_access(current_user, db, vessel_id)
-    # 1. Delete all unresolved alerts for the vessel
+    # 1. Delete all unresolved alerts for the vessel (a database trigger leaves a delete marker for each, so vessels drop them too)
     deleted = await db.execute(
         delete(OrbAlert).where(
             OrbAlert.vessel_id == vessel_id,

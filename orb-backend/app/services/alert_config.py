@@ -3,7 +3,7 @@
 A run (`run_all_checks`) loads the configuration once for its vessel and publishes it through a context
 variable, so the individual checks stay `(vessel_id, upload_id, db)` functions. Thresholds come from
 `orb_threshold_params`: the vessel's own override when it has one, else the default row, else the value in
-alert_catalog.PARAM_DEFAULTS (so nothing breaks while migration 017 is not applied).
+alert_catalog.PARAM_DEFAULTS (so nothing breaks while migration 019 is not applied).
 """
 import uuid
 from contextvars import ContextVar

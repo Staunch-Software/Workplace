@@ -12,6 +12,7 @@ import api from '../api/axiosOrb';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useOrbBase } from '../hooks/useOrbNavigate';
 import './Feed.css';
+import { fmtDateDotTime, dateKey, istWall } from '../utils/time';
 
 const POLL_MS = 15000;
 const SEVERITIES = ['critical', 'major', 'minor', 'observation'];
@@ -33,11 +34,7 @@ const SEVERITY_COLOR = {
   observation: { color: '#4A5560', bg: '#F1F3F5', border: '#D9DFE5' },
 };
 
-const fmtWhen = (iso) => {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return `${d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} · ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
-};
+const fmtWhen = (iso) => (iso ? fmtDateDotTime(iso) : '—');
 const pretty = (s) => (s || '').replace(/_/g, ' ');
 
 function applyFilters(items, { vessel, severity, type, from, to, search }) {
@@ -46,8 +43,10 @@ function applyFilters(items, { vessel, severity, type, from, to, search }) {
     if (vessel && i.vessel_id !== vessel) return false;
     if (severity && i.severity !== severity) return false;
     if (type && i.event_type !== type) return false;
-    if (from && new Date(i.created_at) < new Date(from)) return false;
-    if (to) { const end = new Date(to); end.setHours(23, 59, 59, 999); if (new Date(i.created_at) > end) return false; }
+    // the date filters are IST calendar days
+    const day = dateKey(istWall(i.created_at));
+    if (from && day < from) return false;
+    if (to && day > to) return false;
     if (q && ![i.title, i.message, i.vessel_name, i.alert_type && pretty(i.alert_type), i.actor_name].some(v => (v || '').toLowerCase().includes(q))) return false;
     return true;
   });
@@ -152,8 +151,8 @@ export default function Feed() {
   }, [activeList, viewMode]);
 
   const grouped = useMemo(() => {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const isToday = (i) => new Date(i.created_at) >= today;
+    const todayKey = dateKey(istWall());
+    const isToday = (i) => dateKey(istWall(i.created_at)) === todayKey;
     return {
       today: displayItems.filter(isToday),
       earlier: displayItems.filter(i => !isToday(i) && !i.is_read),

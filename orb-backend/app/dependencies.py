@@ -78,6 +78,13 @@ async def require_shore(current_user: ControlUser = Depends(get_current_user)) -
     return current_user
 
 
+async def shore_instance_only() -> None:
+    """Routes that only the VM runs: uploads, extraction, alert regeneration and the shore's resolution steps.
+    A vessel install holds copies of that data and never creates it."""
+    if settings.is_offline_vessel:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This action is only available on the shore server")
+
+
 def is_shore(user: ControlUser) -> bool:
     return user.role in ("ADMIN", "SHORE")
 

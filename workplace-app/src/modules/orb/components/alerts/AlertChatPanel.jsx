@@ -1,15 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Send, Paperclip, X, Download, Lock, Loader2, MessageSquare, ClipboardCheck, CheckCircle2, Ban, Clock } from 'lucide-react';
 import api from '../../api/axiosOrb';
+import { fmtDayMonthTime } from '../../utils/time';
 
 const MAX_FILES = 5;
 const MAX_MB = 10;
 const POLL_MS = 10000;
 
 const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const fmtWhen = (iso) => (iso ? new Date(iso).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+const fmtWhen = fmtDayMonthTime;
 const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
-const newId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+const newId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
 
 // Message text with "@Name" of known people highlighted.
 function MessageBody({ text, names }) {

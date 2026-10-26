@@ -9,6 +9,8 @@ import { useAuth } from '@/context/AuthContext';
 import { SidebarProvider } from './context/SidebarContext';
 import { ToastProvider } from './context/ToastContext';
 import { viewBaseFor, viewOf, ORB_ROOT } from './hooks/useOrbNavigate';
+import api from './api/axiosOrb';
+import { syncServerClock } from './utils/time';
 
 import './styles/variables.css';
 import './styles/global.css';
@@ -97,6 +99,13 @@ function VesselRoutes() {
 
 export default function OrbModule() {
   useEffect(() => { document.title = 'ORB Platform'; }, []);
+
+  // Screens show IST and count "3 h ago" from the server's clock, not this PC's (a vessel PC's clock is often wrong).
+  useEffect(() => {
+    syncServerClock(api);
+    const id = setInterval(() => syncServerClock(api), 10 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <div className="orb-root">

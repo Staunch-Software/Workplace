@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Respon
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.control_database import get_control_db
 from app.database import get_db
 from app.dependencies import assert_vessel_access, get_current_user, is_shore
@@ -15,7 +16,11 @@ from app.models.orb_alert import OrbAlert
 from app.models.orb_alert_thread import OrbAlertAttachment, OrbAlertThread
 from app.models.vessel import Vessel
 from app.schemas.common import success
+from app.services.clock import utc_now
 from app.services import alert_chat, alert_chat_storage, orb_notify
+from app.services.sync_outbox import enqueue_row
+
+settings = get_settings()
 
 router = APIRouter(prefix="/alerts", tags=["alert-chat"])
 
@@ -118,9 +123,9 @@ async def post_thread(
     cid = None
     if client_id:
         try:
-            cid = uuid.UUID(client_id)
+            cid = uuid.UUID(str(client_id).strip())
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid client_id")
+            cid = uuid.uuid5(uuid.NAMESPACE_OID, str(client_id).strip())
         existing = (await db.execute(select(OrbAlertThread).where(OrbAlertThread.client_id == cid))).scalar_one_or_none()
         if existing is not None:
             if existing.alert_id != alert_id or existing.author_id != user.id:
@@ -164,12 +169,21 @@ async def post_thread(
                                  content_type=ctype, storage_path=path)
         db.add(att)
         saved.append(att)
-    await alert_chat.mark_read(db, alert_id, user.id, datetime.now(timezone.utc))
+    await alert_chat.mark_read(db, alert_id, user.id, utc_now())
+    if settings.is_offline_vessel:
+        # Queue the message (and its files) for the VM, which tells the people on shore; see app/services/sync_processor.py.
+        await db.flush()
+        await db.refresh(thread)
+        enqueue_row(db, "thread", thread, {"has_files": bool(saved)})
+        for att in saved:
+            await db.refresh(att)
+            enqueue_row(db, "attachment", att)
     await db.commit()
     await db.refresh(thread)
-    vessel = (await db.execute(select(Vessel).where(Vessel.id == alert.vessel_id))).scalar_one()
-    await orb_notify.on_message_posted(db, control_db, alert=alert, vessel=vessel, thread=thread, author=user,
-                                       tagged=tagged, has_files=bool(saved))
+    if not settings.is_offline_vessel:
+        vessel = (await db.execute(select(Vessel).where(Vessel.id == alert.vessel_id))).scalar_one()
+        await orb_notify.on_message_posted(db, control_db, alert=alert, vessel=vessel, thread=thread, author=user,
+                                           tagged=tagged, has_files=bool(saved))
     return success(data=_thread_dict(thread, saved), message="Message sent")
 
 
@@ -204,6 +218,6 @@ async def mark_threads_read(
     user: ControlUser = Depends(get_current_user),
 ):
     await _alert_for(db, user, alert_id)
-    await alert_chat.mark_read(db, alert_id, user.id, datetime.now(timezone.utc))
+    await alert_chat.mark_read(db, alert_id, user.id, utc_now())
     await db.commit()
     return success(message="Marked as read")

@@ -10,6 +10,7 @@ import api from '../api/axios';
 import apiLuboil from '../modules/lubeoil/api/axiosLub';
 import apiReports from '../modules/reports/api/axiosReports';
 import apiAepms from '../modules/aepms/api/axiosAepms';
+import apiOrb from '../modules/orb/api/axiosOrb';
 
 
 // ── Module metadata keyed by backend permission key ───────────────────────────
@@ -31,6 +32,7 @@ const MODULE_META = {
     lubeoil: { label: 'Lube Analysis', icon: <Droplet size={14} />, color: '#06b6d4' },
     engine_performance: { label: 'Engine Perf', icon: <Zap size={14} />, color: '#22c55e' },
     report_tracker: { label: 'Report Tracker', icon: <FileText size={14} />, color: '#7c3aed' },
+    orb: { label: 'ORB (Oil Record)', icon: <BookOpen size={14} />, color: '#10b981' },
 };
 function formatAgo(iso) {
     if (!iso) return 'Never';
@@ -427,6 +429,7 @@ const LiveModuleDetail = ({ imo, moduleKey, isInstalled, prefetchedData }) => {
             else if (moduleKey === 'jira') res = await axiosJira.get(`api/vessels/${imo}/sync-log`);
             else if (moduleKey === 'engine_performance') res = await apiAepms.get(`/vessels/${imo}/sync-log`);
             else if (moduleKey === 'report_tracker') res = await apiReports.get(`/vessels/${imo}/sync-log`);
+            else if (moduleKey === 'orb') res = await apiOrb.get(`/api/vessels/${imo}/sync-log`);
             else { setData(null); setLoading(false); return; }
             setData(res.data);
         } catch (err) {
@@ -591,6 +594,7 @@ const VesselStatusModal = ({ onClose }) => {
                 { promise: axiosJira.get("api/vessels/sync-status/all"), key: 'jira' },
                 { promise: apiAepms.get("/vessels/sync-status/all"), key: 'engine_performance' },
                 { promise: apiReports.get("/vessels/sync-status/all"), key: 'report_tracker' },
+                { promise: apiOrb.get("/api/vessels/sync-status/all"), key: 'orb' },
             ];
 
             // Fire all requests, update state as each one resolves
@@ -624,6 +628,7 @@ const VesselStatusModal = ({ onClose }) => {
         { key: 'lubeoil', label: 'Lube oil' },
         { key: 'engine_performance', label: 'Engine perf' },
         { key: 'report_tracker', label: 'Report Tracker' },
+        { key: 'orb', label: 'ORB' },
     ];
 
     function getTotalErrors(imo) {

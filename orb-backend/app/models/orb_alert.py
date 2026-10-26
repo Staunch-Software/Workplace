@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, Text, Boolean, DateTime, ForeignKey
+from sqlalchemy import String, Text, Boolean, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import mapped_column, Mapped
 from sqlalchemy.dialects.postgresql import UUID
 from app.models.base import Base, TimestampMixin
@@ -31,3 +31,6 @@ class OrbAlert(Base, TimestampMixin):
     rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     rejected_by_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     rejected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Bumped by every shore-side step (create, request applied, accept, reject, resolve). A vessel keeps the
+    # row with the higher version when it syncs; its own offline request does not bump it (app/services/sync_processor.py).
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)

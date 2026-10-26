@@ -8,10 +8,11 @@ import api from '../../api/axiosOrb';
 import AlertChatPanel from './AlertChatPanel';
 import ResolutionDialog, { ACTIONS } from './ResolutionDialog';
 import './AlertModal.css';
+import { fmtDateTime } from '../../utils/time';
 
 const SEVERITY_LABEL = { critical: 'Critical', major: 'Major', minor: 'Minor', observation: 'Observation' };
 
-const fmtWhen = (iso) => (iso ? new Date(iso).toLocaleString([], { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
+const fmtWhen = fmtDateTime;
 
 // A PDF served by the API as a blob (an iframe cannot send the bearer token itself).
 function usePdfBlob(path, enabled) {

@@ -3,6 +3,8 @@ import uuid
 from io import BytesIO
 from datetime import datetime
 
+from app.services.clock import IST, utc_now
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -99,7 +101,7 @@ async def generate_pdf(upload_id: uuid.UUID, db: AsyncSession) -> bytes:
         ["Vessel Name:", vessel_name],
         ["IMO Number:", vessel_imo],
         ["Period:", f"{min_date} to {max_date}"],
-        ["Generated:", datetime.now().strftime("%d %b %Y %H:%M UTC")],
+        ["Generated:", utc_now().astimezone(IST).strftime("%d %b %Y %H:%M IST")],
         ["Total Entries:", str(len(entries))],
         ["Open Alerts:", str(sum(1 for a in alerts if not a.is_resolved))],
     ]

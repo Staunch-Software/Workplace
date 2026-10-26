@@ -6,6 +6,7 @@ from typing import Iterable
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.sync_outbox import enqueue
 from app.dependencies import is_shore
 from app.models.control_user import ControlUser
 from app.models.orb_alert import OrbAlert
@@ -85,3 +86,5 @@ async def mark_read(db: AsyncSession, alert_id: uuid.UUID, user_id: uuid.UUID, w
         db.add(OrbAlertThreadRead(alert_id=alert_id, user_id=user_id, last_read_at=when))
     else:
         rec.last_read_at = when
+    enqueue(db, "thread_read", alert_id, {"alert_id": str(alert_id), "user_id": str(user_id),
+                                          "last_read_at": when.isoformat(), "updated_at": when.isoformat()})

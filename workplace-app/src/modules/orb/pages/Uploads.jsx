@@ -14,6 +14,7 @@ import MultiSelectDropdown from '../components/shared/MultiSelectDropdown';
 import api from '../api/axiosOrb';
 import { useToast } from '../context/ToastContext';
 import './Uploads.css';
+import { fmtDate } from '../utils/time';
 
 // phase: 'form' | 'uploading' | 'queued'
 const INITIAL_FORM = { vessel_id: '', file: null };
@@ -308,7 +309,7 @@ export default function Uploads() {
                                   )}
                                 </span>
                               </td>
-                              <td data-label="Uploaded" className="up-muted">{new Date(r.created_at).toLocaleDateString()}</td>
+                              <td data-label="Uploaded" className="up-muted">{fmtDate(r.created_at)}</td>
                               <td className="up-td-actions">
                                 <div className="up-rowbtns">
                                   <button

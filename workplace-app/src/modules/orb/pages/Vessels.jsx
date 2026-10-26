@@ -6,6 +6,7 @@ import Badge from '../components/shared/Badge';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import api from '../api/axiosOrb';
 import './Vessels.css';
+import { fmtDate } from '../utils/time';
 
 const initialsOf = (name) => {
   const words = (name || '?').trim().split(/\s+/);
@@ -162,7 +163,7 @@ export default function Vessels() {
                                     {health.label}
                                   </span>
                                 </td>
-                                <td className="vs-muted">{new Date(v.created_at).toLocaleDateString()}</td>
+                                <td className="vs-muted">{fmtDate(v.created_at)}</td>
                               </tr>
                             );
                           })}

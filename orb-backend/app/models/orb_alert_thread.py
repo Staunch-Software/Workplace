@@ -30,7 +30,8 @@ class OrbAlertThread(Base):
     tagged_user_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     # Client-generated id so a retried send never posts the same message twice.
     client_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, unique=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.orb_utc_now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.orb_utc_now(), onupdate=func.orb_utc_now(), nullable=False)
 
 
 class OrbAlertAttachment(Base):
@@ -44,7 +45,8 @@ class OrbAlertAttachment(Base):
     content_type: Mapped[str] = mapped_column(String(120), nullable=False)
     # Blob URL (Azure) or a path under UPLOAD_DIR/chat -- see services/alert_chat_storage.py
     storage_path: Mapped[str] = mapped_column(String(1000), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.orb_utc_now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.orb_utc_now(), onupdate=func.orb_utc_now(), nullable=False)
 
 
 class OrbAlertThreadRead(Base):
@@ -54,4 +56,5 @@ class OrbAlertThreadRead(Base):
     alert_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("orb_alerts.id", ondelete="CASCADE"), primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
-    last_read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.orb_utc_now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.orb_utc_now(), onupdate=func.orb_utc_now(), nullable=False)

@@ -33,4 +33,7 @@ __all__ = [
     "ThresholdParam",
     "ThresholdHistory",
     "Equipment",
+    "OcmImport",
+    "OcmRecord",
 ]
+from app.models.sync import SyncQueue, SyncState, SyncConflict, SyncTombstone  # noqa: E402,F401
