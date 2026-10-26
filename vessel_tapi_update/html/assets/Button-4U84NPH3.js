@@ -1,0 +1,1 @@
+import{j as r}from"./index-BpLb9BHm.js";/* empty css                   */function m({children:t,variant:n="default",size:o="default",className:s="",disabled:a=!1,...e}){return r.jsx("button",{className:`btn btn-${n} btn-${o} ${s}`,disabled:a,...e,children:t})}export{m as B};
