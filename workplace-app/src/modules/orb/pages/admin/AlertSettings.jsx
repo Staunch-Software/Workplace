@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { SlidersHorizontal, ShieldCheck, History, RotateCcw, Check } from 'lucide-react';
+import { SlidersHorizontal, ShieldCheck, History, RotateCcw, Check, X } from 'lucide-react';
 import Modal from '../../components/shared/Modal';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import Dropdown from '../../components/shared/Dropdown';
+import MultiSelectDropdown from '../../components/shared/MultiSelectDropdown';
 import { useToast } from '../../context/ToastContext';
 import api from '../../api/axiosOrb';
 import './VesselConfiguration.css';
@@ -153,21 +154,48 @@ function AlertsTab({ alerts, setAlerts }) {
 function ThresholdsTab({ alerts }) {
   const { toast } = useToast();
   const [vessels, setVessels] = useState([]);
-  const [vesselId, setVesselId] = useState('');          // '' = the default values
+  const [vesselIds, setVesselIds] = useState([]);        // [] = the default values every vessel follows
   const [params, setParams] = useState(null);
+  const [loading, setLoading] = useState(false);         // reloading: the list stays on screen so the page does not jump
   const [draft, setDraft] = useState({});                // param_code -> { value, comparator, note }
   const [saving, setSaving] = useState('');
   const [history, setHistory] = useState(null);          // { param, rows }
 
   useEffect(() => { api.get('/api/vessels').then(r => setVessels(r.data.data || [])).catch(() => {}); }, []);
 
+  const vesselName = useCallback((id) => vessels.find(v => v.id === id)?.name || 'Vessel', [vessels]);
+
+  // One request per chosen vessel; each threshold then lists, per vessel, the value in force and whether it is an override.
   const load = useCallback(async () => {
-    setParams(null); setDraft({});
+    setLoading(true);
     try {
-      const r = await api.get('/api/alert-config/params', { params: vesselId ? { vessel_id: vesselId } : {} });
-      setParams(r.data.data || []);
-    } catch (e) { toast({ type: 'error', message: errText(e, 'Could not load the thresholds') }); setParams([]); }
-  }, [vesselId, toast]);
+      let merged;
+      if (vesselIds.length === 0) {
+        const r = await api.get('/api/alert-config/params');
+        merged = (r.data.data || []).map(p => ({ ...p, targets: [] }));
+      } else {
+        const results = await Promise.all(vesselIds.map(id =>
+          api.get('/api/alert-config/params', { params: { vessel_id: id } }).then(r => [id, r.data.data || []])));
+        const by = new Map();
+        for (const [id, list] of results) {
+          for (const p of list) {
+            const cur = by.get(p.param_code) || { ...p, targets: [] };
+            cur.targets.push({
+              vessel_id: id, override: p.override,
+              value: p.override ? p.override.value : p.value, comparator: p.override ? p.override.comparator : p.comparator,
+            });
+            by.set(p.param_code, cur);
+          }
+        }
+        merged = [...by.values()];
+      }
+      setParams(merged);
+      setDraft({});
+    } catch (e) {
+      toast({ type: 'error', message: errText(e, 'Could not load the thresholds') });
+      setParams(prev => prev || []);
+    } finally { setLoading(false); }
+  }, [vesselIds, toast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -179,16 +207,23 @@ function ThresholdsTab({ alerts }) {
     return Object.entries(by).sort((a, b) => (order[a[0]] ?? 99) - (order[b[0]] ?? 99));
   }, [params, order]);
 
+  // the value in force: the default, or the chosen vessels' values when they all agree (otherwise null = mixed)
   const current = (p) => {
-    const ov = p.override;
-    return { value: ov ? ov.value : p.value, comparator: ov ? ov.comparator : p.comparator };
+    if (!p.targets.length) return { value: p.value, comparator: p.comparator };
+    const same = (key) => (p.targets.every(t => t[key] === p.targets[0][key]) ? p.targets[0][key] : null);
+    return { value: same('value'), comparator: same('comparator') };
   };
-  const shown = (p) => ({ ...current(p), note: '', ...(draft[p.param_code] || {}) });
+  const shown = (p) => {
+    const c = current(p);
+    return { value: c.value ?? '', comparator: c.comparator, note: '', ...(draft[p.param_code] || {}) };
+  };
   const isDirty = (p) => {
     const d = draft[p.param_code];
     if (!d) return false;
     const c = current(p);
-    return Number(d.value ?? c.value) !== c.value || (d.comparator ?? c.comparator) !== c.comparator;
+    return c.value === null || c.comparator === null
+      ? d.value !== '' || d.comparator !== c.comparator
+      : Number(d.value ?? c.value) !== c.value || (d.comparator ?? c.comparator) !== c.comparator;
   };
   const edit = (p, field, v) => setDraft(d => ({ ...d, [p.param_code]: { ...shown(p), [field]: v } }));
 
@@ -196,22 +231,24 @@ function ThresholdsTab({ alerts }) {
     const d = shown(p);
     const value = Number(d.value);
     if (d.value === '' || Number.isNaN(value)) { toast({ type: 'error', message: 'Enter a number' }); return; }
+    if (!d.comparator) { toast({ type: 'error', message: 'Choose the rule' }); return; }
     setSaving(p.param_code);
+    const body = { value, comparator: d.comparator, note: d.note?.trim() || null };
     try {
-      await api.put(`/api/alert-config/params/${p.param_code}`, {
-        value, comparator: d.comparator, vessel_id: vesselId || null, note: d.note?.trim() || null,
-      });
-      toast({ type: 'success', message: vesselId ? 'Saved for this vessel' : 'Default value saved' });
+      if (vesselIds.length === 0) await api.put(`/api/alert-config/params/${p.param_code}`, { ...body, vessel_id: null });
+      else await Promise.all(vesselIds.map(id => api.put(`/api/alert-config/params/${p.param_code}`, { ...body, vessel_id: id })));
+      toast({ type: 'success', message: vesselIds.length === 0 ? 'Default value saved' : `Saved for ${vesselIds.length === 1 ? vesselName(vesselIds[0]) : `${vesselIds.length} vessels`}` });
       await load();
     } catch (e) { toast({ type: 'error', message: errText(e, 'Could not save') }); }
     finally { setSaving(''); }
   };
 
   const reset = async (p) => {
-    if (!window.confirm('This vessel will follow the default value again. Continue?')) return;
+    const own = p.targets.filter(t => t.override);
+    if (!window.confirm(`${own.length === 1 ? vesselName(own[0].vessel_id) : `${own.length} vessels`} will follow the default value again. Continue?`)) return;
     setSaving(p.param_code);
     try {
-      await api.delete(`/api/alert-config/params/${p.param_code}`, { params: { vessel_id: vesselId } });
+      await Promise.all(own.map(t => api.delete(`/api/alert-config/params/${p.param_code}`, { params: { vessel_id: t.vessel_id } })));
       await load();
     } catch (e) { toast({ type: 'error', message: errText(e, 'Could not reset') }); }
     finally { setSaving(''); }
@@ -220,82 +257,118 @@ function ThresholdsTab({ alerts }) {
   const openHistory = async (p) => {
     setHistory({ param: p, rows: null });
     try {
-      const r = await api.get(`/api/alert-config/params/${p.param_code}/history`, { params: vesselId ? { vessel_id: vesselId } : {} });
-      setHistory({ param: p, rows: r.data.data || [] });
+      let rows;
+      if (vesselIds.length === 0) {
+        rows = (await api.get(`/api/alert-config/params/${p.param_code}/history`)).data.data || [];
+      } else {
+        const lists = await Promise.all(vesselIds.map(id =>
+          api.get(`/api/alert-config/params/${p.param_code}/history`, { params: { vessel_id: id } })
+            .then(r => (r.data.data || []).map(h => ({ ...h, vessel: vesselName(id) })))));
+        rows = lists.flat().sort((a, b) => new Date(b.changed_at) - new Date(a.changed_at));
+      }
+      setHistory({ param: p, rows });
     } catch (e) { setHistory(null); toast({ type: 'error', message: errText(e, 'Could not load the history') }); }
   };
 
-  const vesselName = vessels.find(v => v.id === vesselId)?.name;
+  const names = vesselIds.map(vesselName);
+  const scopeText = vesselIds.length === 0
+    ? 'These are the values every vessel follows unless it has its own override.'
+    : `Saving a value here sets the same override for ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`}; every other vessel keeps the default.`;
+
+  const appliesCell = (p) => {
+    if (!p.targets.length) return <span className="al-pill al-pill--wait">All vessels</span>;
+    const shownTargets = p.targets.slice(0, 3);
+    return (
+      <div className="al-applies">
+        {shownTargets.map(t => (
+          <span key={t.vessel_id} className={`al-pill ${t.override ? 'al-pill--override' : 'al-pill--wait'}`}
+                title={t.override ? `${vesselName(t.vessel_id)} has its own value (${t.value})` : `${vesselName(t.vessel_id)} follows the default value`}>
+            {vesselName(t.vessel_id)} · {t.override ? 'own value' : 'default'}
+          </span>
+        ))}
+        {p.targets.length > 3 && <span className="al-pill al-pill--wait">+{p.targets.length - 3} more</span>}
+      </div>
+    );
+  };
 
   return (
     <>
       <div className="al-scope">
         <div className="as-field al-scope__field"><span>Thresholds for</span>
-          <Dropdown value={vesselId} onChange={setVesselId} ariaLabel="Thresholds for"
-                    options={[{ value: '', label: 'All vessels (default values)' }, ...vessels.map(v => ({ value: v.id, label: v.name }))]} />
+          <MultiSelectDropdown value={vesselIds} onChange={setVesselIds} placeholder="All vessels (default values)"
+                               options={vessels.map(v => ({ value: v.id, label: v.name }))} />
         </div>
-        <p className="as-hint">
-          {vesselId
-            ? `Saving a value here sets an override for ${vesselName}; every other vessel keeps the default.`
-            : 'These are the values every vessel follows unless it has its own override.'}
-        </p>
+        <p className="as-hint">{scopeText}</p>
       </div>
+      {vesselIds.length > 0 && (
+        <div className="al-chips">
+          {vesselIds.map(id => (
+            <span key={id} className="up-fchip al-chip">
+              {vesselName(id)}
+              <button type="button" onClick={() => setVesselIds(ids => ids.filter(x => x !== id))} aria-label={`Remove ${vesselName(id)}`}><X size={12} /></button>
+            </span>
+          ))}
+          <button type="button" className="vc-btn vc-btn--secondary vc-btn--sm" onClick={() => setVesselIds([])}>Back to default values</button>
+        </div>
+      )}
 
-      {!params ? <LoadingSpinner /> : groups.map(([code, list]) => (
-        <section key={code} className="al-group">
-          <h4 className="al-group__title">{alertName[code] || code}</h4>
-          <div className="vc-table-wrap">
-            <table className="vc-table al-table">
-              <thead>
-                <tr><th>Threshold</th><th>Rule</th><th className="vc-num">Value</th><th>Unit</th><th>Applies</th><th className="vc-th-actions">Action</th></tr>
-              </thead>
-              <tbody>
-                {list.map(p => {
-                  const d = shown(p);
-                  const dirty = isDirty(p);
-                  return (
-                    <tr key={p.param_code} className="vc-row">
-                      <td data-label="Threshold" className="vc-tankname">
-                        {p.label}
-                        {p.note && <div className="al-code">{p.note}</div>}
-                        {dirty && (
-                          <input className="form-control al-note" placeholder="Reason for the change (optional)" value={d.note || ''}
-                                 onChange={e => edit(p, 'note', e.target.value)} maxLength={500} />
-                        )}
-                      </td>
-                      <td data-label="Rule">
-                        <Dropdown portal size="sm" value={d.comparator} options={COMPARATORS} onChange={v => edit(p, 'comparator', v)} ariaLabel={`Rule for ${p.label}`} />
-                      </td>
-                      <td data-label="Value" className="vc-num">
-                        <input type="number" step="any" className="form-control al-value" value={d.value} onChange={e => edit(p, 'value', e.target.value)} aria-label={`Value of ${p.label}`} />
-                      </td>
-                      <td data-label="Unit" className="vc-muted">{p.unit || '—'}</td>
-                      <td data-label="Applies">
-                        {vesselId
-                          ? (p.override ? <span className="al-pill al-pill--override">Override</span> : <span className="al-pill al-pill--wait">Default</span>)
-                          : <span className="al-pill al-pill--wait">All vessels</span>}
-                      </td>
-                      <td className="vc-td-actions">
-                        <div className="vc-rowbtns">
-                          <button className="vc-btn vc-btn--primary vc-btn--sm" disabled={!dirty || saving === p.param_code} onClick={() => save(p)}>
-                            <Check size={14} /> Save
-                          </button>
-                          {vesselId && p.override && (
-                            <button className="vc-btn vc-btn--secondary vc-btn--sm" disabled={saving === p.param_code} onClick={() => reset(p)} title="Follow the default again">
-                              <RotateCcw size={14} /> Reset
-                            </button>
-                          )}
-                          <button className="vc-btn vc-btn--secondary vc-btn--sm" onClick={() => openHistory(p)}><History size={14} /> History</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ))}
+      {!params ? <LoadingSpinner /> : (
+        <div className={`al-groups${loading ? ' al-groups--loading' : ''}`} aria-busy={loading}>
+          {groups.map(([code, list]) => (
+            <section key={code} className="al-group">
+              <h4 className="al-group__title">{alertName[code] || code}</h4>
+              <div className="vc-table-wrap">
+                <table className="vc-table al-table">
+                  <thead>
+                    <tr><th>Threshold</th><th>Rule</th><th className="vc-num">Value</th><th>Unit</th><th>Applies to</th><th className="vc-th-actions">Action</th></tr>
+                  </thead>
+                  <tbody>
+                    {list.map(p => {
+                      const d = shown(p);
+                      const dirty = isDirty(p);
+                      const hasOverride = p.targets.some(t => t.override);
+                      return (
+                        <tr key={p.param_code} className="vc-row">
+                          <td data-label="Threshold" className="vc-tankname">
+                            {p.label}
+                            {p.note && <div className="al-code">{p.note}</div>}
+                            {dirty && (
+                              <input className="form-control al-note" placeholder="Reason for the change (optional)" value={d.note || ''}
+                                     onChange={e => edit(p, 'note', e.target.value)} maxLength={500} />
+                            )}
+                          </td>
+                          <td data-label="Rule">
+                            <Dropdown portal size="sm" value={d.comparator} options={COMPARATORS} placeholder="Mixed" onChange={v => edit(p, 'comparator', v)} ariaLabel={`Rule for ${p.label}`} />
+                          </td>
+                          <td data-label="Value" className="vc-num">
+                            <input type="number" step="any" className="form-control al-value" value={d.value} placeholder={d.value === '' ? 'Mixed' : undefined}
+                                   onChange={e => edit(p, 'value', e.target.value)} aria-label={`Value of ${p.label}`} />
+                          </td>
+                          <td data-label="Unit" className="vc-muted">{p.unit || '—'}</td>
+                          <td data-label="Applies to">{appliesCell(p)}</td>
+                          <td className="vc-td-actions">
+                            <div className="vc-rowbtns">
+                              <button className="vc-btn vc-btn--primary vc-btn--sm" disabled={!dirty || saving === p.param_code} onClick={() => save(p)}>
+                                <Check size={14} /> Save
+                              </button>
+                              {hasOverride && (
+                                <button className="vc-btn vc-btn--secondary vc-btn--sm" disabled={saving === p.param_code} onClick={() => reset(p)} title="Follow the default again">
+                                  <RotateCcw size={14} /> Reset
+                                </button>
+                              )}
+                              <button className="vc-btn vc-btn--secondary vc-btn--sm" onClick={() => openHistory(p)}><History size={14} /> History</button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
 
       {history && (
         <Modal title={`History — ${history.param.label}`} onClose={() => setHistory(null)} wide
@@ -305,11 +378,12 @@ function ThresholdsTab({ alerts }) {
           ) : (
             <div className="vc-table-wrap">
               <table className="vc-table">
-                <thead><tr><th>When</th><th>Who</th><th className="vc-num">From</th><th className="vc-num">To</th><th>Note</th></tr></thead>
+                <thead><tr><th>When</th>{vesselIds.length > 0 && <th>Vessel</th>}<th>Who</th><th className="vc-num">From</th><th className="vc-num">To</th><th>Note</th></tr></thead>
                 <tbody>
                   {history.rows.map((h, i) => (
                     <tr key={i} className="vc-row">
                       <td data-label="When">{when(h.changed_at)}</td>
+                      {vesselIds.length > 0 && <td data-label="Vessel">{h.vessel}</td>}
                       <td data-label="Who">{h.changed_by_name || '—'}</td>
                       <td data-label="From" className="vc-num">{h.old_value ?? '—'}</td>
                       <td data-label="To" className="vc-num">{h.new_value ?? 'override removed'}</td>

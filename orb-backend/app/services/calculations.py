@@ -991,8 +991,13 @@ async def check_weekly_c11(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db
 # ─────────────────────────────────────────────────────────────────────────
 async def check_officer_signatures(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
     """Each operation needs the signature of the officer in charge. Judged only where the extractor read
-    it (officer_signature_present not NULL), so older uploads never raise false alerts."""
-    q = select(OrbEntry).where(OrbEntry.vessel_id == vessel_id, OrbEntry.officer_signature_present.is_(False))
+    it (officer_signature_present not NULL), so older uploads never raise false alerts. The names of the
+    officers are read from the signature line itself, so an entry that has any is signed whatever the
+    yes/no flag says (the flag alone was wrong on pages where the signature is plainly there)."""
+    q = select(OrbEntry).where(
+        OrbEntry.vessel_id == vessel_id, OrbEntry.officer_signature_present.is_(False),
+        func.coalesce(func.trim(OrbEntry.officer_1_name), "") == "", func.coalesce(func.trim(OrbEntry.officer_2_name), "") == "",
+    )
     if upload_id:
         q = q.where(OrbEntry.upload_id == upload_id)
     for e in (await db.execute(q)).scalars().all():

@@ -276,6 +276,8 @@ paraph on the signature line directly below the entry, usually followed by rank,
 carries a handwritten mark for THIS entry. Set false ONLY when the signature line below the
 entry is clearly empty, or the entry has no signature line at all before the next entry begins.
 A typed or printed name with no handwritten mark counts as false. If you are unsure, set true.
+If you filled officer_1_name or officer_2_name from that line, the line is signed: set true.
+Handwritten words such as a name, rank and date written on that line are the signature in this book.
 Codes: A and B are the fuel-tank ballasting and dirty-ballast entries; use them only when the
 Code column really reads A or B.
 
@@ -4402,7 +4404,10 @@ async def run_extraction(
                         item_lines=entry_dict.get("item_lines"),
                         has_erasure=bool(entry_dict.get("has_erasure", False)),
                         master_signature_present=entry_dict.get("master_signature_present"),
-                        officer_signature_present=entry_dict.get("officer_signature_present"),
+                        officer_signature_present=(
+                            True if (entry_dict.get("officer_1_name") or entry_dict.get("officer_2_name"))
+                            else entry_dict.get("officer_signature_present")
+                        ),
                         entry_seq=entry_dict.get("entry_seq"),
                         page_language=(entry_dict.get("page_language") or None) and str(entry_dict["page_language"])[:40],
                     )

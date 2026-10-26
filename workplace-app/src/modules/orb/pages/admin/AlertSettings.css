@@ -25,6 +25,12 @@
 .orb-root .al-note { margin-top: 0.4rem; font-size: 0.82rem; font-weight: 400; }
 .orb-root .al-table td { vertical-align: middle; }
 
+.orb-root .al-applies { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+.orb-root .al-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.orb-root .al-chip { display: inline-flex; align-items: center; gap: 0.35rem; }
+.orb-root .al-groups { display: flex; flex-direction: column; gap: 1rem; transition: opacity 0.15s ease; }
+.orb-root .al-groups--loading { opacity: 0.55; pointer-events: none; }
+
 @media (min-width: 1600px) {
   .orb-root .al-tab { font-size: 0.98rem; }
   .orb-root .al-code, .orb-root .al-when { font-size: 0.86rem; }

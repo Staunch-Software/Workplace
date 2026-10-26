@@ -39,6 +39,8 @@ export default function Uploads() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
   const fileRef = useRef();
+  const [dragOver, setDragOver] = useState(false);       // a file is being dragged over the drop area
+  const [heroDrag, setHeroDrag] = useState(false);       // ...or over the upload card of the page
   const [preview, setPreview] = useState(null); // { filename, url, loading }
 
   const load = (silent = false) => {
@@ -82,6 +84,40 @@ export default function Uploads() {
     setPhase('form');
     setProgress(0);
     setError('');
+    setShowModal(true);
+  };
+
+  // A dropped or chosen file must be a PDF within the size limit; returns an error text or ''.
+  const fileProblem = (file) => {
+    if (!file) return 'No file received.';
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    if (!isPdf) return `${file.name} is not a PDF. Only PDF files can be uploaded.`;
+    if (file.size > 50 * 1024 * 1024) return `${file.name} is larger than 50 MB.`;
+    return '';
+  };
+
+  const takeFiles = (fileList) => {
+    const files = Array.from(fileList || []);
+    if (files.length === 0) return null;
+    const problem = fileProblem(files[0]);
+    if (problem) { setError(problem); return null; }
+    setError(files.length > 1 ? `Only one PDF can be uploaded at a time: using ${files[0].name}.` : '');
+    return files[0];
+  };
+
+  const dragHandlers = (setOver, onFiles) => ({
+    onDragEnter: (e) => { if (e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); setOver(true); } },
+    onDragOver: (e) => { if (e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setOver(true); } },
+    onDragLeave: (e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOver(false); },
+    onDrop: (e) => { e.preventDefault(); setOver(false); onFiles(e.dataTransfer.files); },
+  });
+
+  // A PDF dropped on the upload card opens the dialog with the file already chosen.
+  const dropOnPage = (fileList) => {
+    const file = takeFiles(fileList);
+    setForm({ ...INITIAL_FORM, file });
+    setPhase('form');
+    setProgress(0);
     setShowModal(true);
   };
 
@@ -170,12 +206,12 @@ export default function Uploads() {
             </div>
 
             {/* Upload section */}
-            <section className="up-hero">
+            <section className={`up-hero${heroDrag ? ' up-hero--drag' : ''}`} {...dragHandlers(setHeroDrag, dropOnPage)}>
               <div className="up-hero__main">
                 <span className="up-hero__icon"><CloudUpload size={28} /></span>
                 <div className="up-hero__text">
                   <h2 className="up-hero__title">Digitise a new Oil Record Book</h2>
-                  <p className="up-hero__desc">PDF only · up to 50 MB. Extraction runs in the background — you can keep working while it processes.</p>
+                  <p className="up-hero__desc">PDF only · up to 50 MB. Drag a PDF onto this card, or use the button. Extraction runs in the background — you can keep working while it processes.</p>
                 </div>
                 <button className="up-btn up-btn--light" onClick={openModal}>
                   <FileUp size={16} /> Upload ORB PDF
@@ -377,18 +413,19 @@ export default function Uploads() {
                     </div>
                     <div className="form-group">
                       <label>PDF File *</label>
-                      <label className={`up-drop${form.file ? ' up-drop--has' : ''}`}>
+                      <label className={`up-drop${form.file ? ' up-drop--has' : ''}${dragOver ? ' up-drop--over' : ''}`}
+                             {...dragHandlers(setDragOver, (fl) => { const f = takeFiles(fl); if (f) setForm(prev => ({ ...prev, file: f })); })}>
                         <input
                           type="file"
                           accept=".pdf"
                           className="up-drop__input"
                           ref={fileRef}
-                          onChange={e => setForm({ ...form, file: e.target.files[0] })}
+                          onChange={e => { const f = takeFiles(e.target.files); if (f) setForm({ ...form, file: f }); e.target.value = ''; }}
                         />
                         <span className="up-drop__icon">{form.file ? <FileText size={22} /> : <CloudUpload size={22} />}</span>
-                        <span className="up-drop__main">{form.file ? form.file.name : 'Click to choose a PDF file'}</span>
+                        <span className="up-drop__main">{form.file ? form.file.name : (dragOver ? 'Drop the PDF here' : 'Drag & drop a PDF here, or click to choose')}</span>
                         <span className="up-drop__sub">
-                          {form.file ? `${(form.file.size / (1024 * 1024)).toFixed(2)} MB · click to replace` : 'PDF only · max 50 MB'}
+                          {form.file ? `${(form.file.size / (1024 * 1024)).toFixed(2)} MB · drop another or click to replace` : 'PDF only · max 50 MB'}
                         </span>
                       </label>
                     </div>
