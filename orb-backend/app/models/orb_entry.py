@@ -33,6 +33,12 @@ class OrbEntry(Base, TimestampMixin):
     has_erasure: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     page_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     has_gap_before: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    # Officer-in-charge signature for THIS entry (alert 30). NULL = not read (older uploads): never alerted.
+    officer_signature_present: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    # Position of the entry on its page in the order the extractor returned it (alert 31). NULL = older uploads.
+    entry_seq: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Language the page was written in (alert 36). NULL = older uploads.
+    page_language: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     # Row-by-row transcription of the block as written: [{"item": "11.2" | None, "text": "..."}].
     # item is exactly what the Item column held (None = the cell was blank). NULL for
     # entries extracted before this column existed, or whose lines could not be tied

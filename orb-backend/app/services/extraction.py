@@ -269,6 +269,16 @@ neither does a completely blank line. If the page has no such line at all, or th
 present but empty/unsigned, set false. This single true/false value applies to every entry
 extracted from this page.
 
+OFFICER SIGNATURE (per ENTRY):
+Every completed operation must be signed by the officer in charge: a handwritten signature or
+paraph on the signature line directly below the entry, usually followed by rank, name and date
+(e.g. "◠◠◠; 3E; M.SATHIK; 28-DEC-2025"). Set officer_signature_present = true when that line
+carries a handwritten mark for THIS entry. Set false ONLY when the signature line below the
+entry is clearly empty, or the entry has no signature line at all before the next entry begins.
+A typed or printed name with no handwritten mark counts as false. If you are unsure, set true.
+Codes: A and B are the fuel-tank ballasting and dirty-ballast entries; use them only when the
+Code column really reads A or B.
+
 ERASURES / CORRECTIONS (per entry):
 IMO guidance: "If a wrong entry has been recorded, it should immediately be struck through
 with a single line in such a way that the wrong entry is still legible. The wrong entry should
@@ -376,13 +386,14 @@ JSON STRUCTURE — return exactly this:
   "non_orb_page": <true|false — see NON-ORB PAGES rule above>,
   "non_orb_page_note": "<short description if non_orb_page is true, else null>",
   "master_signature_present": <true|false — see MASTER SIGNATURE rule below>,
+  "page_language": "<the language the entries on this page are written in, e.g. English, French, Spanish, Chinese, Russian — null if the page has no handwritten text>",
   "leading_continuation": {"text":.., "item_lines": [...same shape as entry item_lines...], "tank_location":.., "time_start":.., "time_stop":..,
     "position_start":.., "position_stop":.., "quantities": [...same shape as entry quantities...],
     "officer_1_name":.., "officer_1_rank":.., "officer_2_name":.., "officer_2_rank":..} or null,
   "entries": [
     {
       "entry_date": "DD-MMM-YYYY",
-      "orb_code": "<C|D|E|F|G|H|I>",
+      "orb_code": "<A|B|C|D|E|F|G|H|I>",
       "is_continuation": <true if THIS row's Date and Code columns were blank on the page —
         nothing freshly written there, only an item number and/or a comment/value continuing
         the previous entry — false if this row has a freshly written Date and Code of its own.
@@ -419,7 +430,8 @@ JSON STRUCTURE — return exactly this:
       "raw_text": "<complete verbatim text of the entire block including all item lines>",
       "confidence_score": <0.0-1.0>,
       "has_gap_before": <true|false — see GAPS BETWEEN ENTRIES rule below>,
-      "has_erasure": <true|false — see ERASURES / CORRECTIONS rule below>
+      "has_erasure": <true|false — see ERASURES / CORRECTIONS rule below>,
+      "officer_signature_present": <true|false — see OFFICER SIGNATURE rule below>
     }
   ]
 }
@@ -2485,10 +2497,13 @@ async def extract_with_gemini(
 
             page_entries = _dedupe_same_page_entries(_sanitize_page_entries(page_data.get("entries", []), page_num))
             page_signed = bool(page_data.get("master_signature_present", False))
-            for e in page_entries:
+            page_language = str(page_data.get("page_language") or "").strip() or None
+            for seq, e in enumerate(page_entries):
                 # See note above -- always trust the loop's physical page
                 # index over Gemini's own self-reported page_number field.
                 e["page_number"] = page_num
+                e["entry_seq"] = seq
+                e["page_language"] = page_language
                 # master_signature_present is asked for once per page (there's
                 # one "Signature of Master" line per page, not per entry) --
                 # apply that single page-level answer to every entry on it.
@@ -4387,6 +4402,9 @@ async def run_extraction(
                         item_lines=entry_dict.get("item_lines"),
                         has_erasure=bool(entry_dict.get("has_erasure", False)),
                         master_signature_present=entry_dict.get("master_signature_present"),
+                        officer_signature_present=entry_dict.get("officer_signature_present"),
+                        entry_seq=entry_dict.get("entry_seq"),
+                        page_language=(entry_dict.get("page_language") or None) and str(entry_dict["page_language"])[:40],
                     )
                     db.add(entry)
                     await db.flush()

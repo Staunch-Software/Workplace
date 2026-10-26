@@ -15,6 +15,7 @@ from app.dependencies import get_current_user, require_shore, allowed_vessel_ids
 from app.models.orb_alert_thread import OrbAlertThread
 from app.services.alert_chat import thread_stats
 from app.services.calculations import run_all_checks
+from app.services.alert_config import disabled_alert_codes, not_withdrawn
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -26,6 +27,8 @@ async def alert_summary(
     user: ControlUser = Depends(get_current_user),
 ):
     q = select(OrbAlert).where(OrbAlert.is_resolved == False)
+    if disabled := await disabled_alert_codes(db):
+        q = q.where(not_withdrawn(disabled))     # withdrawn alerts stay in the database but are not counted
     scoped = scope_vessel_ids(vessel_id, await allowed_vessel_ids(user, db))
     if scoped is not None:
         q = q.where(OrbAlert.vessel_id.in_(scoped))
@@ -63,6 +66,8 @@ async def list_alerts(
         .outerjoin(OrbEntry, OrbAlert.entry_id == OrbEntry.id)
         .order_by(OrbAlert.created_at.desc())
     )
+    if disabled := await disabled_alert_codes(db):
+        q = q.where(not_withdrawn(disabled))
     scoped = scope_vessel_ids(vessel_id, await allowed_vessel_ids(user, db))
     if scoped is not None:
         q = q.where(OrbAlert.vessel_id.in_(scoped))

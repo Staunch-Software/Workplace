@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     # Workplace control database: users, vessels and permissions live here.
     # Required by the API (checked at startup); the cron scrapers do not need it.
     CONTROL_DATABASE_URL: str = ""
+    # Vessel performance pipeline database (Mariapps noon reports, bunker reports). READ-ONLY and optional:
+    # without it alerts 33 and 35 are skipped and alert 37 falls back to the WNI fuel table.
+    PERFORMANCE_DATABASE_URL: str = ""
     # Must match workplace-backend: tokens are issued there and only verified here.
     SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"

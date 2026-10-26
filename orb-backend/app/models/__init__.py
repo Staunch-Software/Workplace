@@ -10,6 +10,7 @@ from app.models.orb_upload_raw import OrbUploadRaw
 from app.models.orb_alert_thread import OrbAlertThread, OrbAlertAttachment, OrbAlertThreadRead
 from app.models.orb_notification import OrbNotification, OrbFeedEvent, OrbFeedRead
 from app.models.fuel_consumption import FuelConsumption
+from app.models.orb_config import AlertConfig, ThresholdParam, ThresholdHistory, Equipment, OcmImport, OcmRecord
 
 __all__ = [
     "Base",
@@ -28,4 +29,8 @@ __all__ = [
     "OrbFeedEvent",
     "OrbFeedRead",
     "FuelConsumption",
+    "AlertConfig",
+    "ThresholdParam",
+    "ThresholdHistory",
+    "Equipment",
 ]

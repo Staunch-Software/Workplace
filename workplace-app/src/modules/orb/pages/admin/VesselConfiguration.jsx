@@ -1,4 +1,8 @@
 import { Fragment, useState, useEffect, useMemo } from 'react';
+import EquipmentSection from './EquipmentSection';
+import OcmSection from './OcmSection';
+import VesselProfileSection from './VesselProfileSection';
+import IoppFields from './IoppFields';
 import {
   ChevronDown, Ship, Plus, Pencil, Ban, Search, X, Droplets, FileCheck2, Gauge, Anchor,
 } from 'lucide-react';
@@ -8,6 +12,13 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import Dropdown from '../../components/shared/Dropdown';
 import api from '../../api/axiosOrb';
 import './VesselConfiguration.css';
+import './AdminSections.css';
+
+const EMPTY_TANK = {
+  tank_name: '', tank_code: '', tank_group: '', capacity_m3: '', is_iopp: true, is_evaporation_allowed: false,
+  tank_name_iopp: '', iopp_section_ref: '', iopp_capacity_m3: '', effective_from: '', effective_to: '',
+};
+const IOPP_KEYS = ['tank_name_iopp', 'iopp_section_ref', 'iopp_capacity_m3', 'effective_from', 'effective_to'];
 
 const TANK_GROUPS = ['FUEL OIL TANK', 'DIESEL OIL TANK', 'L.O. & Cyl. Oil', 'SLUDGE OIL', 'BILGE WATER', 'GRAY WATER'];
 
@@ -19,7 +30,7 @@ export default function VesselConfiguration() {
   const [showAddVessel, setShowAddVessel] = useState(false);
   const [addTankFor, setAddTankFor] = useState(null);
   const [vesselForm, setVesselForm] = useState({ name: '', imo_number: '', call_sign: '' });
-  const [tankForm, setTankForm] = useState({ tank_name: '', tank_code: '', tank_group: '', capacity_m3: '', is_iopp: true, is_evaporation_allowed: false });
+  const [tankForm, setTankForm] = useState(EMPTY_TANK);
   const [editTank, setEditTank] = useState(null); // { vesselId, tank }
   const [tankFiles, setTankFiles] = useState({ doc1: null, doc2: null });
   const [saving, setSaving] = useState(false);
@@ -76,7 +87,7 @@ export default function VesselConfiguration() {
     finally { setSaving(false); }
   };
 
-  const buildTankFormData = () => {
+  const buildTankFormData = (existing = null) => {
     const fd = new FormData();
     fd.append('tank_name', tankForm.tank_name);
     fd.append('tank_code', tankForm.tank_code);
@@ -84,6 +95,13 @@ export default function VesselConfiguration() {
     fd.append('capacity_m3', parseFloat(tankForm.capacity_m3));
     fd.append('is_iopp', tankForm.is_iopp);
     fd.append('is_evaporation_allowed', tankForm.is_evaporation_allowed);
+    const cleared = [];
+    for (const k of IOPP_KEYS) {
+      const v = String(tankForm[k] ?? '').trim();
+      if (v) fd.append(k, v);
+      else if (existing && existing[k] !== null && existing[k] !== undefined && existing[k] !== '') cleared.push(k);
+    }
+    if (cleared.length) fd.append('iopp_clear', cleared.join(','));
     if (tankFiles.doc1) fd.append('iopp_doc1', tankFiles.doc1);
     if (tankFiles.doc2) fd.append('iopp_doc2', tankFiles.doc2);
     return fd;
@@ -100,7 +118,7 @@ export default function VesselConfiguration() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setAddTankFor(null);
-      setTankForm({ tank_name: '', tank_code: '', tank_group: '', capacity_m3: '', is_iopp: true, is_evaporation_allowed: false });
+      setTankForm(EMPTY_TANK);
       setTankFiles({ doc1: null, doc2: null });
       await loadTanks(addTankFor);
     } catch (e) { setError(e.response?.data?.detail || 'Failed'); }
@@ -115,12 +133,12 @@ export default function VesselConfiguration() {
     }
     setSaving(true); setError('');
     try {
-      await api.put(`/api/vessels/${editTank.vesselId}/tanks/${editTank.tank.id}`, buildTankFormData(), {
+      await api.put(`/api/vessels/${editTank.vesselId}/tanks/${editTank.tank.id}`, buildTankFormData(editTank.tank), {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       await loadTanks(editTank.vesselId);
       setEditTank(null);
-      setTankForm({ tank_name: '', tank_code: '', tank_group: '', capacity_m3: '', is_iopp: true, is_evaporation_allowed: false });
+      setTankForm(EMPTY_TANK);
       setTankFiles({ doc1: null, doc2: null });
     } catch (e) { setError(e.response?.data?.detail || 'Failed'); }
     finally { setSaving(false); }
@@ -183,6 +201,11 @@ export default function VesselConfiguration() {
       capacity_m3: t.capacity_m3,
       is_iopp: t.is_iopp ?? true,
       is_evaporation_allowed: t.is_evaporation_allowed ?? false,
+      tank_name_iopp: t.tank_name_iopp || '',
+      iopp_section_ref: t.iopp_section_ref || '',
+      iopp_capacity_m3: t.iopp_capacity_m3 ?? '',
+      effective_from: t.effective_from || '',
+      effective_to: t.effective_to || '',
     });
     setTankFiles({ doc1: null, doc2: null });
     setError('');
@@ -345,7 +368,13 @@ export default function VesselConfiguration() {
                                       const hasDocs = t.is_iopp && (t.iopp_doc1_url || t.iopp_doc2_url);
                                       return (
                                         <tr key={t.id} className={`vc-row${t.is_active ? '' : ' vc-row--inactive'}`}>
-                                          <td data-label="Tank Name" className="vc-tankname">{t.tank_name}</td>
+                                          <td data-label="Tank Name" className="vc-tankname">
+                                            {t.tank_name}
+                                            {t.tank_name_iopp && <div className="vc-muted" style={{ fontWeight: 400, fontSize: '0.78rem' }}>IOPP: {t.tank_name_iopp}{t.iopp_section_ref ? ` (${t.iopp_section_ref})` : ''}</div>}
+                                            {t.iopp_capacity_m3 != null && Math.abs(t.iopp_capacity_m3 - t.capacity_m3) > 0.005 && (
+                                              <div style={{ fontWeight: 600, fontSize: '0.78rem', color: '#b3261e' }}>IOPP capacity {t.iopp_capacity_m3} m³ differs</div>
+                                            )}
+                                          </td>
                                           <td data-label="Code"><span className="vc-code">{t.tank_code}</span></td>
                                           <td data-label="Group" className="vc-muted">{t.tank_group || '—'}</td>
                                           <td data-label="Capacity (m³)" className="vc-num">{t.capacity_m3}</td>
@@ -390,6 +419,10 @@ export default function VesselConfiguration() {
                             </table>
                           </div>
                         )}
+
+                        {vesselTanks && <EquipmentSection vesselId={v.id} tanks={vesselTanks} />}
+                        <OcmSection vesselId={v.id} />
+                        <VesselProfileSection vessel={v} onSaved={(nv) => setVessels(list => list.map(x => (x.id === nv.id ? { ...x, ...nv } : x)))} />
                       </div>
                     )}
                   </section>
@@ -456,6 +489,7 @@ export default function VesselConfiguration() {
                 </div>
               </>
             )}
+            {tankForm.is_iopp && <IoppFields form={tankForm} setForm={setTankForm} />}
             <div className="checkbox-row">
               <input type="checkbox" id="is_evap" checked={tankForm.is_evaporation_allowed} onChange={e => setTankForm({ ...tankForm, is_evaporation_allowed: e.target.checked })} />
               <label htmlFor="is_evap">Evaporation Allowed (as per IOPP Certificate)</label>
@@ -506,6 +540,7 @@ export default function VesselConfiguration() {
                 </div>
               </>
             )}
+            {tankForm.is_iopp && <IoppFields form={tankForm} setForm={setTankForm} />}
             <div className="checkbox-row">
               <input type="checkbox" id="edit_is_evap" checked={tankForm.is_evaporation_allowed} onChange={e => setTankForm({ ...tankForm, is_evaporation_allowed: e.target.checked })} />
               <label htmlFor="edit_is_evap">Evaporation Allowed (as per IOPP Certificate)</label>

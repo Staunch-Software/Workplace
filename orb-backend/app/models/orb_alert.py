@@ -20,6 +20,8 @@ class OrbAlert(Base, TimestampMixin):
     resolved_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)  # workplace user id
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # Resolution workflow (api/orb_alert_resolution.py): OPEN -> PENDING_APPROVAL -> RESOLVED
+    # The upload that raised a batch-level alert (no entry); NULL for entry alerts and for older rows.
+    upload_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("orb_uploads.id", ondelete="SET NULL"), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(20), default="OPEN", server_default="OPEN", nullable=False, index=True)
     resolution_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     resolution_requested_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)

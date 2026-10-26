@@ -1,5 +1,6 @@
 import uuid
-from sqlalchemy import String, Float, Boolean, ForeignKey, UniqueConstraint
+from datetime import date
+from sqlalchemy import String, Float, Boolean, Date, ForeignKey, UniqueConstraint
 from typing import Optional
 from sqlalchemy.orm import mapped_column, Mapped
 from sqlalchemy.dialects.postgresql import UUID
@@ -24,3 +25,10 @@ class VesselTank(Base, TimestampMixin):
     # NEW — required for Check 9 (Bilge Pump Capacity). Only meaningful on
     # tanks where tank_group == 'BILGE'; NULL elsewhere.
     bilge_pump_capacity_m3_per_hr: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    # IOPP Supplement Form A section 3 particulars (alert 25) and the dates the entry was valid.
+    tank_name_iopp: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    iopp_section_ref: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    effective_from: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    effective_to: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    # Capacity the IOPP Supplement states for this tank; alert 25 flags a registered capacity that differs from it.
+    iopp_capacity_m3: Mapped[Optional[float]] = mapped_column(Float, nullable=True)

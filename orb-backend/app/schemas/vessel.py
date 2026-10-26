@@ -15,6 +15,9 @@ class VesselUpdate(BaseModel):
     imo_number: Optional[str] = None
     call_sign: Optional[str] = None
     is_active: Optional[bool] = None
+    flag_state: Optional[str] = None
+    flag_official_language: Optional[str] = None     # alert 36; send "" to clear
+    fuel_grades: Optional[list[str]] = None
 
 
 class VesselResponse(BaseModel):
@@ -25,6 +28,9 @@ class VesselResponse(BaseModel):
     imo_number: str
     call_sign: Optional[str] = None
     is_active: bool
+    flag_state: Optional[str] = None
+    flag_official_language: Optional[str] = None
+    fuel_grades: Optional[list[str]] = None
     created_by: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: datetime

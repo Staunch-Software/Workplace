@@ -1,0 +1,45 @@
+/* Sections added to the vessel body of Vessel Configuration: flag State, IOPP particulars, monitor data */
+.orb-root .as-block { margin-top: 1.4rem; display: flex; flex-direction: column; gap: 0.7rem; }
+.orb-root .as-block .vc-sectionhead { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; }
+.orb-root .as-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+.orb-root .as-field { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.78rem; font-weight: 700; color: #5c534a; }
+.orb-root .as-hint { margin: 0; font-size: 0.8rem; line-height: 1.45; color: var(--text-muted, #7a7167); }
+.orb-root .as-foot { display: flex; align-items: center; justify-content: flex-end; gap: 0.7rem; }
+.orb-root .as-msg { font-size: 0.82rem; font-weight: 600; }
+.orb-root .as-msg--ok { color: #1f7a3d; }
+.orb-root .as-msg--error { color: #b3261e; }
+.orb-root .as-result { border-radius: 10px; padding: 0.65rem 0.85rem; font-size: 0.85rem; line-height: 1.45; }
+.orb-root .as-result--ok { background: #EFF8F1; border: 1px solid #B9DEC3; color: #1f5f33; }
+.orb-root .as-result--error { background: #FDF0EE; border: 1px solid #F0C4BE; color: #8a2a21; }
+.orb-root .as-result__detail { margin-top: 0.25rem; opacity: 0.85; font-size: 0.8rem; }
+.orb-root .as-upload { position: relative; cursor: pointer; }
+.orb-root .as-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.orb-root .as-upload--busy { opacity: 0.65; pointer-events: none; }
+
+/* IOPP particulars inside the tank modals */
+.orb-root .as-iopp { border: 1px solid #EADFD2; border-radius: 10px; padding: 0.7rem 0.85rem 0.4rem; margin: 0.4rem 0 0.8rem; background: #FCFAF7; }
+.orb-root .as-iopp legend { font-size: 0.78rem; font-weight: 800; color: #5c534a; padding: 0 0.35rem; }
+.orb-root .as-iopp .as-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 0.5rem; }
+.orb-root .as-iopp .form-group { margin-bottom: 0.4rem; }
+
+@media (min-width: 1600px) {
+  .orb-root .as-hint, .orb-root .as-result { font-size: 0.92rem; }
+  .orb-root .as-field { font-size: 0.86rem; }
+}
+@media (max-width: 1024px) {
+  .orb-root .as-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .orb-root .as-grid, .orb-root .as-iopp .as-grid { grid-template-columns: 1fr; }
+  .orb-root .as-foot { justify-content: stretch; }
+  .orb-root .as-foot .vc-btn { flex: 1; justify-content: center; }
+  .orb-root .as-block .form-control, .orb-root .as-iopp .form-control { font-size: 16px; }
+}
+
+/* Switch between the administration pages */
+.orb-root .admin-nav { display: flex; gap: 0.4rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.orb-root .admin-nav__link { padding: 0.45rem 0.95rem; border-radius: 999px; font-size: 0.85rem; font-weight: 700; color: #6b6157; background: #F4EFE9; text-decoration: none; }
+.orb-root .admin-nav__link:hover { background: #EADFD2; }
+.orb-root .admin-nav__link--on { background: #E8742B; color: #fff; }
+@media (min-width: 1600px) { .orb-root .admin-nav__link { font-size: 0.95rem; } }
+@media (max-width: 640px) { .orb-root .admin-nav__link { flex: 1; text-align: center; } }

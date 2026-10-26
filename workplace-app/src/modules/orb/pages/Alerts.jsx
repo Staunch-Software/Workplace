@@ -23,32 +23,10 @@ const SEVERITY_ICONS = {
   observation: Eye,
 };
 
-// 12 alert types per the new compliance spec
-const ALERT_TYPES = [
-  'wrong_item_code',                 // 1  Major
-  'mass_balance_error',              // 2  Major
-  'tank_capacity_exceeded',          // 3  Critical
-  'combined_capacity_threshold',     // 4  Major
-  'sludge_generation_rate',          // 5  Observation/Minor
-  'bilge_increasing_rate',           // 6  Major
-  'sludge_vs_fuel_consumption',      // 7  Observation/Major/Critical
-  'bilge_transfer_vs_soundings',     // 8  Minor
-  // 'bilge_pump_capacity' (9) omitted — check paused, no UI to set pump capacity yet
-  'bunker_mismatch',                 // 10 Minor
-  'missing_master_signature',        // 11 Minor
-  'non_chronological_entry',         // 12 Minor
-  'erasure_detected',                // 12 Observation
-  'item_number_missing',             // 14 Minor  — a line's item number (e.g. 11.2) not written
-  'item_value_missing',              // 14 Major  — nothing recorded for an item (e.g. capacity)
-  'capacity_reading_mismatch',
-  'bunker_quantity_mismatch',
-  'gap_between_entries',
-  'reading_needs_review',            // Observation — figure looks wrong but the entry is uncertain
-];
-
 export default function Alerts() {
   const [alerts, setAlerts] = useState([]);
   const [vessels, setVessels] = useState([]);
+  const [alertTypes, setAlertTypes] = useState([]);   // from the alert configuration: enabled and offered in the filter
   const [summary, setSummary] = useState({});
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ vessel_id: [], severity: '', status: '', alert_type: '' });
@@ -59,6 +37,7 @@ export default function Alerts() {
   const { user, isShore } = useAuth();
 
   useEffect(() => { api.get('/api/vessels').then(r => setVessels(r.data.data || [])); }, []);
+  useEffect(() => { api.get('/api/alert-config/types').then(r => setAlertTypes(r.data.data || [])).catch(() => {}); }, []);
 
   const load = (overrides = {}) => {
     setLoading(true);
@@ -179,7 +158,7 @@ export default function Alerts() {
                   <Dropdown
                     value={filters.alert_type}
                     onChange={v => setFilter('alert_type', v)}
-                    options={[{ value: '', label: 'All' }, ...ALERT_TYPES.map(t => ({ value: t, label: t.replace(/_/g, ' ') }))]}
+                    options={[{ value: '', label: 'All' }, ...alertTypes.map(t => ({ value: t.alert_code, label: t.name }))]}
                   />
                 </div>
                 <div className="al-filters__actions">

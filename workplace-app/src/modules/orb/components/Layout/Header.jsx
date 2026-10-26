@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate as useRouterNavigate } from 'react-router-dom';
-import { ChevronLeft, Menu, ArrowLeft, ChevronDown, Settings } from 'lucide-react';
+import { ChevronLeft, Menu, ArrowLeft, ChevronDown, Settings, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebar } from '../../context/SidebarContext';
 import { useNavigate } from '../../hooks/useOrbNavigate';
@@ -74,6 +74,12 @@ export default function Header({ title, backTo }) {
               <button type="button" role="menuitem" className="user-menu__item" onClick={() => { setOpen(false); navigate('/admin/vessels'); }}>
                 <Settings size={15} />
                 <span>Vessel Config</span>
+              </button>
+            )}
+            {isAdmin && (
+              <button type="button" role="menuitem" className="user-menu__item" onClick={() => { setOpen(false); navigate('/admin/alerts'); }}>
+                <SlidersHorizontal size={15} />
+                <span>Alert Settings</span>
               </button>
             )}
             <button type="button" role="menuitem" className="user-menu__item" onClick={() => { setOpen(false); goToWorkplace('/dashboard'); }}>

@@ -22,6 +22,7 @@ import Alerts from './pages/Alerts';
 import DailyLog from './pages/DailyLog';
 import Feed from './pages/Feed';
 import VesselConfiguration from './pages/admin/VesselConfiguration';
+import AlertSettings from './pages/admin/AlertSettings';
 import AdminLayout from './pages/admin/AdminLayout';
 
 // A user who opens the other view's address (or an old flat /orb/... link) lands on their own view.
@@ -60,6 +61,16 @@ function ShoreRoutes() {
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <AdminLayout title="Vessel Configuration">
               <VesselConfiguration />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="admin/alerts"
+        element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <AdminLayout title="Alert Settings">
+              <AlertSettings />
             </AdminLayout>
           </ProtectedRoute>
         }
