@@ -96,6 +96,7 @@
 .orb-root .en-date { display: flex; align-items: center; gap: 0.4rem; white-space: nowrap; font-weight: 600; color: var(--en-navy); font-variant-numeric: tabular-nums; }
 .orb-root .en-chev { color: var(--en-faint); transition: transform 0.2s ease, color 0.2s ease; flex-shrink: 0; }
 .orb-root .en-chev--open { transform: rotate(90deg); color: var(--en-orange-600); }
+.orb-root .en-vessel { font-weight: 600; color: var(--en-navy); white-space: nowrap; }
 .orb-root .en-code { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 8px; background: var(--en-orange-100); color: var(--en-orange-700); border: 1px solid #F8D2B0; font-weight: 800; font-size: 0.82rem; }
 .orb-root .en-mono { font-family: var(--font-mono, 'Cascadia Code', 'Courier New', monospace); font-size: 0.82rem; }
 .orb-root .en-op { min-width: 380px; max-width: 560px; line-height: 1.45; }

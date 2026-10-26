@@ -107,6 +107,8 @@ async def list_feed(
     conds = await _visible_events(db, user)
     if vessel_id:
         conds.append(OrbFeedEvent.vessel_id == vessel_id)
+    # Hide orphaned feed events for alerts that were deleted
+    conds.append(or_(OrbFeedEvent.alert_id.is_(None), OrbAlert.id.is_not(None)))
     read = (OrbFeedRead.event_id == OrbFeedEvent.id) & (OrbFeedRead.user_id == user.id)
     rows = (await db.execute(
         select(OrbFeedEvent, OrbFeedRead.is_read, Vessel.name, OrbAlert.severity, OrbAlert.alert_type, OrbAlert.status)

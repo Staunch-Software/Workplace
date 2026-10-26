@@ -151,6 +151,11 @@ async def apply_tombstones(db: AsyncSession, items: Iterable[dict], *, vessel_im
             continue
         try:
             async with db.begin_nested():
+                if etype == "alert":
+                    from app.models.orb_notification import OrbFeedEvent, OrbNotification
+                    await db.execute(delete(OrbNotification).where(OrbNotification.alert_id.in_(ids)))
+                    await db.execute(delete(OrbFeedEvent).where(OrbFeedEvent.alert_id.in_(ids)))
+                    await db.execute(delete(OrbAlertThread).where(OrbAlertThread.alert_id.in_(ids)))
                 res = await db.execute(delete(model).where(model.id.in_(ids)))
                 removed += res.rowcount or 0
         except Exception as exc:
