@@ -1,10 +1,12 @@
-import { Fragment, useState, useEffect } from 'react';
+import { Fragment, useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Filter, Search, RotateCcw, FileSearch, ChevronRight, AlertTriangle } from 'lucide-react';
 import Sidebar from '../components/Layout/Sidebar';
 import Header from '../components/Layout/Header';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import Dropdown from '../components/shared/Dropdown';
 import MultiSelectDropdown from '../components/shared/MultiSelectDropdown';
+import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosOrb';
 import './Entries.css';
 
@@ -17,13 +19,43 @@ const EMPTY_FILTERS = {
 const confidenceTone = (score) => (score >= 0.9 ? 'high' : score >= 0.75 ? 'mid' : 'low');
 
 export default function Entries() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { isShore, isVessel } = useAuth();
+  const showVesselCol = isShore || !isVessel;
+
   const [entries, setEntries] = useState([]);
   const [vessels, setVessels] = useState([]);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(null);
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
 
-  useEffect(() => { api.get('/api/vessels').then(r => setVessels(r.data.data || [])); }, []);
+  // Initialize filters from URL search params if present
+  const [filters, setFilters] = useState(() => {
+    const vesselParam = searchParams.getAll('vessel_id');
+    const singleVessel = searchParams.get('vessel_id');
+    const vessel_id = vesselParam.length > 0
+      ? vesselParam
+      : (singleVessel ? singleVessel.split(',').filter(Boolean) : []);
+
+    return {
+      vessel_id,
+      orb_code: searchParams.get('orb_code') || '',
+      date_from: searchParams.get('date_from') || '',
+      date_to: searchParams.get('date_to') || '',
+      confidence_below: searchParams.get('confidence_below') || '',
+    };
+  });
+
+  const vesselMap = useMemo(() => {
+    const map = {};
+    vessels.forEach(v => {
+      map[v.id] = v.name;
+    });
+    return map;
+  }, [vessels]);
+
+  useEffect(() => {
+    api.get('/api/vessels').then(r => setVessels(r.data.data || [])).catch(() => {});
+  }, []);
 
   const load = (activeFilters = filters) => {
     setLoading(true);
@@ -32,12 +64,39 @@ export default function Entries() {
       if (Array.isArray(v)) v.forEach(item => params.append(k, item));
       else if (v) params.append(k, v);
     });
-    api.get(`/api/entries?${params}`).then(r => setEntries(r.data.data || [])).finally(() => setLoading(false));
+
+    // Keep URL query params in sync
+    setSearchParams(params, { replace: true });
+
+    api.get(`/api/entries?${params}`)
+      .then(r => setEntries(r.data.data || []))
+      .catch(() => setEntries([]))
+      .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load(filters);
+  }, []);
 
   const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
+
+  const handleVesselChange = (selectedVessels) => {
+    const nextFilters = { ...filters, vessel_id: selectedVessels };
+    setFilters(nextFilters);
+    load(nextFilters);
+  };
+
+  const handleOrbCodeChange = (code) => {
+    const nextFilters = { ...filters, orb_code: code };
+    setFilters(nextFilters);
+    load(nextFilters);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      load(filters);
+    }
+  };
 
   const clearFilters = () => {
     setFilters(EMPTY_FILTERS);
@@ -45,6 +104,7 @@ export default function Entries() {
   };
 
   const activeCount = Object.values(filters).filter(v => (Array.isArray(v) ? v.length > 0 : v !== '')).length;
+  const colSpan = showVesselCol ? 9 : 8;
 
   return (
     <div className="app-shell">
@@ -71,8 +131,8 @@ export default function Entries() {
                   <label>Vessel</label>
                   <MultiSelectDropdown
                     value={filters.vessel_id}
-                    onChange={v => setFilter('vessel_id', v)}
-                    placeholder="Select the vessel"
+                    onChange={handleVesselChange}
+                    placeholder="All vessels (or select)"
                     options={vessels.map(v => ({ value: v.id, label: v.name }))}
                   />
                 </div>
@@ -80,30 +140,50 @@ export default function Entries() {
                   <label>ORB Code</label>
                   <Dropdown
                     value={filters.orb_code}
-                    onChange={v => setFilter('orb_code', v)}
+                    onChange={handleOrbCodeChange}
                     options={[{ value: '', label: 'All' }, ...ORB_CODES.map(c => ({ value: c, label: `Code ${c}` }))]}
                   />
                 </div>
                 <div className="form-group">
                   <label>Date From</label>
-                  <input type="date" className="form-control" value={filters.date_from} onChange={e => setFilter('date_from', e.target.value)} />
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={filters.date_from}
+                    onChange={e => setFilter('date_from', e.target.value)}
+                    onKeyDown={handleKeyDown}
+                  />
                 </div>
                 <div className="form-group">
                   <label>Date To</label>
-                  <input type="date" className="form-control" value={filters.date_to} onChange={e => setFilter('date_to', e.target.value)} />
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={filters.date_to}
+                    onChange={e => setFilter('date_to', e.target.value)}
+                    onKeyDown={handleKeyDown}
+                  />
                 </div>
                 <div className="form-group">
                   <label>Confidence Below</label>
-                  <input type="number" step="0.05" min="0" max="1" className="form-control"
-                    value={filters.confidence_below} onChange={e => setFilter('confidence_below', e.target.value)}
-                    placeholder="e.g. 0.75" />
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="0"
+                    max="1"
+                    className="form-control"
+                    value={filters.confidence_below}
+                    onChange={e => setFilter('confidence_below', e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="e.g. 0.75"
+                  />
                 </div>
               </div>
               <div className="en-filters__actions">
                 <button className="en-btn en-btn--secondary" onClick={clearFilters} disabled={activeCount === 0}>
                   <RotateCcw size={15} /> Clear Filters
                 </button>
-                <button className="en-btn en-btn--primary" onClick={() => load()}>
+                <button className="en-btn en-btn--primary" onClick={() => load(filters)}>
                   <Search size={16} /> Apply
                 </button>
               </div>
@@ -123,18 +203,29 @@ export default function Entries() {
                   <table className="en-table">
                     <thead>
                       <tr>
-                        <th>Date</th><th>Code</th><th>Item</th><th>Operation</th>
-                        <th>Tank/Location</th><th>Officers</th><th className="en-center">Page</th><th>Confidence</th>
+                        <th>Date</th>
+                        {showVesselCol && <th>Vessel</th>}
+                        <th>Code</th>
+                        <th>Item</th>
+                        <th>Operation</th>
+                        <th>Tank/Location</th>
+                        <th>Officers</th>
+                        <th className="en-center">Page</th>
+                        <th>Confidence</th>
                       </tr>
                     </thead>
                     <tbody>
                       {entries.length === 0 ? (
                         <tr className="en-emptyrow">
-                          <td colSpan={8}>
+                          <td colSpan={colSpan}>
                             <div className="en-empty">
                               <span className="en-empty__icon"><FileSearch size={24} /></span>
                               <div className="en-empty__title">No entries found.</div>
-                              <div className="en-empty__text">Try adjusting or clearing the filters.</div>
+                              <div className="en-empty__text">
+                                {filters.vessel_id.length > 0
+                                  ? `No extracted entries recorded for ${filters.vessel_id.map(id => vesselMap[id] || 'selected vessel').join(', ')}. Try selecting another vessel or clearing filters.`
+                                  : 'Try adjusting or clearing the filters.'}
+                              </div>
                             </div>
                           </td>
                         </tr>
@@ -151,6 +242,11 @@ export default function Entries() {
                                 <ChevronRight size={14} className={`en-chev${isOpen ? ' en-chev--open' : ''}`} />
                                 {e.entry_date}
                               </td>
+                              {showVesselCol && (
+                                <td data-label="Vessel" className="en-vessel">
+                                  {vesselMap[e.vessel_id] || '—'}
+                                </td>
+                              )}
                               <td data-label="Code"><span className="en-code">{e.orb_code}</span></td>
                               <td data-label="Item" className="en-mono">{e.item_number || '—'}</td>
                               <td data-label="Operation" className="en-op"><span className="en-op__text">{e.operation_description}</span></td>
@@ -171,7 +267,7 @@ export default function Entries() {
                             </tr>
                             {isOpen && (
                               <tr className="en-exprow">
-                                <td colSpan={8}>
+                                <td colSpan={colSpan}>
                                   <div className="en-detail">
                                     <div className="en-detail__title">Quantities</div>
                                     {e.quantities?.length ? (
