@@ -94,6 +94,35 @@ def parse_datetime(v: Any) -> Optional[datetime]:
     return datetime.fromisoformat(str(v).replace("Z", "+00:00"))
 
 
+import unicodedata
+
+
+def sanitize_text(v: Any) -> Any:
+    """Normalize and convert Unicode characters that fail single-byte database encodings (e.g. WIN1252 on Windows vessel installs)."""
+    if isinstance(v, str):
+        replacements = {
+            '\u2070': '0', '\u00b9': '1', '\u00b2': '2', '\u00b3': '3', '\u2074': '4',
+            '\u2075': '5', '\u2076': '6', '\u2077': '7', '\u2078': '8', '\u2079': '9',
+            '\u2018': "'", '\u2019': "'", '\u201c': '"', '\u201d': '"',
+            '\u2013': '-', '\u2014': '-', '\u2026': '...', '\u00a0': ' ',
+            '\u2022': '*', '\u25aa': '*', '\u25cf': '*',
+        }
+        for k, rep in replacements.items():
+            if k in v:
+                v = v.replace(k, rep)
+        try:
+            v.encode('cp1252')
+            return v
+        except UnicodeEncodeError:
+            norm = unicodedata.normalize('NFKD', v)
+            return norm.encode('cp1252', errors='replace').decode('cp1252')
+    elif isinstance(v, dict):
+        return {k: sanitize_text(val) for k, val in v.items()}
+    elif isinstance(v, list):
+        return [sanitize_text(val) for val in v]
+    return v
+
+
 def prepare(model: type, data: dict) -> dict:
     """Keep only the model's columns and turn strings back into UUIDs / datetimes."""
     out = {}
@@ -108,6 +137,8 @@ def prepare(model: type, data: dict) -> dict:
                 v = parse_datetime(v)
             elif isinstance(col.type, Date) and not isinstance(v, date):
                 v = date.fromisoformat(str(v)[:10])
+            else:
+                v = sanitize_text(v)
         out[col.key] = v
     return out
 

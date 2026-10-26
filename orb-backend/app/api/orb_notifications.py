@@ -108,7 +108,7 @@ async def list_feed(
     if vessel_id:
         conds.append(OrbFeedEvent.vessel_id == vessel_id)
     # Hide orphaned feed events for alerts that were deleted
-    conds.append(or_(OrbFeedEvent.alert_id.is_(None), OrbAlert.id.is_not(None)))
+    conds.append(or_(OrbFeedEvent.alert_id.is_(None), OrbFeedEvent.alert_id.in_(select(OrbAlert.id))))
     read = (OrbFeedRead.event_id == OrbFeedEvent.id) & (OrbFeedRead.user_id == user.id)
     rows = (await db.execute(
         select(OrbFeedEvent, OrbFeedRead.is_read, Vessel.name, OrbAlert.severity, OrbAlert.alert_type, OrbAlert.status)
@@ -133,7 +133,7 @@ async def list_feed(
             "alert_id": str(e.alert_id) if e.alert_id else None, "upload_id": str(e.upload_id) if e.upload_id else None,
             "alert_type": alert_type, "severity": severity, "alert_status": alert_status,
             "title": e.title, "message": e.message, "link": e.link, "actor_name": e.actor_name, "own": own,
-            "shore_only": e.shore_only, "for_me": me in recipients, "mentioned_me": me in mentioned, "meta": meta,
+            "shore_only": e.shore_only, "for_me": (me in recipients) or (not is_shore(user) and not e.shore_only), "mentioned_me": me in mentioned, "meta": meta,
             "is_read": bool(read_id) or own, "created_at": e.created_at.isoformat(),
         })
     return success(data={"items": items, "unread_count": unread})

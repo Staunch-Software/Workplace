@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.models.orb_alert_thread import OrbAlertThread
 from app.models.sync import SyncConflict
-from app.services.sync_registry import SPECS, TOMBSTONE_MODELS, TOMBSTONE_ORDER, Spec, pk_of, prepare, row_to_dict
+from app.services.sync_registry import SPECS, TOMBSTONE_MODELS, TOMBSTONE_ORDER, Spec, pk_of, prepare, row_to_dict, sanitize_text
 
 settings = get_settings()
 logger = logging.getLogger("orb.sync")
@@ -29,8 +29,10 @@ async def log_conflict(db: AsyncSession, entity_type: str, entity_id, reason: st
                        vessel_imo: Optional[str] = None) -> None:
     """Keep a note of something sync did not apply. Uses its own commit so it survives a rolled-back row."""
     try:
-        db.add(SyncConflict(entity_type=entity_type, entity_id=entity_id, vessel_imo=vessel_imo or None, reason=reason[:2000],
-                            incoming=incoming, existing=existing))
+        db.add(SyncConflict(entity_type=entity_type, entity_id=entity_id, vessel_imo=vessel_imo or None,
+                            reason=sanitize_text(str(reason))[:2000],
+                            incoming=sanitize_text(incoming),
+                            existing=sanitize_text(existing)))
         await db.commit()
     except Exception:
         logger.exception("Could not record a sync conflict for %s %s", entity_type, entity_id)

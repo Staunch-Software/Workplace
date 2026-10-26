@@ -61,7 +61,9 @@ async def start_background_sync() -> None:
         return
     logger.info("ORB sync worker started for vessel %s -> %s", settings.VESSEL_IMO, settings.CLOUD_BASE_URL)
     async with AsyncSessionLocal() as db:
-        await SyncProcessor(db).recover_stale(everything=True)       # whatever was in flight when the PC stopped
+        proc = SyncProcessor(db)
+        await proc.recover_stale(everything=True)       # whatever was in flight when the PC stopped
+        await proc.check_and_rewind_if_needed()
     state = {"heartbeat": 0.0, "purge": time.monotonic(), "clock_saved": 0.0}
     while True:
         try:
