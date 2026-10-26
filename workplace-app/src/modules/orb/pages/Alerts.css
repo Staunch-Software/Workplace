@@ -83,6 +83,7 @@
 .orb-root .al-filters__title { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.75rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--al-soft); }
 .orb-root .al-filters__title svg { color: var(--al-orange-500); }
 .orb-root .al-filters__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 0.9rem; align-items: end; }
+.orb-root .al-filters__grid--vessel { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; }
 .orb-root .al-filters .form-group { margin-bottom: 0; min-width: 0; }
 .orb-root .al-filters .form-group label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--al-soft); }
 .orb-root .al-filters__actions { display: flex; gap: 0.6rem; }
