@@ -5,9 +5,13 @@ the source is not configured or cannot be reached, and the alerts that depend on
 back to the older source) instead of raising false alerts. Vessels are matched by IMO, by name when ORB has no IMO.
 
 Used by:
-  - alert 37 / 2  : consumed fuel per grade per report (Fuel ROB block of the log)
+  - alert 37 / 2  : consumed fuel per grade (pipeline's expanded Mariapps table, emissionx_total_* columns)
   - alert 33      : the vessel's status (at sea / in port / at anchor) and position over time
   - alert 35      : bunker delivery notes
+
+Tables read (a SELECT-only role needs exactly these): expanded_mariapps_data (fuel), vessels (name lookup when a
+vessel has no IMO), raw_mariapps_logs (position, UTC time, anchorage/drifting hours - the expanded table does not
+carry them yet), mariapps_bunker_reports.
 """
 import re
 import asyncio
@@ -326,9 +330,46 @@ async def load_logs(imo: str | None, name: str | None, start: date, end: date) -
     return list(latest.values())
 
 
+_EXPANDED_FUEL = (("HFO", "emissionx_total_hfo_mt"), ("LFO", "emissionx_total_lfo_mt"),
+                  ("MDO", "emissionx_total_mdo_mt"), ("BIO", "emissionx_total_biofuel_mt"))
+
+
 async def fuel_for_period(imo: str | None, name: str | None, start: date, end: date) -> FuelSummary | None:
-    logs = await load_logs(imo, name, start, end)
-    return None if logs is None else summarise_fuel(logs, start, end)
+    """Consumed fuel per grade from the pipeline's expanded Mariapps table (the same totals the DCS pages use).
+    A day counts as covered when at least one report of that day has a fuel figure. None = source not
+    configured / not reachable (the caller then falls back to the older fuel table)."""
+    eng = _get_engine()
+    if eng is None or not ((imo or "").strip() or name):
+        return None
+    cols = ", ".join(f'e."{c}" AS {g.lower()}' for g, c in _EXPANDED_FUEL)
+    if (imo or "").strip():
+        who, params = "e.vessel_imo = :ident", {"ident": imo.strip()}
+    else:
+        who, params = "e.vessel_imo IN (SELECT imo_number FROM vessels WHERE upper(vessel_name) = upper(:ident))", {"ident": name.strip()}
+    sql = text(f"""
+        SELECT e.log_date, e.log_number, {cols}
+        FROM expanded_mariapps_data e
+        WHERE {who} AND e.log_date >= :s AND e.log_date <= :e
+    """)
+    try:
+        async with eng.connect() as conn:
+            rows = (await conn.execute(sql, {**params, "s": start, "e": end})).all()
+    except Exception:
+        logger.exception("Performance database unavailable (expanded fuel)")
+        return None
+    seen: set = set()
+    logs: list[LogRecord] = []
+    for r in rows:
+        if r.log_number and r.log_number in seen:
+            continue                                     # the same report expanded twice
+        seen.add(r.log_number)
+        fuel = {}
+        for g, _c in _EXPANDED_FUEL:
+            mt = num(getattr(r, g.lower()))
+            if mt is not None:
+                fuel[g] = mt
+        logs.append(LogRecord(log_number=str(r.log_number or ""), log_type="", local_date=r.log_date, utc=None, fuel_mt=fuel))
+    return summarise_fuel(logs, start, end)
 
 
 async def load_bunkers(imo: str | None, name: str | None) -> list[BunkerRecord] | None:
