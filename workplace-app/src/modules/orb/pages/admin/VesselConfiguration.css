@@ -135,6 +135,9 @@
   font-size: 0.73rem; font-weight: 600; color: var(--vc-text);
 }
 .orb-root .vc-chip__k { font-size: 0.63rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--vc-faint); }
+.orb-root .vc-chip--warn { background: #fff8e1; border-color: #f59e0b; color: #92400e; font-weight: 600; }
+.orb-root .vc-vessel--unconfigured { opacity: 0.85; }
+.orb-root .vc-vessel--unconfigured .vc-vessel__head { border-left: 3px solid #f59e0b; }
 .orb-root .vc-vessel__actions { display: flex; align-items: center; gap: 0.65rem; flex-shrink: 0; }
 .orb-root .vc-vessel__actions .vc-btn { padding: 0.36rem 0.7rem; font-size: 0.78rem; border-radius: 9px; gap: 0.3rem; }
 .orb-root .vc-vessel__actions .vc-btn svg { width: 14px; height: 14px; }

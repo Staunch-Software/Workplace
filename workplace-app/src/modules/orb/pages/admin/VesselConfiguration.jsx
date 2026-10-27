@@ -11,6 +11,7 @@ import Badge from '../../components/shared/Badge';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import Dropdown from '../../components/shared/Dropdown';
 import api from '../../api/axiosOrb';
+import coreApi from '../../../../api/axios';
 import './VesselConfiguration.css';
 import './AdminSections.css';
 
@@ -27,9 +28,7 @@ export default function VesselConfiguration() {
   const [tanks, setTanks] = useState({});
   const [expanded, setExpanded] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showAddVessel, setShowAddVessel] = useState(false);
   const [addTankFor, setAddTankFor] = useState(null);
-  const [vesselForm, setVesselForm] = useState({ name: '', imo_number: '', call_sign: '' });
   const [tankForm, setTankForm] = useState(EMPTY_TANK);
   const [editTank, setEditTank] = useState(null); // { vesselId, tank }
   const [tankFiles, setTankFiles] = useState({ doc1: null, doc2: null });
@@ -41,14 +40,43 @@ export default function VesselConfiguration() {
   const [activeDocTab, setActiveDocTab] = useState(1);
   const [search, setSearch] = useState('');
 
-  const loadVessels = () => {
+  const loadVessels = async () => {
     setLoading(true);
-    api.get('/api/vessels').then(r => {
-      const list = r.data.data || [];
-      setVessels(list);
-      // Prefetch tanks so the collapsed header can show the tank count right away.
-      list.filter(v => !tanks[v.id]).forEach(v => { loadTanks(v.id).catch(() => {}); });
-    }).finally(() => setLoading(false));
+    try {
+      // Fetch vessel list from core backend (source of truth) and ORB config concurrently
+      const [coreRes, orbRes] = await Promise.allSettled([
+        coreApi.get('/vessels'),
+        api.get('/api/vessels'),
+      ]);
+
+      const coreList = coreRes.status === 'fulfilled' ? (coreRes.value.data || []) : [];
+      const orbList  = orbRes.status  === 'fulfilled' ? (orbRes.value.data?.data || []) : [];
+
+      // Build IMO => ORB vessel map for O(1) lookup
+      const orbByImo = {};
+      orbList.forEach(ov => { orbByImo[ov.imo_number] = ov; });
+
+      // Merge: show all core vessels; enrich with ORB data (id, call_sign) if configured
+      const merged = coreList.map(cv => {
+        const orbVessel = orbByImo[cv.imo] || null;
+        return {
+          id: orbVessel?.id ?? null,               // ORB UUID (null if not yet configured in ORB)
+          name: cv.name,
+          imo_number: cv.imo,
+          call_sign: orbVessel?.call_sign ?? cv.call_sign ?? '',
+          is_active: cv.is_active,
+          orb_configured: !!orbVessel,             // true if vessel exists in ORB DB
+        };
+      });
+
+      setVessels(merged);
+      // Prefetch tanks for already-configured vessels
+      merged
+        .filter(v => v.id && !tanks[v.id])
+        .forEach(v => { loadTanks(v.id).catch(() => {}); });
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { loadVessels(); }, []);
@@ -73,18 +101,7 @@ export default function VesselConfiguration() {
   const toggleVessel = async (vesselId) => {
     if (expanded === vesselId) { setExpanded(null); return; }
     setExpanded(vesselId);
-    if (!tanks[vesselId]) await loadTanks(vesselId);
-  };
-
-  const handleAddVessel = async () => {
-    setSaving(true); setError('');
-    try {
-      await api.post('/api/vessels', vesselForm);
-      setShowAddVessel(false);
-      setVesselForm({ name: '', imo_number: '', call_sign: '' });
-      loadVessels();
-    } catch (e) { setError(e.response?.data?.detail || 'Failed'); }
-    finally { setSaving(false); }
+    if (vesselId && !tanks[vesselId]) await loadTanks(vesselId);
   };
 
   const buildTankFormData = (existing = null) => {
@@ -222,9 +239,6 @@ export default function VesselConfiguration() {
         {!loading && (
           <div className="vc-header__meta">
             <span className="vc-meta-chip"><Ship size={15} /> <strong>{vessels.length}</strong> {vessels.length === 1 ? 'Vessel' : 'Vessels'}</span>
-            <button className="vc-btn vc-btn--primary" onClick={() => { setError(''); setShowAddVessel(true); }}>
-              <Plus size={16} /> Add Vessel
-            </button>
           </div>
         )}
       </div>
@@ -256,7 +270,7 @@ export default function VesselConfiguration() {
           {vessels.length === 0 ? (
             <div className="vc-empty">
               <span className="vc-empty__icon"><Ship size={26} /></span>
-              <div className="vc-empty__title">No vessels configured.</div>
+              <div className="vc-empty__title">No vessels found. Vessels are managed in the core Workplace platform.</div>
             </div>
           ) : filteredVessels.length === 0 ? (
             <div className="vc-empty">
@@ -274,7 +288,7 @@ export default function VesselConfiguration() {
                 const ioppCount = vesselTanks ? vesselTanks.filter(t => t.is_active && t.is_iopp).length : 0;
 
                 return (
-                  <section key={v.id} className={`vc-vessel${isOpen ? ' vc-vessel--open' : ''}`}>
+                  <section key={v.imo_number} className={`vc-vessel${isOpen ? ' vc-vessel--open' : ''}${!v.orb_configured ? ' vc-vessel--unconfigured' : ''}`}>
                     <div
                       className="vc-vessel__head"
                       role="button"
@@ -292,6 +306,9 @@ export default function VesselConfiguration() {
                         <div className="vc-vessel__chips">
                           <span className="vc-chip"><span className="vc-chip__k">IMO</span> {v.imo_number}</span>
                           <span className="vc-chip"><span className="vc-chip__k">Call Sign</span> {v.call_sign || '—'}</span>
+                          {!v.orb_configured && (
+                            <span className="vc-chip vc-chip--warn" title="Vessel exists in Workplace but has no ORB configuration yet">Not configured in ORB</span>
+                          )}
                         </div>
                       </div>
                       <div className="vc-vessel__actions">
@@ -301,6 +318,8 @@ export default function VesselConfiguration() {
                         <button
                           className="vc-btn vc-btn--primary vc-btn--sm"
                           onClick={(e) => { e.stopPropagation(); openAddTank(v.id); }}
+                          disabled={!v.orb_configured}
+                          title={!v.orb_configured ? 'Vessel must be configured in ORB first' : undefined}
                         >
                           <Plus size={15} /> Add Tank
                         </button>
@@ -310,7 +329,13 @@ export default function VesselConfiguration() {
 
                     {isOpen && (
                       <div className="vc-vessel__body">
-                        {vesselTanks && (
+                        {!v.orb_configured && (
+                          <div className="vc-notanks" style={{ padding: '1.5rem 1rem' }}>
+                            <p style={{ marginBottom: '0.4rem' }}>This vessel exists in the Workplace platform but has not been configured in ORB yet.</p>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Once the vessel is configured in ORB (tanks, equipment, OCM), it will appear here with full options.</p>
+                          </div>
+                        )}
+                        {v.orb_configured && vesselTanks && (
                           <div className="vc-summary">
                             <div className="vc-summary__item">
                               <Droplets size={16} />
@@ -330,11 +355,11 @@ export default function VesselConfiguration() {
                           </div>
                         )}
 
-                        <div className="vc-sectionhead">
+                        {v.orb_configured && <div className="vc-sectionhead">
                           <h4 className="vc-sectionhead__title"><Anchor size={16} /> Tanks</h4>
-                        </div>
+                        </div>}
 
-                        {!vesselTanks ? <LoadingSpinner /> : vesselTanks.length === 0 ? (
+                        {v.orb_configured && (!vesselTanks ? <LoadingSpinner /> : vesselTanks.length === 0 ? (
                           <div className="vc-notanks">No tanks configured for this vessel yet.</div>
                         ) : (
                           <div className="vc-table-wrap">
@@ -418,11 +443,11 @@ export default function VesselConfiguration() {
                               </tbody>
                             </table>
                           </div>
-                        )}
+                        ))}
 
-                        {vesselTanks && <EquipmentSection vesselId={v.id} tanks={vesselTanks} />}
-                        <OcmSection vesselId={v.id} />
-                        <VesselProfileSection vessel={v} onSaved={(nv) => setVessels(list => list.map(x => (x.id === nv.id ? { ...x, ...nv } : x)))} />
+                        {v.orb_configured && vesselTanks && <EquipmentSection vesselId={v.id} tanks={vesselTanks} />}
+                        {v.orb_configured && <OcmSection vesselId={v.id} />}
+                        {v.orb_configured && <VesselProfileSection vessel={v} onSaved={(nv) => setVessels(list => list.map(x => (x.imo_number === nv.imo_number ? { ...x, ...nv } : x)))} />}
                       </div>
                     )}
                   </section>
@@ -431,22 +456,6 @@ export default function VesselConfiguration() {
             </div>
           )}
         </>
-      )}
-
-      {showAddVessel && (
-        <Modal title="Add Vessel" onClose={() => setShowAddVessel(false)} footer={
-          <>
-            <button className="vc-btn vc-btn--secondary" onClick={() => setShowAddVessel(false)}>Cancel</button>
-            <button className="vc-btn vc-btn--primary" onClick={handleAddVessel} disabled={saving}>{saving ? 'Saving…' : 'Add'}</button>
-          </>
-        }>
-          <div className="vc-form">
-            {error && <div className="alert-banner error">{error}</div>}
-            <div className="form-group"><label>Vessel Name *</label><input className="form-control" value={vesselForm.name} onChange={e => setVesselForm({ ...vesselForm, name: e.target.value })} /></div>
-            <div className="form-group"><label>IMO Number *</label><input className="form-control" value={vesselForm.imo_number} onChange={e => setVesselForm({ ...vesselForm, imo_number: e.target.value })} /></div>
-            <div className="form-group"><label>Call Sign</label><input className="form-control" value={vesselForm.call_sign} onChange={e => setVesselForm({ ...vesselForm, call_sign: e.target.value })} /></div>
-          </div>
-        </Modal>
       )}
 
       {addTankFor && (
