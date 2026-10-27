@@ -398,3 +398,60 @@ async def load_bunkers(imo: str | None, name: str | None) -> list[BunkerRecord] 
             has_attachment=bool(r.attachments) or bool(r.blob_url),
         ) for r in rows
     ]
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Connection status (Alert Settings > Data sources, scripts/check_performance_db.py)
+# ─────────────────────────────────────────────────────────────────────────
+_TABLES = ("expanded_mariapps_data", "vessels", "raw_mariapps_logs", "mariapps_bunker_reports")
+
+
+def describe_target() -> dict:
+    """Where ORB is pointed, without the password."""
+    from sqlalchemy.engine import make_url
+    url = (get_settings().PERFORMANCE_DATABASE_URL or "").strip()
+    if not url:
+        return {}
+    try:
+        u = make_url(re.sub(r"^postgres(ql)?://", "postgresql+asyncpg://", url))
+        return {"host": u.host, "port": u.port, "database": u.database, "user": u.username}
+    except Exception:
+        return {"unreadable": True}
+
+
+async def status() -> dict:
+    """Is the source configured and reachable, can the role read each table, and what does it hold per vessel (by IMO)."""
+    out: dict = {"configured": configured(), "target": describe_target(), "tables": {}, "vessels": {}}
+    eng = _get_engine()
+    if eng is None:
+        return out
+    for t in _TABLES:                       # one connection per table: a refused table must not poison the next query
+        try:
+            async with eng.connect() as conn:
+                out["tables"][t] = {"rows": (await conn.execute(text(f"SELECT count(*) FROM {t}"))).scalar()}
+        except Exception as e:
+            out["tables"][t] = {"rows": None, "error": str(e).splitlines()[0][:160]}
+    out["connected"] = any(v["rows"] is not None for v in out["tables"].values())
+
+    queries = {
+        "fuel": ("expanded_mariapps_data", """
+            SELECT vessel_imo, count(*) FILTER (WHERE COALESCE(emissionx_total_hfo_mt, '') <> '' OR COALESCE(emissionx_total_lfo_mt, '') <> ''
+                   OR COALESCE(emissionx_total_mdo_mt, '') <> '' OR COALESCE(emissionx_total_biofuel_mt, '') <> '') AS n, max(log_date)::text AS last
+            FROM expanded_mariapps_data GROUP BY vessel_imo"""),
+        "logs": ("raw_mariapps_logs", """
+            SELECT vessel_imo, count(*) AS n, max(log_date) AS last
+            FROM raw_mariapps_logs WHERE COALESCE(is_duplicate, false) = false GROUP BY vessel_imo"""),
+        "bunker": ("mariapps_bunker_reports", """
+            SELECT vessel_imo, count(*) FILTER (WHERE lower(transaction_type) = 'bunkering') AS n, NULL AS last
+            FROM mariapps_bunker_reports GROUP BY vessel_imo"""),
+    }
+    for key, (table, sql) in queries.items():
+        if out["tables"].get(table, {}).get("rows") is None:
+            continue
+        try:
+            async with eng.connect() as conn:
+                for imo, n, last in (await conn.execute(text(sql))).all():
+                    out["vessels"].setdefault(str(imo), {})[key] = {"n": int(n or 0), "last": last}
+        except Exception:
+            logger.exception("Performance database status query failed (%s)", key)
+    return out

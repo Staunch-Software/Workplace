@@ -18,6 +18,7 @@ from app.models.control_user import ControlUser
 from app.models.orb_config import AlertConfig, ThresholdParam, ThresholdHistory
 from app.models.vessel import Vessel
 from app.schemas.common import success
+from app.services import performance_data as perf
 
 router = APIRouter(prefix="/alert-config", tags=["alert-config"])
 
@@ -43,6 +44,26 @@ def _param_dict(p: ThresholdParam) -> dict:
         "value": p.value, "unit": p.unit, "vessel_id": p.vessel_id, "effective_from": p.effective_from,
         "approved_by_name": p.approved_by_name, "note": p.note, "updated_at": p.updated_at,
     }
+
+
+@router.get("/data-source")
+async def data_source(db: AsyncSession = Depends(get_db), admin: ControlUser = Depends(require_admin)):
+    """Is ORB reading the vessel performance (Mariapps) database, and what it finds there for each ORB vessel."""
+    st = await perf.status()
+    vessels = (await db.execute(select(Vessel.name, Vessel.imo_number, Vessel.is_active).order_by(Vessel.name))).all()
+    rows = []
+    for name, imo, active in vessels:
+        got = st["vessels"].get(str(imo).strip(), {})
+        rows.append({
+            "vessel": name, "imo": imo, "is_active": active,
+            "fuel_reports": got.get("fuel", {}).get("n", 0), "fuel_last": got.get("fuel", {}).get("last"),
+            "position_logs": got.get("logs", {}).get("n", 0), "position_last": got.get("logs", {}).get("last"),
+            "bunkerings": got.get("bunker", {}).get("n", 0),
+        })
+    return success(data={
+        "configured": st["configured"], "connected": st.get("connected", False), "target": st["target"],
+        "tables": st["tables"], "vessels": rows,
+    })
 
 
 @router.get("/types")

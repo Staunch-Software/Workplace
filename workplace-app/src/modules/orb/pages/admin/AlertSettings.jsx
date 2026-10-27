@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { SlidersHorizontal, ShieldCheck, History, RotateCcw, Check, X } from 'lucide-react';
+import { SlidersHorizontal, ShieldCheck, History, RotateCcw, Check, X, Database, RefreshCw } from 'lucide-react';
 import Modal from '../../components/shared/Modal';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import Dropdown from '../../components/shared/Dropdown';
@@ -56,12 +56,16 @@ export default function AlertSettings() {
         <button role="tab" aria-selected={tab === 'thresholds'} className={`al-tab${tab === 'thresholds' ? ' al-tab--on' : ''}`} onClick={() => setTab('thresholds')}>
           <SlidersHorizontal size={15} /> Thresholds
         </button>
+        <button role="tab" aria-selected={tab === 'sources'} className={`al-tab${tab === 'sources' ? ' al-tab--on' : ''}`} onClick={() => setTab('sources')}>
+          <Database size={15} /> Data sources
+        </button>
       </div>
 
       {error && <div className="alert-banner error">{error}</div>}
-      {!alerts && !error ? <LoadingSpinner /> : tab === 'alerts'
-        ? <AlertsTab alerts={alerts || []} setAlerts={setAlerts} />
-        : <ThresholdsTab alerts={alerts || []} />}
+      {tab === 'sources' ? <DataSourcesTab />
+        : !alerts && !error ? <LoadingSpinner /> : tab === 'alerts'
+          ? <AlertsTab alerts={alerts || []} setAlerts={setAlerts} />
+          : <ThresholdsTab alerts={alerts || []} />}
     </div>
   );
 }
@@ -397,5 +401,114 @@ function ThresholdsTab({ alerts }) {
         </Modal>
       )}
     </>
+  );
+}
+
+
+const TABLE_USE = {
+  expanded_mariapps_data: 'Fuel per grade (alert 37)',
+  vessels: 'Finding a vessel by name when it has no IMO',
+  raw_mariapps_logs: 'Position, UTC time, anchorage (alert 33)',
+  mariapps_bunker_reports: 'Bunker delivery notes (alert 35)',
+};
+
+// Is ORB reading the vessel performance (Mariapps) database, and what does it find there for each vessel?
+function DataSourcesTab() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const r = await api.get('/api/alert-config/data-source');
+      setData(r.data.data);
+    } catch (e) { setError(errText(e, 'Could not check the data source')); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  if (error) return <div className="alert-banner error">{error}</div>;
+  if (!data) return <LoadingSpinner />;
+
+  const t = data.target || {};
+  const state = !data.configured ? 'off' : data.connected ? 'on' : 'bad';
+  const unreadable = Object.values(data.tables || {}).some(v => v.rows === null);
+
+  return (
+    <div className="al-groups">
+      <div className={`al-source al-source--${state}`} role="status">
+        <div className="al-source__head">
+          <strong>
+            {state === 'on' && 'Connected: ORB is reading the vessel performance database'}
+            {state === 'off' && 'Not connected: PERFORMANCE_DATABASE_URL is not set'}
+            {state === 'bad' && 'Configured but not readable'}
+          </strong>
+          <button className="vc-btn vc-btn--secondary vc-btn--sm" onClick={load} disabled={loading}><RefreshCw size={14} /> {loading ? 'Checking…' : 'Check again'}</button>
+        </div>
+        {state === 'off' && <p>Add <code>PERFORMANCE_DATABASE_URL</code> to the ORB settings and restart the service. Until then &ldquo;Code E in port or at anchor&rdquo; and &ldquo;Bunker vs BDN&rdquo; are not checked and &ldquo;Sludge review&rdquo; uses the older fuel table.</p>}
+        {state !== 'off' && t.host && <p>Target: <code>{t.user}@{t.host}:{t.port || 5432}/{t.database}</code></p>}
+        {state === 'bad' && <p>None of the tables could be read. Check the URL, the password and the role&rsquo;s SELECT rights.</p>}
+        {state === 'on' && unreadable && <p>Some tables cannot be read by this role: the alerts that need them stay silent. See the table below.</p>}
+      </div>
+
+      {data.configured && (
+        <>
+          <section className="al-group">
+            <h4 className="al-group__title">Tables</h4>
+            <div className="vc-table-wrap">
+              <table className="vc-table al-table">
+                <thead><tr><th>Table</th><th>Used for</th><th className="vc-num">Rows</th><th>Status</th></tr></thead>
+                <tbody>
+                  {Object.entries(data.tables || {}).map(([name, info]) => (
+                    <tr key={name} className="vc-row">
+                      <td data-label="Table" className="vc-tankname"><span className="al-code" style={{ marginTop: 0 }}>{name}</span></td>
+                      <td data-label="Used for" className="vc-muted">{TABLE_USE[name] || ''}</td>
+                      <td data-label="Rows" className="vc-num">{info.rows ?? '—'}</td>
+                      <td data-label="Status">
+                        {info.rows === null
+                          ? <span className="al-pill al-pill--bad" title={info.error}>Cannot read</span>
+                          : info.rows === 0 ? <span className="al-pill al-pill--wait">Empty</span> : <span className="al-pill al-pill--ok">Readable</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="al-group">
+            <h4 className="al-group__title">What ORB finds for each vessel</h4>
+            <p className="as-hint">Vessels are matched by IMO. A vessel with nothing in every column is not matched, or its reports have not been scraped.</p>
+            <div className="vc-table-wrap">
+              <table className="vc-table al-table">
+                <thead>
+                  <tr>
+                    <th>Vessel</th><th>IMO</th><th className="vc-num">Days with fuel</th><th>Latest fuel</th>
+                    <th className="vc-num">Position reports</th><th>Latest report</th><th className="vc-num">Bunkerings</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.vessels.map(v => {
+                    const none = !v.fuel_reports && !v.position_logs && !v.bunkerings;
+                    return (
+                      <tr key={v.imo} className={`vc-row${none ? ' vc-row--inactive' : ''}`}>
+                        <td data-label="Vessel" className="vc-tankname">{v.vessel}</td>
+                        <td data-label="IMO" className="vc-muted">{v.imo}</td>
+                        <td data-label="Days with fuel" className="vc-num">{v.fuel_reports}</td>
+                        <td data-label="Latest fuel" className="vc-muted">{v.fuel_last || '—'}</td>
+                        <td data-label="Position reports" className="vc-num">{v.position_logs}</td>
+                        <td data-label="Latest report" className="vc-muted">{v.position_last || '—'}</td>
+                        <td data-label="Bunkerings" className="vc-num">{v.bunkerings}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      )}
+    </div>
   );
 }

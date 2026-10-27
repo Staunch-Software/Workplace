@@ -14,6 +14,14 @@
 .orb-root .al-pill { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.74rem; font-weight: 700; white-space: nowrap; }
 .orb-root .al-pill--ok { background: #E7F5EA; color: #1f6b35; }
 .orb-root .al-pill--wait { background: #F1EDE8; color: #6b6157; }
+.orb-root .al-pill--bad { background: #FBE9E7; color: #b3261e; }
+.orb-root .al-source { border-radius: 12px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9rem; line-height: 1.5; }
+.orb-root .al-source p { margin: 0; }
+.orb-root .al-source code { background: rgba(0,0,0,0.06); padding: 0.05rem 0.35rem; border-radius: 5px; font-size: 0.82rem; }
+.orb-root .al-source__head { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; }
+.orb-root .al-source--on { background: #EFF8F1; border: 1px solid #B9DEC3; color: #1f5f33; }
+.orb-root .al-source--off { background: #FFF7E6; border: 1px solid #F1D08A; color: #7a5200; }
+.orb-root .al-source--bad { background: #FDF0EE; border: 1px solid #F0C4BE; color: #8a2a21; }
 .orb-root .al-pill--override { background: #FFF0E0; color: #b45309; }
 .orb-root .al-withdrawn { display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-start; }
 .orb-root .al-withdrawn .vc-table-wrap { align-self: stretch; }
