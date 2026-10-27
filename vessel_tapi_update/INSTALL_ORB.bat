@@ -68,7 +68,7 @@ if exist "%~dp0configure_nginx_orb.py" (
 
 :: [4/7] Stop WP_ORB_Backend and apply file updates if bundled
 echo.
-echo [4/7] Stopping ORB service and checking file updates...
+echo [4/7] Stopping ORB service and applying updates...
 "%NSSM%" stop WP_ORB_Backend >nul 2>&1
 
 if exist "%~dp0orb_backend" (

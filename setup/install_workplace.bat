@@ -2,12 +2,14 @@
 setlocal EnableDelayedExpansion
 
 :: Check for Administrator permissions
+if "%~1"=="/no-elevate" goto :skip_elevate
 net session >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo Administrator permissions required. Requesting elevation...
     powershell -Command "Start-Process cmd -ArgumentList '/c \"\"%~f0\"\"' -Verb RunAs"
     exit /b
 )
+:skip_elevate
 
 set "ROOT=C:\WORKPLACE"
 set "NSSM=%ROOT%\nssm\win64\nssm.exe"
@@ -134,11 +136,6 @@ echo     Running Migrations: Workplace Reports...
 cd /d "%ROOT%\reports_backend"
 "%PYTHONEXE%" create_reports_tables.py
 
-echo     Configuring Workplace ORB Environment (.env)...
-if exist "%ROOT%\setup\configure_orb_env.py" (
-    "%PYTHONEXE%" "%ROOT%\setup\configure_orb_env.py"
-)
-
 echo     Running Migrations: Workplace ORB...
 cd /d "%ROOT%\orb_backend"
 "%PYTHONEXE%" run_migrations.py
@@ -219,11 +216,6 @@ echo     - ORB Backend (Port 8007)
 "%NSSM%" set WP_ORB_Backend AppStderr "%ROOT%\logs\orb_backend.log"
 "%NSSM%" set WP_ORB_Backend DependOnService WP_Postgres
 
-echo     - Checking Nginx ORB configuration
-if exist "%ROOT%\setup\configure_nginx_orb.py" (
-    "%PYTHONEXE%" "%ROOT%\setup\configure_nginx_orb.py"
-)
-
 echo     - Nginx (Port 8080)
 "%NSSM%" install WP_Nginx "%ROOT%\nginx\nginx.exe"
 "%NSSM%" set WP_Nginx AppDirectory "%ROOT%\nginx"
@@ -257,11 +249,6 @@ echo [8/8] Starting the Vessel Platform...
 "%NSSM%" start WP_Reports_Backend
 "%NSSM%" start WP_ORB_Backend
 "%NSSM%" start WP_Nginx
-
-echo     Synchronizing Workplace ORB data from Cloud...
-if exist "%ROOT%\setup\sync_now.py" (
-    "%PYTHONEXE%" "%ROOT%\setup\sync_now.py"
-)
 
 echo.
 echo ===================================================
