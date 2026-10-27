@@ -30,6 +30,7 @@ from app.models.orb_notification import OrbFeedEvent, OrbFeedRead, OrbNotificati
 from app.models.orb_upload import OrbUpload
 from app.models.vessel import Vessel
 from app.models.vessel_tank import VesselTank
+from app.models.orb_config import Equipment
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,7 @@ class Spec:
 PULL_SPECS: list[Spec] = [
     Spec("vessel", Vessel, "shore_owned"),
     Spec("vessel_tank", VesselTank, "shore_owned", blob_cols=("iopp_doc1_url", "iopp_doc2_url")),
+    Spec("equipment", Equipment, "shore_owned"),
     Spec("upload", OrbUpload, "shore_owned", blob_cols=("pdf_blob_url",)),
     Spec("entry", OrbEntry, "shore_owned"),
     Spec("entry_quantity", OrbEntryQuantity, "shore_owned"),
@@ -62,8 +64,8 @@ SPECS: dict[str, Spec] = {s.key: s for s in PULL_SPECS}
 PUSH_ENTITIES = {"thread", "attachment", "thread_read", "notification", "feed_read", "alert_resolution_request"}
 
 # Delete markers, applied before any rows. Children first so no foreign key is violated.
-TOMBSTONE_ORDER = ["alert", "entry_quantity", "entry", "upload"]
-TOMBSTONE_MODELS = {"alert": OrbAlert, "entry_quantity": OrbEntryQuantity, "entry": OrbEntry, "upload": OrbUpload}
+TOMBSTONE_ORDER = ["equipment", "alert", "entry_quantity", "entry", "upload"]
+TOMBSTONE_MODELS = {"equipment": Equipment, "alert": OrbAlert, "entry_quantity": OrbEntryQuantity, "entry": OrbEntry, "upload": OrbUpload}
 
 BLOB_DOWNLOAD = "blob_download"
 
