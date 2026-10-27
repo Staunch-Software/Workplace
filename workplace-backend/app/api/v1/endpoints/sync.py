@@ -4,7 +4,7 @@ from fastapi.security import APIKeyHeader
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 from app.core.database_control import get_control_db
 from app.core.config import settings
@@ -31,13 +31,24 @@ async def get_config_changes(
     Called by ALL offline modules (DRS, future modules) to sync config data.
     Shore always wins for config data.
     """
-    since_naive = since.replace(tzinfo=None)
+    # Normalise timezone — properly convert timezone-aware timestamps to naive UTC
+    if since.tzinfo is not None:
+        since_naive = since.astimezone(timezone.utc).replace(tzinfo=None)
+    else:
+        since_naive = since
+
+    # Apply 2-minute safety buffer so small clock drift between vessel and shore never misses updates
+    if since_naive > datetime(2000, 1, 1):
+        query_since = since_naive - timedelta(minutes=2)
+    else:
+        query_since = since_naive
+
     results = {}
 
     # --- USERS ---
     user_stmt = (
         select(User)
-        .where(User.updated_at > since_naive)
+        .where(User.updated_at > query_since)
         .options(selectinload(User.vessels))
     )
     users = (await db.execute(user_stmt)).scalars().all()
@@ -51,7 +62,7 @@ async def get_config_changes(
     results["users"] = serialized_users
 
     # --- VESSELS ---
-    vessel_stmt = select(Vessel).where(Vessel.updated_at > since_naive)
+    vessel_stmt = select(Vessel).where(Vessel.updated_at > query_since)
     vessels = (await db.execute(vessel_stmt)).scalars().all()
     results["vessels"] = [
         {c.name: getattr(v, c.name) for c in v.__table__.columns}
