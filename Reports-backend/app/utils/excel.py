@@ -73,11 +73,27 @@ def halfyearly_default_configs() -> list[dict]:
     return out
 
 
+def yearly_default_configs() -> list[dict]:
+    """The 18 yearly Water Ballast Tank reports (no Cargo Holds).
+
+    Same tanks as the half-yearly ones (see halfyearly_default_configs),
+    but the 12-month row is scraped (run_halfyearly_scraper(yearly=True)).
+    report_code is the equipment code + "-YR" so it stays distinct from the
+    half-yearly report of the same equipment on the same vessel.
+    """
+    out = []
+    for d in halfyearly_default_configs():
+        if not d["report_code"].startswith("305.03."):
+            continue
+        out.append({**d, "report_code": f"{d['report_code']}-YR", "frequency": "Yearly"})
+    return out
+
+
 def get_default_configs() -> list[dict]:
     """
     Return the master report configs used by "Assign Defaults": the 45 from
-    the static JSON snapshot plus the 27 half-yearly Cargo Hold / Water
-    Ballast Tank reports.
+    the static JSON snapshot plus the 27 half-yearly Cargo Hold / Water Ballast Tank
+    reports and the 18 yearly Water Ballast Tank reports.
 
     Reads from a static JSON snapshot (DEFAULT_REPORTS_JSON_PATH) instead of
     parsing the Excel workbook on every request. The snapshot was generated
@@ -92,7 +108,7 @@ def get_default_configs() -> list[dict]:
         defaults = json.load(f)
 
     existing = {d["report_code"] for d in defaults}
-    return defaults + [d for d in halfyearly_default_configs() if d["report_code"] not in existing]
+    return defaults + [d for d in halfyearly_default_configs() + yearly_default_configs() if d["report_code"] not in existing]
 
 
 def generate_default_configs_from_excel() -> list[dict]:

@@ -58,7 +58,7 @@ async def create_config(config: ReportConfigCreate, db: AsyncSession = Depends(g
 @router.post("/bulk-assign")
 async def bulk_assign_configs(req: BulkAssignRequest, db: AsyncSession = Depends(get_db), current_user=Depends(require_shore)):
     """
-    Bulk assign the default master reports (45 + 27 half-yearly) to a specific vessel.
+    Bulk assign the default master reports (45 + 27 half-yearly + 18 yearly) to a specific vessel.
     """
     default_reports = get_default_configs()
     if not default_reports:

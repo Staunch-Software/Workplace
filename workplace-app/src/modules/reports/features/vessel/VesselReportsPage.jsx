@@ -36,6 +36,8 @@ const FREQUENCIES = [
 export default function VesselReportsPage() {
   const [expandedFreqs, setExpandedFreqs] = useState(['DAILY', 'WEEKLY', 'MONTHLY']);
   const [selectedReportName, setSelectedReportName] = useState('');
+  // Same report name exists under several frequencies (e.g. a tank's half-yearly and yearly reports), so a selection is name + frequency.
+  const [selectedFreq, setSelectedFreq] = useState('');
   const [search, setSearch] = useState("");
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [tooltipData, setTooltipData] = useState({ visible: false, text: '', x: 0, y: 0 });
@@ -80,6 +82,7 @@ export default function VesselReportsPage() {
 
         setExpandedFreqs(prev => prev.includes(f) ? prev : [...prev, f]);
         setSelectedReportName(target.report_name);
+        setSelectedFreq(f);
         setSelectedRow(target);
 
         if (searchParams.get('thread') === 'true') {
@@ -128,11 +131,12 @@ export default function VesselReportsPage() {
   useEffect(() => {
     if (reports.length > 0) {
       const currentExists = reports.some(r => normalizeReportName(r.report_name) === selectedReportName);
-      if (!currentExists || !selectedReportName) {
+      if (!currentExists || !selectedReportName || !selectedFreq) {
         for (let freq of displayFreqs) {
           const names = getSortedNames(freq.id);
           if (names.length > 0) {
             setSelectedReportName(names[0]);
+            setSelectedFreq(freq.id);
             if (!expandedFreqs.includes(freq.id)) {
               setExpandedFreqs(prev => [...prev, freq.id]);
             }
@@ -159,11 +163,7 @@ export default function VesselReportsPage() {
   const tableData = useMemo(() => {
     if (!selectedReportName) return [];
     let jobs = [];
-    for (let f in treeData) {
-      if (treeData[f][selectedReportName]) {
-        jobs = jobs.concat(treeData[f][selectedReportName]);
-      }
-    }
+    jobs = treeData[selectedFreq]?.[selectedReportName] || [];
     const rows = jobs.filter(r => {
       const matchesSearch = !search || 
         r.job_order_no?.toLowerCase().includes(search.toLowerCase()) ||
@@ -176,7 +176,7 @@ export default function VesselReportsPage() {
       const dateB = reportDate(b)?.getTime() || 0;
       return dateB - dateA;
     });
-  }, [treeData, selectedReportName, search]);
+  }, [treeData, selectedReportName, selectedFreq, search]);
 
   const totalUnread = reports.reduce((acc, r) => acc + (r.unread_vessel || 0), 0);
   const reportsRemaining = reports.filter(r => r.verify_status === 'UNVERIFIED' && r.scrape_status === 'SCRAPED').length;
@@ -289,12 +289,12 @@ export default function VesselReportsPage() {
                       ) : (
                         reportNames.map(name => {
                           const count = treeData[freq.id][name].length;
-                          const isActive = selectedReportName === name;
+                          const isActive = selectedReportName === name && selectedFreq === freq.id;
                           return (
                             <div 
                               key={name} 
                               className={`rt-tree-leaf ${isActive ? 'active' : ''}`}
-                              onClick={() => setSelectedReportName(name)}
+                              onClick={() => { setSelectedReportName(name); setSelectedFreq(freq.id); }}
                               onMouseEnter={(e) => handleTooltipEnter(e, name)}
                               onMouseLeave={handleTooltipLeave}
                             >

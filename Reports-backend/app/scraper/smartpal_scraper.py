@@ -55,6 +55,9 @@ _FREQUENCY_REPORT_DATE_OFFSET = {
     "half yearly": lambda d: d + relativedelta(months=6),
     "half_yearly": lambda d: d + relativedelta(months=6),  # as saved by the Config page
     "6 monthly":   lambda d: d + relativedelta(months=6),
+    # Yearly flow only (see run_halfyearly_scraper(yearly=True)).
+    "yearly":      lambda d: d + relativedelta(years=1),
+    "12 monthly":  lambda d: d + relativedelta(years=1),
 }
 
 
@@ -842,6 +845,15 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                 break
             await eq_page.wait_for_timeout(2000)
 
+        if special:
+            plan_dump = await eq_page.evaluate('''() =>
+                Array.from(document.querySelectorAll(".k-grid")).filter(g => g.offsetWidth > 0).map(g => ({
+                    headers: Array.from(g.querySelectorAll("thead th")).map(t => (t.innerText || "").trim()),
+                    rows: Array.from(g.querySelectorAll("tbody tr")).map(r => (r.innerText || "").replace(/\\s+/g, " ").trim())
+                }))
+            ''')
+            logger.info(f"  {report_code}: Job Plan grid = {plan_dump!r}")
+
         if not has_job_link and special:
             # The History-tab fallback below would mix every frequency's
             # jobs for this equipment -- wrong data is worse than a FAILED row.
@@ -1025,6 +1037,14 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                 });
                 return n;
             }''', idx_status)
+        if special:
+            hist_dump = await job_order_page.evaluate('''() =>
+                Array.from(document.querySelectorAll(".k-grid")).filter(g => g.offsetWidth > 0).map(g => ({
+                    headers: Array.from(g.querySelectorAll("thead th")).map(t => (t.innerText || "").trim()),
+                    rows: Array.from(g.querySelectorAll("tbody tr")).map(r => (r.innerText || "").replace(/\\s+/g, " ").trim())
+                }))
+            ''')
+            logger.info(f"  {report_code}: Job History grid = {hist_dump!r} | page title = {await job_order_page.title()!r}")
         found_pending = False
         pend_details = {}
 
@@ -1681,7 +1701,9 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
         # Fallbacks when no attachment yielded an extractable date (e.g. image PDF):
         if report_date is None:
             from app.utils.report_date import uses_job_end_date_fallback
-            if uses_job_end_date_fallback(report_code, report_name) and job_end_date is not None:
+            # Yearly tank inspections: the due date can sit in the next year (due 03-Feb-2027, done 11-Aug-2026), which
+            # would file the report under the wrong year, so use the date the job was actually completed.
+            if (uses_job_end_date_fallback(report_code, report_name) or _is_yearly_code(report_code)) and job_end_date is not None:
                 # Specific reports (like Boiler) requested to use job_end_date 
                 report_date = job_end_date
                 report_date_source = "job_end_date:fallback"
@@ -2061,6 +2083,18 @@ _HY_FREQUENCY_LABEL = "Half-Yearly"
 _HY_EQ_ROW_MATCH = r"Cargo Hold Inspection\s*\(\s*6\s*Months?\s*\)"
 _HY_PLAN_ROW_MATCH = r"^(6\s*-?\s*months?|half[\s-]*year(ly)?)$"
 
+# Yearly twins of the same equipment. They share the half-yearly equipment
+# codes but need their own report_code (reports are keyed on vessel+code), so
+# the yearly code is the equipment code + this suffix, e.g. "301.01-YR".
+_YR_CODE_SUFFIX = "-YR"
+_YR_FREQUENCY_LABEL = "Yearly"
+_YR_EQ_ROW_MATCH = r"Cargo Hold Inspection\s*\(\s*12\s*Months?\s*\)"
+_YR_PLAN_ROW_MATCH = r"^(12\s*-?\s*months?|year(ly)?|annual(ly)?)$"
+
+
+def _is_yearly_code(report_code):
+    return (report_code or "").strip().upper().endswith(_YR_CODE_SUFFIX)
+
 
 def _halfyearly_spec(report_code, report_name=None):
     """Return the `special` dict for a half-yearly code, else None.
@@ -2073,7 +2107,12 @@ def _halfyearly_spec(report_code, report_name=None):
     """
     import re
     code = (report_code or "").strip()
+    yearly = _is_yearly_code(code)
+    if yearly:
+        code = code[:-len(_YR_CODE_SUFFIX)]
     m = re.match(r"^301\.(0[1-9])$", code)
+    if m and yearly:
+        return None  # no yearly Cargo Hold reports, only Water Ballast Tanks
     if m:
         item_name = f"Cargo Hold No {int(m.group(1))}"
     else:
@@ -2096,18 +2135,21 @@ def _halfyearly_spec(report_code, report_name=None):
         "search_terms": list(dict.fromkeys(terms)),
         "item_code": code,
         "item_name": item_name,
-        "eq_row_match": _HY_EQ_ROW_MATCH if code.startswith("301.") else r".",
+        "eq_row_match": (_YR_EQ_ROW_MATCH if yearly else _HY_EQ_ROW_MATCH) if code.startswith("301.") else r".",
         # Cargo Holds have a single Job Plan row; only ballast tanks (3 rows)
-        # need the 6-month frequency filter.
-        "plan_row_match": None if code.startswith("301.") else _HY_PLAN_ROW_MATCH,
+        # need the 6-/12-month frequency filter.
+        "plan_row_match": None if code.startswith("301.") else (_YR_PLAN_ROW_MATCH if yearly else _HY_PLAN_ROW_MATCH),
     }
 
 
-async def run_halfyearly_scraper(db: AsyncSession, target_reports: str = None, target_vessel: str = None, smart_cron: bool = False):
+async def run_halfyearly_scraper(db: AsyncSession, target_reports: str = None, target_vessel: str = None, smart_cron: bool = False, yearly: bool = False):
     """Scrape only the half-yearly Cargo Hold / Water Ballast Tank reports.
     Same SmartPAL flow as run_scraper, with 6-month row selection. With
-    smart_cron=True only configs whose cycle is due are scraped."""
-    logger.info("--- HALF-YEARLY REPORT SCRAPE STARTING ---")
+    smart_cron=True only configs whose cycle is due are scraped.
+    yearly=True runs the same flow for the yearly twins (codes ending "-YR",
+    12-month row selection) instead of the half-yearly ones."""
+    freq_label = _YR_FREQUENCY_LABEL if yearly else _HY_FREQUENCY_LABEL
+    logger.info(f"--- {freq_label.upper()} REPORT SCRAPE STARTING ---")
 
     stmt = select(ReportConfig)
     if target_vessel:
@@ -2118,6 +2160,7 @@ async def run_halfyearly_scraper(db: AsyncSession, target_reports: str = None, t
     db_configs = [
         c for c in (await db.execute(stmt)).scalars().all()
         if _halfyearly_spec(c.report_code, c.report_name) is not None
+        and _is_yearly_code(c.report_code) == yearly
     ]
 
     if target_reports:
@@ -2154,14 +2197,14 @@ async def run_halfyearly_scraper(db: AsyncSession, target_reports: str = None, t
                 c._target_job_no, c._target_due_date = latest.job_order_no, latest.due_date
                 due.append(c)
             elif latest.next_due_date:
-                expected = _next_cycle_expected_from_report_date(latest.report_date, _HY_FREQUENCY_LABEL)
+                expected = _next_cycle_expected_from_report_date(latest.report_date, freq_label)
                 if latest.next_due_date.date() <= now_date or (expected and expected <= now_date):
                     c._target_job_no, c._target_due_date = latest.job_order_no, latest.next_due_date
                     due.append(c)
             else:
                 due.append(c)
         db_configs = due
-        logger.info(f"Half-yearly smart mode: {len(db_configs)} configs due.")
+        logger.info(f"{freq_label} smart mode: {len(db_configs)} configs due.")
 
     entries = [
         {
@@ -2170,14 +2213,14 @@ async def run_halfyearly_scraper(db: AsyncSession, target_reports: str = None, t
             "report_code": c.report_code.strip(),
             "report_name": (c.report_name or c.report_code).strip(),
             "department": (c.department or "").strip(),
-            "frequency": c.frequency or _HY_FREQUENCY_LABEL,
+            "frequency": c.frequency or freq_label,
             "target_job_order_no": getattr(c, "_target_job_no", None),
             "target_due_date": getattr(c, "_target_due_date", None),
         }
         for c in db_configs
     ]
     if not entries:
-        logger.warning("No half-yearly configs to scrape. Exiting.")
+        logger.warning(f"No {freq_label.lower()} configs to scrape. Exiting.")
         return
 
     async with async_playwright() as p:
@@ -2187,7 +2230,7 @@ async def run_halfyearly_scraper(db: AsyncSession, target_reports: str = None, t
         page = await context.new_page()
 
         if not await _login(page):
-            logger.error("Login failed. Aborting half-yearly run.")
+            logger.error(f"Login failed. Aborting {freq_label.lower()} run.")
             await browser.close()
             return
         overview_page = await _open_job_overview(context, page)
@@ -2211,7 +2254,7 @@ async def run_halfyearly_scraper(db: AsyncSession, target_reports: str = None, t
                 else:
                     logger.warning("Session refresh failed -- continuing with existing session.")
 
-            logger.info(f"[{idx+1}/{total}] Half-yearly: {e['vessel_name']} -> {e['report_code']}")
+            logger.info(f"[{idx+1}/{total}] {freq_label}: {e['vessel_name']} -> {e['report_code']}")
             fail_reason = {}
             base_spec = _halfyearly_spec(e["report_code"], e["report_name"])
             # First run for this config (nothing targeted = no tracked cycle yet,
@@ -2266,7 +2309,7 @@ async def run_halfyearly_scraper(db: AsyncSession, target_reports: str = None, t
                                    vessel_name=e["vessel_name"], report_name=e["report_name"])
 
         await browser.close()
-        logger.info("Half-yearly scrape complete.")
+        logger.info(f"{freq_label} scrape complete.")
 
 
 if __name__ == "__main__":
@@ -2290,16 +2333,19 @@ if __name__ == "__main__":
     
     parser.add_argument("--halfyearly", action="store_true", help="Run the separate half-yearly flow (Cargo Hold / Water Ballast Tank) instead; combine with --full for a deep scrape")
 
+    parser.add_argument("--yearly", action="store_true", help="Run the yearly flow (12-month Cargo Hold / Water Ballast Tank rows, codes ending -YR); combine with --full for a deep scrape")
+
     args = parser.parse_args()
 
     async def main():
-        if args.halfyearly:
+        if args.halfyearly or args.yearly:
             async with SessionLocal() as db:
                 await run_halfyearly_scraper(
                     db,
                     smart_cron=not args.full,
                     target_vessel=args.vessel,
                     target_reports=args.reports,
+                    yearly=args.yearly,
                 )
         elif args.full or args.vessel or args.reports:
             async with SessionLocal() as db:
