@@ -20,8 +20,10 @@ const confidenceTone = (score) => (score >= 0.9 ? 'high' : score >= 0.75 ? 'mid'
 
 export default function Entries() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { isShore, isVessel } = useAuth();
-  const showVesselCol = isShore || !isVessel;
+  const { user, isShore, isVessel } = useAuth();
+  const isVesselUser = isVessel || user?.role === 'VESSEL';
+  const isShoreView = !isVesselUser;
+  const showVesselCol = isShoreView;
 
   const [entries, setEntries] = useState([]);
   const [vessels, setVessels] = useState([]);
@@ -32,9 +34,9 @@ export default function Entries() {
   const [filters, setFilters] = useState(() => {
     const vesselParam = searchParams.getAll('vessel_id');
     const singleVessel = searchParams.get('vessel_id');
-    const vessel_id = vesselParam.length > 0
+    const vessel_id = (isShoreView && vesselParam.length > 0)
       ? vesselParam
-      : (singleVessel ? singleVessel.split(',').filter(Boolean) : []);
+      : (isShoreView && singleVessel ? singleVessel.split(',').filter(Boolean) : []);
 
     return {
       vessel_id,
@@ -54,13 +56,26 @@ export default function Entries() {
   }, [vessels]);
 
   useEffect(() => {
-    api.get('/api/vessels').then(r => setVessels(r.data.data || [])).catch(() => {});
-  }, []);
+    if (isShoreView) {
+      api.get('/api/vessels').then(r => setVessels(r.data.data || [])).catch(() => {});
+    }
+  }, [isShoreView]);
 
   const load = (activeFilters = filters) => {
     setLoading(true);
+    // Ignore overrides if it is a DOM/React event object (e.g. from onClick={load})
+    const cleanFilters = (activeFilters && typeof activeFilters === 'object' && !activeFilters._reactName && !activeFilters.nativeEvent)
+      ? activeFilters
+      : filters;
+    const finalFilters = { ...cleanFilters };
+
+    // For vessel users, never filter by vessel_id
+    if (!isShoreView) {
+      finalFilters.vessel_id = [];
+    }
+
     const params = new URLSearchParams();
-    Object.entries(activeFilters).forEach(([k, v]) => {
+    Object.entries(finalFilters).forEach(([k, v]) => {
       if (Array.isArray(v)) v.forEach(item => params.append(k, item));
       else if (v) params.append(k, v);
     });
@@ -126,16 +141,18 @@ export default function Entries() {
                 <span className="en-filters__title"><Filter size={14} /> Filters</span>
                 {activeCount > 0 && <span className="en-filters__badge">{activeCount} active</span>}
               </div>
-              <div className="en-filters__grid">
-                <div className="form-group en-f-vessel">
-                  <label>Vessel</label>
-                  <MultiSelectDropdown
-                    value={filters.vessel_id}
-                    onChange={handleVesselChange}
-                    placeholder="All vessels (or select)"
-                    options={vessels.map(v => ({ value: v.id, label: v.name }))}
-                  />
-                </div>
+              <div className={`en-filters__grid${!isShoreView ? ' en-filters__grid--vessel' : ''}`}>
+                {isShoreView && (
+                  <div className="form-group en-f-vessel">
+                    <label>Vessel</label>
+                    <MultiSelectDropdown
+                      value={filters.vessel_id}
+                      onChange={handleVesselChange}
+                      placeholder="All vessels (or select)"
+                      options={vessels.map(v => ({ value: v.id, label: v.name }))}
+                    />
+                  </div>
+                )}
                 <div className="form-group">
                   <label>ORB Code</label>
                   <Dropdown
@@ -222,7 +239,7 @@ export default function Entries() {
                               <span className="en-empty__icon"><FileSearch size={24} /></span>
                               <div className="en-empty__title">No entries found.</div>
                               <div className="en-empty__text">
-                                {filters.vessel_id.length > 0
+                                {isShoreView && filters.vessel_id?.length > 0
                                   ? `No extracted entries recorded for ${filters.vessel_id.map(id => vesselMap[id] || 'selected vessel').join(', ')}. Try selecting another vessel or clearing filters.`
                                   : 'Try adjusting or clearing the filters.'}
                               </div>

@@ -12,6 +12,7 @@ import LoadingSpinner from '../components/shared/LoadingSpinner';
 import Dropdown from '../components/shared/Dropdown';
 import MultiSelectDropdown from '../components/shared/MultiSelectDropdown';
 import api from '../api/axiosOrb';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import './Uploads.css';
 import { fmtDate } from '../utils/time';
@@ -27,6 +28,9 @@ const STEPS = [
 
 export default function Uploads() {
   const navigate = useNavigate();
+  const { user, isShore, isVessel } = useAuth();
+  const isVesselUser = isVessel || user?.role === 'VESSEL';
+  const isShoreView = !isVesselUser;
   const { toast } = useToast();
   const [uploads, setUploads] = useState([]);
   const prevStatusRef = useRef({});
@@ -45,7 +49,9 @@ export default function Uploads() {
 
   const load = (silent = false) => {
     const params = new URLSearchParams();
-    vesselFilter.forEach(id => params.append('vessel_id', id));
+    if (isShoreView) {
+      vesselFilter.forEach(id => params.append('vessel_id', id));
+    }
     if (!silent) setLoading(true);
     return api.get(`/api/uploads?${params}`)
       .then(r => {
@@ -80,7 +86,7 @@ export default function Uploads() {
   }, [uploads, vesselFilter]);
 
   const openModal = () => {
-    setForm(INITIAL_FORM);
+    setForm({ vessel_id: (!isShoreView || vessels.length === 1) ? (vessels[0]?.id || '') : '', file: null });
     setPhase('form');
     setProgress(0);
     setError('');
@@ -232,28 +238,30 @@ export default function Uploads() {
             </section>
 
             {/* Filter */}
-            <div className="up-filter">
-              <div className="up-filter__field">
-                <label className="up-filter__label"><Ship size={14} /> Filter by Vessel</label>
-                <MultiSelectDropdown
-                  value={vesselFilter}
-                  onChange={v => setVesselFilter(v)}
-                  placeholder="Select the vessel"
-                  options={vessels.map(v => ({ value: v.id, label: v.name }))}
-                />
-              </div>
-              {selectedVessels.length > 0 && (
-                <div className="up-filter__chips">
-                  {selectedVessels.map(v => (
-                    <span key={v.id} className="up-fchip">
-                      {v.name}
-                      <button type="button" onClick={() => removeVesselFilter(v.id)} aria-label={`Remove ${v.name}`}><X size={12} /></button>
-                    </span>
-                  ))}
-                  <button type="button" className="up-btn up-btn--link" onClick={() => setVesselFilter([])}>Clear all</button>
+            {isShoreView && (
+              <div className="up-filter">
+                <div className="up-filter__field">
+                  <label className="up-filter__label"><Ship size={14} /> Filter by Vessel</label>
+                  <MultiSelectDropdown
+                    value={vesselFilter}
+                    onChange={v => setVesselFilter(v)}
+                    placeholder="Select the vessel"
+                    options={vessels.map(v => ({ value: v.id, label: v.name }))}
+                  />
                 </div>
-              )}
-            </div>
+                {selectedVessels.length > 0 && (
+                  <div className="up-filter__chips">
+                    {selectedVessels.map(v => (
+                      <span key={v.id} className="up-fchip">
+                        {v.name}
+                        <button type="button" onClick={() => removeVesselFilter(v.id)} aria-label={`Remove ${v.name}`}><X size={12} /></button>
+                      </span>
+                    ))}
+                    <button type="button" className="up-btn up-btn--link" onClick={() => setVesselFilter([])}>Clear all</button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {loading ? <LoadingSpinner /> : (
               <>
@@ -302,7 +310,7 @@ export default function Uploads() {
                         <thead>
                           <tr>
                             <th>File</th>
-                            <th>Vessel</th>
+                            {isShoreView && <th>Vessel</th>}
                             <th>Status</th>
                             <th>Entries</th>
                             <th>Uploaded</th>
@@ -318,9 +326,11 @@ export default function Uploads() {
                                   <span className="up-file__name" title={r.original_filename}>{r.original_filename}</span>
                                 </div>
                               </td>
-                              <td data-label="Vessel">
-                                <span className="up-vessel"><Ship size={14} /> {vesselName(r)}</span>
-                              </td>
+                              {isShoreView && (
+                                <td data-label="Vessel">
+                                  <span className="up-vessel"><Ship size={14} /> {vesselName(r)}</span>
+                                </td>
+                              )}
                               <td data-label="Status">
                                 <span className="up-status">
                                   <Badge value={r.status} />
@@ -402,15 +412,17 @@ export default function Uploads() {
                 {phase === 'form' && (
                   <div className="up-form">
                     {error && <div className="alert-banner error">{error}</div>}
-                    <div className="form-group">
-                      <label>Vessel *</label>
-                      <Dropdown
-                        value={form.vessel_id}
-                        onChange={v => setForm({ ...form, vessel_id: v })}
-                        placeholder="Select vessel…"
-                        options={vessels.map(v => ({ value: v.id, label: `${v.name} (${v.imo_number})` }))}
-                      />
-                    </div>
+                    {isShoreView && (
+                      <div className="form-group">
+                        <label>Vessel *</label>
+                        <Dropdown
+                          value={form.vessel_id}
+                          onChange={v => setForm({ ...form, vessel_id: v })}
+                          placeholder="Select vessel…"
+                          options={vessels.map(v => ({ value: v.id, label: `${v.name} (${v.imo_number})` }))}
+                        />
+                      </div>
+                    )}
                     <div className="form-group">
                       <label>PDF File *</label>
                       <label className={`up-drop${form.file ? ' up-drop--has' : ''}${dragOver ? ' up-drop--over' : ''}`}

@@ -51,6 +51,23 @@ class SyncProcessor:
 
     # ── Push ─────────────────────────────────────────────────────────────────
 
+    async def check_and_rewind_if_needed(self) -> None:
+        """One-time auto-recovery on vessel startup: rewind entry, alert and feed cursors to epoch
+        so any items dropped by encoding issues or incomplete syncs are re-fetched and sanitized."""
+        flag = await self.db.get(SyncState, (settings.VESSEL_IMO, "encoding_fix_v1"))
+        if flag is None:
+            await self.db.execute(
+                update(SyncState)
+                .where(
+                    SyncState.vessel_imo == settings.VESSEL_IMO,
+                    SyncState.sync_scope.in_(["pull:entry", "pull:entry_quantity", "pull:alert", "pull:feed_event", "pull:notification"])
+                )
+                .values(last_pull_at=datetime(2000, 1, 1, tzinfo=timezone.utc))
+            )
+            self.db.add(SyncState(vessel_imo=settings.VESSEL_IMO, sync_scope="encoding_fix_v1", last_pull_at=clock.utc_now()))
+            await self.db.commit()
+            logger.info("[RECOVERY] Rewound pull cursors for vessel %s to ensure full synchronization", settings.VESSEL_IMO)
+
     async def recover_stale(self, everything: bool = False) -> int:
         """Items claimed by a run that died (power cut, restart) go back to PENDING."""
         cutoff = clock.utc_now() - STALE_PROCESSING
@@ -204,12 +221,15 @@ class SyncProcessor:
                     await self.db.commit()
                 stamps = [_parse(i["ts"]) for i in items]
             else:
+                applied_stamps = []
                 for item in items:
                     outcome = await apply_row_safely(self.db, spec, item, on_vessel=True, vessel_imo=settings.VESSEL_IMO)
                     if outcome in (INSERTED, UPDATED):
                         await self._queue_blobs(spec, item)
+                    if outcome is not None and item.get(spec.ts_col):
+                        applied_stamps.append(_parse(item[spec.ts_col]))
                 await self.db.commit()
-                stamps = [_parse(i[spec.ts_col]) for i in items if i.get(spec.ts_col)]
+                stamps = applied_stamps
 
             if len(items) >= limit and stamps:
                 newest = max(stamps)

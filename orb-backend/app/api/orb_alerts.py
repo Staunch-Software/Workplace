@@ -87,7 +87,7 @@ async def list_alerts(
     for alert, page_number, upload_id in rows:
         d = AlertResponse.model_validate(alert).model_dump()
         d["page_number"] = page_number
-        d["upload_id"] = upload_id
+        d["upload_id"] = upload_id or alert.upload_id
         d["thread_count"], d["unread_count"] = stats.get(alert.id, (0, 0))
         data.append(d)
     return success(data=data)
@@ -112,7 +112,7 @@ async def get_alert(
     stats = await thread_stats(db, user, [alert.id])
     d = AlertResponse.model_validate(alert).model_dump()
     d["page_number"] = page_number
-    d["upload_id"] = upload_id
+    d["upload_id"] = upload_id or alert.upload_id
     d["thread_count"], d["unread_count"] = stats.get(alert.id, (0, 0))
     return success(data=d)
 

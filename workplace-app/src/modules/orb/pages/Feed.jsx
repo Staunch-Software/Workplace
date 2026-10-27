@@ -100,11 +100,12 @@ export default function Feed() {
   const navigate = useNavigate();
   const base = useOrbBase();
   const { user, isShore } = useAuth();
+  const isVesselUser = !isShore || user?.role === 'VESSEL';
 
   const [data, setData] = useState({ items: [], unread_count: 0 });
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
-  const [tab, setTab] = useState('mine');                  // mine = addressed to me, live = everything on my vessels
+  const [tab, setTab] = useState(isVesselUser ? 'live' : 'mine');                  // mine = addressed to me, live = everything on my vessels
   const [viewMode, setViewMode] = useState('unread');
   const [filters, setFilters] = useState({ vessel: '', severity: '', type: '', from: '', to: '', search: '' });
   const [marking, setMarking] = useState(false);
@@ -138,7 +139,7 @@ export default function Feed() {
     return [...seen].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
   }, [data.items]);
 
-  const mine = useMemo(() => data.items.filter(i => i.for_me), [data.items]);
+  const mine = useMemo(() => data.items.filter(i => isVesselUser ? true : i.for_me), [data.items, isVesselUser]);
   const live = useMemo(() => data.items.filter(i => i.event_type !== 'MENTION'), [data.items]);
   const mineUnread = mine.filter(i => !i.is_read).length;
 
