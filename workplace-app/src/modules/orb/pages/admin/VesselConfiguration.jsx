@@ -4,7 +4,7 @@ import OcmSection from './OcmSection';
 import VesselProfileSection from './VesselProfileSection';
 import IoppFields from './IoppFields';
 import {
-  ChevronDown, Ship, Plus, Pencil, Ban, Search, X, Droplets, FileCheck2, Gauge, Anchor,
+  ChevronDown, Ship, Plus, Pencil, Ban, Search, X, Droplets, FileCheck2, Gauge, Anchor, Settings,
 } from 'lucide-react';
 import Modal from '../../components/shared/Modal';
 import Badge from '../../components/shared/Badge';
@@ -39,6 +39,8 @@ export default function VesselConfiguration() {
   const [docLoading, setDocLoading] = useState(false);
   const [activeDocTab, setActiveDocTab] = useState(1);
   const [search, setSearch] = useState('');
+  const [configuringVessel, setConfiguringVessel] = useState(null);
+  const [configForm, setConfigForm] = useState({ name: '', imo_number: '', call_sign: '' });
 
   const loadVessels = async () => {
     setLoading(true);
@@ -66,6 +68,9 @@ export default function VesselConfiguration() {
           call_sign: orbVessel?.call_sign ?? cv.call_sign ?? '',
           is_active: cv.is_active,
           orb_configured: !!orbVessel,             // true if vessel exists in ORB DB
+          flag_state: orbVessel?.flag_state ?? null,
+          flag_official_language: orbVessel?.flag_official_language ?? null,
+          fuel_grades: orbVessel?.fuel_grades ?? null,
         };
       });
 
@@ -98,10 +103,48 @@ export default function VesselConfiguration() {
     return Object.values(groups);
   };
 
-  const toggleVessel = async (vesselId) => {
-    if (expanded === vesselId) { setExpanded(null); return; }
-    setExpanded(vesselId);
-    if (vesselId && !tanks[vesselId]) await loadTanks(vesselId);
+  const toggleVessel = async (v) => {
+    const key = v.id || v.imo_number;
+    if (expanded === key) { setExpanded(null); return; }
+    setExpanded(key);
+    if (v.id && !tanks[v.id]) await loadTanks(v.id);
+  };
+
+  const openConfigureVessel = (v) => {
+    setConfiguringVessel(v);
+    setConfigForm({
+      name: v.name || '',
+      imo_number: v.imo_number || '',
+      call_sign: v.call_sign || '',
+    });
+    setError('');
+  };
+
+  const handleConfigureVessel = async () => {
+    if (!configForm.name.trim() || !configForm.imo_number.trim()) {
+      setError('Vessel Name and IMO Number are required');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const res = await api.post('/api/vessels', {
+        name: configForm.name.trim(),
+        imo_number: configForm.imo_number.trim(),
+        call_sign: configForm.call_sign.trim() || null,
+      });
+      const created = res.data.data;
+      setConfiguringVessel(null);
+      await loadVessels();
+      if (created?.id) {
+        setExpanded(created.id);
+        loadTanks(created.id).catch(() => {});
+      }
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Failed to configure vessel in ORB');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const buildTankFormData = (existing = null) => {
@@ -281,7 +324,8 @@ export default function VesselConfiguration() {
           ) : (
             <div className="vc-list">
               {filteredVessels.map(v => {
-                const isOpen = expanded === v.id;
+                const vesselKey = v.id || v.imo_number;
+                const isOpen = expanded === vesselKey;
                 const vesselTanks = tanks[v.id];
                 const activeCount = vesselTanks ? vesselTanks.filter(t => t.is_active).length : null;
                 const totalCapacity = vesselTanks ? vesselTanks.filter(t => t.is_active).reduce((s, t) => s + (t.capacity_m3 || 0), 0) : 0;
@@ -294,10 +338,10 @@ export default function VesselConfiguration() {
                       role="button"
                       tabIndex={0}
                       aria-expanded={isOpen}
-                      onClick={() => toggleVessel(v.id)}
+                      onClick={() => toggleVessel(v)}
                       onKeyDown={(e) => {
                         if (e.target !== e.currentTarget) return;
-                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleVessel(v.id); }
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleVessel(v); }
                       }}
                     >
                       <span className="vc-vessel__icon" aria-hidden="true"><Ship size={22} /></span>
@@ -313,16 +357,28 @@ export default function VesselConfiguration() {
                       </div>
                       <div className="vc-vessel__actions">
                         <span className="vc-tankcount">
-                          {vesselTanks ? `${activeCount} tanks` : '—'}
+                          {v.orb_configured
+                            ? (vesselTanks ? `${activeCount} tanks` : '—')
+                            : 'Not Configured'}
                         </span>
-                        <button
-                          className="vc-btn vc-btn--primary vc-btn--sm"
-                          onClick={(e) => { e.stopPropagation(); openAddTank(v.id); }}
-                          disabled={!v.orb_configured}
-                          title={!v.orb_configured ? 'Vessel must be configured in ORB first' : undefined}
-                        >
-                          <Plus size={15} /> Add Tank
-                        </button>
+                        {v.orb_configured ? (
+                          <button
+                            type="button"
+                            className="vc-btn vc-btn--primary vc-btn--sm"
+                            onClick={(e) => { e.stopPropagation(); openAddTank(v.id); }}
+                          >
+                            <Plus size={15} /> Add Tank
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="vc-btn vc-btn--primary vc-btn--sm"
+                            onClick={(e) => { e.stopPropagation(); openConfigureVessel(v); }}
+                            title="Configure this vessel in ORB"
+                          >
+                            <Settings size={14} /> Configure in ORB
+                          </button>
+                        )}
                         <ChevronDown size={20} className={`vc-chevron${isOpen ? ' vc-chevron--open' : ''}`} />
                       </div>
                     </div>
@@ -330,9 +386,18 @@ export default function VesselConfiguration() {
                     {isOpen && (
                       <div className="vc-vessel__body">
                         {!v.orb_configured && (
-                          <div className="vc-notanks" style={{ padding: '1.5rem 1rem' }}>
-                            <p style={{ marginBottom: '0.4rem' }}>This vessel exists in the Workplace platform but has not been configured in ORB yet.</p>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Once the vessel is configured in ORB (tanks, equipment, OCM), it will appear here with full options.</p>
+                          <div className="vc-notanks" style={{ padding: '1.5rem 1rem', textAlign: 'center' }}>
+                            <p style={{ marginBottom: '0.4rem', fontWeight: 600 }}>This vessel is registered in Workplace but has not been configured in ORB yet.</p>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1rem' }}>
+                              Configure this vessel in ORB to start managing tanks, capacities, equipment, and oil record books.
+                            </p>
+                            <button
+                              type="button"
+                              className="vc-btn vc-btn--primary"
+                              onClick={() => openConfigureVessel(v)}
+                            >
+                              <Settings size={15} /> Configure Vessel in ORB
+                            </button>
                           </div>
                         )}
                         {v.orb_configured && vesselTanks && (
@@ -456,6 +521,66 @@ export default function VesselConfiguration() {
             </div>
           )}
         </>
+      )}
+
+      {configuringVessel && (
+        <Modal
+          title={`Configure Vessel in ORB — ${configuringVessel.name}`}
+          onClose={() => setConfiguringVessel(null)}
+          footer={
+            <>
+              <button
+                type="button"
+                className="vc-btn vc-btn--secondary"
+                onClick={() => setConfiguringVessel(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="vc-btn vc-btn--primary"
+                onClick={handleConfigureVessel}
+                disabled={saving}
+              >
+                {saving ? 'Saving…' : 'Configure Vessel'}
+              </button>
+            </>
+          }
+        >
+          <div className="vc-form">
+            {error && <div className="alert-banner error">{error}</div>}
+            <div className="form-group">
+              <label>Vessel Name *</label>
+              <input
+                className="form-control"
+                value={configForm.name}
+                onChange={e => setConfigForm({ ...configForm, name: e.target.value })}
+                placeholder="e.g. AM TARANG"
+              />
+            </div>
+            <div className="form-group">
+              <label>IMO Number *</label>
+              <input
+                className="form-control"
+                value={configForm.imo_number}
+                disabled
+                style={{ background: 'var(--vc-sand, #f8f9fa)', cursor: 'not-allowed' }}
+              />
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                Linked to core Workplace platform
+              </span>
+            </div>
+            <div className="form-group">
+              <label>Call Sign</label>
+              <input
+                className="form-control"
+                value={configForm.call_sign}
+                onChange={e => setConfigForm({ ...configForm, call_sign: e.target.value })}
+                placeholder="e.g. 9V1234"
+              />
+            </div>
+          </div>
+        </Modal>
       )}
 
       {addTankFor && (
