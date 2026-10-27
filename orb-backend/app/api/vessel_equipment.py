@@ -15,6 +15,8 @@ from app.database import get_db
 from app.dependencies import get_current_user, require_admin, assert_vessel_access
 from app.models.control_user import ControlUser
 from app.models.orb_config import Equipment
+from app.models.sync import SyncTombstone
+from datetime import datetime, timezone
 from app.models.vessel_tank import VesselTank
 from app.schemas.common import success
 from app.services.calculations import _get_effective_group
@@ -140,5 +142,6 @@ async def delete_equipment(
     if item is None or item.vessel_id != vessel_id:
         raise HTTPException(status_code=404, detail="Equipment not found")
     await db.delete(item)
+    db.add(SyncTombstone(vessel_id=vessel_id, entity_type="equipment", entity_id=equipment_id, deleted_at=datetime.now(timezone.utc)))
     await db.commit()
     return success(message="Equipment removed")

@@ -90,7 +90,7 @@ def _conditions(spec: Spec, vessel: Vessel, users: list[uuid.UUID]):
     k = spec.key
     if k == "vessel":
         return [Vessel.id == v]
-    if k in ("vessel_tank", "upload", "entry", "alert"):
+    if k in ("vessel_tank", "upload", "entry", "alert", "equipment"):
         return [spec.model.vessel_id == v]
     if k == "entry_quantity":
         return [OrbEntryQuantity.entry_id.in_(select(OrbEntry.id).where(OrbEntry.vessel_id == v))]
