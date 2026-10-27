@@ -1,7 +1,6 @@
 import os
 import re
 import sys
-import subprocess
 
 def find_env_value(key, root=r"C:\WORKPLACE"):
     # Check drs_backend first (primary on vessel), then reports_backend, etc.
@@ -14,40 +13,6 @@ def find_env_value(key, root=r"C:\WORKPLACE"):
             if m and m.group(1).strip():
                 return m.group(1).strip(), env_path
     return None, None
-
-def find_working_pg_password(root=r"C:\WORKPLACE"):
-    # Candidates: CLI arg -> any password in .env -> defaults
-    candidates = []
-    if len(sys.argv) > 2 and sys.argv[2].strip():
-        candidates.append(sys.argv[2].strip())
-
-    for sub in ["drs_backend", "reports_backend", "core_backend", "lub_backend", "Aepms-backend", "orb_backend"]:
-        env_path = os.path.join(root, sub, ".env")
-        if os.path.exists(env_path):
-            try:
-                with open(env_path, "r", encoding="utf-8", errors="ignore") as f:
-                    content = f.read()
-                for pwd in re.findall(r"postgres:([^@:]+)@", content):
-                    if pwd not in candidates:
-                        candidates.append(pwd)
-            except Exception:
-                pass
-
-    for default_pwd in ["maritime123", "sujil123", "postgres", "root"]:
-        if default_pwd not in candidates:
-            candidates.append(default_pwd)
-
-    psql = os.path.join(root, "bin", "pgsql", "bin", "psql.exe")
-    if os.path.exists(psql):
-        for pwd in candidates:
-            env = os.environ.copy()
-            env["PGPASSWORD"] = pwd
-            res = subprocess.run([psql, "-h", "127.0.0.1", "-U", "postgres", "-c", "SELECT 1;"],
-                                 env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if res.returncode == 0:
-                return pwd
-
-    return "maritime123"
 
 def main():
     root = r"C:\WORKPLACE"
@@ -85,10 +50,7 @@ def main():
     if not sync_key:
         sync_key = "PROD_SECURE_SYNC_9922"
 
-    # 4. Detect working PostgreSQL password
-    db_pass = find_working_pg_password(root)
-
-    # 5. Construct .env content
+    # 4. Construct standard vessel .env content (fixed standard vessel DB credentials)
     env_content = f"""# ORB backend, vessel side (offline). Same code as the VM; STORAGE_MODE decides the role.
 STORAGE_MODE=offline
 VESSEL_IMO={target_imo}
@@ -101,8 +63,8 @@ MAX_SYNC_RETRIES=5
 # Set false only behind an SSL-inspecting proxy that breaks certificate checks (DRS does this by default)
 SYNC_VERIFY_TLS=false
 
-DATABASE_URL=postgresql+asyncpg://postgres:{db_pass}@localhost:5432/workplace_orb
-CONTROL_DATABASE_URL=postgresql+asyncpg://postgres:{db_pass}@localhost:5432/workplace_control
+DATABASE_URL=postgresql+asyncpg://postgres:maritime123@localhost:5432/workplace_orb
+CONTROL_DATABASE_URL=postgresql+asyncpg://postgres:maritime123@localhost:5432/workplace_control
 SECRET_KEY=your-super-secret-key-must-match-drs-backend
 ALGORITHM=HS256
 CORS_ORIGINS=http://localhost:8080
@@ -126,7 +88,7 @@ NETWORK_TIMEOUT_SECONDS=15.0
 """
     with open(orb_env_path, "w", encoding="utf-8", newline="\n") as f:
         f.write(env_content)
-    print(f"      [OK] Successfully configured {orb_env_path} (VESSEL_IMO={target_imo}, DB_PASS={db_pass})")
+    print(f"      [OK] Successfully configured {orb_env_path} (VESSEL_IMO={target_imo})")
 
 if __name__ == "__main__":
     main()

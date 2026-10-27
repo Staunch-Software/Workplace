@@ -19,6 +19,8 @@ set "ROOT=C:\WORKPLACE"
 set "NSSM=%ROOT%\nssm\win64\nssm.exe"
 set "PYTHONEXE=%ROOT%\bin\python\python.exe"
 set "PGBIN=%ROOT%\bin\pgsql\bin"
+set "DB_PASS=maritime123"
+set "PGPASSWORD=maritime123"
 
 echo ========================================================
 echo   Setting Up / Updating Workplace ORB Module
@@ -34,28 +36,6 @@ if %ERRORLEVEL% NEQ 0 (
     timeout /t 5 /nobreak >nul
 )
 
-:: Detect working PostgreSQL password (maritime123 on vessels, sujil123 on dev, or postgres/root)
-set "DB_PASS=maritime123"
-set "PGPASSWORD=maritime123"
-"%PGBIN%\psql.exe" -h 127.0.0.1 -U postgres -c "SELECT 1;" >nul 2>&1
-if %ERRORLEVEL% NEQ 0 (
-    set "PGPASSWORD=sujil123"
-    "%PGBIN%\psql.exe" -h 127.0.0.1 -U postgres -c "SELECT 1;" >nul 2>&1
-    if !ERRORLEVEL! EQU 0 (
-        set "DB_PASS=sujil123"
-    ) else (
-        set "PGPASSWORD=postgres"
-        "%PGBIN%\psql.exe" -h 127.0.0.1 -U postgres -c "SELECT 1;" >nul 2>&1
-        if !ERRORLEVEL! EQU 0 (
-            set "DB_PASS=postgres"
-        ) else (
-            set "PGPASSWORD=root"
-            "%PGBIN%\psql.exe" -h 127.0.0.1 -U postgres -c "SELECT 1;" >nul 2>&1
-            if !ERRORLEVEL! EQU 0 set "DB_PASS=root"
-        )
-    )
-)
-
 "%PGBIN%\psql.exe" -h 127.0.0.1 -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'workplace_orb'" | findstr "1" >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo     Database workplace_orb does not exist. Creating with UTF-8 encoding...
@@ -68,13 +48,13 @@ if %ERRORLEVEL% NEQ 0 (
     echo     [OK] Database workplace_orb exists.
 )
 
-:: [2/7] Auto-configure ORB .env (IMO auto-detection & DB password)
+:: [2/7] Auto-configure ORB .env (IMO auto-detection)
 echo.
 echo [2/7] Configuring ORB Environment (.env)...
 if exist "%~dp0configure_orb_env.py" (
-    "%PYTHONEXE%" "%~dp0configure_orb_env.py" %* %DB_PASS%
+    "%PYTHONEXE%" "%~dp0configure_orb_env.py" %*
 ) else if exist "%ROOT%\setup\configure_orb_env.py" (
-    "%PYTHONEXE%" "%ROOT%\setup\configure_orb_env.py" %* %DB_PASS%
+    "%PYTHONEXE%" "%ROOT%\setup\configure_orb_env.py" %*
 )
 
 :: [3/7] Configure Nginx routes
