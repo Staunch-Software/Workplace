@@ -13,7 +13,8 @@ from app.services.mail_service import process_and_email_pending_attachments
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-8s %(message)s")
 logger = logging.getLogger(__name__)
 
-# Cron entry for the half-yearly Cargo Hold (301.01-09) / Water Ballast Tank
+# Cron entry for the half-yearly AND yearly (Water Ballast Tank, -YR codes) reports.
+# Half-yearly Cargo Hold (301.01-09) / Water Ballast Tank
 # (305.03.03-20) reports -- separate from cron_smart_scrape so the existing job
 # is untouched. smart_cron=True: a config with no report yet gets ALL its
 # completed jobs scraped (first run); after that it only runs on the next due
@@ -44,10 +45,24 @@ def _release_lock():
 
 
 async def main():
+    # Half-yearly then yearly (Water Ballast Tank 12-month, codes ending -YR),
+    # one after the other under the same lock. Isolated so a failure in one
+    # does not stop the other or the email step.
     logger.info("Starting Half-Yearly Smart Scrape...")
-    async with SessionLocal() as db:
-        await run_halfyearly_scraper(db, smart_cron=True)
+    try:
+        async with SessionLocal() as db:
+            await run_halfyearly_scraper(db, smart_cron=True)
+    except Exception as e:
+        logger.error(f"Half-Yearly scrape failed: {e}")
     logger.info("Half-Yearly Smart Scrape COMPLETE.")
+
+    logger.info("Starting Yearly Smart Scrape...")
+    try:
+        async with SessionLocal() as db:
+            await run_halfyearly_scraper(db, smart_cron=True, yearly=True)
+    except Exception as e:
+        logger.error(f"Yearly scrape failed: {e}")
+    logger.info("Yearly Smart Scrape COMPLETE.")
 
     # Same follow-up the standard cron does, so new attachments get emailed
     # like every other report. Isolated: a mail failure must not fail the run.
