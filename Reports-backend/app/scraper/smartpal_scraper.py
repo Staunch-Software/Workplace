@@ -1701,9 +1701,9 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
         # Fallbacks when no attachment yielded an extractable date (e.g. image PDF):
         if report_date is None:
             from app.utils.report_date import uses_job_end_date_fallback
-            # Yearly tank inspections: the due date can sit in the next year (due 03-Feb-2027, done 11-Aug-2026), which
-            # would file the report under the wrong year, so use the date the job was actually completed.
-            if (uses_job_end_date_fallback(report_code, report_name) or _is_yearly_code(report_code)) and job_end_date is not None:
+            # Half-yearly / yearly tank & hold inspections: the due date can sit in the next period (due 03-Feb-2027, done
+            # 11-Aug-2026), which would file the report under the wrong one, so use the date the job was completed.
+            if (uses_job_end_date_fallback(report_code, report_name) or special) and job_end_date is not None:
                 # Specific reports (like Boiler) requested to use job_end_date 
                 report_date = job_end_date
                 report_date_source = "job_end_date:fallback"
