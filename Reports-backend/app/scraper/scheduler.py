@@ -43,6 +43,16 @@ async def _scraper_job():
             logger.error(f"[CRON] Scraper job failed: {e}")
 
 
+async def _events_mail_job():
+    """Daily mail: each owner's vessels, last N logbook events (see events_mail_service)."""
+    from app.services.events_mail_service import send_daily_events_mail
+    try:
+        res = await send_daily_events_mail()
+        logger.info(f"[CRON] Events mail done: {res.get('sent')} sent.")
+    except Exception as e:
+        logger.error(f"[CRON] Events mail job failed: {e}")
+
+
 def start_scheduler():
     """
     Registers the scraper job with APScheduler and starts the scheduler.
@@ -60,6 +70,18 @@ def start_scheduler():
         name="SmartPAL PDF Scraper",
         replace_existing=True,
     )
+    if settings.EVENTS_MAIL_ENABLED:
+        scheduler.add_job(
+            _events_mail_job,
+            trigger=CronTrigger(hour=settings.EVENTS_MAIL_HOUR, minute=settings.EVENTS_MAIL_MINUTE, timezone="UTC"),
+            id="events_mail",
+            name="Daily vessel events mail",
+            replace_existing=True,
+        )
+        logger.info(
+            f"[SCHEDULER] Events mail scheduled daily at "
+            f"{settings.EVENTS_MAIL_HOUR:02d}:{settings.EVENTS_MAIL_MINUTE:02d} UTC."
+        )
     scheduler.start()
     logger.info(
         f"[SCHEDULER] SmartPAL scraper scheduled daily at "
