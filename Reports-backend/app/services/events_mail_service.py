@@ -18,8 +18,8 @@ from app.core.database_vessel_perf import VesselPerfSession
 logger = logging.getLogger(__name__)
 
 SOURCE = "mari_apps"
-_SECTION_COLOR = {"Log Info": "#4f46e5", "Performance": "#d97706", "Emission": "#059669"}
-_SECTION_BG = {"Log Info": "#f2f4ff", "Performance": "#fff8eb", "Emission": "#effaf4"}
+_SECTION_COLOR = {"Log Info": "#F15A29", "Performance": "#00904C", "Emission": "#475569"}
+_SECTION_BG = {"Log Info": "#fff3ee", "Performance": "#e8f6ef", "Emission": "#f1f5f9"}
 _NUM = re.compile(r"^-?\d+(\.\d+)?$")
 
 
@@ -46,7 +46,7 @@ def render_events_html(title: str, columns: list, vessels: list, n_events: int, 
     """vessels: [{"name", "imo", "rows": [event dicts, oldest first]}]. One card per vessel, events across,
     logbook columns down. Table layout with inline styles only, so it renders in Outlook and on phones."""
     e = html.escape
-    font = "font-family:Segoe UI,Helvetica,Arial,sans-serif;"
+    font = "font-family:Aptos,'Segoe UI',Calibri,Arial,sans-serif;"
     as_of = as_of or date_type.today()
     total_missing = sum(1 for v in vessels for ev in v["rows"] if ev.get("_missing"))
     total_events = sum(len(v["rows"]) for v in vessels)
@@ -59,31 +59,31 @@ def render_events_html(title: str, columns: list, vessels: list, n_events: int, 
     out = [f'<div style="background:#f1f5f9;padding:20px 8px;{font}">',
            '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:860px;margin:0 auto;">',
            # banner
-           '<tr><td bgcolor="#1e1b4b" style="background:linear-gradient(135deg,#1e1b4b,#4338ca);padding:22px 26px;border-radius:10px 10px 0 0;">'
-           f'<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#a5b4fc;">Daily Logbook Digest</div>'
+           '<tr><td bgcolor="#F15A29" style="background:linear-gradient(135deg,#F15A29,#d9460f);padding:22px 26px;border-radius:10px 10px 0 0;border-bottom:4px solid #00904C;">'
+           f'<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#ffe4d9;">Daily Logbook Digest</div>'
            f'<div style="font-size:22px;font-weight:700;color:#ffffff;margin-top:4px;">{e(title)}</div>'
-           f'<div style="font-size:12px;color:#c7d2fe;margin-top:6px;">Last {n_events} logbook events per vessel &middot; MariApps &middot; as of {as_of.strftime("%d %b %Y")}</div>'
+           f'<div style="font-size:12px;color:#fff1ea;margin-top:6px;">Last {n_events} logbook events per vessel &middot; MariApps &middot; as of {as_of.strftime("%d %b %Y")}</div>'
            '</td></tr>',
            # summary strip
            '<tr><td bgcolor="#ffffff" style="background:#ffffff;border-bottom:1px solid #e2e8f0;">'
            '<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>'
-           + stat("Vessels", len(vessels), "#4338ca") + stat("Events", total_events, "#0f172a")
-           + stat("Missing reports", total_missing, "#b91c1c" if total_missing else "#059669")
+           + stat("Vessels", len(vessels), "#F15A29") + stat("Events", total_events, "#0f172a")
+           + stat("Missing reports", total_missing, "#b91c1c" if total_missing else "#00904C")
            + '</tr></table></td></tr>']
 
-    th = f"padding:7px 6px;border-bottom:2px solid #e2e8f0;{font}font-size:11px;font-weight:600;color:#1e293b;text-align:center;background:#f8fafc;"
-    td = f"padding:6px 8px;border-bottom:1px solid #eef1f6;{font}font-size:12px;color:#334155;text-align:center;white-space:nowrap;"
+    th = f"padding:10px 8px;line-height:16px;border-bottom:2px solid #e2e8f0;{font}font-size:11px;font-weight:600;color:#1e293b;text-align:center;background:#f8fafc;"
+    td = f"padding:11px 10px;line-height:20px;border-bottom:1px solid #e9edf3;{font}font-size:13px;color:#334155;text-align:center;white-space:nowrap;"
 
     for v in vessels:
         missing = sum(1 for ev in v["rows"] if ev.get("_missing"))
         badge = (f'<span style="background:#fee2e2;color:#b91c1c;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600;">{missing} missing</span>'
                  if missing else
-                 '<span style="background:#dcfce7;color:#15803d;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600;">All reported</span>')
+                 '<span style="background:#e3f5ec;color:#00904C;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600;">All reported</span>')
         out.append('<tr><td bgcolor="#ffffff" style="background:#ffffff;padding:18px 18px 4px;">'
                    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e2e8f0;border-radius:8px;border-collapse:separate;overflow:hidden;">'
-                   f'<tr><td colspan="{len(v["rows"]) + 1}" bgcolor="#eef2ff" style="background:#eef2ff;padding:11px 14px;border-bottom:1px solid #e0e7ff;">'
+                   f'<tr><td colspan="{len(v["rows"]) + 1}" bgcolor="#fff3ee" style="background:#fff3ee;padding:11px 14px;border-bottom:1px solid #fcd9cb;">'
                    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>'
-                   f'<td style="{font}font-size:15px;font-weight:700;color:#1e1b4b;">{e(v["name"])}'
+                   f'<td style="{font}font-size:15px;font-weight:700;color:#3b1d10;">{e(v["name"])}'
                    f'<span style="font-size:11px;font-weight:400;color:#64748b;margin-left:8px;">IMO {e(v["imo"])}</span></td>'
                    f'<td align="right">{badge}</td></tr></table></td></tr>')
         # date header
@@ -96,13 +96,13 @@ def render_events_html(title: str, columns: list, vessels: list, n_events: int, 
             else:
                 t = _fmt_time(ts)
                 out.append(f'<th style="{th}">{e(_fmt_day(ts))}'
-                           + (f'<div style="font-weight:400;font-size:10px;color:#4338ca;">{t} UTC</div>' if t else "") + "</th>")
+                           + (f'<div style="font-weight:400;font-size:10px;color:#F15A29;">{t} UTC</div>' if t else "") + "</th>")
         out.append("</tr>")
         for sec in ("Log Info", "Performance", "Emission"):
             cols = [c for c in columns if c["category"] == sec]
             if not cols:
                 continue
-            out.append(f'<tr><td colspan="{len(v["rows"]) + 1}" bgcolor="{_SECTION_BG[sec]}" style="padding:6px 10px;background:{_SECTION_BG[sec]};'
+            out.append(f'<tr><td colspan="{len(v["rows"]) + 1}" bgcolor="{_SECTION_BG[sec]}" style="padding:10px 12px;background:{_SECTION_BG[sec]};'
                        f'color:{_SECTION_COLOR[sec]};{font}font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;'
                        f'border-left:3px solid {_SECTION_COLOR[sec]};">{e(sec)}</td></tr>')
             for i, c in enumerate(cols):
