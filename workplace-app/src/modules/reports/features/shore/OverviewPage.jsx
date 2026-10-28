@@ -82,6 +82,13 @@ function reportDate(r) {
 }
 
 
+// Date shown on a cell / in the preview. Half-yearly and yearly reports show the day the job was completed (job end date).
+function displayDate(r) {
+  const f = normalizeFreq(r.frequency);
+  if ((f === 'HALF_YEARLY' || f === 'YEARLY') && r.job_end_date) return new Date(r.job_end_date);
+  return reportDate(r);
+}
+
 function hasValidAttachment(attachments) {
   return Array.isArray(attachments) && attachments.some(a => a.blob_path && !a.blob_path.startsWith('MISSING:'));
 }
@@ -349,10 +356,37 @@ function CompactSelect({ icon, value, options, onChange }) {
   );
 }
 
+/* Dark year pill; click opens a dropdown of the years that have data. */
+function YearChip({ value, options, onChange }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="ovw-year-chip ovw-year-chip--btn" onClick={() => setOpen(o => !o)}>
+      {value}
+      <ChevronDown size={12} className={`ovw-compact-chevron ${open ? 'open' : ''}`} />
+      {open && (
+        <>
+          <div className="ovw-dropdown-overlay" onClick={e => { e.stopPropagation(); setOpen(false); }} />
+          <div className="ovw-dropdown">
+            {options.map(o => (
+              <div
+                key={o.id}
+                className={`ovw-option ${o.id === value ? 'active' : ''}`}
+                onClick={e => { e.stopPropagation(); onChange(o.id); setOpen(false); }}
+              >
+                <span>{o.label}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </span>
+  );
+}
+
 function AttachmentPreviewModal({ report, onClose }) {
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
   if (!report) return null;
-  const date = reportDate(report);
+  const date = displayDate(report);
   return (
     <div className="rt-modal-backdrop" onClick={onClose}>
       <div className="rt-modal-container ovw-preview-modal" onClick={e => e.stopPropagation()}>
@@ -396,7 +430,7 @@ function AttachmentIcon({ report, bucket, onOpen, viewerRole, showDate = true, s
     <button
       type="button"
       className={`ovw-chip ovw-chip-has ${isSeen ? 'ovw-chip-seen' : 'ovw-chip-new'}${!showDate ? ' ovw-chip-icon-only' : ''}`}
-      title={`${bucket?.label || ''}: ${fmtDateShort(reportDate(report))} — ${isSeen ? 'Viewed' : 'New'} attachment`}
+      title={`${bucket?.label || ''}: ${fmtDateShort(displayDate(report))} — ${isSeen ? 'Viewed' : 'New'} attachment`}
       onClick={() => onOpen(report)}
     >
       <span className="ovw-chip-has-icon">
@@ -407,7 +441,7 @@ function AttachmentIcon({ report, bucket, onOpen, viewerRole, showDate = true, s
           </span>
         )}
       </span>
-      {showDate && <span>{fmtDateShort(reportDate(report))}</span>}
+      {showDate && <span>{fmtDateShort(displayDate(report))}</span>}
     </button>
   );
 }
@@ -903,12 +937,7 @@ export default function OverviewPage() {
       <div className="ovw-control-bar">
         <div className="ovw-control-left">
           {frequency !== 'DAILY' && yearOptions.length > 1 ? (
-            <CompactSelect
-              icon={<CalendarDays size={13} />}
-              value={year}
-              options={yearOptions}
-              onChange={setYear}
-            />
+            <YearChip value={year} options={yearOptions} onChange={setYear} />
           ) : (
             <span className="ovw-year-chip">{displayYear}</span>
           )}
