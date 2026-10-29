@@ -44,8 +44,8 @@ def _fmt_time(ts: str) -> str:
     return m.group(1) if m else ""
 
 
-def _leg(ev: dict) -> str:
-    for k in ("voyage_no", "emissionx_voyage_no"):
+def _log_number(ev: dict) -> str:
+    for k in ("log_number", "voyage_no", "emissionx_voyage_no"):
         v = ev.get(k)
         if v not in (None, ""):
             return _fmt_value(v)
@@ -214,7 +214,7 @@ async def send_new_event_mails(test_to: str = "", dry_run: bool = False, force: 
                         continue
                 rows = list(reversed(real[-n:]))  # latest first
                 day = date_type.fromisoformat(latest["_ts"][:10]).strftime("%d %b %Y")
-                subject = (f"{'[TEST] ' if test_to else ''}{v['name']} - Leg {_leg(latest)} - "
+                subject = (f"{'[TEST] ' if test_to else ''}{v['name']} - {_log_number(latest)} - "
                            f"{_report_type(latest)} - {day}")
                 body = render_events_html(data["columns"], {"name": v["name"], "rows": rows}, n)
                 previews.append((subject, body))
