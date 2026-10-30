@@ -133,6 +133,31 @@ async def _click_attachments_tab_and_wait(page, timeout: int = 15000):
 # number, lower it further -- the pattern is empirical, not derived from
 # a known timeout value.
 SESSION_REFRESH_EVERY = 5
+BROWSER_RESTART_EVERY = 25
+
+
+async def _fresh_browser_session(playwright):
+    """Launch a brand-new Chromium browser process + fresh context + login + Job Overview.
+    Used for browser recycling every BROWSER_RESTART_EVERY reports to completely
+    release memory (RAM) back to the OS. Returns (browser, context, page, overview_page)
+    or None if any step fails."""
+    browser = None
+    try:
+        browser = await playwright.chromium.launch(headless=True)
+        session = await _fresh_session(browser)
+        if session:
+            context, page, overview_page = session
+            return browser, context, page, overview_page
+        if browser:
+            try: await browser.close()
+            except Exception: pass
+        return None
+    except Exception as e:
+        logger.error(f"Failed to launch fresh Chromium browser process: {e}")
+        if browser:
+            try: await browser.close()
+            except Exception: pass
+        return None
 
 
 async def _fresh_session(browser):
@@ -229,29 +254,25 @@ async def run_scraper(db: AsyncSession, target_frequency: str = None, target_rep
                     target_job_no = latest_report.job_order_no
                     target_due_date = latest_report.due_date
                 elif not latest_report.attachments:
-                    # A COMPLETED job with zero attachments on file is a real
-                    # gap, not a report that genuinely has none -- every
-                    # completed SmartPAL job we scrape carries at least one
-                    # file. This happens when a scrape completed the job
-                    # lookup but the attachment download/upload step failed
-                    # or was skipped that run (a transient blob-upload error,
-                    # the attachments tab not yet populated at scrape time,
-                    # etc). Re-scrape the SAME already-completed job (reusing
-                    # its own job_order_no/due_date, exactly like the PENDING
-                    # branch above re-targets the job it's already tracking)
-                    # to pick up the attachment SmartPAL already has, rather
-                    # than waiting for next_due_date to roll the row over to
-                    # an entirely different cycle and leaving this gap
-                    # unfilled forever.
-                    should_scrape = True
-                    target_job_no = latest_report.job_order_no
-                    target_due_date = latest_report.due_date
-                    missing_attachment_count += 1
-                    logger.info(
-                        f"Smart Cron: {c.vessel_name}/{c.report_code} job "
-                        f"{latest_report.job_order_no} is COMPLETED but has no "
-                        f"attachments on file -- re-scraping to recover them."
-                    )
+                    # A COMPLETED job with zero attachments on file is checked
+                    # up to 2 times to recover attachments. If still empty after
+                    # 2 attempts, further re-scraping is restricted/skipped.
+                    retries = getattr(latest_report, "attachment_retry_count", 0) or 0
+                    if retries < 2:
+                        should_scrape = True
+                        target_job_no = latest_report.job_order_no
+                        target_due_date = latest_report.due_date
+                        missing_attachment_count += 1
+                        logger.info(
+                            f"Smart Cron: {c.vessel_name}/{c.report_code} job "
+                            f"{latest_report.job_order_no} is COMPLETED but has no "
+                            f"attachments on file (retry attempt {retries + 1}/2) -- re-scraping to recover them."
+                        )
+                    else:
+                        logger.info(
+                            f"Smart Cron: {c.vessel_name}/{c.report_code} job "
+                            f"{latest_report.job_order_no} has no attachments but reached max retries ({retries}/2) -- skipping."
+                        )
                 else:
                     if latest_report.next_due_date:
                         due_reached = latest_report.next_due_date.date() <= now_date
@@ -348,7 +369,30 @@ async def run_scraper(db: AsyncSession, target_frequency: str = None, target_rep
             # through a long run, keeps every report on the safe side of
             # whatever that cutover is instead of silently failing en masse
             # once it's crossed.
-            if idx > 0 and idx % SESSION_REFRESH_EVERY == 0:
+            if idx > 0 and idx % BROWSER_RESTART_EVERY == 0:
+                logger.info(f"[{idx}/{total}] Recycling Chromium browser process (restart browser) "
+                            f"to release memory and keep RAM below 500 MB...")
+                try: await context.close()
+                except Exception: pass
+                try: await browser.close()
+                except Exception: pass
+
+                fresh_b = await _fresh_browser_session(p)
+                if fresh_b:
+                    browser, context, page, overview_page = fresh_b
+                    logger.info(f"[{idx}/{total}] Chromium browser recycled successfully. Memory flushed.")
+                else:
+                    logger.warning(f"[{idx}/{total}] Browser recycle failed on first attempt; retrying once...")
+                    await asyncio.sleep(3)
+                    fresh_b = await _fresh_browser_session(p)
+                    if fresh_b:
+                        browser, context, page, overview_page = fresh_b
+                        logger.info(f"[{idx}/{total}] Chromium browser recycled successfully on retry.")
+                    else:
+                        logger.error(f"[{idx}/{total}] Browser recycle failed after retry. Aborting scraper run.")
+                        break
+
+            elif idx > 0 and idx % SESSION_REFRESH_EVERY == 0:
                 logger.info(f"[{idx}/{total}] Refreshing SmartPAL session (login + Job Overview) "
                             f"to avoid long-run session degradation observed after ~15 reports...")
                 fresh = await _fresh_session(browser)
@@ -419,11 +463,38 @@ async def run_scraper(db: AsyncSession, target_frequency: str = None, target_rep
                     # "the scraper couldn't find it". Every attempt now
                     # leaves a row so a full re-scrape can be audited
                     # config-by-config afterwards.
+                    if target_job_no:
+                        try:
+                            stmt_tgt = select(Report).where(
+                                Report.vessel_imo == vessel_imo,
+                                Report.report_code == report_code,
+                                Report.job_order_no == target_job_no,
+                            ).options(selectinload(Report.attachments))
+                            tgt_row = (await db.execute(stmt_tgt)).scalars().first()
+                            if tgt_row and tgt_row.job_status == "COMPLETED" and not tgt_row.attachments:
+                                tgt_row.attachment_retry_count = (tgt_row.attachment_retry_count or 0) + 1
+                                await db.commit()
+                        except Exception as re_err:
+                            logger.warning(f"Failed to increment retry count for {target_job_no}: {re_err}")
+
                     reason = fail_reason.get("msg", "Scrape returned no data for an unlogged reason.")
                     logger.warning(f"No data captured for {vessel_name}/{report_code}: {reason}")
                     await _mark_failed(db, vessel_imo, report_code, reason,
                                        vessel_name=vessel_name, report_name=report_name)
             except Exception as e:
+                if target_job_no:
+                    try:
+                        stmt_tgt = select(Report).where(
+                            Report.vessel_imo == vessel_imo,
+                            Report.report_code == report_code,
+                            Report.job_order_no == target_job_no,
+                        ).options(selectinload(Report.attachments))
+                        tgt_row = (await db.execute(stmt_tgt)).scalars().first()
+                        if tgt_row and tgt_row.job_status == "COMPLETED" and not tgt_row.attachments:
+                            tgt_row.attachment_retry_count = (tgt_row.attachment_retry_count or 0) + 1
+                            await db.commit()
+                    except Exception:
+                        pass
                 logger.error(f"Error scraping {vessel_name}/{report_code}: {e}")
                 await _mark_failed(db, vessel_imo, report_code, str(e),
                                    vessel_name=vessel_name, report_name=report_name)
@@ -549,6 +620,8 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
     eq_page = None
     job_page = None
     job_order_page = None
+    pending_details_page = None
+    history_details_page = None
 
     try:
         # Step 3: Select vessel via Kendo dropdown
@@ -1760,6 +1833,12 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
         if job_order_page:
             try: await job_order_page.close()
             except: pass
+        if pending_details_page:
+            try: await pending_details_page.close()
+            except: pass
+        if history_details_page:
+            try: await history_details_page.close()
+            except: pass
     return None
 
 
@@ -1828,6 +1907,17 @@ async def _save_report(db: AsyncSession, data: dict):
             if data.get("report_date") is not None:
                 existing.report_date        = data.get("report_date")
                 existing.report_date_source = data.get("report_date_source")
+
+            is_completed = data.get("job_status") == "COMPLETED"
+            if is_completed:
+                if data.get("attachments"):
+                    existing.attachment_retry_count = 0
+                else:
+                    existing.attachment_retry_count = (existing.attachment_retry_count or 0) + 1
+                    logger.info(
+                        f"Job {existing.job_order_no} still has 0 attachments "
+                        f"(attachment retry count: {existing.attachment_retry_count}/2)"
+                    )
 
             existing.scrape_status = ScrapeStatus.SCRAPED
             existing.scrape_error  = None
@@ -2194,8 +2284,15 @@ async def run_halfyearly_scraper(db: AsyncSession, target_reports: str = None, t
                 c._target_job_no, c._target_due_date = latest.job_order_no, latest.due_date
                 due.append(c)
             elif not latest.attachments:
-                c._target_job_no, c._target_due_date = latest.job_order_no, latest.due_date
-                due.append(c)
+                retries = getattr(latest, "attachment_retry_count", 0) or 0
+                if retries < 2:
+                    c._target_job_no, c._target_due_date = latest.job_order_no, latest.due_date
+                    due.append(c)
+                else:
+                    logger.info(
+                        f"{freq_label} smart: {c.vessel_name}/{c.report_code} has no attachments "
+                        f"but reached max retries ({retries}/2) -- skipping."
+                    )
             elif latest.next_due_date:
                 expected = _next_cycle_expected_from_report_date(latest.report_date, freq_label)
                 if latest.next_due_date.date() <= now_date or (expected and expected <= now_date):
@@ -2241,7 +2338,30 @@ async def run_halfyearly_scraper(db: AsyncSession, target_reports: str = None, t
 
         total = len(entries)
         for idx, e in enumerate(entries):
-            if idx > 0 and idx % SESSION_REFRESH_EVERY == 0:
+            if idx > 0 and idx % BROWSER_RESTART_EVERY == 0:
+                logger.info(f"[{idx}/{total}] Recycling Chromium browser process (restart browser) "
+                            f"to release memory and keep RAM below 500 MB...")
+                try: await context.close()
+                except Exception: pass
+                try: await browser.close()
+                except Exception: pass
+
+                fresh_b = await _fresh_browser_session(p)
+                if fresh_b:
+                    browser, context, page, overview_page = fresh_b
+                    logger.info(f"[{idx}/{total}] Chromium browser recycled successfully. Memory flushed.")
+                else:
+                    logger.warning(f"[{idx}/{total}] Browser recycle failed on first attempt; retrying once...")
+                    await asyncio.sleep(3)
+                    fresh_b = await _fresh_browser_session(p)
+                    if fresh_b:
+                        browser, context, page, overview_page = fresh_b
+                        logger.info(f"[{idx}/{total}] Chromium browser recycled successfully on retry.")
+                    else:
+                        logger.error(f"[{idx}/{total}] Browser recycle failed after retry. Aborting run.")
+                        break
+
+            elif idx > 0 and idx % SESSION_REFRESH_EVERY == 0:
                 logger.info(f"[{idx}/{total}] Refreshing SmartPAL session...")
                 fresh = await _fresh_session(browser)
                 if fresh:
