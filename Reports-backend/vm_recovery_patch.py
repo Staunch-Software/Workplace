@@ -54,6 +54,25 @@ async def patch():
         except Exception as e:
             print(f"Failed on AEPMS fields: {e}")
 
+        # Attachment retry count (2-attempt cap)
+        try:
+            await conn.execute(text("ALTER TABLE reports ADD COLUMN IF NOT EXISTS attachment_retry_count INTEGER NOT NULL DEFAULT 0;"))
+            await conn.execute(text("""
+                UPDATE reports
+                SET attachment_retry_count = 2
+                WHERE job_status = 'COMPLETED'
+                  AND id IN (
+                      SELECT r.id
+                      FROM reports r
+                      LEFT JOIN report_attachments a ON a.report_id = r.id
+                      GROUP BY r.id
+                      HAVING COUNT(a.id) = 0
+                  );
+            """))
+            print("Added attachment_retry_count and capped historical empty reports")
+        except Exception as e:
+            print(f"Failed on attachment_retry_count: {e}")
+
     await engine.dispose()
     print("Patch completed successfully!")
 
