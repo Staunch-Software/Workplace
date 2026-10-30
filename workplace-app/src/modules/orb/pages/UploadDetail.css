@@ -203,3 +203,10 @@
   .orb-root .ud-table--summary { min-width: 620px; }
   .orb-root .ud-table--tanks { min-width: 500px; }
 }
+
+/* alerts tab: expandable source entry + chat button */
+.orb-root .ud-alert-wrap { display: flex; flex-direction: column; gap: 0.35rem; }
+.orb-root .ud-alert[role="button"] { cursor: pointer; }
+.orb-root .ud-alert[role="button"]:focus-visible { outline: 2px solid var(--ud-orange-500, #E8701A); outline-offset: 2px; }
+.orb-root .ud-alert__actions { display: flex; align-items: center; gap: 0.5rem; flex: none; }
+@media (max-width: 700px) { .orb-root .ud-alert__actions { width: 100%; justify-content: flex-end; } }

@@ -1,0 +1,25 @@
+/* Pumps & equipment inside the vessel body of Vessel Configuration */
+.orb-root .eq { margin-top: 1.4rem; display: flex; flex-direction: column; gap: 0.8rem; }
+.orb-root .eq .vc-sectionhead { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; }
+.orb-root .eq-warn { display: flex; align-items: flex-start; gap: 0.6rem; background: #FFF7E6; border: 1px solid #F1D08A; color: #7a5200; border-radius: 10px; padding: 0.65rem 0.85rem; font-size: 0.85rem; line-height: 1.45; }
+.orb-root .eq-warn svg { flex: none; margin-top: 2px; }
+.orb-root .eq-form { background: #FAF5EE; border: 1px solid #EADFD2; border-radius: 12px; padding: 1rem; display: flex; flex-direction: column; gap: 0.8rem; }
+.orb-root .eq-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+.orb-root .eq-field { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.78rem; font-weight: 700; color: #5c534a; }
+.orb-root .eq-check { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.85rem; color: #4a4036; }
+.orb-root .eq-form__foot { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+@media (min-width: 1600px) {
+  .orb-root .eq-warn { font-size: 0.95rem; }
+  .orb-root .eq-field { font-size: 0.86rem; }
+}
+@media (max-width: 1024px) {
+  .orb-root .eq-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .orb-root .eq-grid { grid-template-columns: 1fr; }
+  .orb-root .eq-form { padding: 0.8rem; }
+  .orb-root .eq-form__foot { justify-content: stretch; }
+  .orb-root .eq-form__foot .vc-btn { flex: 1; justify-content: center; }
+  .orb-root .eq .form-control { font-size: 16px; }
+}

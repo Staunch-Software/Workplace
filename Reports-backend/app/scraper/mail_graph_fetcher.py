@@ -66,6 +66,11 @@ DAILY_CATEGORIES = {
         "name": "DAILY - 05 - RIDING TEAM DAILY WORKDONE REPORT",
         "dept": "DECK",
     },
+    "DY-06-DAILY_LOG_TEMPLATE": {
+        "code": "DY-06-DAILY_LOG_TEMPLATE",
+        "name": "DAILY - 06 - DAILY LOG TEMPLATE",
+        "dept": "ENGINE",
+    },
 }
 
 def map_attachment_to_daily_category(filename: str) -> str:
@@ -74,6 +79,10 @@ def map_attachment_to_daily_category(filename: str) -> str:
     
     clean = re.sub(r"[\-_\.\/]+", " ", filename.lower())
     
+    # 0. TECH Daily Log Template (xlsx) -> 6th report
+    if "daily log" in clean or "log template" in clean:
+        return "DY-06-DAILY_LOG_TEMPLATE"
+
     # 1. Work Plan Meeting Form (ADM-19) & Work Planners -> 4th report
     if (
         "adm 19" in clean
@@ -104,6 +113,11 @@ def map_attachment_to_daily_category(filename: str) -> str:
     return "DY-01-DECK_DAILY_WORK_DONE"
 
 DEFAULT_MAILBOX = "technical@ozellar.com"
+
+# TM distribution lists (tmamnstufmax@ etc.) have no mailbox of their own; mail
+# sent to them lands in each member's mailbox. This member receives every
+# vessel's TM mail, so scan it too (override with MAIL_SCRAPE_EXTRA_MAILBOXES).
+DEFAULT_EXTRA_MAILBOXES = ["abhinav.s@ozellar.com"]
 
 ALLOWED_DOC_EXTS = {".pdf", ".xls", ".xlsx", ".xlsm", ".csv", ".doc", ".docx"}
 
@@ -157,6 +171,21 @@ EMAIL_TO_VESSEL = [
     ("gclyamuna", "GCL YAMUNA"),
     ("gcl.yamuna", "GCL YAMUNA"),
 ]
+
+# Each vessel's own mailbox (Sent Items hold the reports the vessel emailed out)
+VESSEL_TO_MAILBOX = {
+    "AM KIRTI": "amkirti@ozellar.com",
+    "AM TARANG": "amtarang@ozellar.com",
+    "AM UMANG": "amumang@ozellar.com",
+    "AMNS TUFMAX": "amnstufmax@ozellar.com",
+    "GCL FOS": "gclfos@ozellar.com",
+    "GCL GANGA": "gclganga@ozellar.com",
+    "GCL NARMADA": "gclnarmada@ozellar.com",
+    "GCL SABARMATI": "gclsabarmati@ozellar.com",
+    "GCL SARASWATI": "gclsaraswati@ozellar.com",
+    "GCL TAPI": "gcltapi@ozellar.com",
+    "GCL YAMUNA": "gclyamuna@ozellar.com",
+}
 
 # Subject / display name keywords to canonical vessel names (including common typos)
 KEYWORD_TO_VESSEL = [
@@ -225,6 +254,8 @@ def _is_daily_work_done_subject(subject: str) -> bool:
     s = subject.lower()
     if any(w in s for w in ("weekly", "week ", "wk ")):
         return False
+    if "daily log" in s or "log template" in s:
+        return True
     return ("daily" in s and "work" in s) or "work done" in s or "workdone" in s
 
 
@@ -506,68 +537,101 @@ async def run_mail_fetcher(
         return 0
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
 
-    # 3. Page through recent messages in technical@ozellar.com (newest first)
+    # 3. Page through recent messages (newest first) in the shared technical mailbox
+    #    plus each vessel's own mailbox. Vessels often address their reports to a
+    #    person and CC only a TM distribution list (which has no readable mailbox),
+    #    so those mails never reach the shared mailbox but do sit in the vessel's
+    #    Sent Items.
     cutoff_dt = datetime.utcnow() - timedelta(days=days_back)
-    next_url = (
-        f"https://graph.microsoft.com/v1.0/users/{mailbox}/messages"
-        f"?$top=200&$orderby=receivedDateTime%20desc"
-        f"&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments"
+    scan_mailboxes: list[tuple[str, bool]] = [(mailbox, False)]
+    extra_cfg = getattr(settings, "MAIL_SCRAPE_EXTRA_MAILBOXES", None)
+    extra_boxes = (
+        [x.strip() for x in extra_cfg.split(",") if x.strip()]
+        if isinstance(extra_cfg, str) else DEFAULT_EXTRA_MAILBOXES
     )
+    for xbox in extra_boxes:
+        if all(xbox.lower() != mb.lower() for mb, _ in scan_mailboxes):
+            scan_mailboxes.append((xbox, False))
+    for vessel_key in vessel_imo_map:
+        vbox = VESSEL_TO_MAILBOX.get(vessel_key)
+        if vbox and all(vbox.lower() != mb.lower() for mb, _ in scan_mailboxes):
+            scan_mailboxes.append((vbox, True))
 
     candidate_messages: list[dict] = []
-    page_count = 0
-    stop_paging = False
+    seen_msg_keys: set[tuple[str, str]] = set()
 
-    while next_url and not stop_paging and page_count < 25:
-        page_count += 1
-        res = await asyncio.to_thread(requests.get, next_url, headers=headers, timeout=30)
-        if res.status_code != 200:
-            logger.error(f"[MAIL-FETCH] Failed to list messages on page {page_count}: {res.status_code} {res.text[:300]}")
-            break
+    for scan_box, sent_only in scan_mailboxes:
+        next_url = (
+            f"https://graph.microsoft.com/v1.0/users/{scan_box}/messages"
+            f"?$top=200&$orderby=receivedDateTime%20desc"
+            f"&$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,hasAttachments"
+        )
+        page_count = 0
+        stop_paging = False
 
-        data = res.json()
-        msgs = data.get("value", [])
-        if not msgs:
-            break
+        while next_url and not stop_paging and page_count < 25:
+            page_count += 1
+            res = await asyncio.to_thread(requests.get, next_url, headers=headers, timeout=30)
+            if res.status_code != 200:
+                logger.error(f"[MAIL-FETCH] Failed to list messages in {scan_box} page {page_count}: {res.status_code} {res.text[:300]}")
+                break
 
-        older_count_on_page = 0
-        for m in msgs:
-            recv_str = m.get("receivedDateTime")
-            recv_dt = None
-            if recv_str:
-                try:
-                    recv_dt = datetime.fromisoformat(recv_str.replace("Z", "+00:00")).replace(tzinfo=None)
-                except Exception:
-                    pass
+            data = res.json()
+            msgs = data.get("value", [])
+            if not msgs:
+                break
 
-            if recv_dt and recv_dt < cutoff_dt:
-                older_count_on_page += 1
-                continue
+            older_count_on_page = 0
+            for m in msgs:
+                recv_str = m.get("receivedDateTime")
+                recv_dt = None
+                if recv_str:
+                    try:
+                        recv_dt = datetime.fromisoformat(recv_str.replace("Z", "+00:00")).replace(tzinfo=None)
+                    except Exception:
+                        pass
 
-            if not m.get("hasAttachments"):
-                continue
+                if recv_dt and recv_dt < cutoff_dt:
+                    older_count_on_page += 1
+                    continue
 
-            subj = m.get("subject") or ""
-            if not _is_daily_work_done_subject(subj):
-                continue
+                if not m.get("hasAttachments"):
+                    continue
 
-            vessel_name = _resolve_vessel_from_message(m)
-            if not vessel_name:
-                logger.debug(f"[MAIL-FETCH] Could not identify vessel for email: '{subj}'")
-                continue
+                subj = m.get("subject") or ""
+                if not _is_daily_work_done_subject(subj):
+                    continue
 
-            if vessel_name.upper() not in vessel_imo_map:
-                logger.debug(f"[MAIL-FETCH] Skipping email for unconfigured/filtered vessel {vessel_name}: '{subj}'")
-                continue
+                # In a vessel mailbox only take mails the vessel itself sent
+                if sent_only:
+                    from_addr = (((m.get("from") or {}).get("emailAddress") or {}).get("address") or "").lower()
+                    if from_addr != scan_box.lower():
+                        continue
 
-            m["_resolved_vessel"] = vessel_name.upper()
-            m["_received_dt"] = recv_dt or datetime.utcnow()
-            candidate_messages.append(m)
+                vessel_name = _resolve_vessel_from_message(m)
+                if not vessel_name:
+                    logger.debug(f"[MAIL-FETCH] Could not identify vessel for email: '{subj}'")
+                    continue
 
-        if older_count_on_page >= max(1, len(msgs) // 2):
-            stop_paging = True
+                if vessel_name.upper() not in vessel_imo_map:
+                    logger.debug(f"[MAIL-FETCH] Skipping email for unconfigured/filtered vessel {vessel_name}: '{subj}'")
+                    continue
 
-        next_url = data.get("@odata.nextLink")
+                # Same mail can sit in several mailboxes (To/CC copies)
+                dedup_key = (subj.strip().lower(), (recv_str or "")[:16])
+                if dedup_key in seen_msg_keys:
+                    continue
+                seen_msg_keys.add(dedup_key)
+
+                m["_resolved_vessel"] = vessel_name.upper()
+                m["_received_dt"] = recv_dt or datetime.utcnow()
+                m["_mailbox"] = scan_box
+                candidate_messages.append(m)
+
+            if older_count_on_page >= max(1, len(msgs) // 2):
+                stop_paging = True
+
+            next_url = data.get("@odata.nextLink")
 
     logger.info(f"[MAIL-FETCH] Found {len(candidate_messages)} candidate Daily Work Done email(s) within last {days_back} days.")
 
@@ -585,7 +649,7 @@ async def run_mail_fetcher(
 
         sender_email = (((m.get("from") or {}).get("emailAddress") or {}).get("address") or "").strip()
 
-        docs, raw_att_names = await asyncio.to_thread(_fetch_message_documents, headers, mailbox, msg_id)
+        docs, raw_att_names = await asyncio.to_thread(_fetch_message_documents, headers, m["_mailbox"], msg_id)
         if not docs:
             logger.info(f"[MAIL-FETCH] Skipping email with 0 valid report documents: '{subj}'")
             continue

@@ -1,13 +1,14 @@
 // src/modules/reports/features/shore/EventsGrid.jsx
 // Overview "Events" tab: logbook column (rows) x vessel (columns), with
-// today to last 5 days of Vessel_Performance noon-report values per vessel.
+// the last 5 Vessel_Performance logbook events per vessel (each log row is an event, a day with
+// no report counts as one "Missing" event).
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Layers, FileWarning, AlertCircle, Search, X, CalendarDays, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { reportsApi } from '../../api/reportsApi';
 import '../../styles/EventsCells.css';
 
-const DAYS = 5;
+const EVENTS = 5;
 const SOURCES = [
   { id: 'mari_apps', label: 'MariApps' },
   { id: 'wni', label: 'WNI' },
@@ -41,6 +42,7 @@ function parseIso(iso) {
 export default function EventsGrid({ vessels, search, setSearch }) {
   const [source, setSource] = useState('mari_apps');
   const [anchor, setAnchor] = useState(null); // null = today (latest)
+  const [page, setPage] = useState(0); // 0 = newest EVENTS events; n = n pages further back
   const [selected, setSelected] = useState(() => new Set()); // highlighted rows
   // Plain click = single select (click again to clear); Shift+click = add/remove for multi select.
   const toggleRow = (key, e) => setSelected(prev => {
@@ -59,29 +61,23 @@ export default function EventsGrid({ vessels, search, setSearch }) {
     return () => clearInterval(t);
   }, []);
   const activeEndIso = anchor || todayIso;
-  const isAtLatest = !anchor || anchor >= todayIso;
+  const isAtLatest = page === 0 && (!anchor || anchor >= todayIso);
 
   const { data, isLoading, isPlaceholderData, error } = useQuery({
-    queryKey: ['events-logbook', source, activeEndIso],
-    queryFn: () => reportsApi.getEventsLogbook({ source, days: DAYS, end_date: activeEndIso }),
+    queryKey: ['events-logbook', source, activeEndIso, page],
+    queryFn: () => reportsApi.getEventsLogbook({ source, limit: EVENTS, offset: page * EVENTS, end_date: activeEndIso }),
     refetchInterval: 60000,
-    // keep the previous days on screen while paging, but never show the other source's columns
+    // keep the previous events on screen while paging, but never show the other source's columns
     placeholderData: (prev, prevQuery) => (prevQuery?.queryKey?.[1] === source ? prev : undefined),
   });
 
-  const shiftAnchor = (delta) => {
-    const base = parseIso(anchor || todayIso);
-    base.setDate(base.getDate() + delta);
-    const iso = toIso(base);
-    if (delta > 0 && iso >= todayIso) setAnchor(null);
-    else setAnchor(iso);
-  };
   const onPickDate = (e) => {
     const v = e.target.value;
     if (!v) return;
-    if (v >= todayIso) setAnchor(null);
-    else setAnchor(v);
+    setPage(0);
+    setAnchor(v >= todayIso ? null : v);
   };
+  const resetLatest = () => { setAnchor(null); setPage(0); };
 
   const byImo = useMemo(() => {
     const m = {};
@@ -95,31 +91,39 @@ export default function EventsGrid({ vessels, search, setSearch }) {
     return m;
   }, [data]);
 
-  // Target 5 calendar days ending on activeEndIso, oldest -> newest.
-  // Every vessel shows these same 5 dates.
-  const targetDays = useMemo(() => {
-    const end = parseIso(activeEndIso);
-    const days = [];
-    for (let i = DAYS - 1; i >= 0; i--) {
-      const d = new Date(end);
-      d.setDate(d.getDate() - i);
-      days.push(toIso(d));
-    }
-    return days;
-  }, [activeEndIso]);
-
-  const dayCols = useMemo(() => {
+  // Each vessel shows its own last EVENTS events, oldest -> newest. Every logbook row is one event
+  // (a day with 3 rows = 3 events) and a day with no report is one "Missing" event.
+  const slotCols = useMemo(() => {
     const out = {};
     vessels.forEach(v => {
-      out[v.imo] = targetDays;
+      let evs = byImo[v.imo];
+      if (!evs && !isPlaceholderData) {
+        // vessel has no logbook rows at all: every day back from the end date is a missing event
+        evs = [];
+        const day = parseIso(activeEndIso);
+        day.setDate(day.getDate() - page * EVENTS);
+        while (evs.length < EVENTS && evs.length < 60) {
+          const iso = toIso(day);
+          if (iso < todayIso) evs.unshift({ _missing: true, _ts: iso });
+          day.setDate(day.getDate() - 1);
+        }
+        evs = evs.slice(-EVENTS);
+      }
+      evs = evs || [];
+      const slots = evs.map((ev, i) => ({
+        ev,
+        dayStart: i === 0 || evs[i - 1]._ts.slice(0, 10) !== ev._ts.slice(0, 10),
+      }));
+      while (slots.length < EVENTS) slots.push({ ev: null, dayStart: slots.length === 0 });
+      out[v.imo] = slots;
     });
     return out;
-  }, [vessels, targetDays]);
+  }, [vessels, byImo, isPlaceholderData, activeEndIso, page, todayIso]);
 
-  const rangeLabel = useMemo(() => {
-    if (targetDays.length === 0) return '';
-    return `${fmtDay(targetDays[0])} – ${fmtDay(targetDays[targetDays.length - 1])}`;
-  }, [targetDays]);
+  const totalCols = vessels.length * EVENTS;
+
+  const rangeLabel = anchor ? `Up to ${fmtDay(anchor)}` : 'Latest 5 events';
+  const pageLabel = page === 0 ? '' : ` · ${page * EVENTS + 1}–${(page + 1) * EVENTS} back`;
 
   const sections = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -131,7 +135,7 @@ export default function EventsGrid({ vessels, search, setSearch }) {
     })).filter(s => s.cols.length > 0);
   }, [data, search]);
 
-  const totalCols = vessels.length * DAYS;
+  
 
   return (
     <>
@@ -142,20 +146,20 @@ export default function EventsGrid({ vessels, search, setSearch }) {
               <button
                 key={s.id}
                 className={`ovw-freq-tab ${source === s.id ? 'active' : ''}`}
-                onClick={() => { setSource(s.id); setAnchor(null); }}
+                onClick={() => { setSource(s.id); resetLatest(); }}
               >
                 {s.label}
               </button>
             ))}
           </div>
           <div className="ovw-daily-nav-group">
-            <button type="button" className="ovw-nav-arrow-btn" onClick={() => shiftAnchor(-DAYS)} title="Previous 5 days">
+            <button type="button" className="ovw-nav-arrow-btn" onClick={() => setPage(p => p + 1)} title="Previous 5 events">
               <ChevronLeft size={14} />
             </button>
             <label className="ovw-compact-select ovw-daily-picker-label" title="Click to pick an end date">
               <span className="ovw-compact-select-icon"><CalendarDays size={13} /></span>
               <span className="ovw-compact-select-value">
-                {rangeLabel || 'Latest 5 days'}
+                {rangeLabel}{pageLabel}
               </span>
               <input
                 type="date"
@@ -168,14 +172,14 @@ export default function EventsGrid({ vessels, search, setSearch }) {
             <button
               type="button"
               className="ovw-nav-arrow-btn"
-              onClick={() => shiftAnchor(DAYS)}
-              disabled={isAtLatest}
-              title={isAtLatest ? 'Already at latest' : 'Next 5 days'}
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              title={page === 0 ? 'Already at latest' : 'Next 5 events'}
             >
               <ChevronRight size={14} />
             </button>
             {!isAtLatest && (
-              <button type="button" className="ovw-reset-latest-btn" onClick={() => setAnchor(null)} title="Jump back to today (latest)">
+              <button type="button" className="ovw-reset-latest-btn" onClick={resetLatest} title="Jump back to the latest events">
                 <RotateCcw size={11} style={{ marginRight: 4 }} />
                 Latest
               </button>
@@ -191,7 +195,7 @@ export default function EventsGrid({ vessels, search, setSearch }) {
               <strong>{vessels.length}</strong>&nbsp;vessels
             </span>
             <span className="ovw-stat-pill">
-              Latest <strong>&nbsp;{DAYS}&nbsp;</strong> days of noon reports
+              Last <strong>&nbsp;{EVENTS}&nbsp;</strong> events per vessel
             </span>
           </div>
         </div>
@@ -249,7 +253,7 @@ export default function EventsGrid({ vessels, search, setSearch }) {
                     </div>
                   </th>
                   {vessels.map((v, vi) => (
-                    <th key={v.imo} className={`ovw-th-vessel${vi % 2 ? ' grp-odd' : ''}`} colSpan={DAYS}>
+                    <th key={v.imo} className={`ovw-th-vessel${vi % 2 ? ' grp-odd' : ''}`} colSpan={slotCols[v.imo].length}>
                       <div className="ovw-th-vessel-inner">
                         <span className="ovw-vessel-name">{v.name}</span>
                         <span className="ovw-vessel-imo">IMO {v.imo}</span>
@@ -262,17 +266,18 @@ export default function EventsGrid({ vessels, search, setSearch }) {
                 </tr>
                 <tr className="ovw-thead-row2">
                   {vessels.map((v, vi) =>
-                    dayCols[v.imo].map((d) => {
-                      // not marked while the new window is still loading, nor for today (report may still be due)
-                      const missing = !isPlaceholderData && d !== todayIso && !byImo[v.imo]?.[d];
+                    slotCols[v.imo].map((sl, i) => {
+                      const ts = sl.ev?._ts;
+                      const isToday = ts?.slice(0, 10) === todayIso;
                       return (
                         <th
-                          key={`${v.imo}-${d}`}
-                          className={`ovw-th-week${d === todayIso ? ' ovw-th-week-current' : ''}${vi % 2 ? ' grp-odd' : ''}`}
+                          key={`${v.imo}-${i}`}
+                          className={`ovw-th-week${isToday ? ' ovw-th-week-current' : ''}${vi % 2 ? ' grp-odd' : ''}`}
+                          title={ts || ''}
                         >
-                          {fmtDay(d)}
-                          {d === todayIso && <span className="ovw-current-week-dot" />}
-                          {missing && <span className="ev-missing-tag">Missing</span>}
+                          {ts && fmtDay(ts.slice(0, 10))}
+                          {isToday && <span className="ovw-current-week-dot" />}
+                          {sl.ev?._missing && <span className="ev-missing-tag">Missing</span>}
                         </th>
                       );
                     })
@@ -303,15 +308,15 @@ export default function EventsGrid({ vessels, search, setSearch }) {
                           {c.unit && <span className="ev-unit">{c.unit}</span>}
                         </td>
                         {vessels.map((v, vi) =>
-                          dayCols[v.imo].map((d, i) => {
-                            const missingDay = !isPlaceholderData && d !== todayIso && !byImo[v.imo]?.[d];
-                            const val = fmtValue(byImo[v.imo]?.[d]?.[c.db_column]);
+                          slotCols[v.imo].map((sl, i) => {
+                            const missingDay = !!sl.ev?._missing;
+                            const val = fmtValue(sl.ev?.[c.db_column]);
                             const empty = val === '-';
                             const isNum = !empty && /^-?\d+(\.\d+)?$/.test(val);
                             return (
                               <td
-                                key={`${v.imo}-${d}`}
-                                className={`ovw-td-cell ovw-td-week ovw-ev-cell${i === 0 ? ' first' : ''}${empty ? ' empty' : ''}${missingDay ? ' missing' : ''}${!empty && !isNum ? ' text' : ''}${vi % 2 ? ' grp-odd' : ''}`}
+                                key={`${v.imo}-${i}`}
+                                className={`ovw-td-cell ovw-td-week ovw-ev-cell${sl.dayStart ? ' first' : ''}${empty ? ' empty' : ''}${missingDay ? ' missing' : ''}${!empty && !isNum ? ' text' : ''}${vi % 2 ? ' grp-odd' : ''}`}
                                 title={empty ? '' : val}
                               >
                                 {!empty && !isNum ? <span className="ev-pill">{val}</span> : val}

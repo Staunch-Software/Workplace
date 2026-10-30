@@ -25,6 +25,8 @@ const FREQUENCIES = [
   { id: 'WEEKLY',    label: 'Weekly' },
   { id: 'MONTHLY',  label: 'Monthly' },
   { id: 'QUARTERLY',label: 'Quarterly' },
+  { id: 'HALF_YEARLY', label: 'Half-Yearly' },
+  { id: 'YEARLY', label: 'Yearly' },
 ];
 
 const MONTH_NAMES = [
@@ -37,12 +39,20 @@ const MONTH_NAMES = [
 const REPORT_COL_W = 260;
 const BASE_WEEK_COL_W = 88;
 const BASE_STD_COL_W = 150;
+// Floor for Monthly / Quarterly / Half-Yearly / Yearly vessel columns (same as the design width; they only grow, never shrink).
+const MIN_STD_COL_W = BASE_STD_COL_W;
+const STD_COLS_PER_VIEW = 6;
 
 const QUARTERS = [
   { id: 0, label: 'Q1', sub: 'Jan – Mar' },
   { id: 1, label: 'Q2', sub: 'Apr – Jun' },
   { id: 2, label: 'Q3', sub: 'Jul – Sep' },
   { id: 3, label: 'Q4', sub: 'Oct – Dec' },
+];
+
+const HALVES = [
+  { id: 0, label: 'H1', sub: 'Jan – Jun' },
+  { id: 1, label: 'H2', sub: 'Jul – Dec' },
 ];
 
 /* ─── Helpers ───────────────────────────────────────────────────────────── */
@@ -71,6 +81,13 @@ function reportDate(r) {
   return d ? new Date(d) : null;
 }
 
+
+// Date shown on a cell / in the preview. Half-yearly and yearly reports show the day the job was completed (job end date).
+function displayDate(r) {
+  const f = normalizeFreq(r.frequency);
+  if ((f === 'HALF_YEARLY' || f === 'YEARLY') && r.job_end_date) return new Date(r.job_end_date);
+  return reportDate(r);
+}
 
 function hasValidAttachment(attachments) {
   return Array.isArray(attachments) && attachments.some(a => a.blob_path && !a.blob_path.startsWith('MISSING:'));
@@ -127,7 +144,7 @@ function toIsoDate(d) {
   return `${y}-${m}-${day}`;
 }
 
-function buildBuckets(frequency, year, monthIdx, quarterIdx, dailyEndDate = null, isAtLatest = true) {
+function buildBuckets(frequency, year, monthIdx, quarterIdx, dailyEndDate = null, isAtLatest = true, halfIdx = 0) {
   if (frequency === 'DAILY') {
     const refDate = dailyEndDate instanceof Date ? dailyEndDate : new Date();
 
@@ -166,6 +183,25 @@ function buildBuckets(frequency, year, monthIdx, quarterIdx, dailyEndDate = null
       label: MONTH_NAMES[monthIdx],
       start: new Date(year, monthIdx, 1),
       end: new Date(year, monthIdx, lastDay, 23, 59, 59),
+    }];
+  }
+  if (frequency === 'HALF_YEARLY') {
+    const startMonth = halfIdx * 6;
+    const endMonth = startMonth + 5;
+    const lastDay = new Date(year, endMonth + 1, 0).getDate();
+    return [{
+      key: 'h1',
+      label: `H${halfIdx + 1}`,
+      start: new Date(year, startMonth, 1),
+      end: new Date(year, endMonth, lastDay, 23, 59, 59),
+    }];
+  }
+  if (frequency === 'YEARLY') {
+    return [{
+      key: 'y1',
+      label: `${year}`,
+      start: new Date(year, 0, 1),
+      end: new Date(year, 11, 31, 23, 59, 59),
     }];
   }
   const startMonth = quarterIdx * 3;
@@ -320,10 +356,37 @@ function CompactSelect({ icon, value, options, onChange }) {
   );
 }
 
+/* Dark year pill; click opens a dropdown of the years that have data. */
+function YearChip({ value, options, onChange }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="ovw-year-chip ovw-year-chip--btn" onClick={() => setOpen(o => !o)}>
+      {value}
+      <ChevronDown size={12} className={`ovw-compact-chevron ${open ? 'open' : ''}`} />
+      {open && (
+        <>
+          <div className="ovw-dropdown-overlay" onClick={e => { e.stopPropagation(); setOpen(false); }} />
+          <div className="ovw-dropdown">
+            {options.map(o => (
+              <div
+                key={o.id}
+                className={`ovw-option ${o.id === value ? 'active' : ''}`}
+                onClick={e => { e.stopPropagation(); onChange(o.id); setOpen(false); }}
+              >
+                <span>{o.label}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </span>
+  );
+}
+
 function AttachmentPreviewModal({ report, onClose }) {
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
   if (!report) return null;
-  const date = reportDate(report);
+  const date = displayDate(report);
   return (
     <div className="rt-modal-backdrop" onClick={onClose}>
       <div className="rt-modal-container ovw-preview-modal" onClick={e => e.stopPropagation()}>
@@ -367,7 +430,7 @@ function AttachmentIcon({ report, bucket, onOpen, viewerRole, showDate = true, s
     <button
       type="button"
       className={`ovw-chip ovw-chip-has ${isSeen ? 'ovw-chip-seen' : 'ovw-chip-new'}${!showDate ? ' ovw-chip-icon-only' : ''}`}
-      title={`${bucket?.label || ''}: ${fmtDateShort(reportDate(report))} — ${isSeen ? 'Viewed' : 'New'} attachment`}
+      title={`${bucket?.label || ''}: ${fmtDateShort(displayDate(report))} — ${isSeen ? 'Viewed' : 'New'} attachment`}
       onClick={() => onOpen(report)}
     >
       <span className="ovw-chip-has-icon">
@@ -378,7 +441,7 @@ function AttachmentIcon({ report, bucket, onOpen, viewerRole, showDate = true, s
           </span>
         )}
       </span>
-      {showDate && <span>{fmtDateShort(reportDate(report))}</span>}
+      {showDate && <span>{fmtDateShort(displayDate(report))}</span>}
     </button>
   );
 }
@@ -426,9 +489,10 @@ export default function OverviewPage() {
   const queryClient = useQueryClient();
   const now = new Date();
   const [frequency, setFrequency] = useState('WEEKLY');
-  const [year] = useState(now.getFullYear());
+  const [year, setYear] = useState(now.getFullYear());
   const [monthIdx, setMonthIdx] = useState(now.getMonth());
   const [quarterIdx, setQuarterIdx] = useState(Math.floor(now.getMonth() / 3));
+  const [halfIdx, setHalfIdx] = useState(Math.floor(now.getMonth() / 6));
   const [search, setSearch] = useState('');
   const [previewReport, setPreviewReport] = useState(null);
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
@@ -567,8 +631,8 @@ export default function OverviewPage() {
   }, [configs, frequency]);
 
   const buckets = useMemo(
-    () => buildBuckets(frequency, year, monthIdx, quarterIdx, activeDailyEnd, isAtLatestDaily),
-    [frequency, year, monthIdx, quarterIdx, activeDailyEnd, isAtLatestDaily]
+    () => buildBuckets(frequency, year, monthIdx, quarterIdx, activeDailyEnd, isAtLatestDaily, halfIdx),
+    [frequency, year, monthIdx, quarterIdx, activeDailyEnd, isAtLatestDaily, halfIdx]
   );
 
   const instanceIndex = useMemo(() => {
@@ -613,9 +677,17 @@ export default function OverviewPage() {
 
   const handleMonthChange = useCallback((v) => setMonthIdx(v), []);
   const handleQuarterChange = useCallback((v) => setQuarterIdx(v), []);
+  const handleHalfChange = useCallback((v) => setHalfIdx(v), []);
 
   const monthOptions = MONTH_NAMES.map((m, i) => ({ id: i, label: m }));
   const quarterOptions = QUARTERS.map(q => ({ id: q.id, label: q.label, sub: q.sub }));
+  const halfOptions = HALVES.map(h => ({ id: h.id, label: h.label, sub: h.sub }));
+  // Years that actually have reports (so a future year such as 2027 shows up once it has data), plus the current year.
+  const yearOptions = useMemo(() => {
+    const years = new Set([now.getFullYear()]);
+    reports.forEach(r => { const d = reportDate(r); if (d && !isNaN(d)) years.add(d.getFullYear()); });
+    return Array.from(years).sort((a, b) => b - a).map(y => ({ id: y, label: String(y) }));
+  }, [reports]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Stat counts ── */
   const isDaily = frequency === 'DAILY';
@@ -661,6 +733,8 @@ export default function OverviewPage() {
         return `${m.getFullYear()}-${pad(m.getMonth() + 1)}-${pad(m.getDate())}`;
       }
       if (frequency === 'MONTHLY') return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+      if (frequency === 'HALF_YEARLY') return `${d.getFullYear()}-H${Math.floor(d.getMonth() / 6)}`;
+      if (frequency === 'YEARLY') return `${d.getFullYear()}`;
       return `${d.getFullYear()}-Q${Math.floor(d.getMonth() / 3)}`;
     };
     const step = d => {
@@ -668,6 +742,8 @@ export default function OverviewPage() {
       if (frequency === 'DAILY') n.setDate(n.getDate() + 1);
       else if (frequency === 'WEEKLY') n.setDate(n.getDate() + 7);
       else if (frequency === 'MONTHLY') { n.setDate(1); n.setMonth(n.getMonth() + 1); }
+      else if (frequency === 'HALF_YEARLY') { n.setDate(1); n.setMonth(n.getMonth() + 6); }
+      else if (frequency === 'YEARLY') { n.setDate(1); n.setMonth(0); n.setFullYear(n.getFullYear() + 1); }
       else { n.setDate(1); n.setMonth(n.getMonth() + 3); }
       return n;
     };
@@ -680,6 +756,8 @@ export default function OverviewPage() {
         return `${fmtDateShort(m)} – ${fmtDateShort(e)}`;
       }
       if (frequency === 'MONTHLY') return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+      if (frequency === 'HALF_YEARLY') return `H${Math.floor(d.getMonth() / 6) + 1} ${d.getFullYear()}`;
+      if (frequency === 'YEARLY') return `${d.getFullYear()}`;
       return `Q${Math.floor(d.getMonth() / 3) + 1} ${d.getFullYear()}`;
     };
     const today = new Date();
@@ -725,7 +803,7 @@ export default function OverviewPage() {
     Object.keys(stats).forEach(k => { stats[k] = withPct(stats[k]); life[k] = withPct(life[k]); });
     Object.values(stats).forEach(st => { overall.done += st.done; overall.expected += st.expected; });
     Object.values(stats).forEach(st => st.items.sort((x, y) => y.labels.length - x.labels.length));
-    const prefix = { DAILY: 'Today', WEEKLY: 'This week', MONTHLY: 'This month', QUARTERLY: 'This quarter' }[frequency];
+    const prefix = { DAILY: 'Today', WEEKLY: 'This week', MONTHLY: 'This month', QUARTERLY: 'This quarter', HALF_YEARLY: 'This half-year', YEARLY: 'This year' }[frequency];
     return { overall: withPct(overall), byVessel: stats, lifeByVessel: life, periodTitle: prefix, periodLabel: labelOf(today) };
   }, [frequency, reportNames, vessels, instanceIndex, configuredPairs]);
 
@@ -745,6 +823,7 @@ export default function OverviewPage() {
   // back to the CSS defaults and the table scrolls horizontally as usual.
   const scrollRef = useRef(null);
   const [dataColWidth, setDataColWidth] = useState(null);
+  const [reportColWidth, setReportColWidth] = useState(REPORT_COL_W);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -755,9 +834,15 @@ export default function OverviewPage() {
 
     const recompute = () => {
       if (totalDataCols === 0) { setDataColWidth(null); return; }
-      const available = el.clientWidth - REPORT_COL_W;
-      const ideal = Math.floor(available / totalDataCols);
-      setDataColWidth(ideal > baseWidth ? ideal : null);
+      // The report column width comes from CSS (it shrinks on narrower screens, see the media queries in OverviewPage.css).
+      const reportW = parseInt(getComputedStyle(el).getPropertyValue('--ovw-col-report-w'), 10) || REPORT_COL_W;
+      setReportColWidth(reportW);
+      const available = el.clientWidth - reportW;
+      const shrinkable = !hasSubCols;
+      // Standard tabs: size the vessel columns so STD_COLS_PER_VIEW fit on screen (fewer vessels just fill the width); the rest scroll sideways.
+      const ideal = Math.floor(available / (shrinkable ? Math.min(STD_COLS_PER_VIEW, totalDataCols) : totalDataCols));
+      if (shrinkable) setDataColWidth(Math.max(MIN_STD_COL_W, ideal));
+      else setDataColWidth(ideal > baseWidth ? ideal : null);
     };
 
     recompute();
@@ -769,7 +854,8 @@ export default function OverviewPage() {
   const totalDataColsForWidth = hasSubCols ? vessels.length * buckets.length : vessels.length;
   const baseWidthForWidth = isWeekly ? BASE_WEEK_COL_W : (isDaily ? 76 : BASE_STD_COL_W);
   const actualDataColWidth = dataColWidth || baseWidthForWidth;
-  const totalTableWidth = REPORT_COL_W + (totalDataColsForWidth * actualDataColWidth);
+  const totalTableWidth = reportColWidth + (totalDataColsForWidth * actualDataColWidth);
+  const isCompactCols = !hasSubCols && actualDataColWidth < BASE_STD_COL_W;
 
   return (
     <div className="rt-root ovw-root">
@@ -826,19 +912,21 @@ export default function OverviewPage() {
             <Download size={14} />
             Download Reports
           </button>
+        </div>
+      </div>
 
-          {/* ── Frequency Pill Tabs ── */}
-          <div className="ovw-freq-tabs">
-            {FREQUENCIES.map(f => (
-              <button
-                key={f.id}
-                className={`ovw-freq-tab ${frequency === f.id ? 'active' : ''}`}
-                onClick={() => setFrequency(f.id)}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+      {/* ── Frequency Pill Tabs (second row) ── */}
+      <div className="ovw-tabs-row">
+        <div className="ovw-freq-tabs">
+          {FREQUENCIES.map(f => (
+            <button
+              key={f.id}
+              className={`ovw-freq-tab ${frequency === f.id ? 'active' : ''}`}
+              onClick={() => setFrequency(f.id)}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -848,7 +936,11 @@ export default function OverviewPage() {
       {/* ── Control Bar ── */}
       <div className="ovw-control-bar">
         <div className="ovw-control-left">
-          <span className="ovw-year-chip">{displayYear}</span>
+          {frequency !== 'DAILY' && yearOptions.length > 1 ? (
+            <YearChip value={year} options={yearOptions} onChange={setYear} />
+          ) : (
+            <span className="ovw-year-chip">{displayYear}</span>
+          )}
 
           {frequency === 'QUARTERLY' ? (
             <CompactSelect
@@ -857,7 +949,15 @@ export default function OverviewPage() {
               options={quarterOptions}
               onChange={handleQuarterChange}
             />
-          ) : frequency === 'DAILY' ? (
+          ) : frequency === 'HALF_YEARLY' ? (
+            <CompactSelect
+              icon={<CalendarDays size={13} />}
+              value={halfIdx}
+              options={halfOptions}
+              onChange={handleHalfChange}
+            />
+          ) : frequency === 'YEARLY' ? null
+          : frequency === 'DAILY' ? (
             <div className="ovw-daily-nav-group">
               <button
                 type="button"
@@ -993,7 +1093,7 @@ export default function OverviewPage() {
               '--ovw-cell-week-w': `${actualDataColWidth}px`,
             } : undefined)}
           >
-            <table className="ovw-table" style={{ width: `${totalTableWidth}px` }}>
+            <table className={`ovw-table${isCompactCols ? ' ovw-table--compact' : ''}`} style={{ width: `${totalTableWidth}px` }}>
               <colgroup>
                 <col style={{ width: 'var(--ovw-col-report-w)', minWidth: 'var(--ovw-col-report-w)', maxWidth: 'var(--ovw-col-report-w)' }} />
                 {vessels.flatMap(v => 

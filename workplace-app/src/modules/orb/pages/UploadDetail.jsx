@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useNavigate } from '../hooks/useOrbNavigate';
-import { RefreshCw, FileText, FileSpreadsheet, Download, Ship, User, CalendarClock, ListChecks, Layers, Copy, AlertTriangle, CheckCircle2, XCircle, Table2, ClipboardList, Anchor } from 'lucide-react';
+import { MessageSquare, RefreshCw, FileText, FileSpreadsheet, Download, Ship, User, CalendarClock, ListChecks, Layers, Copy, AlertTriangle, CheckCircle2, XCircle, Table2, ClipboardList, Anchor } from 'lucide-react';
 import Sidebar from '../components/Layout/Sidebar';
 import Header from '../components/Layout/Header';
 import Badge from '../components/shared/Badge';
@@ -9,7 +9,10 @@ import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import api from '../api/axiosOrb';
 import { useAuth } from '../context/AuthContext';
+import AlertModal from '../components/alerts/AlertModal';
+import SourceEntryDetail from '../components/alerts/SourceEntryDetail';
 import './UploadDetail.css';
+import { fmtDateTime } from '../utils/time';
 
 const TABS = ['Entries', 'Alerts', 'Daily Log'];
 
@@ -61,20 +64,23 @@ export default function UploadDetail() {
   const [logLoading, setLogLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('Entries');
   const [preview, setPreview] = useState(null); // { url, loading }
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
+  const [openAlertId, setOpenAlertId] = useState(null);   // alert whose Source ORB Entry is expanded
+  const [modalAlert, setModalAlert] = useState(null);     // alert open in the popup
+  const [modalAction, setModalAction] = useState(null);     // resolution box to open with it
   const [reprocessing, setReprocessing] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
       const [u, e, a] = await Promise.all([
         api.get(`/api/uploads/${id}`),
         api.get(`/api/uploads/${id}/entries`),
-        api.get(`/api/alerts?is_resolved=false`),
+        api.get(`/api/uploads/${id}/alerts?is_resolved=false`),
       ]);
       setUpload(u.data.data);
       setEntries(e.data.data || []);
-      setAlerts((a.data.data || []).filter(al => al.vessel_id === u.data.data?.vessel_id));
+      setAlerts(a.data.data || []);
     } finally {
       setLoading(false);
     }
@@ -98,11 +104,6 @@ export default function UploadDetail() {
   useEffect(() => {
     if (activeTab === 'Daily Log') loadDailyLog();
   }, [activeTab]);
-
-  const resolveAlert = async (alertId) => {
-    await api.patch(`/api/alerts/${alertId}/resolve`, { notes: '' });
-    load();
-  };
 
   const openPreview = async () => {
     setPreview({ url: null, loading: true });
@@ -129,6 +130,20 @@ export default function UploadDetail() {
       await load();
     } catch (err) {
       window.alert(err.response?.data?.detail || 'Could not start re-extraction');
+    } finally {
+      setReprocessing(false);
+    }
+  };
+
+  // TEMPORARY (testing only): re-apply post-processing to the saved extraction -- no Gemini cost.
+  const reprocessSaved = async () => {
+    if (!window.confirm('Re-process this upload from its saved extraction?\n\nNo Gemini calls are made (no cost). Its current entries and their alerts are deleted and rebuilt with the latest repair and check rules.')) return;
+    setReprocessing(true);
+    try {
+      await api.post(`/api/uploads/${id}/reprocess-saved`);
+      await load();
+    } catch (err) {
+      window.alert(err.response?.data?.detail || 'Could not start re-processing');
     } finally {
       setReprocessing(false);
     }
@@ -203,7 +218,7 @@ export default function UploadDetail() {
                       <div className="ud-meta">
                         <span className="ud-meta__item"><Ship size={15} />Vessel: <strong>{upload.vessel_name}</strong></span>
                         <span className="ud-meta__item"><User size={15} />Uploaded by: <strong>{upload.uploader_name}</strong></span>
-                        <span className="ud-meta__item"><CalendarClock size={15} />{new Date(upload.created_at).toLocaleString()}</span>
+                        <span className="ud-meta__item"><CalendarClock size={15} />{fmtDateTime(upload.created_at)}</span>
                       </div>
                     </div>
                   </div>
@@ -213,9 +228,15 @@ export default function UploadDetail() {
                       Preview PDF
                     </button>
                     {isAdmin && ['completed', 'failed'].includes(upload.status) && (
+                      <button className="ud-btn ud-btn--secondary" onClick={reprocessSaved} disabled={reprocessing}
+                              title="Temporary testing option: re-apply the latest rules to the saved extraction (no Gemini cost)">
+                        <RefreshCw size={15} />Re-process saved (free)
+                      </button>
+                    )}
+                    {isAdmin && ['completed', 'failed', 'processing'].includes(upload.status) && (
                       <button className="ud-btn ud-btn--secondary" onClick={reprocess} disabled={reprocessing}
                               title="Temporary testing option: rebuild this upload's entries from the PDF">
-                        <RefreshCw size={15} />{reprocessing ? 'Starting…' : 'Re-run extraction'}
+                        <RefreshCw size={15} />{reprocessing ? 'Starting…' : (upload.status === 'processing' ? 'Re-run (if stuck)' : 'Re-run extraction')}
                       </button>
                     )}
                     {upload.status === 'completed' && (
@@ -382,28 +403,62 @@ export default function UploadDetail() {
                 {alerts.length === 0 ? (
                   <div className="ud-empty">
                     <span className="ud-empty__icon"><CheckCircle2 size={24} /></span>
-                    No open alerts for this vessel.
+                    No open alerts for this upload.
                   </div>
                 ) : (
                   <div className="ud-alerts">
-                    {alerts.map(a => (
-                      <div key={a.id} className={`ud-alert ${a.severity === 'critical' ? 'ud-alert--critical' : a.severity === 'major' ? 'ud-alert--major' : ''}`}>
-                        <div className="ud-alert__body">
-                          <div className="ud-alert__head">
-                            <Badge value={a.severity} />
-                            <span className="ud-alert__type">{a.alert_type.replace(/_/g, ' ')}</span>
-                            {a.page_number != null && (
-                              <span className="ud-alert__page">· Page {a.page_number}</span>
-                            )}
+                    {alerts.map(a => {
+                      const open = openAlertId === a.id;
+                      return (
+                        <div key={a.id} className="ud-alert-wrap">
+                          <div
+                            className={`ud-alert ${a.severity === 'critical' ? 'ud-alert--critical' : a.severity === 'major' ? 'ud-alert--major' : ''}${open ? ' ud-alert--open' : ''}`}
+                            role="button" tabIndex={0} aria-expanded={open}
+                            onClick={() => setOpenAlertId(open ? null : a.id)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenAlertId(open ? null : a.id); } }}
+                          >
+                            <div className="ud-alert__body">
+                              <div className="ud-alert__head">
+                                <Badge value={a.severity} />
+                                <span className="ud-alert__type">{a.alert_type.replace(/_/g, ' ')}</span>
+                                {a.status === 'PENDING_APPROVAL' && <Badge value="Pending approval" type="review" />}
+                                {a.page_number != null && (
+                                  <span className="ud-alert__page">· Page {a.page_number}</span>
+                                )}
+                              </div>
+                              <p className="ud-alert__msg">{a.message}</p>
+                            </div>
+                            <div className="ud-alert__actions">
+                              <button className="ud-btn ud-btn--secondary ud-btn--sm" title="Open the pages and the conversation"
+                                      onClick={(e) => { e.stopPropagation(); setModalAction(null); setModalAlert(a); }}>
+                                <MessageSquare size={13} />
+                                {a.thread_count > 0 ? ` ${a.thread_count}${a.unread_count > 0 ? ` · ${a.unread_count} new` : ''}` : ' Open'}
+                              </button>
+                              <button className="ud-btn ud-btn--secondary ud-btn--sm"
+                                      onClick={(e) => { e.stopPropagation(); setModalAction(a.status === 'PENDING_APPROVAL' ? null : 'resolve'); setModalAlert(a); }}>
+                                {a.status === 'PENDING_APPROVAL' ? 'Review' : 'Resolve'}
+                              </button>
+                            </div>
                           </div>
-                          <p className="ud-alert__msg">{a.message}</p>
+                          {open && <SourceEntryDetail alert={a} />}
                         </div>
-                        <button className="ud-btn ud-btn--secondary ud-btn--sm" onClick={() => resolveAlert(a.id)}>Resolve</button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
+            )}
+
+            {modalAlert && (
+              <AlertModal
+                alert={modalAlert}
+                vesselName={upload?.vessel_name}
+                isShore
+                currentUserId={user?.id}
+                startAction={modalAction}
+                onClose={() => { setModalAlert(null); setModalAction(null); load(true); }}
+                onChanged={() => load(true)}
+              />
             )}
 
             {/* ── Tab: Daily Log ── */}

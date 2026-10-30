@@ -2,7 +2,7 @@ import uuid
 from typing import Optional
 from sqlalchemy import String, Text, Integer, ForeignKey
 from sqlalchemy.orm import mapped_column, Mapped
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.models.base import Base, TimestampMixin
 
 
@@ -25,3 +25,5 @@ class OrbUpload(Base, TimestampMixin):
     # Duplicate detection
     file_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     duplicate_entries_skipped: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # How raw PDF pages were split for extraction (see services/alert_pages.py); NULL for older uploads.
+    page_map: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)

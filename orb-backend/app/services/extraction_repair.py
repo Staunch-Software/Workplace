@@ -16,7 +16,7 @@ import asyncio
 import logging
 import re
 
-from app.services.gemini_config import gemini_model, gemini_thinking_config
+from app.services.gemini_config import generate as gemini_generate
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +227,14 @@ def find_suspect_readings(entries: list[dict]) -> list[dict]:
     last: dict[str, tuple[int, float]] = {}
     suspects: list[dict] = []
     for idx, e in enumerate(entries):
+        # Only a sounding (Code C 11.x) or a weekly inventory (Code I) with ONE retained figure can
+        # be re-read unambiguously. A transfer entry carries two retained figures (source and
+        # destination tank) and the same tank can appear in several entries on one day -- the
+        # re-read then picks a neighbour's number (confirmed on AM KIRTI: 6 of 6 flags were false).
+        # Such entries still update the running balance below; they just are never second-guessed.
+        n_retained = sum(1 for q in e.get("quantities") or [] if _qty_type(q) == "retained")
+        item = _norm_item(e.get("item_number")) or ""
+        rereadable = n_retained == 1 and ((e.get("orb_code") == "C" and item.startswith("11")) or e.get("orb_code") == "I")
         for q in e.get("quantities") or []:
             if _qty_type(q) != "retained":
                 continue
@@ -242,7 +250,7 @@ def find_suspect_readings(entries: list[dict]) -> list[dict]:
                     for mq in entries[j].get("quantities") or []:
                         if _qty_type(mq) in _MOVEMENT_TYPES and tank in (_tank_key(mq.get("from_tank")), _tank_key(mq.get("to_tank"))):
                             moved = True
-                if not moved and abs(value - prev_val) > 0.004:
+                if rereadable and not moved and abs(value - prev_val) > 0.004:
                     kind = None
                     if abs(value - prev_val) <= SMALL_CHANGE_MAX:
                         kind = "small_unexplained_change"
@@ -288,6 +296,8 @@ def apply_reread(entry: dict, qty: dict, original: float, expected: float, rerea
         qty["qty_value"] = expected
         for field in ("operation_description", "raw_text"):
             entry[field], _ = _rewrite(entry.get(field) or "", original, expected)
+        for line in entry.get("item_lines") or []:      # the exports render these rows
+            line["text"], _ = _rewrite(line.get("text") or "", original, expected)
         note = (f" [re-read corrected {_fmt(original)} -> {_fmt(expected)}: a second reading of the page "
                 f"matches the preceding balance]")
         entry["operation_description"] = (entry.get("operation_description") or "") + note
@@ -305,8 +315,8 @@ def apply_reread(entry: dict, qty: dict, original: float, expected: float, rerea
 
 
 _REREAD_PROMPT = """This image is one page of a ship's handwritten Oil Record Book.
-Find the sounding / inventory entry for the tank "{tank}" dated {date} and read ONLY its
-RETAINED quantity (item 11.3, or the word RETAINED / RETD).
+Find {what} dated {date} and read ONLY its RETAINED quantity (the word RETAINED / RETD{item_hint}).
+Ignore every other figure on the page, including other tanks and other entries of the same day.
 Read it digit by digit and check whether a decimal point is actually drawn between two digits --
 whole numbers such as "13" or "24" are written WITHOUT a decimal point.
 Return JSON only:
@@ -316,7 +326,7 @@ Return JSON only:
   "legible": <true|false>}}"""
 
 
-def _call_value_reread(client, page_image, tank: str, date_str: str) -> dict | None:
+def _call_value_reread(client, page_image, tank: str, date_str: str, kind: str = "sounding") -> dict | None:
     import io as _io
     import json as _json
     from google.genai import types
@@ -324,18 +334,18 @@ def _call_value_reread(client, page_image, tank: str, date_str: str) -> dict | N
     buf = _io.BytesIO()
     page_image.save(buf, format="PNG")
     try:
-        response = client.models.generate_content(
-            model=gemini_model(),
-            contents=[
+        response = gemini_generate(
+            client, "value_reread",
+            [
                 types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
-                _REREAD_PROMPT.format(tank=tank, date=date_str),
+                _REREAD_PROMPT.format(
+                    what=(f'the Code I WEEKLY INVENTORY entry of the tank "{tank}"' if kind == "inventory"
+                          else f'the Code C item 11.1 sounding block of the tank "{tank}"'),
+                    date=date_str,
+                    item_hint=("" if kind == "inventory" else ", item 11.3"),
+                ),
             ],
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-                max_output_tokens=500,
-                response_mime_type="application/json",
-                thinking_config=gemini_thinking_config(types),
-            ),
+            light=True, small_output=500, temperature=0.0, response_mime_type="application/json",
         )
         data = _json.loads(response.text.strip())
         return data if isinstance(data, dict) else None
@@ -344,28 +354,55 @@ def _call_value_reread(client, page_image, tank: str, date_str: str) -> dict | N
         return None
 
 
-async def verify_suspect_readings(client, pages: list, entries: list[dict], timeout: float = 120, call_fn=None) -> dict:
-    """Re-read suspect retained figures on the page image. Never raises; returns counts."""
+REREAD_BUDGET_SECONDS = 300   # total time the whole pass may take
+REREAD_CONCURRENCY = 3        # calls in flight at once
+
+
+async def verify_suspect_readings(client, pages: list, entries: list[dict], timeout: float = 120, call_fn=None,
+                                  budget_seconds: float = REREAD_BUDGET_SECONDS,
+                                  concurrency: int = REREAD_CONCURRENCY) -> dict:
+    """Re-read suspect retained figures on the page image. Never raises; returns counts.
+
+    The pass has a total time budget: a slow model must not keep an upload in "processing"
+    for tens of minutes at the very end. Suspects not reached in time are left exactly as
+    extracted ("skipped") -- the alerts still flag them.
+    """
+    import time
+
     call = call_fn or _call_value_reread
-    stats = {"suspects": 0, "confirmed": 0, "corrected": 0, "flagged": 0, "unchanged": 0}
-    for s in find_suspect_readings(entries):
+    stats = {"suspects": 0, "confirmed": 0, "corrected": 0, "flagged": 0, "unchanged": 0, "skipped": 0}
+    deadline = time.monotonic() + budget_seconds
+    sem = asyncio.Semaphore(max(1, concurrency))
+
+    async def one(s: dict) -> None:
         entry = entries[s["entry_idx"]]
         page_no = entry.get("page_number") or 0
-        if not (1 <= page_no <= len(pages)):
-            continue
-        stats["suspects"] += 1
-        try:
-            reread = await asyncio.wait_for(
-                asyncio.to_thread(call, client, pages[page_no - 1], entry.get("tank_location") or s["tank"],
-                                  str(entry.get("entry_date") or "")),
-                timeout=timeout,
-            )
-        except Exception as e:
-            logger.warning("Re-read of %r on page %s skipped: %s", s["tank"], page_no, e)
-            stats["unchanged"] += 1
-            continue
+        async with sem:
+            remaining = deadline - time.monotonic()
+            if remaining <= 1:
+                stats["skipped"] += 1
+                return
+            try:
+                reread = await asyncio.wait_for(
+                    asyncio.to_thread(call, client, pages[page_no - 1], entry.get("tank_location") or s["tank"],
+                                      str(entry.get("entry_date") or ""),
+                                      "inventory" if entry.get("orb_code") == "I" else "sounding"),
+                    timeout=min(timeout, remaining),
+                )
+            except Exception as e:
+                logger.warning("Re-read of %r on page %s skipped: %s", s["tank"], page_no, e)
+                stats["unchanged"] += 1
+                return
         outcome = apply_reread(entry, s["qty"], s["value"], s["expected"], reread)
         stats[outcome] += 1
-    if stats["suspects"]:
-        logger.info("Suspect-reading re-read: %s", stats)
+
+    todo = []
+    for s in find_suspect_readings(entries):
+        page_no = entries[s["entry_idx"]].get("page_number") or 0
+        if 1 <= page_no <= len(pages):
+            stats["suspects"] += 1
+            todo.append(s)
+    if todo:
+        await asyncio.gather(*(one(s) for s in todo), return_exceptions=True)
+        logger.warning("Suspect-reading re-read: %s", stats)   # warning: visible at the service's log level
     return stats

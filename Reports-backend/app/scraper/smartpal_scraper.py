@@ -49,6 +49,15 @@ _FREQUENCY_REPORT_DATE_OFFSET = {
     "weekly":    lambda d: d + relativedelta(days=7),
     "monthly":   lambda d: d + relativedelta(months=1),
     "quarterly": lambda d: d + relativedelta(months=3),
+    # Half-yearly flow only (see run_halfyearly_scraper); never looked up by
+    # the standard run_scraper, which skips those report codes.
+    "half-yearly": lambda d: d + relativedelta(months=6),
+    "half yearly": lambda d: d + relativedelta(months=6),
+    "half_yearly": lambda d: d + relativedelta(months=6),  # as saved by the Config page
+    "6 monthly":   lambda d: d + relativedelta(months=6),
+    # Yearly flow only (see run_halfyearly_scraper(yearly=True)).
+    "yearly":      lambda d: d + relativedelta(years=1),
+    "12 monthly":  lambda d: d + relativedelta(years=1),
 }
 
 
@@ -176,6 +185,10 @@ async def run_scraper(db: AsyncSession, target_frequency: str = None, target_rep
         c for c in db_configs
         if (c.frequency or "").strip().lower() != "daily"
         and not (c.report_code or "").upper().startswith("DY-")
+        # Cargo Hold / Water Ballast Tank half-yearly reports have their own
+        # flow (run_halfyearly_scraper) -- they need row selection this
+        # standard flow does not do.
+        and _halfyearly_spec(c.report_code, c.report_name) is None
     ]
 
     if target_reports:
@@ -520,7 +533,7 @@ async def _open_job_overview(context, landing_page):
 # Steps 3-11: Scrape one report for one vessel
 # ---------------------------------------------------------------------------
 
-async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report_code, report_name, department, frequency, target_job_order_no=None, target_due_date=None, fail_reason=None):
+async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report_code, report_name, department, frequency, target_job_order_no=None, target_due_date=None, fail_reason=None, special=None):
     """`fail_reason`, if given, is a dict this function fills in with a
     human-readable explanation before every early `return None` -- so a run
     that finds nothing for a report still tells the caller WHY (equipment
@@ -634,6 +647,8 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                 search_terms.append(desc_term)
 
         search_terms = list(dict.fromkeys(t for t in search_terms if t))
+        if special:  # half-yearly flow: exact names, no heuristics
+            search_terms = list(special["search_terms"])
 
         # --- Locate the search input ---
         search_input_handle = await overview_page.evaluate_handle('''() => {
@@ -668,7 +683,7 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
             if found > 0:
                 # Click the FIRST dropdown item — this selects the node and loads the grid
                 logger.info(f"AutoComplete returned {found} item(s). Clicking first result...")
-                clicked_node = await overview_page.evaluate(r'''(code) => {
+                clicked_node = await overview_page.evaluate(_HY_PICK_ITEM_JS if special else r'''(code) => {
                     const items = Array.from(document.querySelectorAll(
                         ".k-animation-container li, .k-list-container li, ul.k-list li, .k-popup li"
                     ));
@@ -699,7 +714,7 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                     
                     bestNode.click();
                     return true;
-                }''', report_code.upper())
+                }''', special if special else report_code.upper())
                 if clicked_node:
                     logger.info(f"Strategy 1 SUCCESS: Clicked autocomplete item for '{term}'")
                     break
@@ -734,21 +749,41 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                          "empty grid (no equipment link) -- the vessel may have no job plan "
                          "configured for this equipment code.")
 
+        if special:
+            # Several equipment rows per code (e.g. "Cargo Hold Inspection
+            # (6 Month)" + another) -- make sure the wanted one exists
+            # before clicking, and say what WAS there if it doesn't.
+            row_texts = await overview_page.evaluate('''() =>
+                Array.from(document.querySelectorAll("a.cellEqpNameLink"))
+                    .map(a => ((a.closest("tr") || a).innerText || "").replace(/\\s+/g, " ").trim())
+            ''')
+            if not any(re.search(special["eq_row_match"], t, re.I) for t in row_texts):
+                return _fail(f"Equipment grid has no row matching /{special['eq_row_match']}/. "
+                             f"Rows found: {row_texts!r}")
+
         logger.info("Opening Job Order details...")
         # Remove overlay before clicking to prevent pointer-event interception
         await overview_page.evaluate('''() => {
             document.querySelectorAll(".k-loading-mask, .k-loading-color").forEach(e => e.remove());
         }''')
-        
+
         eq_page = None
         for attempt in range(3):
             try:
                 async with context.expect_page(timeout=15000) as eq_page_info:
                     # Use JS click which is more reliable than Playwright's force=True if element is obscured
-                    await overview_page.evaluate('''() => {
-                        const link = document.querySelector("a.cellEqpNameLink");
-                        if (link) link.click();
-                    }''')
+                    if special:
+                        await overview_page.evaluate('''(rowMatch) => {
+                            const re = new RegExp(rowMatch, "i");
+                            const link = Array.from(document.querySelectorAll("a.cellEqpNameLink"))
+                                .find(a => re.test((a.closest("tr") || a).innerText || ""));
+                            if (link) link.click();
+                        }''', special["eq_row_match"])
+                    else:
+                        await overview_page.evaluate('''() => {
+                            const link = document.querySelector("a.cellEqpNameLink");
+                            if (link) link.click();
+                        }''')
                 eq_page = await eq_page_info.value
                 break
             except Exception as e:
@@ -795,17 +830,41 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
         # accepting "not found" and giving up on the primary path.
         has_job_link = False
         for _ in range(8):
-            has_job_link = await eq_page.evaluate('''() => {
-                const grids = Array.from(document.querySelectorAll(".k-grid"));
-                const visibleGrids = grids.filter(g => g.offsetWidth > 0);
-                for (const g of visibleGrids) {
-                    if (g.querySelector("tbody tr td a")) return true;
-                }
-                return false;
-            }''')
+            if special:
+                has_job_link = await eq_page.evaluate(_HY_PLAN_ROW_JS, [special["plan_row_match"], False])
+            else:
+                has_job_link = await eq_page.evaluate('''() => {
+                    const grids = Array.from(document.querySelectorAll(".k-grid"));
+                    const visibleGrids = grids.filter(g => g.offsetWidth > 0);
+                    for (const g of visibleGrids) {
+                        if (g.querySelector("tbody tr td a")) return true;
+                    }
+                    return false;
+                }''')
             if has_job_link:
                 break
             await eq_page.wait_for_timeout(2000)
+
+        if special:
+            plan_dump = await eq_page.evaluate('''() =>
+                Array.from(document.querySelectorAll(".k-grid")).filter(g => g.offsetWidth > 0).map(g => ({
+                    headers: Array.from(g.querySelectorAll("thead th")).map(t => (t.innerText || "").trim()),
+                    rows: Array.from(g.querySelectorAll("tbody tr")).map(r => (r.innerText || "").replace(/\\s+/g, " ").trim())
+                }))
+            ''')
+            logger.info(f"  {report_code}: Job Plan grid = {plan_dump!r}")
+
+        if not has_job_link and special:
+            # The History-tab fallback below would mix every frequency's
+            # jobs for this equipment -- wrong data is worse than a FAILED row.
+            grid_dump = await eq_page.evaluate('''() =>
+                Array.from(document.querySelectorAll(".k-grid")).filter(g => g.offsetWidth > 0).map(g => ({
+                    headers: Array.from(g.querySelectorAll("thead th")).map(t => (t.innerText || "").trim()),
+                    rows: Array.from(g.querySelectorAll("tbody tr")).map(r => (r.innerText || "").replace(/\\s+/g, " ").trim())
+                }))
+            ''')
+            return _fail(f"Job Plan grid has no row whose frequency matches "
+                         f"/{special['plan_row_match']}/. Grid: {grid_dump!r}")
 
         if not has_job_link:
             logger.warning(f"Could not find Job Title link in Job Plan grid. Trying 'History' tab on Equipment Page as fallback...")
@@ -853,14 +912,17 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                 await job_order_page.wait_for_timeout(1500)
         else:
             async with context.expect_page(timeout=120000) as jo_page_info:
-                await eq_page.evaluate('''() => {
-                    const grids = Array.from(document.querySelectorAll(".k-grid"));
-                    const visibleGrids = grids.filter(g => g.offsetWidth > 0);
-                    for (const g of visibleGrids) {
-                        const link = g.querySelector("tbody tr td a");
-                        if (link) { link.click(); return; }
-                    }
-                }''')
+                if special:
+                    await eq_page.evaluate(_HY_PLAN_ROW_JS, [special["plan_row_match"], True])
+                else:
+                    await eq_page.evaluate('''() => {
+                        const grids = Array.from(document.querySelectorAll(".k-grid"));
+                        const visibleGrids = grids.filter(g => g.offsetWidth > 0);
+                        for (const g of visibleGrids) {
+                            const link = g.querySelector("tbody tr td a");
+                            if (link) { link.click(); return; }
+                        }
+                    }''')
                     
             job_order_page = await jo_page_info.value
             try:
@@ -960,6 +1022,29 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
         job_category = None
 
         found_completed = False
+        # Half-yearly flow only: which COMPLETED row to open (0 = latest) and
+        # how many exist, so the caller can walk back through all of them.
+        completed_seen = 0
+        completed_total = 0
+        if special:
+            completed_total = await job_order_page.evaluate('''(statusIdx) => {
+                let n = 0;
+                Array.from(document.querySelectorAll(".k-grid")).filter(g => g.offsetWidth > 0).forEach(g => {
+                    g.querySelectorAll("tbody tr").forEach(r => {
+                        const c = r.querySelectorAll("td")[statusIdx];
+                        if (c && /COMPLETED/i.test(c.innerText || "")) n++;
+                    });
+                });
+                return n;
+            }''', idx_status)
+        if special:
+            hist_dump = await job_order_page.evaluate('''() =>
+                Array.from(document.querySelectorAll(".k-grid")).filter(g => g.offsetWidth > 0).map(g => ({
+                    headers: Array.from(g.querySelectorAll("thead th")).map(t => (t.innerText || "").trim()),
+                    rows: Array.from(g.querySelectorAll("tbody tr")).map(r => (r.innerText || "").replace(/\\s+/g, " ").trim())
+                }))
+            ''')
+            logger.info(f"  {report_code}: Job History grid = {hist_dump!r} | page title = {await job_order_page.title()!r}")
         found_pending = False
         pend_details = {}
 
@@ -1234,6 +1319,11 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
                             "report_date": report_date,
                             "report_date_source": report_date_source,
                         }
+
+                if (special and "COMPLETED" in status_text.upper() and not found_completed
+                        and completed_seen < special.get("completed_index", 0)):
+                    completed_seen += 1  # an older/newer completed job than the one requested
+                    continue
 
                 if "COMPLETED" in status_text.upper() and not found_completed:
                     # Strict validation: If we are tracking a specific cycle via smart_cron
@@ -1611,7 +1701,9 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
         # Fallbacks when no attachment yielded an extractable date (e.g. image PDF):
         if report_date is None:
             from app.utils.report_date import uses_job_end_date_fallback
-            if uses_job_end_date_fallback(report_code, report_name) and job_end_date is not None:
+            # Half-yearly / yearly tank & hold inspections: the due date can sit in the next period (due 03-Feb-2027, done
+            # 11-Aug-2026), which would file the report under the wrong one, so use the date the job was completed.
+            if (uses_job_end_date_fallback(report_code, report_name) or special) and job_end_date is not None:
                 # Specific reports (like Boiler) requested to use job_end_date 
                 report_date = job_end_date
                 report_date_source = "job_end_date:fallback"
@@ -1649,6 +1741,7 @@ async def _scrape_report(context, overview_page, vessel_imo, vessel_name, report
             "job_category": job_category,
             "report_date":  report_date,
             "report_date_source": report_date_source,
+            **({"completed_total": completed_total} if special else {}),
         }
 
     except PlaywrightTimeout as e:
@@ -1689,10 +1782,27 @@ async def _save_report(db: AsyncSession, data: dict):
 
         if existing:
             # We already have this exact Job Order in the DB. Update it.
-            old_blob_paths = {att.blob_path for att in existing.attachments}
+            # blob_path embeds the scrape date (reports/<imo>/<code>/<date>_<idx>_<name>),
+            # so it differs on every daily re-scrape of the same job order. Matching on
+            # it re-flagged the same files PENDING and re-emailed them daily. Match on
+            # file_name instead and carry over the existing email status, so only
+            # genuinely new files get emailed.
+            # Only COMPLETED jobs are emailed; pending-job files are not.
+            is_completed = data.get("job_status") == "COMPLETED"
+            old_status_by_name = {att.file_name: att.email_status for att in existing.attachments}
             existing.attachments.clear()
             for att in data.get("attachments", []):
-                email_status = EmailStatus.PENDING if is_target_vessel and att["blob_path"] not in old_blob_paths else EmailStatus.NOT_REQUIRED
+                old = old_status_by_name.get(att["file_name"])
+                if old is not None and old != EmailStatus.NOT_REQUIRED.value and old != EmailStatus.NOT_REQUIRED:
+                    email_status = old  # already queued/sent/failed: keep
+                elif is_target_vessel and is_completed and (
+                        old is None or existing.job_status != "COMPLETED"):
+                    # new file, or the job just flipped PENDING -> COMPLETED
+                    email_status = EmailStatus.PENDING
+                else:
+                    email_status = EmailStatus.NOT_REQUIRED
+                if att["blob_path"].startswith("MISSING:"):
+                    email_status = EmailStatus.NOT_REQUIRED
                 existing.attachments.append(ReportAttachment(
                     id=uuid4(),
                     file_name=att["file_name"],
@@ -1753,7 +1863,7 @@ async def _save_report(db: AsyncSession, data: dict):
             )
             
             for att in data.get("attachments", []):
-                email_status = EmailStatus.PENDING if is_target_vessel else EmailStatus.NOT_REQUIRED
+                email_status = EmailStatus.PENDING if is_target_vessel and data.get("job_status") == "COMPLETED" and not att["blob_path"].startswith("MISSING:") else EmailStatus.NOT_REQUIRED
                 new_report.attachments.append(ReportAttachment(
                     id=uuid4(),
                     file_name=att["file_name"],
@@ -1909,6 +2019,299 @@ async def _mark_failed(db: AsyncSession, vessel_imo: str, report_code: str, erro
         logger.error(f"Could not mark FAILED: {vessel_imo}/{report_code}: {e}")
 
 
+# ===========================================================================
+# HALF-YEARLY FLOW -- Cargo Hold (301.01-301.09) and Water Ballast Tank
+# (305.03.03-305.03.20) reports.
+#
+# Kept separate from run_scraper on purpose: these equipment codes have
+# several rows per code and the scraper must pick the 6-month one, which the
+# standard flow (always "first row") does not do. run_scraper skips these
+# codes (see _halfyearly_spec) and this flow only ever handles them. It
+# reuses the same login / Job Overview / save helpers and the same
+# _scrape_report body; the extra `special` argument only switches on row
+# selection and is None for every standard report.
+# ===========================================================================
+
+# Picks the autocomplete item for the exact equipment. `sp` is the `special`
+# dict from _halfyearly_spec. Prefers an item containing the report code,
+# else the item whose text has the equipment name not followed by a digit
+# (so "No 1" never matches "No 10"). Returns false if nothing fits -- never
+# falls back to "first item", which could be the wrong tank.
+_HY_PICK_ITEM_JS = r'''(sp) => {
+    const norm = s => (s || "").toLowerCase().replace(/\s+/g, " ").trim();
+    const items = Array.from(document.querySelectorAll(
+        ".k-animation-container li, .k-list-container li, ul.k-list li, .k-popup li"
+    )).filter(i => i.offsetWidth > 0 && i.offsetHeight > 0);
+    const code = sp.item_code.toLowerCase();
+    const name = norm(sp.item_name);
+    let pick = items.find(i => norm(i.innerText).includes(code));
+    if (!pick) {
+        pick = items.find(i => {
+            const t = norm(i.innerText);
+            const idx = t.indexOf(name);
+            if (idx < 0) return false;
+            return !/^\d/.test(t.slice(idx + name.length));
+        });
+    }
+    if (!pick) return false;
+    pick.click();
+    return true;
+}'''
+
+# In the visible Job Plan grid, find the row whose Frequency cell (or, if no
+# Frequency header, whole row text) matches `pattern`; click its job link
+# when doClick. Returns whether such a row with a link exists.
+_HY_PLAN_ROW_JS = r'''([pattern, doClick]) => {
+    const re = pattern ? new RegExp(pattern, "i") : null;
+    const grids = Array.from(document.querySelectorAll(".k-grid")).filter(g => g.offsetWidth > 0);
+    for (const g of grids) {
+        for (const row of Array.from(g.querySelectorAll("tbody tr"))) {
+            // Header index != body cell index (hidden/checkbox columns), so
+            // test every cell's whole text against the frequency pattern.
+            const cells = Array.from(row.querySelectorAll("td"));
+            if (re && !cells.some(c => re.test((c.innerText || "").trim()))) continue;
+            const link = row.querySelector("td a");
+            if (!link) continue;
+            if (doClick) link.click();
+            return true;
+        }
+    }
+    return false;
+}'''
+
+_HY_FREQUENCY_LABEL = "Half-Yearly"
+_HY_EQ_ROW_MATCH = r"Cargo Hold Inspection\s*\(\s*6\s*Months?\s*\)"
+_HY_PLAN_ROW_MATCH = r"^(6\s*-?\s*months?|half[\s-]*year(ly)?)$"
+
+# Yearly twins of the same equipment. They share the half-yearly equipment
+# codes but need their own report_code (reports are keyed on vessel+code), so
+# the yearly code is the equipment code + this suffix, e.g. "301.01-YR".
+_YR_CODE_SUFFIX = "-YR"
+_YR_FREQUENCY_LABEL = "Yearly"
+_YR_EQ_ROW_MATCH = r"Cargo Hold Inspection\s*\(\s*12\s*Months?\s*\)"
+_YR_PLAN_ROW_MATCH = r"^(12\s*-?\s*months?|year(ly)?|annual(ly)?)$"
+
+
+def _is_yearly_code(report_code):
+    return (report_code or "").strip().upper().endswith(_YR_CODE_SUFFIX)
+
+
+def _halfyearly_spec(report_code, report_name=None):
+    """Return the `special` dict for a half-yearly code, else None.
+
+    301.01-301.09      -> Cargo Hold No N      (equipment grid: pick the
+                          "Cargo Hold Inspection (6 Month)" row)
+    305.03.03-305.03.20 -> Water Ballast Tank No N (P|S) (Job Plan grid: pick
+                          the 6-month frequency row). 03/04 = tank 1 P/S,
+                          05/06 = tank 2 P/S, ... 19/20 = tank 9 P/S.
+    """
+    import re
+    code = (report_code or "").strip()
+    yearly = _is_yearly_code(code)
+    if yearly:
+        code = code[:-len(_YR_CODE_SUFFIX)]
+    m = re.match(r"^301\.(0[1-9])$", code)
+    if m and yearly:
+        return None  # no yearly Cargo Hold reports, only Water Ballast Tanks
+    if m:
+        item_name = f"Cargo Hold No {int(m.group(1))}"
+    else:
+        m = re.match(r"^305\.03\.(\d{2})$", code)
+        if not m or not 3 <= int(m.group(1)) <= 20:
+            return None
+        k = int(m.group(1)) - 3
+        item_name = f"Water Ballast Tank No {k // 2 + 1} ({'P' if k % 2 == 0 else 'S'})"
+
+    # Prefer the configured name (minus "301.01 - " prefix and trailing "(2)"
+    # row-count), then the generated one.
+    terms = []
+    if report_name:
+        cleaned = re.sub(r"^[\d.]+\s*-\s*", "", report_name.strip())
+        cleaned = re.sub(r"\s*\(\d+\)\s*$", "", cleaned).strip()
+        if cleaned:
+            terms.append(cleaned)
+    terms.append(item_name)
+    return {
+        "search_terms": list(dict.fromkeys(terms)),
+        "item_code": code,
+        "item_name": item_name,
+        "eq_row_match": (_YR_EQ_ROW_MATCH if yearly else _HY_EQ_ROW_MATCH) if code.startswith("301.") else r".",
+        # Cargo Holds have a single Job Plan row; only ballast tanks (3 rows)
+        # need the 6-/12-month frequency filter.
+        "plan_row_match": None if code.startswith("301.") else (_YR_PLAN_ROW_MATCH if yearly else _HY_PLAN_ROW_MATCH),
+    }
+
+
+async def run_halfyearly_scraper(db: AsyncSession, target_reports: str = None, target_vessel: str = None, smart_cron: bool = False, yearly: bool = False):
+    """Scrape only the half-yearly Cargo Hold / Water Ballast Tank reports.
+    Same SmartPAL flow as run_scraper, with 6-month row selection. With
+    smart_cron=True only configs whose cycle is due are scraped.
+    yearly=True runs the same flow for the yearly twins (codes ending "-YR",
+    12-month row selection) instead of the half-yearly ones."""
+    freq_label = _YR_FREQUENCY_LABEL if yearly else _HY_FREQUENCY_LABEL
+    logger.info(f"--- {freq_label.upper()} REPORT SCRAPE STARTING ---")
+
+    stmt = select(ReportConfig)
+    if target_vessel:
+        stmt = stmt.where(
+            (ReportConfig.vessel_name.ilike(f"%{target_vessel}%")) |
+            (ReportConfig.vessel_imo == target_vessel)
+        )
+    db_configs = [
+        c for c in (await db.execute(stmt)).scalars().all()
+        if _halfyearly_spec(c.report_code, c.report_name) is not None
+        and _is_yearly_code(c.report_code) == yearly
+    ]
+
+    if target_reports:
+        if isinstance(target_reports, list):
+            target_reports = ",".join(target_reports)
+        allowed = [r.strip().lower() for r in target_reports.split(",")]
+        db_configs = [
+            c for c in db_configs
+            if any(a in c.report_code.lower() or (c.report_name and a in c.report_name.lower()) for a in allowed)
+        ]
+
+    if smart_cron:
+        now_date = datetime.utcnow().date()
+        due = []
+        for c in db_configs:
+            res = await db.execute(
+                select(Report)
+                .where(Report.vessel_imo == c.vessel_imo, Report.report_code == c.report_code)
+                .options(selectinload(Report.attachments))
+            )
+            # A first run saves every historical completed job, so created_at
+            # no longer says which is newest -- the newest cycle has the
+            # latest due date.
+            all_rows = res.scalars().all()
+            latest = max(all_rows, key=lambda r: (r.due_date or r.report_date or r.created_at, r.created_at), default=None)
+            c._target_job_no = None
+            c._target_due_date = None
+            if not latest:
+                due.append(c)
+            elif latest.job_status == "PENDING":
+                c._target_job_no, c._target_due_date = latest.job_order_no, latest.due_date
+                due.append(c)
+            elif not latest.attachments:
+                c._target_job_no, c._target_due_date = latest.job_order_no, latest.due_date
+                due.append(c)
+            elif latest.next_due_date:
+                expected = _next_cycle_expected_from_report_date(latest.report_date, freq_label)
+                if latest.next_due_date.date() <= now_date or (expected and expected <= now_date):
+                    c._target_job_no, c._target_due_date = latest.job_order_no, latest.next_due_date
+                    due.append(c)
+            else:
+                due.append(c)
+        db_configs = due
+        logger.info(f"{freq_label} smart mode: {len(db_configs)} configs due.")
+
+    entries = [
+        {
+            "vessel_imo": c.vessel_imo.strip(),
+            "vessel_name": c.vessel_name.strip(),
+            "report_code": c.report_code.strip(),
+            "report_name": (c.report_name or c.report_code).strip(),
+            "department": (c.department or "").strip(),
+            "frequency": c.frequency or freq_label,
+            "target_job_order_no": getattr(c, "_target_job_no", None),
+            "target_due_date": getattr(c, "_target_due_date", None),
+        }
+        for c in db_configs
+    ]
+    if not entries:
+        logger.warning(f"No {freq_label.lower()} configs to scrape. Exiting.")
+        return
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(accept_downloads=True, ignore_https_errors=True)
+        context.set_default_timeout(60000)
+        page = await context.new_page()
+
+        if not await _login(page):
+            logger.error(f"Login failed. Aborting {freq_label.lower()} run.")
+            await browser.close()
+            return
+        overview_page = await _open_job_overview(context, page)
+        if not overview_page:
+            logger.error("Could not open Job Overview. Aborting.")
+            await browser.close()
+            return
+
+        total = len(entries)
+        for idx, e in enumerate(entries):
+            if idx > 0 and idx % SESSION_REFRESH_EVERY == 0:
+                logger.info(f"[{idx}/{total}] Refreshing SmartPAL session...")
+                fresh = await _fresh_session(browser)
+                if fresh:
+                    old_context = context
+                    context, page, overview_page = fresh
+                    try:
+                        await old_context.close()
+                    except Exception:
+                        pass
+                else:
+                    logger.warning("Session refresh failed -- continuing with existing session.")
+
+            logger.info(f"[{idx+1}/{total}] {freq_label}: {e['vessel_name']} -> {e['report_code']}")
+            fail_reason = {}
+            base_spec = _halfyearly_spec(e["report_code"], e["report_name"])
+            # First run for this config (nothing targeted = no tracked cycle yet,
+            # or a --full deep scrape): save EVERY completed job, not just the
+            # latest. Later smart runs target one specific cycle and take one.
+            all_completed = (not smart_cron) or not (e["target_job_order_no"] and e["target_due_date"])
+            try:
+                result = await _scrape_report(
+                    context, overview_page,
+                    e["vessel_imo"], e["vessel_name"],
+                    e["report_code"], e["report_name"], e["department"], e["frequency"],
+                    e["target_job_order_no"], e["target_due_date"],
+                    fail_reason=fail_reason,
+                    special=dict(base_spec, completed_index=0),
+                )
+                if result and all_completed and result.get("completed_total", 1) > 1:
+                    n_completed = result["completed_total"]
+                    logger.info(f"  {e['report_code']}: {n_completed} completed jobs in history -- scraping the older ones too.")
+                    # Oldest first, latest saved LAST, so the newest cycle is
+                    # also the newest row.
+                    for ci in range(n_completed - 1, 0, -1):
+                        older_reason = {}
+                        try:
+                            older = await _scrape_report(
+                                context, overview_page,
+                                e["vessel_imo"], e["vessel_name"],
+                                e["report_code"], e["report_name"], e["department"], e["frequency"],
+                                None, None,
+                                fail_reason=older_reason,
+                                special=dict(base_spec, completed_index=ci),
+                            )
+                        except Exception as oe:
+                            older, older_reason["msg"] = None, str(oe)
+                        if older:
+                            older["next_due_date"] = None  # only the latest cycle carries the next due
+                            older["is_smart_scrape"] = False
+                            await _save_report(db, older)
+                        else:
+                            logger.warning(f"  {e['report_code']}: completed job #{ci + 1} not captured: "
+                                           f"{older_reason.get('msg', 'unknown reason')}")
+                if result:
+                    result["is_smart_scrape"] = smart_cron
+                    await _save_report(db, result)
+                else:
+                    reason = fail_reason.get("msg", "Scrape returned no data for an unlogged reason.")
+                    logger.warning(f"No data captured for {e['vessel_name']}/{e['report_code']}: {reason}")
+                    await _mark_failed(db, e["vessel_imo"], e["report_code"], reason,
+                                       vessel_name=e["vessel_name"], report_name=e["report_name"])
+            except Exception as ex:
+                logger.error(f"Error scraping {e['vessel_name']}/{e['report_code']}: {ex}")
+                await _mark_failed(db, e["vessel_imo"], e["report_code"], str(ex),
+                                   vessel_name=e["vessel_name"], report_name=e["report_name"])
+
+        await browser.close()
+        logger.info(f"{freq_label} scrape complete.")
+
+
 if __name__ == "__main__":
     import argparse
     import asyncio
@@ -1928,10 +2331,23 @@ if __name__ == "__main__":
     parser.add_argument("--vessel", type=str, default=None, help="Target a specific vessel (by name or IMO)")
     parser.add_argument("--reports", type=str, default=None, help="Comma separated report codes to target")
     
+    parser.add_argument("--halfyearly", action="store_true", help="Run the separate half-yearly flow (Cargo Hold / Water Ballast Tank) instead; combine with --full for a deep scrape")
+
+    parser.add_argument("--yearly", action="store_true", help="Run the yearly flow (12-month Cargo Hold / Water Ballast Tank rows, codes ending -YR); combine with --full for a deep scrape")
+
     args = parser.parse_args()
-    
+
     async def main():
-        if args.full or args.vessel or args.reports:
+        if args.halfyearly or args.yearly:
+            async with SessionLocal() as db:
+                await run_halfyearly_scraper(
+                    db,
+                    smart_cron=not args.full,
+                    target_vessel=args.vessel,
+                    target_reports=args.reports,
+                    yearly=args.yearly,
+                )
+        elif args.full or args.vessel or args.reports:
             async with SessionLocal() as db:
                 await run_scraper(
                     db,

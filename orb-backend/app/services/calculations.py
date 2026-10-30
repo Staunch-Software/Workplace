@@ -1,7 +1,16 @@
 """
 Compliance calculation checks — runs after every extraction.
 
-13 checks total:
+Which alerts are on, their severity and every threshold come from the configuration tables
+(services/alert_config.py, reviewed alert set in services/alert_catalog.py); a withdrawn alert is disabled,
+never deleted.
+
+Checks 15-23 (alerts 23, 25, 29-36) came with the compliance review (20 and 21 read Mariapps data):
+  15 weekly_c11_missing   16 missing_officer_signature   17 late_entry
+  18 code_ab_present / accidental_discharge_notify   19 orb_language
+  20 auto_discharge_location   21 bunker_bdn_mismatch   22 tank_not_in_iopp
+  23 ows_alarm_record_mismatch (imported 15 ppm monitor data)
+The 14 earlier checks:
   1  wrong_item_code
   2  mass_balance_error
   3  tank_capacity_exceeded
@@ -29,6 +38,9 @@ from app.models.orb_alert import OrbAlert
 from app.models.vessel_tank import VesselTank
 from app.models.fuel_consumption import FuelConsumption
 from app.models.vessel import Vessel
+from app.models.orb_config import Equipment
+from app.services import alert_config
+from app.services.alert_config import current as cfg_now
 
 logger = logging.getLogger(__name__)
 
@@ -152,56 +164,104 @@ def _parse_time(t: str | None):
     return hh * 60 + mm 
 
 async def create_alert_if_new(
-    db: AsyncSession, 
-    vessel_id: uuid.UUID, 
-    entry_id, 
-    alert_type: str, 
-    severity: str, 
-    message: str
+    db: AsyncSession,
+    vessel_id: uuid.UUID,
+    entry_id,
+    alert_type: str,
+    severity: str,
+    message: str,
+    upload_id: uuid.UUID | None = None,
+    keep_severity: bool = False,
 ):
-    """Creates a compliance alert if an identical one doesn't already exist."""
-    q = select(OrbAlert).where(
-        OrbAlert.alert_type == alert_type, 
-        OrbAlert.vessel_id == vessel_id
-    )
+    """Creates a compliance alert unless it is switched off, or an identical one already exists.
+
+    - A disabled (withdrawn) alert type is never raised.
+    - The severity comes from the alert configuration, except where the check decides it itself
+      (keep_severity: one alert with two levels, e.g. sludge vs fuel burn).
+    - An entry alert is unique per entry and type, and stays unique after it is resolved.
+    - A batch alert (no entry) is unique per upload and type, so the next upload can raise it again.
+    - A vessel-level alert is raised again once the previous one is resolved.
+    """
+    cfg = cfg_now()
+    if not cfg.is_enabled(alert_type):
+        return
+    if not keep_severity:
+        severity = cfg.severity(alert_type, severity)
+
+    q = select(OrbAlert.id).where(OrbAlert.alert_type == alert_type, OrbAlert.vessel_id == vessel_id)
     if entry_id:
         q = q.where(OrbAlert.entry_id == entry_id)
     else:
         q = q.where(OrbAlert.entry_id.is_(None))
+        if cfg.scope(alert_type) == "Batch (vessel)":
+            q = q.where(OrbAlert.is_resolved.is_(False))
+        elif upload_id:
+            q = q.where(OrbAlert.upload_id == upload_id)
 
-    result = await db.execute(q)
-    if result.scalar_one_or_none():
+    if (await db.execute(q.limit(1))).first():
         return
 
     alert = OrbAlert(
-        id=uuid.uuid4(), 
-        vessel_id=vessel_id, 
-        entry_id=entry_id, 
-        alert_type=alert_type, 
-        severity=severity, 
-        message=message, 
+        id=uuid.uuid4(),
+        vessel_id=vessel_id,
+        entry_id=entry_id,
+        upload_id=None if entry_id else upload_id,
+        alert_type=alert_type,
+        severity=severity,
+        message=message,
         is_resolved=False
     )
     db.add(alert)
     await db.flush()
 
+# Every check with the alert codes it can raise: a check whose alerts are all disabled is not run.
+def _checks():
+    return [
+        (check_wrong_item_code,              ["wrong_item_code"]),
+        (check_mass_balance_error,           ["mass_balance_error"]),
+        (check_tank_capacity_exceeded,       ["tank_capacity_exceeded", "reading_needs_review", "capacity_reading_mismatch"]),
+        (check_combined_capacity_threshold,  ["combined_capacity_threshold"]),
+        (check_sludge_generation_rate,       ["sludge_generation_rate"]),
+        (check_bilge_increasing_rate,        ["bilge_increasing_rate"]),
+        (check_sludge_vs_fuel_consumption,   ["sludge_vs_fuel_consumption", "sludge_review_fuel_missing"]),
+        (check_bilge_transfer_vs_soundings,  ["bilge_transfer_vs_soundings"]),
+        (check_bilge_pump_capacity,          ["bilge_pump_capacity"]),
+        (check_bunker_mismatch,              ["bunker_mismatch", "bunker_quantity_mismatch"]),
+        (check_missing_master_signature,     ["missing_master_signature"]),
+        (check_chronology_and_erasures,      ["non_chronological_entry", "erasure_detected"]),
+        (check_entry_gaps,                   ["gap_between_entries"]),
+        (check_item_numbers,                 ["item_value_missing", "item_number_missing"]),
+        (check_weekly_c11,                   ["weekly_c11_missing"]),
+        (check_officer_signatures,           ["missing_officer_signature"]),
+        (check_late_entries,                 ["late_entry"]),
+        (check_code_flags,                   ["code_ab_present", "accidental_discharge_notify"]),
+        (check_book_language,                ["orb_language"]),
+        (check_auto_discharge_location,      ["auto_discharge_location"]),
+        (check_bunker_bdn_mismatch,          ["bunker_bdn_mismatch"]),
+        (check_tank_not_in_iopp,             ["tank_not_in_iopp"]),
+        (check_ows_alarm_record,             ["ows_alarm_record_mismatch"]),
+    ]
+
+
 async def run_all_checks(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
-    """Run all 14 compliance checks scoped closely to avoid duplication loops."""
-    await check_wrong_item_code(vessel_id, upload_id, db)                    # 1
-    await check_mass_balance_error(vessel_id, upload_id, db)                 # 2
-    await check_tank_capacity_exceeded(vessel_id, upload_id, db)             # 3
-    await check_combined_capacity_threshold(vessel_id, db)                   # 4
-    await check_sludge_generation_rate(vessel_id, upload_id, db)             # 5
-    await check_bilge_increasing_rate(vessel_id, upload_id, db)              # 6
-    await check_sludge_vs_fuel_consumption(vessel_id, upload_id, db)         # 7
-    await check_bilge_transfer_vs_soundings(vessel_id, upload_id, db)        # 8
-    await check_bilge_pump_capacity(vessel_id, upload_id, db)                # 9
-    await check_bunker_mismatch(vessel_id, upload_id, db)                    # 10
-    await check_missing_master_signature(vessel_id, upload_id, db)           # 11
-    await check_chronology_and_erasures(vessel_id, upload_id, db)            # 12
-    await check_entry_gaps(vessel_id, upload_id, db)                         # 13
-    await check_item_numbers(vessel_id, upload_id, db)                       # 14
-    await db.commit()
+    """Run every enabled compliance check, scoped closely to avoid duplication loops."""
+    try:
+        cfg = await alert_config.load_run_config(db, vessel_id)
+    except Exception:
+        # Configuration tables not there yet (migration 019 pending): run with the built-in defaults.
+        logger.exception("Alert configuration unavailable, using defaults")
+        await db.rollback()
+        cfg = alert_config.RunConfig()
+
+    token = alert_config.set_current(cfg)
+    try:
+        for check, codes in _checks():
+            if not any(cfg.is_enabled(c) for c in codes):
+                continue
+            await check(vessel_id, upload_id, db)
+        await db.commit()
+    finally:
+        alert_config.reset_current(token)
 
 # ─────────────────────────────────────────────────────────────────────────
 # Check 1 — Wrong Item Code
@@ -215,6 +275,8 @@ async def check_wrong_item_code(vessel_id: uuid.UUID, upload_id: uuid.UUID | Non
     for entry in result.scalars().all():
         item = (entry.item_number or "").strip()
         code = entry.orb_code
+        if code in ("A", "B"):
+            continue  # alert 32 (Code A / B found) covers these, their items are not validated
         if code == "I":
             is_wrong = bool(item)  # Code I entries must carry no item number
         else:
@@ -374,37 +436,52 @@ def _rows_for_tank(rows, tn: str, protect: frozenset[str] = frozenset()):
 # Check 2 — Mass Balance Error
 # ─────────────────────────────────────────────────────────────────────────
 async def check_mass_balance_error(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
-    tanks_all = (await db.execute(select(VesselTank).where(VesselTank.vessel_id == vessel_id, VesselTank.is_active == True))).scalars().all()
-    protect = _compute_protected_tank_words(tanks_all)
-    tanks = [t for t in tanks_all if _get_effective_group(t) not in EXCLUDED_MASS_BALANCE_GROUPS]
+    """Alert 4. For every tank, the retained figure must not fall below the running balance (previous
+    retained +/- logged transfers, disposals, evaporation and incineration) -- zero tolerance on a drop.
+    Tanks other than bilge/sludge keep the old check on a rise (a missing transfer in). An evaporation
+    entry on a tank whose IOPP Supplement has no evaporation provision is flagged as well."""
+    cfg = cfg_now()
+    tanks = (await db.execute(select(VesselTank).where(VesselTank.vessel_id == vessel_id, VesselTank.is_active == True))).scalars().all()
     if not tanks: return
+    protect = _compute_protected_tank_words(tanks)
     all_rows = await _fetch_vessel_qty_rows(db, vessel_id, upload_id)
 
     for tank in tanks:
         tn = _norm_tank(tank.tank_name, protect)
         rows = _rows_for_tank(all_rows, tn, protect)
+        keeps_rise_check = _get_effective_group(tank) not in EXCLUDED_MASS_BALANCE_GROUPS
         balance = None
         for entry, qty in rows:
+            from_here = _norm_tank(qty.from_tank, protect) == tn
             if qty.qty_type == "retained":
-                if balance is not None and abs(balance - qty.qty_value) > 0.15:
-                    msg = f"[{entry.entry_date}] Tank {tank.tank_name} mass balance error."
-                    await create_alert_if_new(db, vessel_id, entry.id, "mass_balance_error", "major", msg)
+                if balance is not None:
+                    drop = balance - qty.qty_value
+                    if cfg.exceeds("mass_balance_drop_tolerance", drop):
+                        msg = (f"[{entry.entry_date}] Tank {tank.tank_name}: retained {qty.qty_value:g}m³ is {drop:.2f}m³ "
+                               f"below the expected {balance:.2f}m³ -- no transfer, disposal, evaporation or incineration "
+                               f"from this tank explains the drop.")
+                        await create_alert_if_new(db, vessel_id, entry.id, "mass_balance_error", "major", msg)
+                    elif keeps_rise_check and cfg.exceeds("mass_balance_rise_tolerance", -drop):
+                        msg = f"[{entry.entry_date}] Tank {tank.tank_name} mass balance error."
+                        await create_alert_if_new(db, vessel_id, entry.id, "mass_balance_error", "major", msg)
                 balance = qty.qty_value
             elif qty.qty_type == "transferred":
                 if balance is not None: balance += qty.qty_value if _norm_tank(qty.to_tank, protect) == tn else -qty.qty_value
-            elif qty.qty_type in ("disposed", "evaporated") and _norm_tank(qty.from_tank, protect) == tn:
+            elif qty.qty_type in ("disposed", "evaporated", "incinerated") and from_here:
                 if balance is not None: balance -= qty.qty_value
+
+            if qty.qty_type == "evaporated" and from_here and not tank.is_evaporation_allowed:
+                msg = (f"[{entry.entry_date}] Evaporation recorded from {tank.tank_name}, but the IOPP Supplement "
+                       f"has no evaporation provision for this tank.")
+                await create_alert_if_new(db, vessel_id, entry.id, "mass_balance_error", "major", msg)
 
 # ─────────────────────────────────────────────────────────────────────────
 # Check 3 — Tank Capacity Exceeded (+ capacity-reading transcription check)
 # ─────────────────────────────────────────────────────────────────────────
-# Entries at or below this confidence carry figures the extractor could not stand behind.
-_UNCERTAIN_CONFIDENCE = 0.4
-
-
+# Entries at or below the configured confidence (default 0.4) carry figures the extractor could not stand behind.
 def _reading_is_uncertain(entry) -> bool:
     conf = entry.confidence_score
-    if conf is not None and conf <= _UNCERTAIN_CONFIDENCE:
+    if conf is not None and cfg_now().exceeds("low_confidence_cutoff", conf):
         return True
     return "auto-corrected" in (entry.operation_description or "").lower()
 
@@ -451,20 +528,27 @@ async def check_tank_capacity_exceeded(vessel_id: uuid.UUID, upload_id: uuid.UUI
 # ─────────────────────────────────────────────────────────────────────────
 # Check 4 — Combined Capacity Threshold
 # ─────────────────────────────────────────────────────────────────────────
-async def check_combined_capacity_threshold(vessel_id: uuid.UUID, db: AsyncSession):
+async def check_combined_capacity_threshold(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
+    """Alert 5. Latest retained figures of the MAIN tanks (capacity above the configured minimum, 10 m³)
+    against their total capacity. A tank without a capacity is out of both sides of the ratio."""
+    cfg = cfg_now()
     tanks = (await db.execute(select(VesselTank).where(VesselTank.vessel_id == vessel_id, VesselTank.is_active == True))).scalars().all()
-    if not tanks: return
+    main_tanks = [t for t in tanks if t.capacity_m3 and cfg.exceeds("main_tank_min_capacity", t.capacity_m3)]
+    if not main_tanks: return
     protect = _compute_protected_tank_words(tanks)
-    total_cap = sum(t.capacity_m3 for t in tanks if t.capacity_m3)
+    total_cap = sum(t.capacity_m3 for t in main_tanks)
     all_rows = await _fetch_vessel_qty_rows(db, vessel_id, None, [OrbEntryQuantity.qty_type == "retained"])
 
     total_ret = 0.0
-    for tank in tanks:
+    for tank in main_tanks:
         tn = _norm_tank(tank.tank_name, protect)
         matches = _rows_for_tank(all_rows, tn, protect)
         if matches: total_ret += matches[-1][1].qty_value
-    if total_cap > 0 and (total_ret / total_cap) > 0.85:
-        await create_alert_if_new(db, vessel_id, None, "combined_capacity_threshold", "major", "Combined tank fill exceeds 85% threshold limit.")
+    fill_pct = total_ret / total_cap * 100
+    if total_cap > 0 and cfg.exceeds("combined_fill_pct", fill_pct):
+        msg = (f"Combined fill of the main tanks (over {cfg.value('main_tank_min_capacity'):g} m³) is {fill_pct:.1f}% "
+               f"of {total_cap:.1f} m³, above the {cfg.value('combined_fill_pct'):g}% limit.")
+        await create_alert_if_new(db, vessel_id, None, "combined_capacity_threshold", "major", msg, upload_id=upload_id)
 
 # ─────────────────────────────────────────────────────────────────────────
 # Check 5 — Sludge Generation Rate (Pattern Tracking)
@@ -492,7 +576,7 @@ async def check_sludge_generation_rate(vessel_id: uuid.UUID, upload_id: uuid.UUI
                     # branch alone accounted for 72 of 101 total alerts (71%)
                     # raised for the vessel. Only a genuine unexplained DROP
                     # is worth surfacing.
-                    if diff > 0.01:
+                    if cfg_now().exceeds("sludge_drop_tolerance", diff):
                         has_mov = any(e2.entry_date >= prev_ent.entry_date and e2.entry_date <= entry.entry_date and q2.qty_type in ("transferred", "disposed", "incinerated", "evaporated") for e2, q2 in rows)
                         if not has_mov:
                             msg = f"[{entry.entry_date}] Sludge drop in {tank.tank_name} without matching log entry."
@@ -568,21 +652,41 @@ async def check_sludge_vs_fuel_consumption(vessel_id: uuid.UUID, upload_id: uuid
         return
     start_date, end_date = date_range
 
-    total_fuel = (await db.execute(
-        select(func.sum(FuelConsumption.total_fuel_consumption)).where(
-            FuelConsumption.vessel_name == vessel.name,
-            FuelConsumption.report_date >= start_date,
-            FuelConsumption.report_date <= end_date,
-        )
-    )).scalar_one_or_none()
-
-    if not total_fuel or total_fuel <= 0:
-        return
+    # Consumed fuel for the period: the Mariapps reports (vessel performance database) when that source is
+    # connected, otherwise the older WNI fuel table.
+    from app.services import performance_data as perf
+    mariapps = await perf.fuel_for_period(vessel.imo_number, vessel.name, start_date, end_date)
+    if mariapps is not None and mariapps.total_mt <= 0:
+        mariapps = None              # nothing in Mariapps for this period: the older WNI table may still have it
+    fuel_gap = None
+    if mariapps is not None:
+        total_fuel = mariapps.total_mt
+        if cfg_now().exceeds("fuel_coverage_min_pct", mariapps.coverage_pct):
+            first = ", ".join(d.strftime("%d-%b") for d in mariapps.missing_days[:5])
+            fuel_gap = (f"fuel consumption is recorded for only {mariapps.days_covered} of {mariapps.days_total} days "
+                        f"({mariapps.coverage_pct:.0f}%, at least {cfg_now().value('fuel_coverage_min_pct'):.0f}% needed); "
+                        f"missing e.g. {first}.")
+    else:
+        total_fuel = (await db.execute(
+            select(func.sum(FuelConsumption.total_fuel_consumption)).where(
+                FuelConsumption.vessel_name == vessel.name,
+                FuelConsumption.report_date >= start_date,
+                FuelConsumption.report_date <= end_date,
+            )
+        )).scalar_one_or_none()
+        if not total_fuel or total_fuel <= 0:
+            fuel_gap = "no daily fuel consumption records for this period."
 
     tanks_all = (await db.execute(select(VesselTank).where(VesselTank.vessel_id == vessel_id, VesselTank.is_active == True))).scalars().all()
     protect = _compute_protected_tank_words(tanks_all)
     sludge_tanks = [t for t in tanks_all if _get_effective_group(t) == "SLUDGE"]
     if not sludge_tanks: return
+
+    if fuel_gap:
+        # Alert 37: the ratio cannot be judged, so say so instead of staying silent.
+        msg = f"[{start_date} to {end_date}] Review of the generated sludge quantity is not possible: {fuel_gap}"
+        await create_alert_if_new(db, vessel_id, None, "sludge_review_fuel_missing", "minor", msg, upload_id=upload_id)
+        return
 
     all_rows = await _fetch_vessel_qty_rows(db, vessel_id, upload_id, [OrbEntry.orb_code == "C"])
 
@@ -610,16 +714,20 @@ async def check_sludge_vs_fuel_consumption(vessel_id: uuid.UUID, upload_id: uuid
 
     ratio_pct = (total_sludge_generated / total_fuel) * 100
 
-    if ratio_pct >= 2.0:
+    cfg = cfg_now()
+    if cfg.exceeds("sludge_ratio_critical", ratio_pct):
         severity = "critical"
-    elif ratio_pct >= 1.5:
+    elif cfg.exceeds("sludge_ratio_major", ratio_pct):
         severity = "major"
     else:
         return
 
+    grades = ""
+    if mariapps is not None and mariapps.by_grade:
+        grades = " (" + ", ".join(f"{g} {mt:.1f}" for g, mt in sorted(mariapps.by_grade.items())) + ")"
     msg = (f"[{start_date} to {end_date}] Sludge generation rate is {ratio_pct:.2f}% of fuel consumed "
-           f"over this period ({total_fuel:.2f} MT). Total generated: {total_sludge_generated:.2f} m³.")
-    await create_alert_if_new(db, vessel_id, None, "sludge_vs_fuel_consumption", severity, msg)
+           f"over this period ({total_fuel:.2f} MT{grades}). Total generated: {total_sludge_generated:.2f} m³.")
+    await create_alert_if_new(db, vessel_id, None, "sludge_vs_fuel_consumption", severity, msg, upload_id=upload_id, keep_severity=True)
 
 # ─────────────────────────────────────────────────────────────────────────
 # Check 8 — Bilge Transfer vs Soundings
@@ -679,14 +787,26 @@ async def check_bilge_transfer_vs_soundings(vessel_id: uuid.UUID, upload_id: uui
 async def check_bilge_pump_capacity(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
     tanks_all = (await db.execute(select(VesselTank).where(VesselTank.vessel_id == vessel_id, VesselTank.is_active == True))).scalars().all()
     protect = _compute_protected_tank_words(tanks_all)
+    # The pump rate is the rated capacity in the vessel's equipment register, linked to the tank it
+    # pumps from. There is NO default rate: a tank without one is not checked (Vessel Configuration
+    # lists the tanks that still need it). Two pumps on one tank: the faster one counts.
     # Keyed by normalised tank name -- qty.from_tank is the raw extracted
     # string ("BILGE TANK", "E/R BILGE WELLS", ...), which rarely matches
     # the registered vessel_tanks.tank_name verbatim, so an exact-string key
     # (the previous approach) silently missed almost every real entry.
-    tanks = {
-        _norm_tank(t.tank_name, protect): (t.bilge_pump_capacity_m3_per_hr or 2.0)
-        for t in tanks_all if _get_effective_group(t) == "BILGE"
-    }
+    by_id = {t.id: t for t in tanks_all}
+    pumps = (await db.execute(select(Equipment).where(
+        Equipment.vessel_id == vessel_id, Equipment.is_active.is_(True),
+        Equipment.equipment_type.in_(["BILGE_PUMP", "OWS"]),
+        Equipment.rated_capacity_m3_hr.isnot(None), Equipment.rated_capacity_m3_hr > 0,
+        Equipment.linked_tank_id.isnot(None),
+    ))).scalars().all()
+    tanks: dict[str, float] = {}
+    for pump in pumps:
+        tank = by_id.get(pump.linked_tank_id)
+        if tank is None: continue
+        key = _norm_tank(tank.tank_name, protect)
+        tanks[key] = max(tanks.get(key, 0.0), pump.rated_capacity_m3_hr)
     if not tanks: return
 
     base_q = select(OrbEntry, OrbEntryQuantity).join(OrbEntryQuantity).where(
@@ -705,13 +825,17 @@ async def check_bilge_pump_capacity(vessel_id: uuid.UUID, upload_id: uuid.UUID |
         if start is None or stop is None: continue
         hours = ((stop - start) if stop >= start else ((1440 - start) + stop)) / 60.0
         if hours <= 0: continue
-        if qty.qty_value > (pump_cap * hours + 0.05):
+        if cfg_now().exceeds("pump_capacity_allowance", qty.qty_value - pump_cap * hours):
             msg = f"[{entry.entry_date}] Disposed quantity {qty.qty_value}m³ exceeds {pump_cap}m³/hr pump capacity limit."
             await create_alert_if_new(db, vessel_id, entry.id, "bilge_pump_capacity", "major", msg)
 
 # ─────────────────────────────────────────────────────────────────────────
 # Check 10 — Bunker Mismatch
 # ─────────────────────────────────────────────────────────────────────────
+def _is_mt(unit: str | None) -> bool:
+    return (unit or "").strip().lower() in ("mt", "t", "tonne", "tonnes", "ton", "tons", "metric ton", "metric tons")
+
+
 async def check_bunker_mismatch(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
     q_filter = and_(OrbEntry.vessel_id == vessel_id, OrbEntry.orb_code == BUNKER_ORB_CODE, OrbEntry.item_number.in_(BUNKER_ITEMS))
     if upload_id: q_filter = and_(q_filter, OrbEntry.upload_id == upload_id)
@@ -729,16 +853,18 @@ async def check_bunker_mismatch(vessel_id: uuid.UUID, upload_id: uuid.UUID | Non
 
         desc = entry.operation_description or ""
         is_lube = entry.item_number == "26.4"
-        missing_grade = False if is_lube else not re.search(r"\b(VLSFO|HSFO|MGO|MDO|LSMGO|IFO|ULSFO)\b", desc, re.I)
+        missing_grade = False if is_lube else not re.search(r"\b(VLSFO|HSFO|MGO|MDO|LSMGO|VLSMGO|IFO|ULSFO|B24|B30)\b", desc, re.I)
         if total_qty <= 0 or missing_grade or not re.search(r"[A-Za-z0-9]{6,}", desc):
             msg = f"[{entry.entry_date}] Bunker entry missing essential details/specification grades."
             await create_alert_if_new(db, vessel_id, entry.id, "bunker_mismatch", "minor", msg)
 
         # Self-contained quantity check: does the per-tank breakdown add up to the
         # header total actually written on the page? No external reference needed.
-        if header_total is not None and tank_splits and abs(split_sum - header_total) > 0.5:
+        # Compared in MT (alert 8): a figure written in another unit is not compared.
+        in_mt = all(_is_mt(q.qty_unit) for q in bunkered)
+        if in_mt and header_total is not None and tank_splits and cfg_now().exceeds("bunker_sum_tolerance", abs(split_sum - header_total)):
             msg = (f"[{entry.entry_date}] Bunker quantity mismatch: total bunkered "
-                   f"{header_total:.2f} vs per-tank breakdown sums to {split_sum:.2f}.")
+                   f"{header_total:.2f} MT vs per-tank breakdown sums to {split_sum:.2f} MT.")
             await create_alert_if_new(db, vessel_id, entry.id, "bunker_quantity_mismatch", "major", msg)
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -756,7 +882,7 @@ async def check_missing_master_signature(vessel_id: uuid.UUID, upload_id: uuid.U
     page_list = ", ".join(str(p) for p in pages)
     label = "page" if len(pages) == 1 else "pages"
     msg = f"Master/Officer signature not detected on {label} {page_list} in this upload batch."
-    await create_alert_if_new(db, vessel_id, None, "missing_master_signature", "minor", msg)
+    await create_alert_if_new(db, vessel_id, None, "missing_master_signature", "minor", msg, upload_id=upload_id)
 
 # ─────────────────────────────────────────────────────────────────────────
 # Check 12 — Chronology and Erasures
@@ -825,3 +951,359 @@ async def check_entry_gaps(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db
         page = f" (page {entry.page_number})" if entry.page_number else ""
         msg = f"[{entry.entry_date}] Blank line left before this entry{page} — successive entries must not have empty lines between them."
         await create_alert_if_new(db, vessel_id, entry.id, "gap_between_entries", "minor", msg)
+
+# ─────────────────────────────────────────────────────────────────────────
+# Check 15 — Weekly sludge inventory (alert 29)
+# ─────────────────────────────────────────────────────────────────────────
+async def check_weekly_c11(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
+    """A sludge tank needs a Code C 11 retained-quantity entry at least every 7 days. The gap is measured
+    across the vessel's whole history (an upload starts mid-book); the alert goes on the later entry and
+    only for entries of the upload being checked."""
+    tanks = (await db.execute(select(VesselTank).where(VesselTank.vessel_id == vessel_id))).scalars().all()
+    protect = _compute_protected_tank_words(tanks)
+    sludge = {_norm_tank(t.tank_name, protect): t.tank_name for t in tanks if _get_effective_group(t) == "SLUDGE"}
+    if not sludge:
+        return
+    entries = (await db.execute(
+        select(OrbEntry).where(OrbEntry.vessel_id == vessel_id, OrbEntry.orb_code == "C", OrbEntry.item_number.like("11%"))
+        .order_by(OrbEntry.entry_date, OrbEntry.page_number, OrbEntry.created_at)
+    )).scalars().all()
+
+    last_seen: dict[str, object] = {}
+    for e in entries:
+        tn = _norm_tank(e.tank_location, protect)
+        if tn not in sludge:
+            continue
+        prev = last_seen.get(tn)
+        last_seen[tn] = e.entry_date
+        if prev is None or e.entry_date == prev:
+            continue
+        if upload_id and e.upload_id != upload_id:
+            continue
+        gap = (e.entry_date - prev).days
+        if cfg_now().exceeds("weekly_inventory_interval", gap):
+            msg = (f"[{e.entry_date}] {sludge[tn]}: {gap} days since the previous Code C 11 entry ({prev}) - "
+                   f"the retained quantity of a sludge tank must be recorded at least every 7 days.")
+            await create_alert_if_new(db, vessel_id, e.id, "weekly_c11_missing", "minor", msg)
+
+# ─────────────────────────────────────────────────────────────────────────
+# Check 16 — Officer signature per entry (alert 30)
+# ─────────────────────────────────────────────────────────────────────────
+async def check_officer_signatures(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
+    """Each operation needs the signature of the officer in charge. Judged only where the extractor read
+    it (officer_signature_present not NULL), so older uploads never raise false alerts. The names of the
+    officers are read from the signature line itself, so an entry that has any is signed whatever the
+    yes/no flag says (the flag alone was wrong on pages where the signature is plainly there)."""
+    q = select(OrbEntry).where(
+        OrbEntry.vessel_id == vessel_id, OrbEntry.officer_signature_present.is_(False),
+        func.coalesce(func.trim(OrbEntry.officer_1_name), "") == "", func.coalesce(func.trim(OrbEntry.officer_2_name), "") == "",
+    )
+    if upload_id:
+        q = q.where(OrbEntry.upload_id == upload_id)
+    for e in (await db.execute(q)).scalars().all():
+        page = f" (page {e.page_number})" if e.page_number else ""
+        msg = f"[{e.entry_date}] Code {e.orb_code} {e.item_number or ''}{page}: no officer-in-charge signature detected on this entry."
+        await create_alert_if_new(db, vessel_id, e.id, "missing_officer_signature", "major", msg)
+
+# ─────────────────────────────────────────────────────────────────────────
+# Check 17 — Late entry inside a page (alert 31)
+# ─────────────────────────────────────────────────────────────────────────
+async def check_late_entries(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
+    """An entry dated earlier than an entry above it on the same page was inserted late. Uses the order in
+    which the extractor returned the entries (entry_seq), so older uploads without it are skipped. Entries
+    already caught by the cross-page check (alert 16) are not raised twice."""
+    q = select(OrbEntry).where(OrbEntry.vessel_id == vessel_id, OrbEntry.entry_seq.isnot(None))
+    if upload_id:
+        q = q.where(OrbEntry.upload_id == upload_id)
+    entries = (await db.execute(q.order_by(OrbEntry.upload_id, OrbEntry.page_number, OrbEntry.entry_seq))).scalars().all()
+
+    upload_max: dict = {}           # upload -> highest date on the pages before the current one
+    cur_key, page_max = None, None
+    for e in entries:
+        key = (e.upload_id, e.page_number)
+        if key != cur_key:
+            if cur_key is not None and page_max is not None:
+                upload_max[cur_key[0]] = max(upload_max.get(cur_key[0], page_max), page_max)
+            cur_key, page_max = key, None
+        earlier_pages = upload_max.get(e.upload_id)
+        cross_page = earlier_pages is not None and e.entry_date < earlier_pages
+        if page_max is not None and e.entry_date < page_max and not cross_page:
+            msg = (f"[{e.entry_date}] Entry on page {e.page_number} is dated earlier than the entry above it ({page_max}) - "
+                   f"possible late or back-dated entry; operations must be recorded without delay.")
+            await create_alert_if_new(db, vessel_id, e.id, "late_entry", "minor", msg)
+        page_max = e.entry_date if page_max is None else max(page_max, e.entry_date)
+
+# ─────────────────────────────────────────────────────────────────────────
+# Check 18 — Code A/B (alert 32) and Code G (alert 34)
+# ─────────────────────────────────────────────────────────────────────────
+async def check_code_flags(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
+    q = select(OrbEntry).where(OrbEntry.vessel_id == vessel_id, OrbEntry.orb_code.in_(("A", "B", "G")))
+    if upload_id:
+        q = q.where(OrbEntry.upload_id == upload_id)
+    for e in (await db.execute(q)).scalars().all():
+        page = f" (page {e.page_number})" if e.page_number else ""
+        if e.orb_code == "G":
+            msg = (f"[{e.entry_date}] Accidental or exceptional discharge recorded (Code G {e.item_number or ''}){page} - "
+                   f"confirm the circumstances are written up and the coastal/flag State report was made.")
+            await create_alert_if_new(db, vessel_id, e.id, "accidental_discharge_notify", "major", msg)
+        else:
+            what = "fuel tank ballasting / cleaning" if e.orb_code == "A" else "dirty ballast / cleaning water discharge"
+            msg = f"[{e.entry_date}] Code {e.orb_code} entry ({what}){page} - not validated by the system, review the full entry."
+            await create_alert_if_new(db, vessel_id, e.id, "code_ab_present", "observation", msg)
+
+# ─────────────────────────────────────────────────────────────────────────
+# Check 19 — Book language (alert 36)
+# ─────────────────────────────────────────────────────────────────────────
+_ACCEPTED_LANGUAGES = {"english", "french", "spanish", "en", "fr", "es", "francais", "français", "espanol", "español"}
+
+
+async def check_book_language(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
+    """MARPOL Annex I Reg 17.5: entries are in an official language of the flag State and, where that is not
+    English, French or Spanish, also in one of these. Raised once per vessel until resolved."""
+    vessel = await db.get(Vessel, vessel_id)
+    flag_lang = (getattr(vessel, "flag_official_language", None) or "").strip().lower()
+    if not flag_lang or flag_lang in _ACCEPTED_LANGUAGES:
+        return
+    q = select(OrbEntry.page_language).where(OrbEntry.vessel_id == vessel_id, OrbEntry.page_language.isnot(None))
+    if upload_id:
+        q = q.where(OrbEntry.upload_id == upload_id)
+    found = {(l or "").strip().lower() for (l,) in (await db.execute(q.distinct())).all()}
+    found.discard("")
+    if not found or found & _ACCEPTED_LANGUAGES:
+        return
+    msg = (f"Entries are written in {', '.join(sorted(l.title() for l in found))}; the flag State's official language is "
+           f"{vessel.flag_official_language}, so a translation into English, French or Spanish is required.")
+    await create_alert_if_new(db, vessel_id, None, "orb_language", "minor", msg, upload_id=upload_id)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Check 20 — Automatic discharge in port / at anchor / polar or special area (alert 33)
+# ─────────────────────────────────────────────────────────────────────────
+async def check_auto_discharge_location(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
+    """Code E 16 (system placed in automatic mode for discharge overboard): where was the vessel at that time?
+    Position and status come from the Mariapps reports (noon / arrival / departure / BOSP / EOSP) kept in the
+    vessel performance database. Major in port, at anchor or in polar waters; an Observation in a MARPOL special
+    area (confirm the 15 ppm alarm and automatic stop). Where the reports do not cover the time, nothing is raised.
+    Code E 17/18 (back to manual mode, reasons) are not discharges and are not judged."""
+    from datetime import datetime, time as dtime
+    from app.services import performance_data as perf
+    from app.services.geo_areas import POLAR
+
+    q = select(OrbEntry).where(OrbEntry.vessel_id == vessel_id, OrbEntry.orb_code == "E", OrbEntry.item_number == "16")
+    if upload_id:
+        q = q.where(OrbEntry.upload_id == upload_id)
+    entries = [e for e in (await db.execute(q)).scalars().all() if _parse_time(e.time_start) is not None]
+    if not entries:
+        return
+    vessel = await db.get(Vessel, vessel_id)
+    first = min(e.entry_date for e in entries) - timedelta(days=4)
+    last = max(e.entry_date for e in entries) + timedelta(days=4)
+    logs = await perf.load_logs(vessel.imo_number, vessel.name, first, last)
+    if not logs:
+        return
+
+    for e in entries:
+        mins = _parse_time(e.time_start)
+        near = min(logs, key=lambda r: abs((r.local_date - e.entry_date).days))
+        t_local = datetime.combine(e.entry_date, dtime(mins // 60, mins % 60))
+        t_utc = t_local - timedelta(minutes=near.tz_min)
+        st = perf.status_at(logs, t_utc)
+        area = perf.area_of(st)
+        when = f"[{e.entry_date} {e.time_start}]"
+        if st.not_en_route:
+            msg = (f"{when} Automatic discharge (Code E 16) started while the vessel was {st.state} ({st.basis}) - "
+                   f"automatic discharge is not permitted in port or at anchor.")
+            await create_alert_if_new(db, vessel_id, e.id, "auto_discharge_location", "major", msg, keep_severity=True)
+        elif area in POLAR:
+            msg = (f"{when} Automatic discharge (Code E 16) started in the {area} ({st.lat:.2f}, {st.lon:.2f}; {st.basis}) - "
+                   f"discharge of oily mixtures is prohibited there.")
+            await create_alert_if_new(db, vessel_id, e.id, "auto_discharge_location", "major", msg, keep_severity=True)
+        elif area:
+            msg = (f"{when} Automatic discharge (Code E 16) started in a special area: {area} ({st.lat:.2f}, {st.lon:.2f}; {st.basis}) - "
+                   f"confirm the 15 ppm alarm and automatic stop were in operation.")
+            await create_alert_if_new(db, vessel_id, e.id, "auto_discharge_location", "observation", msg, keep_severity=True)
+
+# ─────────────────────────────────────────────────────────────────────────
+# Check 21 — Bunker entry vs Bunker Delivery Note (alert 35)
+# ─────────────────────────────────────────────────────────────────────────
+_SULPHUR_STATED = re.compile(r"(sulph|sulf)|\bS\s*[:=]?\s*\d|\d\s*%\s*(m/?m|wt)?", re.I)
+_HFO_WORDS = re.compile(r"\b(VLSFO|HSFO|ULSFO|LSFO|IFO|HFO|RME|RMG|RMK|B24|B30)\b", re.I)
+_MDO_WORDS = re.compile(r"\b(MGO|MDO|LSMGO|VLSMGO|ULSMGO|DMA|DMB|DMX|DMZ)\b", re.I)
+
+
+def _grade_family(text_: str | None) -> str | None:
+    t = text_ or ""
+    hfo, mdo = bool(_HFO_WORDS.search(t)), bool(_MDO_WORDS.search(t))
+    if hfo == mdo:
+        return None      # none named, or both: nothing to compare
+    return "HFO" if hfo else "MDO"
+
+
+async def check_bunker_bdn_mismatch(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
+    """H 26.3 must state the sulphur content (% m/m), and its quantity and grade must match the Bunker Delivery
+    Note kept in Mariapps. BDNs are matched by date (within 2 days). Skipped for a vessel with no bunker reports in
+    Mariapps, and an entry older than the vessel's first bunker report is not blamed for having no BDN."""
+    from app.services import performance_data as perf
+
+    q = select(OrbEntry).where(OrbEntry.vessel_id == vessel_id, OrbEntry.orb_code == BUNKER_ORB_CODE, OrbEntry.item_number == BUNKER_ITEM)
+    if upload_id:
+        q = q.where(OrbEntry.upload_id == upload_id)
+    entries = (await db.execute(q)).scalars().all()
+    if not entries:
+        return
+    vessel = await db.get(Vessel, vessel_id)
+    records = await perf.load_bunkers(vessel.imo_number, vessel.name)
+    if not records:
+        return                       # source not connected, or this vessel has no bunker reports there
+    bunkerings = [b for b in records if b.transaction_type.strip().lower() == "bunkering" and b.begin]
+    if not bunkerings:
+        return
+    covered_from = min(b.begin.date() for b in bunkerings)
+
+    for e in entries:
+        qty_rows = (await db.execute(select(OrbEntryQuantity).where(OrbEntryQuantity.entry_id == e.id, OrbEntryQuantity.qty_type == "bunkered"))).scalars().all()
+        header = next((qy.qty_value for qy in qty_rows if not qy.to_tank), None)
+        splits = [qy for qy in qty_rows if qy.to_tank]
+        total = header if header is not None else (sum(qy.qty_value for qy in splits) if splits else None)
+        in_mt = bool(qty_rows) and all(_is_mt(qy.qty_unit) for qy in qty_rows)
+        text_ = f"{e.operation_description or ''} {e.raw_text or ''}"
+
+        issues = []
+        if not _SULPHUR_STATED.search(text_):
+            issues.append("the sulphur content (% m/m) is not stated")
+
+        near = [b for b in bunkerings if abs((b.begin.date() - e.entry_date).days) <= 2]
+        if not near:
+            if e.entry_date >= covered_from:
+                issues.append("no Bunker Delivery Note found in Mariapps for this date")
+        else:
+            bdn = min(near, key=lambda b: abs((b.quantity_mt or 0) - (total or 0)) if total is not None else 0)
+            if total is not None and in_mt and bdn.quantity_mt:
+                pct = abs(total - bdn.quantity_mt) / bdn.quantity_mt * 100
+                if cfg_now().exceeds("bdn_qty_tolerance", pct):
+                    issues.append(f"quantity {total:.2f} MT differs from the BDN {bdn.bdn_reference_no or ''} ({bdn.quantity_mt:.2f} MT, {pct:.1f}%)".replace("  ", " "))
+            fam, bdn_fam = _grade_family(text_), _grade_family(f"{bdn.imo_fuel_grade} {bdn.fuel_type}")
+            if fam and bdn_fam and fam != bdn_fam:
+                issues.append(f"grade written as {fam} but the BDN is {bdn_fam} ({bdn.fuel_type or bdn.imo_fuel_grade})")
+        if issues:
+            msg = f"[{e.entry_date}] Bunker entry vs BDN: " + "; ".join(issues) + "."
+            await create_alert_if_new(db, vessel_id, e.id, "bunker_bdn_mismatch", "minor", msg)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Check 22 — Tank not in the IOPP Supplement (alert 25)
+# ─────────────────────────────────────────────────────────────────────────
+_NOT_A_TANK = re.compile(r"incinerat|overboard|shore|ashore|reception|barge|separator|\bows\b|\bsea\b|\bfacility\b", re.I)
+
+
+async def check_tank_not_in_iopp(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
+    """Every sludge / bilge tank named in a Code C or D entry must be a tank of the vessel's IOPP register
+    (the registered tanks marked IOPP, by their registered or their IOPP name), valid on the entry date, and where
+    the IOPP capacity is recorded it must equal the registered capacity. A vessel with no IOPP tanks registered
+    cannot be judged. Destinations that are not tanks (incinerator, shore, overboard...) are ignored."""
+    tanks = (await db.execute(select(VesselTank).where(VesselTank.vessel_id == vessel_id))).scalars().all()
+    register = [t for t in tanks if t.is_iopp]
+    if not register:
+        return
+    protect = _compute_protected_tank_words(tanks)
+    index: dict[str, list] = {}
+    for t in register:
+        for nm in (t.tank_name, t.tank_name_iopp):
+            if nm:
+                index.setdefault(_norm_tank(nm, protect), []).append(t)
+
+    q = select(OrbEntry).where(OrbEntry.vessel_id == vessel_id, OrbEntry.orb_code.in_(("C", "D")))
+    if upload_id:
+        q = q.where(OrbEntry.upload_id == upload_id)
+    for e in (await db.execute(q)).scalars().all():
+        qty_rows = (await db.execute(select(OrbEntryQuantity.from_tank, OrbEntryQuantity.to_tank).where(OrbEntryQuantity.entry_id == e.id))).all()
+        names: dict[str, str] = {}
+        for nm in [e.tank_location] + [x for r in qty_rows for x in r]:
+            if nm and nm.strip():
+                names.setdefault(_norm_tank(nm, protect), nm.strip())
+        problems = []
+        for key, nm in names.items():
+            if key == "unknown" or (_NOT_A_TANK.search(nm) and "tank" not in nm.lower()):
+                continue
+            cands = index.get(key)
+            if not cands:
+                problems.append(f"'{nm}' is not a tank of the IOPP register")
+                continue
+            valid = [t for t in cands if (t.effective_from is None or t.effective_from <= e.entry_date)
+                     and (t.effective_to is None or e.entry_date <= t.effective_to)]
+            if not valid:
+                problems.append(f"'{nm}' was not in the IOPP register on this date")
+                continue
+            t = valid[0]
+            if t.iopp_capacity_m3 is not None and abs(t.iopp_capacity_m3 - t.capacity_m3) > 0.005:
+                problems.append(f"'{t.tank_name}': registered capacity {t.capacity_m3:g} m3 differs from the IOPP capacity {t.iopp_capacity_m3:g} m3")
+        if problems:
+            msg = f"[{e.entry_date}] Code {e.orb_code} {e.item_number or ''}: " + "; ".join(problems) + "."
+            await create_alert_if_new(db, vessel_id, e.id, "tank_not_in_iopp", "major", msg)
+
+# ─────────────────────────────────────────────────────────────────────────
+# Check 23 — ORB vs 15 ppm bilge alarm record (alert 23)
+# ─────────────────────────────────────────────────────────────────────────
+async def check_ows_alarm_record(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: AsyncSession):
+    """Each D 15.1 (discharge overboard through the 15 ppm equipment) must match a discharge operation in the
+    imported monitor data, within the time window, and each recorded operation must have a D 15.1 entry. Only
+    dates the imported data covers are judged. An operation with no entry has no entry to carry the alert, so those
+    are listed in one alert for the upload."""
+    from datetime import datetime, time as dtime
+    from app.models.orb_config import OcmImport, OcmRecord
+    from app.services import ocm_data
+
+    cover = (await db.execute(select(func.min(OcmImport.period_from), func.max(OcmImport.period_to)).where(OcmImport.vessel_id == vessel_id))).one()
+    if not cover[0]:
+        return                                      # no monitor data imported for this vessel
+    cov_from, cov_to = cover[0].date(), cover[1].date()
+
+    q = select(OrbEntry).where(OrbEntry.vessel_id == vessel_id, OrbEntry.orb_code == "D", OrbEntry.item_number == "15.1")
+    if upload_id:
+        q = q.where(OrbEntry.upload_id == upload_id)
+    in_scope = [e for e in (await db.execute(q)).scalars().all() if cov_from <= e.entry_date <= cov_to]
+    if not in_scope:
+        return
+    window = cfg_now().value("alarm_match_window")
+
+    lo = min(e.entry_date for e in in_scope) - timedelta(days=1)
+    hi = max(e.entry_date for e in in_scope) + timedelta(days=2)
+    recs = (await db.execute(
+        select(OcmRecord.recorded_at, OcmRecord.discharging).where(
+            OcmRecord.vessel_id == vessel_id, OcmRecord.recorded_at >= datetime.combine(lo, dtime.min), OcmRecord.recorded_at <= datetime.combine(hi, dtime.min)
+        ).order_by(OcmRecord.recorded_at)
+    )).all()
+    ops = ocm_data.operations(recs)
+
+    def span(e):
+        s = _parse_time(e.time_start)
+        if s is None:
+            return datetime.combine(e.entry_date, dtime.min), datetime.combine(e.entry_date, dtime.min) + timedelta(days=1)
+        start = datetime.combine(e.entry_date, dtime(s // 60, s % 60))
+        t = _parse_time(e.time_stop)
+        end = start if t is None else datetime.combine(e.entry_date, dtime(t // 60, t % 60))
+        return start, end + (timedelta(days=1) if end < start else timedelta())
+
+    for e in in_scope:
+        s, t = span(e)
+        if not any(ocm_data.overlaps(s, t, op, window) for op in ops):
+            when = f"{e.time_start}" + (f"-{e.time_stop}" if e.time_stop else "") if e.time_start else "no time written"
+            msg = (f"[{e.entry_date} {when}] Discharge overboard through the 15 ppm equipment (D 15.1) has no matching "
+                   f"discharge in the 15 ppm monitor record (within {window:g} minutes).")
+            await create_alert_if_new(db, vessel_id, e.id, "ows_alarm_record_mismatch", "critical", msg)
+
+    # recorded operations with no D 15.1 entry anywhere in the vessel's book
+    if upload_id:
+        d_lo, d_hi = min(e.entry_date for e in in_scope), max(e.entry_date for e in in_scope)
+        all_d = (await db.execute(
+            select(OrbEntry).where(OrbEntry.vessel_id == vessel_id, OrbEntry.orb_code == "D", OrbEntry.item_number == "15.1",
+                                   OrbEntry.entry_date >= d_lo - timedelta(days=1), OrbEntry.entry_date <= d_hi + timedelta(days=1))
+        )).scalars().all()
+        spans = [span(e) for e in all_d]
+        orphans = [op for op in ops if d_lo <= op[0].date() <= d_hi and not any(ocm_data.overlaps(s, t, op, window) for s, t in spans)]
+        if orphans:
+            first = "; ".join(f"{op[0]:%d-%b %H:%M}-{op[1]:%H:%M}" for op in orphans[:5])
+            more = f" and {len(orphans) - 5} more" if len(orphans) > 5 else ""
+            msg = (f"{len(orphans)} discharge operation(s) in the 15 ppm monitor record have no D 15.1 entry in the Oil Record Book "
+                   f"({d_lo} to {d_hi}): {first}{more}.")
+            await create_alert_if_new(db, vessel_id, None, "ows_alarm_record_mismatch", "critical", msg, upload_id=upload_id)

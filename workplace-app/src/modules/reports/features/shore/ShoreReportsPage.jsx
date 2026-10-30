@@ -52,6 +52,8 @@ export default function ShoreReportsPage() {
   const [selectedImo, setSelectedImo] = useState('');
   const [expandedFreqs, setExpandedFreqs] = useState(['DAILY', 'WEEKLY', 'MONTHLY']);
   const [selectedReportName, setSelectedReportName] = useState('');
+  // Same report name exists under several frequencies (e.g. a tank's half-yearly and yearly reports), so a selection is name + frequency.
+  const [selectedFreq, setSelectedFreq] = useState('');
   const [search, setSearch] = useState('');
   const [sidebarSearch, setSidebarSearch] = useState('');
   const [selectedRow, setSelectedRow] = useState(null); // The report opened in the Modal
@@ -108,6 +110,7 @@ export default function ShoreReportsPage() {
         setExpandedFreqs(prev => prev.includes(f) ? prev : [...prev, f]);
 
         setSelectedReportName(target.report_name);
+        setSelectedFreq(f);
         setSelectedRow(target);
 
         if (searchParams.get('thread') === 'true') {
@@ -223,19 +226,22 @@ export default function ShoreReportsPage() {
       const names = getSortedNames(f);
       if (names.length > 0) {
         setSelectedReportName(names[0]);
+        setSelectedFreq(f);
         if (!expandedFreqs.includes(f)) setExpandedFreqs(p => [...p, f]);
         return;
       }
     }
     setSelectedReportName('');
+    setSelectedFreq('');
   }, [activeVesselImo]); // eslint-disable-line
 
   const toggleFreq = useCallback((id) => {
     setExpandedFreqs(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   }, []);
 
-  const selectReport = useCallback((name) => {
+  const selectReport = useCallback((name, freq) => {
     setSelectedReportName(name);
+    setSelectedFreq(freq);
     setSelectedRow(null);
   }, []);
 
@@ -248,11 +254,7 @@ function reportDate(r) {
   const tableData = useMemo(() => {
     if (!selectedReportName) return [];
     let rows = [];
-    for (const f in treeData) {
-      if (treeData[f][selectedReportName]) {
-        rows = rows.concat(treeData[f][selectedReportName]);
-      }
-    }
+    rows = treeData[selectedFreq]?.[selectedReportName] || [];
     const q = search.toLowerCase();
     return rows
       .filter(r => !q ||
@@ -266,7 +268,7 @@ function reportDate(r) {
         const dateB = reportDate(b)?.getTime() || 0;
         return dateB - dateA;
       });
-  }, [treeData, selectedReportName, search]);
+  }, [treeData, selectedReportName, selectedFreq, search]);
 
   const totalUnread = reports.reduce((a, r) => a + (r.unread_shore || 0), 0);
 
@@ -422,12 +424,12 @@ function reportDate(r) {
                     ) : (
                       reportNames.map(name => {
                         const instances = treeData[freqId][name];
-                        const isActive = selectedReportName === name;
+                        const isActive = selectedReportName === name && selectedFreq === freqId;
                         return (
                           <div
                             key={name}
                             className={`rt-tree-leaf ${isActive ? 'active' : ''}`}
-                            onClick={() => selectReport(name)}
+                            onClick={() => selectReport(name, freqId)}
                             onMouseEnter={(e) => handleTooltipEnter(e, name)}
                             onMouseLeave={handleTooltipLeave}
                           >

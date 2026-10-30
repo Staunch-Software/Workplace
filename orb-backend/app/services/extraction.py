@@ -14,7 +14,9 @@ from sqlalchemy import select
 from sqlalchemy import select as sa_select
 
 from app.config import get_settings
-from app.services.gemini_config import gemini_model, gemini_thinking_config
+from app.services.gemini_config import generate as gemini_generate, gemini_model, create_prompt_cache, delete_prompt_cache
+from app.services.gemini_usage import start_collection
+from app.models.orb_upload_raw import OrbUploadRaw
 from app.models.orb_upload import OrbUpload
 from app.models.orb_entry import OrbEntry
 from app.models.orb_entry_quantity import OrbEntryQuantity
@@ -267,6 +269,18 @@ neither does a completely blank line. If the page has no such line at all, or th
 present but empty/unsigned, set false. This single true/false value applies to every entry
 extracted from this page.
 
+OFFICER SIGNATURE (per ENTRY):
+Every completed operation must be signed by the officer in charge: a handwritten signature or
+paraph on the signature line directly below the entry, usually followed by rank, name and date
+(e.g. "◠◠◠; 3E; M.SATHIK; 28-DEC-2025"). Set officer_signature_present = true when that line
+carries a handwritten mark for THIS entry. Set false ONLY when the signature line below the
+entry is clearly empty, or the entry has no signature line at all before the next entry begins.
+A typed or printed name with no handwritten mark counts as false. If you are unsure, set true.
+If you filled officer_1_name or officer_2_name from that line, the line is signed: set true.
+Handwritten words such as a name, rank and date written on that line are the signature in this book.
+Codes: A and B are the fuel-tank ballasting and dirty-ballast entries; use them only when the
+Code column really reads A or B.
+
 ERASURES / CORRECTIONS (per entry):
 IMO guidance: "If a wrong entry has been recorded, it should immediately be struck through
 with a single line in such a way that the wrong entry is still legible. The wrong entry should
@@ -374,13 +388,14 @@ JSON STRUCTURE — return exactly this:
   "non_orb_page": <true|false — see NON-ORB PAGES rule above>,
   "non_orb_page_note": "<short description if non_orb_page is true, else null>",
   "master_signature_present": <true|false — see MASTER SIGNATURE rule below>,
+  "page_language": "<the language the entries on this page are written in, e.g. English, French, Spanish, Chinese, Russian — null if the page has no handwritten text>",
   "leading_continuation": {"text":.., "item_lines": [...same shape as entry item_lines...], "tank_location":.., "time_start":.., "time_stop":..,
     "position_start":.., "position_stop":.., "quantities": [...same shape as entry quantities...],
     "officer_1_name":.., "officer_1_rank":.., "officer_2_name":.., "officer_2_rank":..} or null,
   "entries": [
     {
       "entry_date": "DD-MMM-YYYY",
-      "orb_code": "<C|D|E|F|G|H|I>",
+      "orb_code": "<A|B|C|D|E|F|G|H|I>",
       "is_continuation": <true if THIS row's Date and Code columns were blank on the page —
         nothing freshly written there, only an item number and/or a comment/value continuing
         the previous entry — false if this row has a freshly written Date and Code of its own.
@@ -417,7 +432,8 @@ JSON STRUCTURE — return exactly this:
       "raw_text": "<complete verbatim text of the entire block including all item lines>",
       "confidence_score": <0.0-1.0>,
       "has_gap_before": <true|false — see GAPS BETWEEN ENTRIES rule below>,
-      "has_erasure": <true|false — see ERASURES / CORRECTIONS rule below>
+      "has_erasure": <true|false — see ERASURES / CORRECTIONS rule below>,
+      "officer_signature_present": <true|false — see OFFICER SIGNATURE rule below>
     }
   ]
 }
@@ -907,6 +923,10 @@ def parse_entry_date(date_str: str) -> date:
     # _TRAILING_DATE_RE-based signature-date checks (_signature_date_matches,
     # _reconcile_entry_date_vs_own_signature) silently never matched any
     # 2-digit-year signature at all, since this function raised on them.
+    # "SEPT" is a common written form of September that strptime's %b does not accept; a model that
+    # transcribes the page literally (gemini-3.5-flash-lite) returns it, and every such entry was
+    # dropped as "unparseable date".
+    date_str = re.sub(r"(?i)(?<=[\d\-\s/])SEPT(?=[\d\-\s/]|$)", "SEP", date_str or "")
     for fmt in ("%d-%b-%Y", "%d/%m/%Y", "%Y-%m-%d", "%d-%B-%Y", "%d-%m-%Y",
                 "%d-%b-%y", "%d-%B-%y", "%d/%m/%y", "%d-%m-%y"):
         try:
@@ -1082,6 +1102,24 @@ class FailedPages(list):
     def __init__(self, *args):
         super().__init__(*args)
         self.reasons: dict[int, str] = {}
+        # How the raw PDF pages were split (see _page_map_from_manifest); carried out of the
+        # extractor with the result so run_extraction can store it on the upload.
+        self.page_map: list | None = None
+
+
+def _page_map_from_manifest(manifest: list | None) -> list | None:
+    """[{"raw_page": 7, "path": "stacked_split", "outputs": 2}, ...] from the split manifest.
+
+    An entry's page_number counts the pages AFTER splitting; this is what maps it back to the
+    page of the uploaded PDF (services/alert_pages.py)."""
+    if not manifest:
+        return None
+    out = []
+    for m in manifest:
+        path = m.get("path")
+        outputs = m.get("output_count") or (2 if path == "stacked_split" else 1)
+        out.append({"raw_page": m.get("raw_page_index"), "path": path, "outputs": int(outputs)})
+    return out
 
 
 def _is_billing_error(exc: Exception) -> bool:
@@ -1161,18 +1199,10 @@ def _detect_vessel_name(client, page_image) -> str | None:
     buf = _io.BytesIO()
     page_image.save(buf, format="PNG")
     try:
-        response = client.models.generate_content(
-            model=gemini_model(),
-            contents=[
-                types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
-                _VESSEL_NAME_CHECK_PROMPT,
-            ],
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-                max_output_tokens=500,
-                response_mime_type="application/json",
-                thinking_config=gemini_thinking_config(types),
-            ),
+        response = gemini_generate(
+            client, "vessel_name",
+            [types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"), _VESSEL_NAME_CHECK_PROMPT],
+            light=True, small_output=500, temperature=0.0, response_mime_type="application/json",
         )
         data = _json.loads(response.text.strip())
         name = data.get("ship_name") if isinstance(data, dict) else None
@@ -1213,17 +1243,10 @@ def _detect_stacked_pages(client, page_image) -> tuple[int, float | None]:
     buf = _io.BytesIO()
     page_image.save(buf, format="PNG")
     try:
-        response = client.models.generate_content(
-            model=gemini_model(),
-            contents=[
-                types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
-                _STACK_SPLIT_PROMPT,
-            ],
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-                max_output_tokens=2000,
-                response_mime_type="application/json",
-            ),
+        response = gemini_generate(
+            client, "stack_detect",
+            [types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"), _STACK_SPLIT_PROMPT],
+            light=True, small_output=2000, temperature=0.0, response_mime_type="application/json",
         )
         data = _json.loads(response.text.strip())
         count = int(data.get("page_count") or 1)
@@ -1338,18 +1361,10 @@ def _call_boundary_recheck(client, page_image) -> dict | None:
     buf = _io.BytesIO()
     strip.save(buf, format="PNG")
     try:
-        response = client.models.generate_content(
-            model=gemini_model(),
-            contents=[
-                types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
-                _BOUNDARY_RECHECK_PROMPT,
-            ],
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-                max_output_tokens=2000,
-                response_mime_type="application/json",
-                thinking_config=gemini_thinking_config(types),
-            ),
+        response = gemini_generate(
+            client, "boundary_recheck",
+            [types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"), _BOUNDARY_RECHECK_PROMPT],
+            light=True, small_output=2000, temperature=0.0, response_mime_type="application/json",
         )
         data = _json.loads(response.text.strip())
         continuation = data.get("continuation")
@@ -1518,18 +1533,10 @@ def _call_targeted_orphan_recheck(client, page_image, orphan: dict) -> dict | No
     strip.save(buf, format="PNG")
     prompt = _build_targeted_orphan_prompt(orphan)
     try:
-        response = client.models.generate_content(
-            model=gemini_model(),
-            contents=[
-                types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
-                prompt,
-            ],
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-                max_output_tokens=2000,
-                response_mime_type="application/json",
-                thinking_config=gemini_thinking_config(types),
-            ),
+        response = gemini_generate(
+            client, "orphan_recheck",
+            [types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"), prompt],
+            light=True, small_output=2000, temperature=0.0, response_mime_type="application/json",
         )
         data = _json.loads(response.text.strip())
         continuation = data.get("continuation")
@@ -2034,7 +2041,7 @@ async def extract_with_gemini(
         if detected_name and not _vessel_names_plausibly_match(detected_name, expected_vessel_name):
             raise VesselMismatchError(detected_name, expected_vessel_name)
 
-    split_manifest: list = [] if debug_dir is not None else None
+    split_manifest: list = []        # always kept: it is what maps entry pages back to PDF pages
     pages = await _split_pages_for_gemini(pages, client, split_manifest=split_manifest)
     if debug_dir is not None:
         import json as _json_debug
@@ -2053,44 +2060,42 @@ async def extract_with_gemini(
         prompt_text = f"Extract all ORB entries from page {page_num}."
         if roster_hint:
             prompt_text += f"\n\n{roster_hint}"
-        response = client.models.generate_content(
-            model=gemini_model(),
-            contents=[
-                types.Part.from_bytes(
-                    data=buf.getvalue(),
-                    mime_type="image/png",
-                ),
-                prompt_text,
-            ],
-            config=types.GenerateContentConfig(
-                system_instruction=EXTRACTION_SYSTEM_PROMPT,
-                # A page with several dense entries (verbatim raw_text, quantities,
-                # positions, officer info per entry) can approach/exceed 8192 tokens,
-                # silently truncating the JSON and dropping the last entries on the
-                # page. Raised with margin — see the 08-Mar case where the last two
-                # of six entries on one page vanished with no error at all.
-                max_output_tokens=32768,
-                # gemini-2.5-flash spends part of any output-token budget on its own
-                # internal "thinking" before writing the actual JSON -- confirmed in
-                # production via the debug dump (EXTRACTION_DEBUG_DIR): two separate
-                # pages' raw responses cut off mid-object, mid-entry, with the closing
-                # brackets simply never generated, well inside what 32768 tokens should
-                # cover for a single page's JSON. This task doesn't need extended
-                # reasoning -- the system prompt above already spells out, step by step,
-                # exactly how to resolve every judgment call (entry boundaries, date
-                # ambiguity, continuations) -- so disabling thinking removes the
-                # competition for the output budget entirely rather than trying to
-                # guess a max_output_tokens large enough to outrun an unpredictable
-                # thinking allocation.
-                thinking_config=gemini_thinking_config(types),
-                temperature=0.1,
-                response_mime_type="application/json",
-            ),
+        contents = [types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"), prompt_text]
+        # With a prompt cache the instructions are referenced, not re-sent; a cache that has
+        # expired or vanished drops us back to sending them (the call is then just full price).
+        instructions = (
+            {"cached_content": prompt_cache["name"]} if prompt_cache["name"]
+            else {"system_instruction": EXTRACTION_SYSTEM_PROMPT}
         )
+        extra = dict(
+            # A page with several dense entries (verbatim raw_text, quantities, positions, officer
+            # info per entry) can approach/exceed 8192 tokens, silently truncating the JSON and
+            # dropping the last entries on the page (the 08-Mar case) -- hence the large limit.
+            # Thinking is controlled centrally (gemini_config.gemini_thinking_config): switched off
+            # on 2.5 models, lowered by GEMINI_THINKING_LEVEL on newer ones, because thinking tokens
+            # compete with the JSON for this output budget and are billed as output.
+            max_output_tokens=32768,
+            temperature=0.1,
+            response_mime_type="application/json",
+        )
+        try:
+            response = gemini_generate(client, "extract", contents, **instructions, **extra)
+        except Exception as e:
+            if not prompt_cache["name"]:
+                raise
+            logger.warning("Extraction call with prompt cache failed (%s); sending instructions directly", e)
+            prompt_cache["name"] = None
+            response = gemini_generate(client, "extract", contents,
+                                       system_instruction=EXTRACTION_SYSTEM_PROMPT, **extra)
         return response.text.strip()
+
+    prompt_cache = {"name": await asyncio.to_thread(create_prompt_cache, client, EXTRACTION_SYSTEM_PROMPT)}
+    if prompt_cache["name"]:
+        logger.warning("Extraction instructions cached for this upload (%s)", prompt_cache["name"])
 
     all_entries = []
     failed_pages = FailedPages()
+    failed_pages.page_map = _page_map_from_manifest(split_manifest)
     # Running per-rank tally of confidently-read officer names, built up as
     # pages are processed in order and fed to each subsequent page's call as
     # a spelling-reference hint (see OFFICER NAME CONSISTENCY in the prompt
@@ -2494,10 +2499,13 @@ async def extract_with_gemini(
 
             page_entries = _dedupe_same_page_entries(_sanitize_page_entries(page_data.get("entries", []), page_num))
             page_signed = bool(page_data.get("master_signature_present", False))
-            for e in page_entries:
+            page_language = str(page_data.get("page_language") or "").strip() or None
+            for seq, e in enumerate(page_entries):
                 # See note above -- always trust the loop's physical page
                 # index over Gemini's own self-reported page_number field.
                 e["page_number"] = page_num
+                e["entry_seq"] = seq
+                e["page_language"] = page_language
                 # master_signature_present is asked for once per page (there's
                 # one "Signature of Master" line per page, not per entry) --
                 # apply that single page-level answer to every entry on it.
@@ -2515,6 +2523,8 @@ async def extract_with_gemini(
             continue
 
         await _write_progress(session_factory, upload_id, pages_processed=page_num)
+
+    await asyncio.to_thread(delete_prompt_cache, client, prompt_cache["name"])
 
     # One focused re-read of retained figures that disagree with the running balance (see
     # extraction_repair). Failure here must never cost the extraction itself.
@@ -3733,7 +3743,7 @@ def _qty_content_signature(qty_dicts: list[dict]) -> tuple:
     return tuple(sorted(sig, key=lambda t: (t[0], t[1] is None, t[1] if t[1] is not None else 0.0, t[2])))
 
 
-_TRAILING_DATE_RE = re.compile(r"(\d{1,2})[\-\s]([A-Z]{3})[\-\s](\d{4}|\d{2})")
+_TRAILING_DATE_RE = re.compile(r"(\d{1,2})[\-\s](SEPT|[A-Z]{3})[\-\s](\d{4}|\d{2})")
 
 
 def _reconcile_entry_date_vs_own_header(entries_data: list[dict]) -> list[dict]:
@@ -3964,10 +3974,18 @@ def _dedupe_cross_date_duplicates(entries_data: list[dict]) -> list[dict]:
                 return True
 
         consistent = [e for e, _ in dated if _signature_date_matches(e)]
-        keep_pool = consistent if consistent else [e for e, _ in dated]
-        keep = keep_pool[0]
-        for e, _ in dated:
-            if e is not keep and id(e) not in to_drop:
+        consistent_ids = {id(e) for e in consistent}
+        inconsistent = [e for e, _ in dated if id(e) not in consistent_ids]
+        # Evidence of a mis-dated copy is a signature date that contradicts the entry's own date.
+        # With no such copy (every copy is internally consistent) these are genuine repeats of the
+        # same routine operation -- e.g. AM KIRTI "0.8 m3 from OILY BILGE TANK, RETD 3.9 m3 -> 0.8 m3"
+        # on both 02-Sep and 05-Sep -- and dropping one silently lost a real entry. With no
+        # consistent copy to keep there is nothing to compare against either. Keep everything then.
+        if not consistent or not inconsistent:
+            continue
+        keep = consistent[0]
+        for e in inconsistent:
+            if id(e) not in to_drop:
                 to_drop.add(id(e))
                 logger.warning(
                     f"Dropped cross-date duplicate entry: code={key[0]} item={key[1]} "
@@ -4033,13 +4051,67 @@ def _flag_fused_continuation_entries(entries_data: list[dict]) -> list[dict]:
     return entries_data
 
 
+async def _save_raw_extraction(session_factory, upload_id, entries_data, failed_pages, usage_summary) -> None:
+    """Keep what the extractor returned so post-processing can be re-applied without Gemini.
+    Never raises: losing this copy must not fail an upload."""
+    try:
+        payload = json.loads(json.dumps(entries_data, default=str))
+        failed = {"pages": list(failed_pages or []), "reasons": {str(k): v for k, v in getattr(failed_pages, "reasons", {}).items()}}
+        async with session_factory() as s:
+            rec = await s.get(OrbUploadRaw, upload_id)
+            if rec is None:
+                s.add(OrbUploadRaw(upload_id=upload_id, entries=payload, failed_pages=failed, usage=usage_summary, model=gemini_model()))
+            else:
+                rec.entries, rec.failed_pages, rec.usage, rec.model = payload, failed, usage_summary, gemini_model()
+            await s.commit()
+    except Exception:
+        logger.exception("Could not save the raw extraction of upload %s", upload_id)
+
+
+async def _notify_upload_done(db, upload, entry_count: int, failed: bool = False, error: str = "") -> None:
+    """Bell + feed for a finished or failed upload. Never raises: it must not affect the upload itself."""
+    try:
+        from app.models.vessel import Vessel
+        from app.services import orb_notify
+        from app.services.report_alerts import alerts_for_upload
+        vessel = (await db.execute(sa_select(Vessel).where(Vessel.id == upload.vessel_id))).scalar_one_or_none()
+        counts: dict = {}
+        if not failed:
+            entries = (await db.execute(sa_select(OrbEntry).where(OrbEntry.upload_id == upload.id))).scalars().all()
+            for a in await alerts_for_upload(db, upload, list(entries)):
+                if not a.is_resolved:
+                    counts[a.severity] = counts.get(a.severity, 0) + 1
+        await orb_notify.on_upload_finished(db, upload=upload, vessel_name=vessel.name if vessel else "",
+                                            entries=entry_count, alert_counts=counts, failed=failed, error=error)
+    except Exception:
+        logger.exception("Could not send the finish notification of upload %s", getattr(upload, "id", None))
+
+
+async def _load_raw_extraction(session_factory, upload_id):
+    """(entries, FailedPages) saved for this upload, or None."""
+    async with session_factory() as s:
+        rec = await s.get(OrbUploadRaw, upload_id)
+        if rec is None:
+            return None
+        failed = FailedPages(rec.failed_pages.get("pages", []) if rec.failed_pages else [])
+        for k, v in ((rec.failed_pages or {}).get("reasons") or {}).items():
+            failed.reasons[int(k)] = v
+        return json.loads(json.dumps(rec.entries)), failed
+
+
 async def run_extraction(
     upload_id: uuid.UUID,
     storage_path: str,
     vessel_id: uuid.UUID,
     session_factory: async_sessionmaker,
+    use_saved: bool = False,
 ):
-    """Background task: extract entries from uploaded PDF and run calculations."""
+    """Background task: extract entries from uploaded PDF and run calculations.
+
+    use_saved=True skips Gemini and re-applies post-processing to the extraction saved earlier
+    (orb_upload_raw) -- a free way to pick up fixes to the repair / de-duplication / check steps.
+    """
+    usage = start_collection()      # token usage of every Gemini call made for this upload
     async with session_factory() as db:
         try:
             result = await db.execute(sa_select(OrbUpload).where(OrbUpload.id == upload_id))
@@ -4053,9 +4125,25 @@ async def run_extraction(
 
             vessel_result = await db.execute(sa_select(Vessel).where(Vessel.id == vessel_id))
             vessel = vessel_result.scalar_one_or_none()
+            # End this read transaction NOW. Left open it sat "idle in transaction" for the whole
+            # extraction (25+ minutes on a slow model), the database dropped that connection, and the
+            # first query after extraction died with asyncpg InterfaceError -- the upload then stayed
+            # "processing" forever. Objects stay usable (expire_on_commit=False); the next statement
+            # opens a fresh transaction on a checked (pool_pre_ping) connection.
+            await db.commit()
 
             failed_pages: list[int] = []
-            if settings.USE_MOCK_EXTRACTION:
+            if use_saved:
+                saved = await _load_raw_extraction(session_factory, upload_id)
+                if saved is None:
+                    upload.status = "failed"
+                    upload.error_message = "No saved extraction for this upload -- run a full re-extraction once first."
+                    upload.updated_at = datetime.now(timezone.utc)
+                    await db.commit()
+                    return
+                entries_data, failed_pages = saved
+                logger.warning("Upload %s re-processed from its saved extraction (no Gemini calls)", upload_id)
+            elif settings.USE_MOCK_EXTRACTION:
                 entries_data = get_mock_data(vessel_id, upload_id)
             else:
                 try:
@@ -4074,6 +4162,8 @@ async def run_extraction(
                         )
                 except GeminiBillingError as e:
                     logger.error(f"Upload {upload_id} stopped: {e}")
+                    if usage.by_kind:
+                        logger.warning("Gemini usage for upload %s (stopped): %s", upload_id, usage.describe())
                     upload.status = "failed"
                     upload.error_message = f"{e}. Top up the Gemini account, then re-run the upload."
                     upload.updated_at = datetime.now(timezone.utc)
@@ -4086,6 +4176,15 @@ async def run_extraction(
                     upload.updated_at = datetime.now(timezone.utc)
                     await db.commit()
                     return
+
+            if usage.by_kind:
+                logger.warning("Gemini usage for upload %s: %s", upload_id, usage.describe())
+            if not use_saved:
+                # Before ANY post-processing: this is the expensive part, keep it.
+                await _save_raw_extraction(session_factory, upload_id, entries_data, failed_pages, usage.summary())
+                page_map = getattr(failed_pages, "page_map", None)
+                if page_map:
+                    upload.page_map = page_map
 
             entries_data = _merge_split_entries(entries_data)
             entries_data = reattach_split_blocks(entries_data)
@@ -4305,6 +4404,12 @@ async def run_extraction(
                         item_lines=entry_dict.get("item_lines"),
                         has_erasure=bool(entry_dict.get("has_erasure", False)),
                         master_signature_present=entry_dict.get("master_signature_present"),
+                        officer_signature_present=(
+                            True if (entry_dict.get("officer_1_name") or entry_dict.get("officer_2_name"))
+                            else entry_dict.get("officer_signature_present")
+                        ),
+                        entry_seq=entry_dict.get("entry_seq"),
+                        page_language=(entry_dict.get("page_language") or None) and str(entry_dict["page_language"])[:40],
                     )
                     db.add(entry)
                     await db.flush()
@@ -4512,6 +4617,8 @@ async def run_extraction(
             upload.updated_at = datetime.now(timezone.utc)
             await db.commit()
             if entry_count == 0:
+                if upload.status == "failed":
+                    await _notify_upload_done(db, upload, 0, failed=True, error=upload.error_message or "")
                 return
 
             # Run compliance checks
@@ -4521,15 +4628,22 @@ async def run_extraction(
             except Exception as e:
                 logger.error(f"Calculations failed: {e}")
 
+            await _notify_upload_done(db, upload, entry_count)
+
         except Exception as e:
             logger.error(f"Extraction failed for upload {upload_id}: {e}")
+            # Record the failure on a FRESH session: the one above may be the very thing that broke
+            # (dropped connection), and reusing it made this handler fail silently, leaving the
+            # upload stuck in "processing".
             try:
-                result = await db.execute(sa_select(OrbUpload).where(OrbUpload.id == upload_id))
-                upload = result.scalar_one_or_none()
-                if upload:
-                    upload.status = "failed"
-                    upload.error_message = str(e)
-                    upload.updated_at = datetime.now(timezone.utc)
-                    await db.commit()
+                async with session_factory() as fresh:
+                    result = await fresh.execute(sa_select(OrbUpload).where(OrbUpload.id == upload_id))
+                    failed_upload = result.scalar_one_or_none()
+                    if failed_upload:
+                        failed_upload.status = "failed"
+                        failed_upload.error_message = f"Extraction failed: {str(e)[:400]}"
+                        failed_upload.updated_at = datetime.now(timezone.utc)
+                        await fresh.commit()
+                        await _notify_upload_done(fresh, failed_upload, 0, failed=True, error=str(e))
             except Exception:
-                pass
+                logger.exception("Could not record the failure of upload %s", upload_id)

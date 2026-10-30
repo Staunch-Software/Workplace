@@ -106,6 +106,15 @@ class Settings(BaseSettings):
     MAIL_FROM: str = ""
     NOTIFICATION_EMAIL: str = ""
 
+    # Daily "last N events" mail to vessel owners (see app/services/events_mail_service.py).
+    EVENTS_MAIL_ENABLED: bool = False
+    EVENTS_MAIL_POLL_MINUTES: int = 15  # how often to check for a new logbook event
+    EVENTS_MAIL_EVENTS: int = 7        # events per vessel
+    # While set, EVERY mail goes only to these address(es) (comma separated) with a [TEST] subject.
+    EVENTS_MAIL_TEST_TO: str = ""
+    # JSON list: [{"owner": "Name", "emails": ["a@x.com"], "vessels": ["9832925", ...]}, ...]
+    EVENTS_MAIL_OWNERS: str = ""
+
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
         encoded_password = quote_plus(self.DB_PASSWORD)

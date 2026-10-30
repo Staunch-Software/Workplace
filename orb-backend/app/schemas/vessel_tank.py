@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
@@ -45,5 +45,11 @@ class TankResponse(BaseModel):
     iopp_doc2_url: Optional[str] = None
     # NEW
     bilge_pump_capacity_m3_per_hr: Optional[float] = None
+    # IOPP Supplement Form A section 3 particulars (alert 25)
+    tank_name_iopp: Optional[str] = None
+    iopp_section_ref: Optional[str] = None
+    iopp_capacity_m3: Optional[float] = None
+    effective_from: Optional[date] = None
+    effective_to: Optional[date] = None
     created_at: datetime
     updated_at: datetime

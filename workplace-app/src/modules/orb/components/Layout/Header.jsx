@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { LogOut, Menu, ArrowLeft, ChevronDown } from 'lucide-react';
+import { useNavigate as useRouterNavigate } from 'react-router-dom';
+import { ChevronLeft, Menu, ArrowLeft, ChevronDown, Settings, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSidebar } from '../../context/SidebarContext';
 import { useNavigate } from '../../hooks/useOrbNavigate';
+import NotificationBell from './NotificationBell';
 
 export default function Header({ title, backTo }) {
-  const { user, logout } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const goToWorkplace = useRouterNavigate();
   const { toggle } = useSidebar();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -43,6 +46,8 @@ export default function Header({ title, backTo }) {
         )}
         <span className="header-title">{title}</span>
       </div>
+      <div className="header-actions">
+      <NotificationBell />
       <div className="header-user" ref={menuRef}>
         <button
           type="button"
@@ -65,12 +70,25 @@ export default function Header({ title, backTo }) {
                 {user?.role && <span className="user-menu__role">{user.role}</span>}
               </div>
             </div>
-            <button type="button" role="menuitem" className="user-menu__item" onClick={logout}>
-              <LogOut size={15} />
-              <span>Sign Out</span>
+            {isAdmin && (
+              <button type="button" role="menuitem" className="user-menu__item" onClick={() => { setOpen(false); navigate('/admin/vessels'); }}>
+                <Settings size={15} />
+                <span>Vessel Config</span>
+              </button>
+            )}
+            {isAdmin && (
+              <button type="button" role="menuitem" className="user-menu__item" onClick={() => { setOpen(false); navigate('/admin/alerts'); }}>
+                <SlidersHorizontal size={15} />
+                <span>Alert Settings</span>
+              </button>
+            )}
+            <button type="button" role="menuitem" className="user-menu__item" onClick={() => { setOpen(false); goToWorkplace('/dashboard'); }}>
+              <ChevronLeft size={15} />
+              <span>Back to Dashboard</span>
             </button>
           </div>
         )}
+      </div>
       </div>
     </header>
   );

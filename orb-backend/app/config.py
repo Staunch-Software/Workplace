@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     # Workplace control database: users, vessels and permissions live here.
     # Required by the API (checked at startup); the cron scrapers do not need it.
     CONTROL_DATABASE_URL: str = ""
+    # Vessel performance pipeline database (Mariapps noon reports, bunker reports). READ-ONLY and optional:
+    # without it alerts 33 and 35 are skipped and alert 37 falls back to the WNI fuel table.
+    PERFORMANCE_DATABASE_URL: str = ""
     # Must match workplace-backend: tokens are issued there and only verified here.
     SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
@@ -21,6 +24,20 @@ class Settings(BaseSettings):
     # Model used for every extraction / re-check call. Google gates older models for new
     # projects, so this must be changeable without a code release.
     GEMINI_MODEL: str = "gemini-2.5-flash"
+    # Cheaper model for the simple calls (page layout, vessel name, boundary / value re-checks).
+    # Empty = use GEMINI_MODEL for everything.
+    GEMINI_MODEL_LIGHT: str = ""
+    # Thinking level for non-2.5 models: minimal | low | medium | high. Empty = model default.
+    # Thinking tokens are billed as output, so a lower level is the main cost lever.
+    GEMINI_THINKING_LEVEL: str = ""
+    # Cache the extraction instructions on Gemini's side for the duration of one upload (cheaper input).
+    GEMINI_PROMPT_CACHE: bool = False
+    # Prices (USD per 1M tokens) used ONLY for the per-upload cost estimate in the log.
+    GEMINI_PRICE_IN_PER_M: float = 0.75
+    GEMINI_PRICE_OUT_PER_M: float = 3.75
+    GEMINI_LIGHT_PRICE_IN_PER_M: float = 0.0     # 0 = same as the main model
+    GEMINI_LIGHT_PRICE_OUT_PER_M: float = 0.0
+    GEMINI_USD_INR: float = 0.0                  # >0 also shows the estimate in rupees
     USE_MOCK_EXTRACTION: bool = True
     UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_SIZE_MB: int = 50
@@ -45,6 +62,10 @@ class Settings(BaseSettings):
     AZURE_STORAGE_CONTAINER: str = "iopp-documents"
     # Separate container for original ORB upload PDFs (preview feature).
     AZURE_STORAGE_ORB_CONTAINER: str = "orb-uploads"
+    # Container for files attached to alert chat messages (falls back to UPLOAD_DIR/chat when Azure is not configured).
+    AZURE_STORAGE_ORB_CHAT_CONTAINER: str = "orb-chat"
+    # Largest file accepted as an alert chat attachment, enforced on the server.
+    MAX_CHAT_ATTACHMENT_MB: int = 10
 
     # ── WNI Fuel Scraper (Check 7 support) ─────────────────────────────────
     # Separate, standalone scraper — see app/scrapers/wni_fuel_scraper.py.
@@ -78,6 +99,29 @@ class Settings(BaseSettings):
     # concurrent uploads and was killed by the kernel). Keep this at 1 unless
     # the VM has memory headroom to spare.
     MAX_CONCURRENT_EXTRACTIONS: int = 1
+
+    # ── Offline (vessel) sync ───────────────────────────────────────────────
+    # The same code runs on the VM (online = shore) and on the vessel PC under C:\WORKPLACE (offline).
+    # A vessel pushes its outbox to the VM and pulls what changed there; it never calls Gemini, runs
+    # extraction or creates alerts (see app/services/sync_processor.py).
+    STORAGE_MODE: str = "online"            # online | offline
+    VESSEL_IMO: str = ""                    # offline only: which vessel this install belongs to
+    SYNC_API_KEY: str = "change-me-in-production"   # same key on the VM and every vessel
+    CLOUD_BASE_URL: str = "https://workplace.ozellar.com/orb"   # the VM's ORB root (offline only)
+    CLOUD_HEALTH_URL: str = ""                  # empty = CLOUD_BASE_URL + "/health"
+    NETWORK_TIMEOUT_SECONDS: float = 15.0
+    SYNC_INTERVAL_SECONDS: int = 60
+    SYNC_BATCH_SIZE: int = 50
+    SYNC_PULL_PAGE_SIZE: int = 500
+    MAX_SYNC_RETRIES: int = 5
+    SYNC_VERIFY_TLS: bool = True
+    # Azure account of the VM, used by the vessel to copy files (PDFs, chat attachments) up and down.
+    # AZURE_STORAGE_CONNECTION_STRING is then the vessel's local Azurite.
+    CLOUD_STORAGE_CONNECTION_STRING: str = ""
+
+    @property
+    def is_offline_vessel(self) -> bool:
+        return self.STORAGE_MODE.strip().lower() == "offline"
 
 
 @lru_cache

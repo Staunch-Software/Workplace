@@ -27,3 +27,12 @@ Thumbs.db
 
 # Virtual env
 Aepms-backend/venv_new/
+
+# Vessel offline bundles & archives
+vessel_tapi_update/
+vessel_orb_update/
+*.zip
+
+# Offline setup & install folders
+setup/
+update/

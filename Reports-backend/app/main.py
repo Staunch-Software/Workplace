@@ -55,6 +55,12 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(start_background_mail_fetcher(interval_minutes=30))
         print("Mail Graph API Fetcher started in background (polls every 30m all day).")
 
+        # Mails owners when a vessel's newest logbook event changes (needs EVENTS_MAIL_ENABLED).
+        if settings.EVENTS_MAIL_ENABLED:
+            from app.services.events_mail_service import start_background_events_mail
+            asyncio.create_task(start_background_events_mail(settings.EVENTS_MAIL_POLL_MINUTES))
+            print(f"Events mail watcher started (checks every {settings.EVENTS_MAIL_POLL_MINUTES}m).")
+
     print("Backend ready. SmartPAL scraping is handled by the external cron job.")
 
     yield

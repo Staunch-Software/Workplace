@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, Text, Boolean, DateTime, ForeignKey
+from sqlalchemy import String, Text, Boolean, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import mapped_column, Mapped
 from sqlalchemy.dialects.postgresql import UUID
 from app.models.base import Base, TimestampMixin
@@ -19,3 +19,18 @@ class OrbAlert(Base, TimestampMixin):
     is_resolved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     resolved_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)  # workplace user id
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Resolution workflow (api/orb_alert_resolution.py): OPEN -> PENDING_APPROVAL -> RESOLVED
+    # The upload that raised a batch-level alert (no entry); NULL for entry alerts and for older rows.
+    upload_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("orb_uploads.id", ondelete="SET NULL"), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="OPEN", server_default="OPEN", nullable=False, index=True)
+    resolution_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolution_requested_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    resolution_requested_by_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    resolution_requested_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_by_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    rejected_by_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    rejected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Bumped by every shore-side step (create, request applied, accept, reject, resolve). A vessel keeps the
+    # row with the higher version when it syncs; its own offline request does not bump it (app/services/sync_processor.py).
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)

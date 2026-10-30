@@ -7,5 +7,12 @@ export function useAuth() {
   const orbUser = user
     ? { ...user, name: user.full_name || user.name || user.email, role: user.role }
     : null;
-  return { user: orbUser, logout, isAdmin: user?.role === 'ADMIN' };
+  const isVessel = user?.role === 'VESSEL';
+  return {
+    user: orbUser,
+    logout,
+    isAdmin: user?.role === 'ADMIN',
+    isVessel,                       // ship user: Vessel View
+    isShore: !!user && !isVessel,   // SHORE or ADMIN: Shore View
+  };
 }

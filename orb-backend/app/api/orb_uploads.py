@@ -15,6 +15,7 @@ from app.models.orb_upload import OrbUpload
 from app.models.orb_entry import OrbEntry
 from app.models.orb_entry_quantity import OrbEntryQuantity
 from app.models.orb_alert import OrbAlert
+from app.models.orb_upload_raw import OrbUploadRaw
 from app.models.vessel import Vessel
 from app.models.user import User as OrbHistoryUser
 from app.models.control_user import ControlUser
@@ -22,7 +23,7 @@ from app.control_database import get_control_db
 from app.schemas.orb_upload import UploadResponse, UploadDetail
 from app.schemas.orb_entry import EntryResponse
 from app.schemas.common import success
-from app.dependencies import get_current_user, require_admin, allowed_vessel_ids, scope_vessel_ids, assert_vessel_access
+from app.dependencies import get_current_user, require_shore, require_admin, allowed_vessel_ids, scope_vessel_ids, assert_vessel_access, shore_instance_only
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 settings = get_settings()
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 async def list_uploads(
     vessel_id: Optional[List[uuid.UUID]] = Query(None),
     db: AsyncSession = Depends(get_db),
-    user: ControlUser = Depends(get_current_user),
+    user: ControlUser = Depends(require_shore),
 ):
     q = select(OrbUpload).order_by(OrbUpload.created_at.desc()).limit(50)
     scoped = scope_vessel_ids(vessel_id, await allowed_vessel_ids(user, db))
@@ -44,13 +45,13 @@ async def list_uploads(
     return success(data=[UploadResponse.model_validate(u).model_dump() for u in uploads])
 
 
-@router.post("")
+@router.post("", dependencies=[Depends(shore_instance_only)])
 async def create_upload(
     background_tasks: BackgroundTasks,
     vessel_id: uuid.UUID = Form(...),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: ControlUser = Depends(get_current_user),
+    current_user: ControlUser = Depends(require_shore),
 ):
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted")
@@ -131,7 +132,7 @@ async def get_upload(
     upload_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     control_db: AsyncSession = Depends(get_control_db),
-    user: ControlUser = Depends(get_current_user),
+    user: ControlUser = Depends(require_shore),
 ):
     result = await db.execute(select(OrbUpload).where(OrbUpload.id == upload_id))
     upload = result.scalar_one_or_none()
@@ -164,7 +165,7 @@ async def get_upload(
 # Re-run extraction on an existing upload so older uploads pick up newer
 # extraction rules (e.g. item_lines / item-number alerts). Remove once testing
 # is done: it deletes the upload's entries and the alerts attached to them.
-@router.post("/{upload_id}/reprocess")
+@router.post("/{upload_id}/reprocess", dependencies=[Depends(shore_instance_only)])
 async def reprocess_upload(
     upload_id: uuid.UUID,
     background_tasks: BackgroundTasks,
@@ -176,7 +177,12 @@ async def reprocess_upload(
     if not upload:
         raise HTTPException(status_code=404, detail="Upload not found")
     if upload.status in ("pending", "processing"):
-        raise HTTPException(status_code=409, detail="This upload is already being processed")
+        # A run that has shown no activity for a long time is dead (worker restarted, connection
+        # dropped...) and would otherwise stay "processing" forever with no way to retry it.
+        from datetime import datetime, timezone, timedelta
+        last = upload.updated_at or upload.created_at
+        if last is not None and (datetime.now(timezone.utc) - last) < timedelta(minutes=30):
+            raise HTTPException(status_code=409, detail="This upload is still being processed (activity within the last 30 minutes)")
 
     # The extractor reads the PDF from disk; restore it from blob storage if the
     # local copy is gone.
@@ -188,6 +194,10 @@ async def reprocess_upload(
         os.makedirs(os.path.dirname(upload.storage_path) or ".", exist_ok=True)
         with open(upload.storage_path, "wb") as f:
             f.write(content)
+
+    from app.services.alert_chat import upload_has_alert_chat
+    if await upload_has_alert_chat(db, upload_id):
+        raise HTTPException(status_code=409, detail="Alerts of this upload already have chat messages; re-processing would delete them")
 
     # Entries first: extraction de-duplicates against every existing entry of the
     # vessel, so leaving the old ones would turn the whole re-run into duplicates.
@@ -208,11 +218,91 @@ async def reprocess_upload(
     return success(message="Re-extraction queued")
 
 
+# ── TEMPORARY (testing only) ─────────────────────────────────────────────────
+# Re-apply post-processing (repairs, de-duplication, checks) to the extraction saved for this
+# upload, WITHOUT calling Gemini. Remove together with /reprocess once testing is done.
+@router.post("/{upload_id}/reprocess-saved", dependencies=[Depends(shore_instance_only)])
+async def reprocess_saved(
+    upload_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    user: ControlUser = Depends(require_admin),
+):
+    result = await db.execute(select(OrbUpload).where(OrbUpload.id == upload_id))
+    upload = result.scalar_one_or_none()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    if upload.status in ("pending", "processing"):
+        from datetime import datetime, timezone, timedelta
+        last = upload.updated_at or upload.created_at
+        if last is not None and (datetime.now(timezone.utc) - last) < timedelta(minutes=30):
+            raise HTTPException(status_code=409, detail="This upload is still being processed (activity within the last 30 minutes)")
+    if await db.get(OrbUploadRaw, upload_id) is None:
+        raise HTTPException(status_code=404, detail="No saved extraction for this upload. Run a full re-extraction once; later fixes can then be re-applied for free.")
+
+    from app.services.alert_chat import upload_has_alert_chat
+    if await upload_has_alert_chat(db, upload_id):
+        raise HTTPException(status_code=409, detail="Alerts of this upload already have chat messages; re-processing would delete them")
+
+    entry_ids = select(OrbEntry.id).where(OrbEntry.upload_id == upload_id)
+    await db.execute(delete(OrbAlert).where(OrbAlert.entry_id.in_(entry_ids)))
+    await db.execute(delete(OrbEntryQuantity).where(OrbEntryQuantity.entry_id.in_(entry_ids)))
+    await db.execute(delete(OrbEntry).where(OrbEntry.upload_id == upload_id))
+    upload.status = "pending"
+    upload.error_message = None
+    upload.pages_processed = 0
+    upload.extracted_entries_count = 0
+    upload.duplicate_entries_skipped = 0
+    await db.commit()
+
+    from app.services.extraction import run_extraction
+    background_tasks.add_task(run_extraction, upload_id, upload.storage_path, upload.vessel_id, AsyncSessionLocal, True)
+    logger.warning("Upload %s re-processed from saved extraction by %s (temporary endpoint)", upload_id, user.id)
+    return success(message="Re-processing from the saved extraction queued")
+
+
+@router.get("/{upload_id}/alerts")
+async def get_upload_alerts(
+    upload_id: uuid.UUID,
+    is_resolved: Optional[bool] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    user: ControlUser = Depends(require_shore),
+):
+    """Alerts that belong to THIS upload (its own entries, plus batch-level alerts raised while it
+    was processed). The vessel-wide list is /api/alerts; the upload page used to show that one, so
+    a brand-new upload with no entries displayed every open alert the vessel ever had."""
+    from app.models.orb_alert import OrbAlert  # noqa: F401  (typing aid)
+    from app.schemas.orb_alert import AlertResponse
+    from app.services.report_alerts import alerts_for_upload
+
+    result = await db.execute(select(OrbUpload).where(OrbUpload.id == upload_id))
+    upload = result.scalar_one_or_none()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    await assert_vessel_access(user, db, upload.vessel_id)
+
+    entries = (await db.execute(select(OrbEntry).where(OrbEntry.upload_id == upload_id))).scalars().all()
+    pages = {e.id: e.page_number for e in entries}
+    alerts = await alerts_for_upload(db, upload, list(entries))
+    from app.services.alert_chat import thread_stats
+    stats = await thread_stats(db, user, [a.id for a in alerts])
+    data = []
+    for a in alerts:
+        if is_resolved is not None and a.is_resolved != is_resolved:
+            continue
+        d = AlertResponse.model_validate(a).model_dump()
+        d["page_number"] = pages.get(a.entry_id)
+        d["upload_id"] = upload_id if a.entry_id in pages else None
+        d["thread_count"], d["unread_count"] = stats.get(a.id, (0, 0))
+        data.append(d)
+    return success(data=data)
+
+
 @router.get("/{upload_id}/pdf")
 async def get_upload_pdf(
     upload_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: ControlUser = Depends(get_current_user),
+    user: ControlUser = Depends(require_shore),
 ):
     """Stream the original uploaded PDF back for in-app preview.
 
@@ -253,7 +343,7 @@ async def get_upload_pdf(
 async def get_upload_entries(
     upload_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: ControlUser = Depends(get_current_user),
+    user: ControlUser = Depends(require_shore),
 ):
     from app.models.orb_entry_quantity import OrbEntryQuantity
     owner = (await db.execute(select(OrbUpload).where(OrbUpload.id == upload_id))).scalar_one_or_none()
@@ -282,7 +372,7 @@ async def get_upload_entries(
 async def get_daily_log(
     upload_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: ControlUser = Depends(get_current_user),
+    user: ControlUser = Depends(require_shore),
 ):
     result = await db.execute(select(OrbUpload).where(OrbUpload.id == upload_id))
     upload = result.scalar_one_or_none()
@@ -298,7 +388,7 @@ async def get_daily_log(
 async def export_excel(
     upload_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: ControlUser = Depends(get_current_user),
+    user: ControlUser = Depends(require_shore),
 ):
     result = await db.execute(select(OrbUpload).where(OrbUpload.id == upload_id))
     upload = result.scalar_one_or_none()
@@ -321,7 +411,7 @@ async def export_excel(
 async def export_pdf(
     upload_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: ControlUser = Depends(get_current_user),
+    user: ControlUser = Depends(require_shore),
 ):
     result = await db.execute(select(OrbUpload).where(OrbUpload.id == upload_id))
     upload = result.scalar_one_or_none()

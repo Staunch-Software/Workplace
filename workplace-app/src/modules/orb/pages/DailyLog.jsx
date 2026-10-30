@@ -4,8 +4,10 @@ import Sidebar from '../components/Layout/Sidebar';
 import Header from '../components/Layout/Header';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import Dropdown from '../components/shared/Dropdown';
+import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosOrb';
 import './DailyLog.css';
+import { dateKey, istToday } from '../utils/time';
 
 const DAILY_COLS = [
   { key: 'date',                   label: 'Date',                          isArray: false },
@@ -119,9 +121,12 @@ function MonthStepper({ date, onChange, disabled }) {
 }
 
 export default function DailyLog() {
+  const { user, isShore, isVessel } = useAuth();
+  const isVesselUser = isVessel || user?.role === 'VESSEL';
+  const isShoreView = !isVesselUser;
   const [vessels, setVessels] = useState([]);
 
-  const toDateStr = (d) => d.toISOString().slice(0, 10);
+  const toDateStr = dateKey;
   const monthRange = (date) => [
     toDateStr(new Date(date.getFullYear(), date.getMonth(), 1)),
     toDateStr(new Date(date.getFullYear(), date.getMonth() + 1, 0)),
@@ -138,19 +143,35 @@ export default function DailyLog() {
   // Monthly summary filter state (own vessel + date range)
   const [summaryVessel,  setSummaryVessel]  = useState('');
   const [summaryMode,    setSummaryMode]    = useState('month'); // 'month' | 'custom'
-  const [summaryMonth,   setSummaryMonth]   = useState(new Date());
+  const [summaryMonth,   setSummaryMonth]   = useState(istToday());
   const [summaryFrom,    setSummaryFrom]    = useState('');
   const [summaryTo,      setSummaryTo]      = useState('');
   const [summaryData,    setSummaryData]    = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError,   setSummaryError]   = useState('');
 
+  const handleDailyVesselChange = (v) => {
+    setDailyVessel(v);
+    if (v) loadDailyLog(v, dailyFrom, dailyTo);
+    else setLogData(null);
+  };
+
+  const handleSummaryVesselChange = (v) => {
+    setSummaryVessel(v);
+    if (v) loadSummary(v, summaryFrom, summaryTo);
+    else setSummaryData(null);
+  };
+
   const handleSummaryMonthChange = (date) => {
     setSummaryMonth(date);
     const [from, to] = monthRange(date);
     setSummaryFrom(from);
     setSummaryTo(to);
-    setSummaryData(null);
+    if (summaryVessel) {
+      loadSummary(summaryVessel, from, to);
+    } else {
+      setSummaryData(null);
+    }
   };
 
   useEffect(() => {
@@ -158,13 +179,15 @@ export default function DailyLog() {
       const list = r.data.data || [];
       setVessels(list);
 
-      const today = new Date();
+      const today = istToday();
       const todayStr = toDateStr(today);
       const from7 = toDateStr(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7));
       const [monthFrom, monthTo] = monthRange(today);
 
-      // Default vessel = AM UMANG (case-insensitive), else first vessel
-      const defaultVessel = list.find(v => v.name.toUpperCase().includes('AM UMANG')) || list[0];
+      // On vessel view, list has only that 1 vessel. On Shore, prefer AM UMANG or first vessel.
+      const defaultVessel = !isShoreView
+        ? list[0]
+        : (list.find(v => v.name.toUpperCase().includes('AM UMANG')) || list[0]);
       const vid = defaultVessel?.id || '';
 
       setDailyVessel(vid);
@@ -181,7 +204,7 @@ export default function DailyLog() {
         loadSummary(vid, monthFrom, monthTo);
       }
     });
-  }, []);
+  }, [isShoreView]);
 
   async function loadDailyLog(vessel = dailyVessel, from = dailyFrom, to = dailyTo) {
     if (!vessel) return;
@@ -242,15 +265,17 @@ export default function DailyLog() {
 
               {/* Daily filters */}
               <div className="dl-filters">
-                <div className="form-group">
-                  <label>Vessel</label>
-                  <Dropdown
-                    value={dailyVessel}
-                    onChange={v => { setDailyVessel(v); setLogData(null); }}
-                    placeholder="— Select Vessel —"
-                    options={vessels.map(v => ({ value: v.id, label: v.name }))}
-                  />
-                </div>
+                {isShoreView && (
+                  <div className="form-group">
+                    <label>Vessel</label>
+                    <Dropdown
+                      value={dailyVessel}
+                      onChange={handleDailyVesselChange}
+                      placeholder="— Select Vessel —"
+                      options={vessels.map(v => ({ value: v.id, label: v.name }))}
+                    />
+                  </div>
+                )}
                 <div className="form-group">
                   <label>Date From</label>
                   <input
@@ -337,15 +362,17 @@ export default function DailyLog() {
 
               {/* Summary filters (independent) */}
               <div className="dl-filters dl-filters--summary">
-                <div className="form-group">
-                  <label>Vessel</label>
-                  <Dropdown
-                    value={summaryVessel}
-                    onChange={v => { setSummaryVessel(v); setSummaryData(null); }}
-                    placeholder="— Select Vessel —"
-                    options={vessels.map(v => ({ value: v.id, label: v.name }))}
-                  />
-                </div>
+                {isShoreView && (
+                  <div className="form-group">
+                    <label>Vessel</label>
+                    <Dropdown
+                      value={summaryVessel}
+                      onChange={handleSummaryVesselChange}
+                      placeholder="— Select Vessel —"
+                      options={vessels.map(v => ({ value: v.id, label: v.name }))}
+                    />
+                  </div>
+                )}
                 <div className="form-group" style={{ flex: '0 0 auto' }}>
                   <label>Filter Mode</label>
                   <ModeToggle mode={summaryMode} onChange={setSummaryMode} />

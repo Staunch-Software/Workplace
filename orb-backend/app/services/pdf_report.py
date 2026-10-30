@@ -3,6 +3,8 @@ import uuid
 from io import BytesIO
 from datetime import datetime
 
+from app.services.clock import IST, utc_now
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -20,7 +22,8 @@ from app.models.orb_entry import OrbEntry
 from app.models.orb_entry_quantity import OrbEntryQuantity
 from app.models.orb_alert import OrbAlert
 from app.models.vessel import Vessel
-from app.services.report_alerts import alerts_for_upload
+from app.services.report_alerts import alerts_for_upload, alert_status_label
+from xml.sax.saxutils import escape
 from app.services.report_lines import entry_line_rows
 
 PAGE_W, PAGE_H = landscape(A4)
@@ -98,7 +101,7 @@ async def generate_pdf(upload_id: uuid.UUID, db: AsyncSession) -> bytes:
         ["Vessel Name:", vessel_name],
         ["IMO Number:", vessel_imo],
         ["Period:", f"{min_date} to {max_date}"],
-        ["Generated:", datetime.now().strftime("%d %b %Y %H:%M UTC")],
+        ["Generated:", utc_now().astimezone(IST).strftime("%d %b %Y %H:%M IST")],
         ["Total Entries:", str(len(entries))],
         ["Open Alerts:", str(sum(1 for a in alerts if not a.is_resolved))],
     ]
@@ -179,12 +182,12 @@ async def generate_pdf(upload_id: uuid.UUID, db: AsyncSession) -> bytes:
         alert_data.append([
             alert.severity.upper(),
             alert.alert_type,
-            Paragraph(alert.message, normal),
-            "Resolved" if alert.is_resolved else "Open",
+            Paragraph(alert.message + (f"<br/><i>Resolution: {escape(alert.resolution_notes)}</i>" if alert.resolution_notes else ""), normal),
+            alert_status_label(alert),
         ])
 
     if len(alert_data) > 1:
-        alert_table = Table(alert_data, colWidths=[2.5 * cm, 5 * cm, 14 * cm, 2.5 * cm], repeatRows=1)
+        alert_table = Table(alert_data, colWidths=[2.5 * cm, 4.5 * cm, 14 * cm, 3 * cm], repeatRows=1)
         severity_color_map = {
             "critical": colors.HexColor("#FFE0E0"),
             "major": colors.HexColor("#FFF0E0"),

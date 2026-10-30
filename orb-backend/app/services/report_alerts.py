@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.orb_alert import OrbAlert
 from app.models.orb_entry import OrbEntry
 from app.models.orb_upload import OrbUpload
+from app.services.alert_config import disabled_alert_codes, not_withdrawn
 
 _MESSAGE_DATE_RE = re.compile(r"^\[(\d{4}-\d{2}-\d{2})")
 
@@ -30,6 +31,7 @@ async def alerts_for_upload(db: AsyncSession, upload: OrbUpload, entries: list[O
     conditions = []
     if entry_ids:
         conditions.append(OrbAlert.entry_id.in_(entry_ids))
+    conditions.append(OrbAlert.upload_id == upload.id)
     if upload.created_at is not None:
         window_end = (upload.updated_at or upload.created_at) + _BATCH_ALERT_SLACK
         conditions.append(and_(
@@ -39,12 +41,17 @@ async def alerts_for_upload(db: AsyncSession, upload: OrbUpload, entries: list[O
         ))
     if not conditions:
         return []
-    result = await db.execute(
-        select(OrbAlert)
-        .where(OrbAlert.vessel_id == upload.vessel_id, or_(*conditions))
-        .order_by(OrbAlert.created_at.desc())
-    )
+    q = select(OrbAlert).where(OrbAlert.vessel_id == upload.vessel_id, or_(*conditions))
+    if disabled := await disabled_alert_codes(db):
+        q = q.where(not_withdrawn(disabled))     # withdrawn alerts are left out of the tab and the exports
+    result = await db.execute(q.order_by(OrbAlert.created_at.desc()))
     return list(result.scalars().all())
+
+
+def alert_status_label(alert) -> str:
+    """Open / Pending approval / Resolved, for the Excel and PDF exports."""
+    status = getattr(alert, "status", None) or ("RESOLVED" if alert.is_resolved else "OPEN")
+    return {"RESOLVED": "Resolved", "PENDING_APPROVAL": "Pending approval"}.get(status, "Open")
 
 
 def alert_entry_date(alert: OrbAlert, entry_dates: dict[uuid.UUID, object]) -> str:

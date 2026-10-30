@@ -1,5 +1,5 @@
 # app/api/v1/endpoints/events.py
-# Latest N days of Vessel_Performance logbook data for the Overview "Events" tab.
+# Latest N events per vessel from the Vessel_Performance logbook, for the Overview "Events" tab.
 
 from datetime import date as date_type, timedelta
 from typing import Optional
@@ -17,6 +17,13 @@ router = APIRouter(prefix="/events", tags=["Events"])
 _SOURCES = {
     "mari_apps": ("expanded_mariapps_data", "log_date"),
     "wni": ("expanded_wni_data", "date"),
+}
+
+# Link from an expanded_* row to its analysis_data row(s): (expanded column, analysis_data column).
+# The logbook orders events of the same day by analysis_data."Time_UTC" (log_date has no time).
+_TIME_LINK = {
+    "mari_apps": ("raw_log_id", "raw_mariapps_id"),
+    "wni": ("raw_report_id", "raw_report_id"),
 }
 
 # Keys used for lookups, never shown as rows.
@@ -87,34 +94,73 @@ def _quote(ident: str) -> str:
     return '"' + ident.replace('"', '""') + '"'
 
 
-async def _fetch_rows(db, table, date_col, cols, start_date, end_date, imos):
-    """Fetch logbook values in [start_date, end_date] -> {imo: {date: {col: value}}}."""
+# How far back the event window may reach (paging stops at this point).
+_LOOKBACK_DAYS = 60
+
+
+def _timeline(by_day, end_date, limit, offset):
+    """Newest-first walk back from end_date: every logbook row of a day is one event, a day
+    with no report is one "missing" event. Returns events [offset, offset+limit), oldest first."""
+    today = date_type.today()
+    need, events = offset + limit, []
+    day = end_date
+    for _ in range(_LOOKBACK_DAYS + 1):
+        if len(events) >= need:
+            break
+        key = day.isoformat()
+        rows = by_day.get(key)
+        if rows:
+            events.extend(reversed(rows))
+        elif day < today:  # today's report may still be due, so it is not "missing" yet
+            events.append({"_missing": True, "_ts": key, "_ev": None})
+        day -= timedelta(days=1)
+    return list(reversed(events[offset:offset + limit]))
+
+
+async def _fetch_rows(db, table, date_col, cols, start_date, end_date, imos, link):
+    """Fetch logbook values in [start_date, end_date] -> {imo: {date: [{col: value}, ...]}}.
+
+    Every event of a day is returned (BOSP, Departure, EOSP, ...), oldest first, the same
+    order the Vessel_Performance logbook uses (ORDER BY date ASC). Only exact repeats of the
+    same timestamp + event are collapsed (the latest copy wins).
+    """
     cols = sorted(cols)
     if not cols:
         return {}
     dcol = _quote(date_col)
+    tcol, acol = link
     sql = (
-        f"SELECT t.vessel_imo, t.{dcol} AS d, {', '.join('t.' + _quote(c) for c in cols)} "
+        f"SELECT t.vessel_imo, t.{dcol} AS d, a.tm AS tm, {', '.join('t.' + _quote(c) for c in cols)} "
         f"FROM {table} t "
+        f"LEFT JOIN (SELECT {acol} AS k, MIN(\"Time_UTC\") AS tm FROM analysis_data "
+        f"          WHERE {acol} IS NOT NULL GROUP BY {acol}) a ON a.k = t.{tcol} "
         f"WHERE t.{dcol} IS NOT NULL "
         f"  AND t.{dcol}::date >= :start_date "
         f"  AND t.{dcol}::date <= :end_date "
         f"  {'AND t.vessel_imo = ANY(:imos)' if imos is not None else ''} "
-        f"ORDER BY t.vessel_imo, t.{dcol} DESC, t.ctid DESC"
+        f"ORDER BY t.vessel_imo, t.{dcol} ASC, a.tm ASC NULLS LAST, t.ctid ASC"
     )
     params = {"start_date": start_date, "end_date": end_date}
     if imos is not None:
         params["imos"] = imos
     result = await db.execute(text(sql), params)
     keys = list(result.keys())
-    out, seen = {}, set()
+    ev_col = next((c for c in ("log_type", "event_type") if c in cols), None)
+    out = {}
     for row in result.fetchall():
         m = dict(zip(keys, row))
-        imo, d = _IMO_ALIAS.get(m["vessel_imo"], m["vessel_imo"]), str(m["d"])[:10]
-        if (imo, d) in seen:  # keep one log per day (the latest)
-            continue
-        seen.add((imo, d))
-        out.setdefault(imo, {})[d] = {c: (None if m[c] is None else str(m[c])) for c in cols}
+        imo, stamp = _IMO_ALIAS.get(m["vessel_imo"], m["vessel_imo"]), str(m["d"])
+        if m["tm"] and len(stamp) == 10:  # date only: add the UTC time the logbook sorts by
+            stamp = f"{stamp} {m['tm']}"
+        d = stamp[:10]
+        entry = {c: (None if m[c] is None else str(m[c])) for c in cols}
+        entry["_ts"] = stamp
+        entry["_ev"] = entry.get(ev_col) if ev_col else None
+        day = out.setdefault(imo, {}).setdefault(d, [])
+        if day and day[-1]["_ts"] == stamp and day[-1]["_ev"] == entry["_ev"]:
+            day[-1] = entry  # exact repeat: keep the latest copy
+        else:
+            day.append(entry)
     return out
 
 
@@ -132,8 +178,9 @@ async def _latest_date(db, table, date_col, imos):
 @router.get("/logbook")
 async def get_logbook(
     source: str = Query("mari_apps"),
-    days: int = Query(5, ge=1, le=14),
-    end_date: Optional[date_type] = Query(None, description="Show the latest days up to and including this date"),
+    limit: int = Query(5, ge=1, le=20, description="Events per vessel"),
+    offset: int = Query(0, ge=0, description="Skip this many of the newest events"),
+    end_date: Optional[date_type] = Query(None, description="Only events up to and including this date"),
     db: Optional[AsyncSession] = Depends(get_vessel_perf_db),
     current_user=Depends(require_any),
 ):
@@ -141,8 +188,6 @@ async def get_logbook(
         raise HTTPException(status_code=400, detail="Unknown source")
     if db is None:
         raise HTTPException(status_code=503, detail="Vessel Performance database is not configured")
-
-    table, date_col = _SOURCES[source]
 
     allowed = None
     if current_user.role == "VESSEL":
@@ -157,8 +202,14 @@ async def get_logbook(
         if not allowed:
             return {"source": source, "columns": [], "vessels": []}
 
+    return await build_logbook(db, source, limit, offset, end_date, allowed)
+
+
+async def build_logbook(db, source, limit, offset, end_date, allowed):
+    """Columns + last `limit` events per vessel for `source` (shared by the endpoint and the daily mail)."""
+    table, date_col = _SOURCES[source]
     target_end_date = end_date or date_type.today()
-    start_date = target_end_date - timedelta(days=days - 1)
+    start_date = target_end_date - timedelta(days=_LOOKBACK_DAYS)
 
     # Column definitions from metadata (also acts as the whitelist for SQL identifiers).
     meta = (await db.execute(
@@ -349,7 +400,7 @@ async def get_logbook(
     for r in emis_cols:
         add_emis(r["db_column"])
 
-    vessels = await _fetch_rows(db, table, date_col, used, start_date, target_end_date, allowed)
+    vessels = await _fetch_rows(db, table, date_col, used, start_date, target_end_date, allowed, _TIME_LINK[source])
     latest = await _latest_date(db, table, date_col, allowed)
     via_backup = []
 
@@ -363,7 +414,7 @@ async def get_logbook(
                 {"t": b_table},
             )).fetchall()}
             b_cols = {c for c in used if c in existing}
-            backup = await _fetch_rows(db, b_table, b_date, b_cols, start_date, target_end_date, b_imos)
+            backup = await _fetch_rows(db, b_table, b_date, b_cols, start_date, target_end_date, b_imos, _TIME_LINK[_BACKUP_SOURCE])
             for imo, b_rows in backup.items():
                 m_rows = vessels.get(imo)
                 if b_rows and (not m_rows or max(b_rows) > max(m_rows)):
@@ -378,7 +429,8 @@ async def get_logbook(
         "latest_date": latest.isoformat() if latest else None,
         "columns": columns,
         "vessels": [
-            {"imo": imo, "rows": rows, **({"via": "excel_mail"} if imo in via_backup else {})}
+            {"imo": imo, "rows": _timeline(rows, target_end_date, limit, offset),
+             **({"via": "excel_mail"} if imo in via_backup else {})}
             for imo, rows in vessels.items()
         ],
     }

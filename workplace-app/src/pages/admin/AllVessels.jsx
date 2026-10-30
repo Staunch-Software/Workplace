@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Zap, Trash2, FileBarChart2 } from "lucide-react";
+import { Search, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Zap, Trash2, FileBarChart2, BookOpen } from "lucide-react";
 import { getVessels, updateVessel, updateVesselModuleStatus, deleteVessel } from "./lib/adminApi";
 import ConfirmModal from "./ConfirmModal";
 
@@ -14,6 +14,7 @@ const MODULE_META = [
   { key: "lubeoil", label: "Lubeoil Analysis", icon: <Droplet size={14} />, color: "#06b6d4" },
   { key: "engine_performance", label: "Engine Performance", icon: <Zap size={14} />, color: "#22c55e" },
   { key: "report_tracker", label: "Report Tracker", icon: <FileBarChart2 size={14} />, color: "#7c3aed" },
+  { key: "orb", label: "Oil Record Book", icon: <BookOpen size={14} />, color: "#10b981" },
 ];
 function getRoleStyle(role) {
   const r = role?.toUpperCase();

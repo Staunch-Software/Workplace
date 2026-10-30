@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,7 +11,7 @@ from app.models.vessel_tank import VesselTank
 from app.models.control_user import ControlUser
 from app.schemas.vessel_tank import TankResponse
 from app.schemas.common import success
-from app.dependencies import get_current_user, require_admin, assert_vessel_access
+from app.dependencies import get_current_user, require_admin, assert_vessel_access, shore_instance_only
 from app.services.azure_storage import upload_iopp_document, download_iopp_document
 
 router = APIRouter(prefix="/vessels", tags=["vessel_tanks"])
@@ -56,6 +57,45 @@ async def list_tanks(
         
     return success(data=response_data)
 
+def _iopp_particulars(name, section, capacity, valid_from, valid_to, clear=None) -> dict:
+    """IOPP Supplement particulars sent as text form fields. None / empty = not sent (an empty form value reaches
+    the API as None, so it cannot mean "clear"); `clear` names the fields to empty, comma separated."""
+    out: dict = {}
+    if name is not None:
+        out["tank_name_iopp"] = name.strip() or None
+    if section is not None:
+        out["iopp_section_ref"] = section.strip() or None
+    if capacity is not None:
+        if capacity.strip() == "":
+            out["iopp_capacity_m3"] = None
+        else:
+            try:
+                value = float(capacity)
+            except ValueError:
+                raise HTTPException(status_code=422, detail="IOPP capacity must be a number")
+            if value <= 0:
+                raise HTTPException(status_code=422, detail="IOPP capacity must be above 0")
+            out["iopp_capacity_m3"] = value
+    for key, raw in (("effective_from", valid_from), ("effective_to", valid_to)):
+        if raw is not None:
+            if raw.strip() == "":
+                out[key] = None
+            else:
+                try:
+                    out[key] = date.fromisoformat(raw.strip())
+                except ValueError:
+                    raise HTTPException(status_code=422, detail="Dates must be written YYYY-MM-DD")
+    allowed = ("tank_name_iopp", "iopp_section_ref", "iopp_capacity_m3", "effective_from", "effective_to")
+    for field in [c.strip() for c in (clear or "").split(",") if c.strip()]:
+        if field not in allowed:
+            raise HTTPException(status_code=422, detail=f"Cannot clear '{field}'")
+        out[field] = None
+    start, end = out.get("effective_from"), out.get("effective_to")
+    if start and end and end < start:
+        raise HTTPException(status_code=422, detail="'Valid to' is before 'valid from'")
+    return out
+
+
 async def _store_iopp_docs(iopp_doc1: Optional[UploadFile], iopp_doc2: Optional[UploadFile]):
     """Upload whichever of the two IOPP files were actually provided — at
     least one is required for an IOPP tank, but both are optional individually."""
@@ -68,7 +108,7 @@ async def _store_iopp_docs(iopp_doc1: Optional[UploadFile], iopp_doc2: Optional[
     return doc1_url, doc2_url
 
 
-@router.post("/{vessel_id}/tanks")
+@router.post("/{vessel_id}/tanks", dependencies=[Depends(shore_instance_only)])
 async def add_tank(
     vessel_id: uuid.UUID,
     tank_name: str = Form(...),
@@ -77,11 +117,18 @@ async def add_tank(
     capacity_m3: float = Form(...),
     is_iopp: bool = Form(True),
     is_evaporation_allowed: bool = Form(False),
+    tank_name_iopp: Optional[str] = Form(None),
+    iopp_section_ref: Optional[str] = Form(None),
+    iopp_capacity_m3: Optional[str] = Form(None),
+    effective_from: Optional[str] = Form(None),
+    effective_to: Optional[str] = Form(None),
+    iopp_clear: Optional[str] = Form(None),
     iopp_doc1: Optional[UploadFile] = File(None),
     iopp_doc2: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
     _: ControlUser = Depends(require_admin),
 ):
+    particulars = _iopp_particulars(tank_name_iopp, iopp_section_ref, iopp_capacity_m3, effective_from, effective_to, iopp_clear)
     result = await db.execute(select(Vessel).where(Vessel.id == vessel_id))
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Vessel not found")
@@ -113,6 +160,7 @@ async def add_tank(
         is_active=True,
         iopp_doc1_url=iopp_doc1_url,
         iopp_doc2_url=iopp_doc2_url,
+        **particulars,
     )
     db.add(tank)
     await db.commit()
@@ -120,7 +168,7 @@ async def add_tank(
     return success(data=TankResponse.model_validate(tank).model_dump(), message="Tank added")
 
 
-@router.put("/{vessel_id}/tanks/{tank_id}")
+@router.put("/{vessel_id}/tanks/{tank_id}", dependencies=[Depends(shore_instance_only)])
 async def update_tank(
     vessel_id: uuid.UUID,
     tank_id: uuid.UUID,
@@ -130,6 +178,12 @@ async def update_tank(
     capacity_m3: Optional[float] = Form(None),
     is_iopp: Optional[bool] = Form(None),
     is_evaporation_allowed: Optional[bool] = Form(None),
+    tank_name_iopp: Optional[str] = Form(None),
+    iopp_section_ref: Optional[str] = Form(None),
+    iopp_capacity_m3: Optional[str] = Form(None),
+    effective_from: Optional[str] = Form(None),
+    effective_to: Optional[str] = Form(None),
+    iopp_clear: Optional[str] = Form(None),
     iopp_doc1: Optional[UploadFile] = File(None),
     iopp_doc2: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
@@ -141,6 +195,11 @@ async def update_tank(
     tank = result.scalar_one_or_none()
     if not tank:
         raise HTTPException(status_code=404, detail="Tank not found")
+    particulars = _iopp_particulars(tank_name_iopp, iopp_section_ref, iopp_capacity_m3, effective_from, effective_to, iopp_clear)
+    start = particulars.get("effective_from", tank.effective_from)
+    end = particulars.get("effective_to", tank.effective_to)
+    if start and end and end < start:
+        raise HTTPException(status_code=422, detail="'Valid to' is before 'valid from'")
 
     effective_is_iopp = is_iopp if is_iopp is not None else tank.is_iopp
     has_existing_doc = bool(tank.iopp_doc1_url or tank.iopp_doc2_url)
@@ -161,6 +220,8 @@ async def update_tank(
     for field, val in fields.items():
         if val is not None:
             setattr(tank, field, val)
+    for field, val in particulars.items():
+        setattr(tank, field, val)
 
     await db.commit()
     await db.refresh(tank)
@@ -194,7 +255,7 @@ async def get_iopp_doc(
     return Response(content=content, media_type=content_type)
 
 
-@router.patch("/{vessel_id}/tanks/{tank_id}/deactivate")
+@router.patch("/{vessel_id}/tanks/{tank_id}/deactivate", dependencies=[Depends(shore_instance_only)])
 async def deactivate_tank(
     vessel_id: uuid.UUID,
     tank_id: uuid.UUID,

@@ -157,6 +157,11 @@
 .orb-root .up-drop { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; padding: 1.5rem 1rem; text-align: center; cursor: pointer; background: var(--up-orange-50); border: 2px dashed #F0C9A6; border-radius: 14px; transition: all 0.2s ease; }
 .orb-root .up-drop:hover { border-color: var(--up-orange-500); background: var(--up-orange-100); }
 .orb-root .up-drop:focus-within { border-color: var(--up-orange-500); box-shadow: 0 0 0 3px rgba(232,112,26,0.16); }
+.orb-root .up-drop--over { border-style: solid; border-color: var(--up-orange-500); background: var(--up-orange-100); box-shadow: 0 0 0 4px rgba(232,112,26,0.18); }
+.orb-root .up-drop--over * { pointer-events: none; }
+.orb-root .up-hero { position: relative; }
+.orb-root .up-hero--drag { outline: 3px dashed #fff; outline-offset: -10px; box-shadow: 0 0 0 4px rgba(232,112,26,0.35); }
+.orb-root .up-hero--drag::after { content: 'Drop the PDF to upload it'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; border-radius: inherit; background: rgba(204,90,10,0.82); color: #fff; font-weight: 700; font-size: 1.1rem; pointer-events: none; }
 .orb-root .up-drop--has { border-style: solid; background: #fff; border-color: var(--up-orange-400); }
 .orb-root .up-drop__input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip: rect(0 0 0 0); }
 .orb-root .up-drop__icon { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #fff; color: var(--up-orange-600); box-shadow: 0 2px 8px rgba(204,90,10,0.15); }

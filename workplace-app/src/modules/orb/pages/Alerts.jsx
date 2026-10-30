@@ -1,16 +1,19 @@
-import { Fragment, useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
-  ShieldAlert, AlertTriangle, AlertCircle, Eye, RefreshCw, Check, FileText, BellOff, Filter,
+  ShieldAlert, AlertTriangle, AlertCircle, Eye, RefreshCw, BellOff, Filter, MessageSquare, Check, Send, RotateCcw,
 } from 'lucide-react';
 import Sidebar from '../components/Layout/Sidebar';
 import Header from '../components/Layout/Header';
 import Badge from '../components/shared/Badge';
-import Modal from '../components/shared/Modal';
+import AlertModal from '../components/alerts/AlertModal';
+import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import Dropdown from '../components/shared/Dropdown';
 import MultiSelectDropdown from '../components/shared/MultiSelectDropdown';
 import api from '../api/axiosOrb';
 import './Alerts.css';
+import { fmtDate, daysSince } from '../utils/time';
 
 const SEVERITIES = ['critical', 'major', 'minor', 'observation'];
 
@@ -21,70 +24,97 @@ const SEVERITY_ICONS = {
   observation: Eye,
 };
 
-// 12 alert types per the new compliance spec
-const ALERT_TYPES = [
-  'wrong_item_code',                 // 1  Major
-  'mass_balance_error',              // 2  Major
-  'tank_capacity_exceeded',          // 3  Critical
-  'combined_capacity_threshold',     // 4  Major
-  'sludge_generation_rate',          // 5  Observation/Minor
-  'bilge_increasing_rate',           // 6  Major
-  'sludge_vs_fuel_consumption',      // 7  Observation/Major/Critical
-  'bilge_transfer_vs_soundings',     // 8  Minor
-  // 'bilge_pump_capacity' (9) omitted — check paused, no UI to set pump capacity yet
-  'bunker_mismatch',                 // 10 Minor
-  'missing_master_signature',        // 11 Minor
-  'non_chronological_entry',         // 12 Minor
-  'erasure_detected',                // 12 Observation
-  'item_number_missing',             // 14 Minor  — a line's item number (e.g. 11.2) not written
-  'item_value_missing',              // 14 Major  — nothing recorded for an item (e.g. capacity)
-  'reading_needs_review',            // Observation — figure looks wrong but the entry is uncertain
-];
-
 export default function Alerts() {
   const [alerts, setAlerts] = useState([]);
   const [vessels, setVessels] = useState([]);
+  const [alertTypes, setAlertTypes] = useState([]);   // from the alert configuration: enabled and offered in the filter
   const [summary, setSummary] = useState({});
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ vessel_id: [], severity: '', is_resolved: '', alert_type: '' });
-  const [resolving, setResolving] = useState(null);
   const [recalculating, setRecalculating] = useState(false);
-  const [expandedId, setExpandedId] = useState(null);
-  const [entryCache, setEntryCache] = useState({}); // entry_id -> EntryResponse
-  const [entryLoading, setEntryLoading] = useState(null); // entry_id currently fetching
-  const expandedRowRef = useRef(null);
+  const [selected, setSelected] = useState(null);   // alert open in the popup
+  const [startAction, setStartAction] = useState(null);   // resolution box to open with it
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user, isShore, isVessel } = useAuth();
+  const isVesselUser = isVessel || user?.role === 'VESSEL';
+  const isShoreView = !isVesselUser;
 
-  // Auto-scroll the expanded "Source ORB Entry" panel into view — it can render
-  // below the fold (especially for the 3rd+ row), and once the entry data loads
-  // the panel grows taller, so re-run after loading finishes too.
+  const [filters, setFilters] = useState(() => {
+    const vesselParam = searchParams.getAll('vessel_id');
+    const singleVessel = searchParams.get('vessel_id');
+    const vessel_id = (isShoreView && vesselParam.length > 0)
+      ? vesselParam
+      : (isShoreView && singleVessel ? singleVessel.split(',').filter(Boolean) : []);
+
+    return {
+      vessel_id,
+      severity: searchParams.get('severity') || '',
+      status: searchParams.get('status') || '',
+      alert_type: searchParams.get('alert_type') || '',
+    };
+  });
+
   useEffect(() => {
-    if (expandedId && expandedRowRef.current) {
-      expandedRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (isShoreView) {
+      api.get('/api/vessels').then(r => setVessels(r.data.data || [])).catch(() => {});
     }
-  }, [expandedId, entryLoading]);
+  }, [isShoreView]);
 
-  useEffect(() => { api.get('/api/vessels').then(r => setVessels(r.data.data || [])); }, []);
+  useEffect(() => {
+    api.get('/api/alert-config/types').then(r => setAlertTypes(r.data.data || [])).catch(() => {});
+  }, []);
 
-  const load = (overrides = {}) => {
+  const load = useCallback((overrides = {}) => {
     setLoading(true);
-    const activeFilters = { ...filters, ...overrides };
+    // Ignore overrides if it is a DOM/React event object (e.g. from onClick={load})
+    const cleanOverrides = (overrides && typeof overrides === 'object' && !overrides._reactName && !overrides.nativeEvent)
+      ? overrides
+      : {};
+    const activeFilters = { ...filters, ...cleanOverrides };
+
+    // For vessel users, never filter by vessel_id
+    if (!isShoreView) {
+      activeFilters.vessel_id = [];
+    }
+
     const params = new URLSearchParams();
     Object.entries(activeFilters).forEach(([k, v]) => {
       if (Array.isArray(v)) v.forEach(item => params.append(k, item));
       else if (v !== '') params.append(k, v);
     });
+
+    const summaryParams = new URLSearchParams();
+    if (activeFilters.vessel_id?.length) {
+      activeFilters.vessel_id.forEach(id => summaryParams.append('vessel_id', id));
+    }
+
     Promise.all([
       api.get(`/api/alerts?${params}`),
-      api.get('/api/alerts/summary'),
+      api.get(`/api/alerts/summary?${summaryParams}`),
     ]).then(([a, s]) => {
       setAlerts(a.data.data || []);
       setSummary(s.data.data || {});
     }).finally(() => setLoading(false));
+  }, [filters, isShoreView]);
+
+  useEffect(() => {
+    load(filters);
+  }, []);
+
+  // Opened from a notification or the activity feed: /alerts?alert=<id>
+  const linkedAlertId = searchParams.get('alert');
+  useEffect(() => {
+    if (!linkedAlertId) return;
+    api.get(`/api/alerts/${linkedAlertId}`)
+      .then(r => setSelected(r.data.data))
+      .catch(() => {})
+      .finally(() => setSearchParams({}, { replace: true }));
+  }, [linkedAlertId]);
+
+  const handleVesselChange = (v) => {
+    const nextFilters = { ...filters, vessel_id: v };
+    setFilters(nextFilters);
+    load({ vessel_id: v });
   };
-
-  useEffect(() => { load(); }, []);
-
-  const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
   const handleSeverityClick = (s) => {
     const newSeverity = filters.severity === s ? '' : s;
@@ -92,24 +122,25 @@ export default function Alerts() {
     load({ severity: newSeverity });
   };
 
-  const toggleExpand = async (alert) => {
-    if (expandedId === alert.id) { setExpandedId(null); return; }
-    setExpandedId(alert.id);
-    if (alert.entry_id && !entryCache[alert.entry_id]) {
-      setEntryLoading(alert.entry_id);
-      try {
-        const r = await api.get(`/api/entries/${alert.entry_id}`);
-        setEntryCache(c => ({ ...c, [alert.entry_id]: r.data.data }));
-      } finally {
-        setEntryLoading(null);
-      }
-    }
+  const handleSeverityDropdown = (s) => {
+    setFilters(f => ({ ...f, severity: s }));
+    load({ severity: s });
   };
 
-  const handleResolve = async () => {
-    await api.patch(`/api/alerts/${resolving}/resolve`, { notes: '' });
-    setResolving(null);
-    load();
+  const handleStatusChange = (status) => {
+    setFilters(f => ({ ...f, status }));
+    load({ status });
+  };
+
+  const handleTypeChange = (alert_type) => {
+    setFilters(f => ({ ...f, alert_type }));
+    load({ alert_type });
+  };
+
+  const clearFilters = () => {
+    const empty = { vessel_id: [], severity: '', status: '', alert_type: '' };
+    setFilters(empty);
+    load(empty);
   };
 
   const handleRecalculate = async () => {
@@ -122,6 +153,13 @@ export default function Alerts() {
       setRecalculating(false);
     }
   };
+
+  const activeCount = Object.entries(filters).filter(([k, v]) => {
+    if (!isShoreView && k === 'vessel_id') return false;
+    return Array.isArray(v) ? v.length > 0 : v !== '';
+  }).length;
+
+  const colSpan = isShoreView ? 8 : 7;
 
   return (
     <div className="app-shell">
@@ -163,51 +201,58 @@ export default function Alerts() {
 
             <div className="al-filters">
               <div className="al-filters__title"><Filter size={14} /> Filters</div>
-              <div className="al-filters__grid">
-                <div className="form-group">
-                  <label>Vessel</label>
-                  <MultiSelectDropdown
-                    value={filters.vessel_id}
-                    onChange={v => setFilter('vessel_id', v)}
-                    placeholder="Select the vessel"
-                    options={vessels.map(v => ({ value: v.id, label: v.name }))}
-                  />
-                </div>
+              <div className={`al-filters__grid${!isShoreView ? ' al-filters__grid--vessel' : ''}`}>
+                {isShoreView && (
+                  <div className="form-group">
+                    <label>Vessel</label>
+                    <MultiSelectDropdown
+                      value={filters.vessel_id}
+                      onChange={handleVesselChange}
+                      placeholder="All vessels (or select)"
+                      options={vessels.map(v => ({ value: v.id, label: v.name }))}
+                    />
+                  </div>
+                )}
                 <div className="form-group">
                   <label>Severity</label>
                   <Dropdown
                     value={filters.severity}
-                    onChange={v => setFilter('severity', v)}
+                    onChange={handleSeverityDropdown}
                     options={[{ value: '', label: 'All' }, ...SEVERITIES.map(s => ({ value: s, label: s }))]}
                   />
                 </div>
                 <div className="form-group">
                   <label>Status</label>
                   <Dropdown
-                    value={filters.is_resolved}
-                    onChange={v => setFilter('is_resolved', v)}
-                    options={[{ value: '', label: 'All' }, { value: 'false', label: 'Open' }, { value: 'true', label: 'Resolved' }]}
+                    value={filters.status}
+                    onChange={handleStatusChange}
+                    options={[{ value: '', label: 'All' }, { value: 'OPEN', label: 'Open' }, { value: 'PENDING_APPROVAL', label: 'Pending approval' }, { value: 'RESOLVED', label: 'Resolved' }]}
                   />
                 </div>
                 <div className="form-group">
                   <label>Type</label>
                   <Dropdown
                     value={filters.alert_type}
-                    onChange={v => setFilter('alert_type', v)}
-                    options={[{ value: '', label: 'All' }, ...ALERT_TYPES.map(t => ({ value: t, label: t.replace(/_/g, ' ') }))]}
+                    onChange={handleTypeChange}
+                    options={[{ value: '', label: 'All' }, ...alertTypes.map(t => ({ value: t.alert_code, label: t.name }))]}
                   />
                 </div>
                 <div className="al-filters__actions">
-                  <button className="al-btn al-btn--primary" onClick={load}>Apply</button>
-                  <button
-                    className="al-btn al-btn--secondary"
-                    onClick={handleRecalculate}
-                    disabled={filters.vessel_id.length !== 1 || recalculating}
-                    title={filters.vessel_id.length !== 1 ? 'Select exactly one vessel first' : 'Clear stale alerts and rerun all compliance checks'}
-                  >
-                    <RefreshCw size={15} className={recalculating ? 'al-spin' : ''} />
-                    {recalculating ? 'Recalculating…' : 'Recalculate Alerts'}
+                  <button className="al-btn al-btn--secondary" onClick={clearFilters} disabled={activeCount === 0}>
+                    <RotateCcw size={14} /> Clear
                   </button>
+                  <button className="al-btn al-btn--primary" onClick={() => load()}>Apply</button>
+                  {isShoreView && (
+                    <button
+                      className="al-btn al-btn--secondary"
+                      onClick={handleRecalculate}
+                      disabled={filters.vessel_id.length !== 1 || recalculating}
+                      title={filters.vessel_id.length !== 1 ? 'Select exactly one vessel first' : 'Clear stale alerts and rerun all compliance checks'}
+                    >
+                      <RefreshCw size={15} className={recalculating ? 'al-spin' : ''} />
+                      {recalculating ? 'Recalculating…' : 'Recalculate Alerts'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -218,39 +263,59 @@ export default function Alerts() {
                   <table className="al-table">
                     <thead>
                       <tr>
-                        <th>Severity</th><th>Vessel</th><th>Type</th><th>Message</th><th className="al-center">Page</th>
-                        <th>Created</th><th>Status</th><th className="al-th-actions">Action</th>
+                        <th>Severity</th>
+                        {isShoreView && <th>Vessel</th>}
+                        <th>Type</th>
+                        <th>Message</th>
+                        <th className="al-center">Page</th>
+                        <th>Created</th>
+                        <th>Status</th>
+                        <th className="al-th-actions">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {alerts.length === 0 ? (
                         <tr className="al-emptyrow">
-                          <td colSpan={8}>
+                          <td colSpan={colSpan}>
                             <div className="al-empty">
                               <span className="al-empty__icon"><BellOff size={24} /></span>
                               <div className="al-empty__title">No alerts found.</div>
-                              <div className="al-empty__text">Nothing matches the current filters.</div>
+                              <div className="al-empty__text">
+                                {filters.vessel_id?.length > 0
+                                  ? `No alerts found for ${filters.vessel_id.map(id => vessels.find(v => v.id === id)?.name || 'selected vessel').join(', ')}.`
+                                  : 'Nothing matches the current filters.'}
+                              </div>
                             </div>
                           </td>
                         </tr>
                       ) : alerts.map(a => {
-                        const expanded = expandedId === a.id;
-                        const entry = a.entry_id ? entryCache[a.entry_id] : null;
                         return (
-                          <Fragment key={a.id}>
                             <tr
-                              onClick={() => toggleExpand(a)}
-                              className={`al-row al-row--${a.severity}${expanded ? ' al-row--open' : ''}${a.is_resolved ? ' al-row--resolved' : ''}`}
+                              key={a.id}
+                              onClick={() => { setStartAction(null); setSelected(a); }}
+                              className={`al-row al-row--${a.severity}${a.is_resolved ? ' al-row--resolved' : ''}`}
+                              title="Open alert"
                             >
                               <td data-label="Severity" className="al-td-sev"><Badge value={a.severity} /></td>
-                              <td data-label="Vessel" className="al-vessel">{vessels.find(v => v.id === a.vessel_id)?.name || '—'}</td>
+                              {isShoreView && (
+                                <td data-label="Vessel" className="al-vessel">
+                                  {vessels.find(v => v.id === a.vessel_id)?.name || '—'}
+                                </td>
+                              )}
                               <td data-label="Type"><span className="al-type">{a.alert_type.replace(/_/g, ' ')}</span></td>
-                              <td data-label="Message" className="al-msg"><span className="al-msg__text">{a.message}</span></td>
+                              <td data-label="Message" className="al-msg">
+                                <span className="al-msg__text">{a.message}</span>
+                                {a.thread_count > 0 && (
+                                  <span className={`al-chat${a.unread_count > 0 ? ' al-chat--new' : ''}`}>
+                                    <MessageSquare size={12} /> {a.thread_count}{a.unread_count > 0 ? ` · ${a.unread_count} new` : ''}
+                                  </span>
+                                )}
+                              </td>
                               <td data-label="Page" className="al-center al-muted">{a.page_number ?? '—'}</td>
                               <td data-label="Created" className="al-muted">
-                                {new Date(a.created_at).toLocaleDateString()}
+                                {fmtDate(a.created_at)}
                                 {!a.is_resolved && (() => {
-                                  const days = Math.floor((Date.now() - new Date(a.created_at)) / 86400000);
+                                  const days = daysSince(a.created_at);
                                   const color = days < 7 ? '#22c55e' : days < 30 ? '#f59e0b' : '#ef4444';
                                   return (
                                     <span
@@ -262,78 +327,20 @@ export default function Alerts() {
                                   );
                                 })()}
                               </td>
-                              <td data-label="Status"><Badge value={a.is_resolved ? 'Resolved' : 'Open'} type={a.is_resolved ? 'completed' : 'pending'} /></td>
+                              <td data-label="Status">
+                                {a.status === 'PENDING_APPROVAL'
+                                  ? <Badge value="Pending approval" type="review" />
+                                  : <Badge value={a.is_resolved ? 'Resolved' : 'Open'} type={a.is_resolved ? 'completed' : 'pending'} />}
+                              </td>
                               <td className="al-td-actions">
-                                {!a.is_resolved && (
-                                  <button className="al-btn al-btn--ghost al-btn--sm" onClick={(e) => { e.stopPropagation(); setResolving(a.id); }}>
-                                    <Check size={14} /> Resolve
+                                {!a.is_resolved && (isShoreView || a.status !== 'PENDING_APPROVAL') && (
+                                  <button className="al-btn al-btn--ghost al-btn--sm"
+                                          onClick={(e) => { e.stopPropagation(); setStartAction(isShoreView ? (a.status === 'PENDING_APPROVAL' ? null : 'resolve') : 'request'); setSelected(a); }}>
+                                    {isShoreView ? <><Check size={14} /> {a.status === 'PENDING_APPROVAL' ? 'Review' : 'Resolve'}</> : <><Send size={14} /> Request</>}
                                   </button>
                                 )}
                               </td>
                             </tr>
-                            {expanded && (
-                              <tr key={`${a.id}-exp`} ref={expandedRowRef} className="al-exprow">
-                                <td colSpan={8}>
-                                  <div className="al-detail">
-                                    {!a.entry_id ? (
-                                      <span className="al-muted">
-                                        No specific entry — this is a vessel-level aggregate alert.
-                                      </span>
-                                    ) : entryLoading === a.entry_id ? (
-                                      <LoadingSpinner />
-                                    ) : !entry ? (
-                                      <span className="al-muted">Source entry not found.</span>
-                                    ) : (
-                                      <>
-                                        <div className="al-detail__title"><FileText size={15} /> Source ORB Entry</div>
-                                        <div className="al-detail__grid">
-                                          <div><span className="al-k">Date:</span> {entry.entry_date}</div>
-                                          <div><span className="al-k">Code:</span> <strong>{entry.orb_code}</strong></div>
-                                          <div><span className="al-k">Item:</span> {entry.item_number || '—'}</div>
-                                          <div><span className="al-k">Tank/Location:</span> {entry.tank_location || '—'}</div>
-                                          <div className="al-detail__wide"><span className="al-k">Operation:</span> {entry.operation_description}</div>
-                                          {entry.item_lines?.length > 0 && (
-                                            <div className="al-detail__wide">
-                                              <span className="al-k">Lines as written:</span>
-                                              {entry.item_lines.map((l, i) => (
-                                                <div key={i} className="en-mono">
-                                                  <strong style={l.item ? undefined : { color: '#c00000' }}>{l.item || '(blank)'}</strong> {l.text}
-                                                </div>
-                                              ))}
-                                            </div>
-                                          )}
-                                          <div><span className="al-k">Officer 1:</span> {entry.officer_1_name || '—'} {entry.officer_1_rank ? `(${entry.officer_1_rank})` : ''}</div>
-                                          <div><span className="al-k">Officer 2:</span> {entry.officer_2_name || '—'} {entry.officer_2_rank ? `(${entry.officer_2_rank})` : ''}</div>
-                                          <div><span className="al-k">Confidence:</span> {entry.confidence_score != null ? `${(entry.confidence_score * 100).toFixed(0)}%` : '—'}</div>
-                                        </div>
-                                        <div className="al-detail__qty">
-                                          <div className="al-detail__title">Quantities</div>
-                                          {entry.quantities?.length ? (
-                                            <div className="al-qty-wrap">
-                                              <table className="al-qty">
-                                                <thead><tr><th>Type</th><th>Value</th><th>Unit</th><th>From</th><th>To</th></tr></thead>
-                                                <tbody>
-                                                  {entry.quantities.map(q => (
-                                                    <tr key={q.id}>
-                                                      <td>{q.qty_type}</td>
-                                                      <td>{q.qty_value}</td>
-                                                      <td>{q.qty_unit}</td>
-                                                      <td>{q.from_tank || '—'}</td>
-                                                      <td>{q.to_tank || '—'}</td>
-                                                    </tr>
-                                                  ))}
-                                                </tbody>
-                                              </table>
-                                            </div>
-                                          ) : <span className="al-muted"> None</span>}
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </Fragment>
                         );
                       })}
                     </tbody>
@@ -342,20 +349,18 @@ export default function Alerts() {
               </div>
             )}
 
-            {resolving && (
-              <Modal
-                title="Resolve Alert"
-                onClose={() => setResolving(null)}
-                footer={
-                  <>
-                    <button className="al-btn al-btn--secondary" onClick={() => setResolving(null)}>Cancel</button>
-                    <button className="al-btn al-btn--primary" onClick={handleResolve}>Confirm Resolve</button>
-                  </>
-                }
-              >
-                <p>Mark this alert as resolved? This action will record your name and timestamp.</p>
-              </Modal>
+            {selected && (
+              <AlertModal
+                alert={selected}
+                vesselName={vessels.find(v => v.id === selected.vessel_id)?.name}
+                isShore={isShoreView}
+                currentUserId={user?.id}
+                startAction={startAction}
+                onClose={() => { setSelected(null); setStartAction(null); load(); }}
+                onChanged={() => load()}
+              />
             )}
+
           </div>
         </div>
       </div>
