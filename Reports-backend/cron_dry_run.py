@@ -31,7 +31,7 @@ async def dry_run():
         for c in configs:
             r2 = await db.execute(
                 select(Report)
-                .where(Report.vessel_imo == c.vessel_imo, Report.report_code == c.report_code)
+                .where(Report.vessel_imo == c.vessel_imo, Report.report_code == c.report_code, Report.job_order_no != 'N/A')
                 .order_by(Report.created_at.desc())
                 .options(selectinload(Report.attachments))
             )
@@ -44,7 +44,7 @@ async def dry_run():
                 due_str = str(latest.due_date.date()) if latest.due_date else '?'
                 reason = 'Still PENDING (due ' + due_str + ')'
                 would_scrape.append((c.vessel_name, c.report_code, reason))
-            elif not latest.attachments:
+            elif latest.job_status == 'COMPLETED' and not latest.attachments:
                 retries = getattr(latest, "attachment_retry_count", 0) or 0
                 if retries < 2:
                     reason = 'COMPLETED but missing attachments (job ' + str(latest.job_order_no) + ', retry ' + str(retries + 1) + '/2)'

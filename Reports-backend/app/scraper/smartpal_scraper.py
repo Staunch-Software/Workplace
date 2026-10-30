@@ -236,7 +236,8 @@ async def run_scraper(db: AsyncSession, target_frequency: str = None, target_rep
         for c in db_configs:
             stmt_latest = select(Report).where(
                 Report.vessel_imo == c.vessel_imo,
-                Report.report_code == c.report_code
+                Report.report_code == c.report_code,
+                Report.job_order_no != "N/A"
             ).order_by(Report.created_at.desc()).options(selectinload(Report.attachments))
 
             res_latest = await db.execute(stmt_latest)
@@ -253,7 +254,7 @@ async def run_scraper(db: AsyncSession, target_frequency: str = None, target_rep
                     should_scrape = True
                     target_job_no = latest_report.job_order_no
                     target_due_date = latest_report.due_date
-                elif not latest_report.attachments:
+                elif latest_report.job_status == 'COMPLETED' and not latest_report.attachments:
                     # A COMPLETED job with zero attachments on file is checked
                     # up to 2 times to recover attachments. If still empty after
                     # 2 attempts, further re-scraping is restricted/skipped.
@@ -2268,7 +2269,7 @@ async def run_halfyearly_scraper(db: AsyncSession, target_reports: str = None, t
         for c in db_configs:
             res = await db.execute(
                 select(Report)
-                .where(Report.vessel_imo == c.vessel_imo, Report.report_code == c.report_code)
+                .where(Report.vessel_imo == c.vessel_imo, Report.report_code == c.report_code, Report.job_order_no != "N/A")
                 .options(selectinload(Report.attachments))
             )
             # A first run saves every historical completed job, so created_at
@@ -2283,7 +2284,7 @@ async def run_halfyearly_scraper(db: AsyncSession, target_reports: str = None, t
             elif latest.job_status == "PENDING":
                 c._target_job_no, c._target_due_date = latest.job_order_no, latest.due_date
                 due.append(c)
-            elif not latest.attachments:
+            elif latest.job_status == 'COMPLETED' and not latest.attachments:
                 retries = getattr(latest, "attachment_retry_count", 0) or 0
                 if retries < 2:
                     c._target_job_no, c._target_due_date = latest.job_order_no, latest.due_date

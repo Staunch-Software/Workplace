@@ -76,3 +76,4 @@ scratch/
 # Data files
 data/*.xlsx
 data/*.csv
+attachments_dump_*.html
