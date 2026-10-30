@@ -19,6 +19,14 @@ async def get_allowed_vessel_imos(current_user: dict) -> Tuple[List[int], str]:
                 logger.warning("get_allowed_vessel_imos: no user_id in token")
                 return [], role
 
+            # Elevated roles always see every vessel, regardless of assignments
+            if role in ("ADMIN", "SUPERUSER", "SHORE", "SUPERINTENDENT"):
+                result = await control_db.execute(select(ControlVessel))
+                all_vessels = result.scalars().all()
+                all_imos = [int(v.imo) for v in all_vessels if str(v.imo).isdigit()]
+                logger.info(f"Elevated role {role} granted all IMOs: {all_imos}")
+                return all_imos, role
+
             query = text("""
                 SELECT vessel_imo
                 FROM user_vessel_link
@@ -32,13 +40,6 @@ async def get_allowed_vessel_imos(current_user: dict) -> Tuple[List[int], str]:
 
             if clean_imos:
                 return clean_imos, role
-
-            if role in ("ADMIN", "SUPERUSER", "SHORE", "SUPERINTENDENT"):
-                result = await control_db.execute(select(ControlVessel))
-                all_vessels = result.scalars().all()
-                all_imos = [int(v.imo) for v in all_vessels if str(v.imo).isdigit()]
-                logger.info(f"Elevated role {role} granted all IMOs: {all_imos}")
-                return all_imos, role
 
             logger.warning(f"User {user_id_raw} has no assigned vessels and role {role} is not elevated")
             return [], role
