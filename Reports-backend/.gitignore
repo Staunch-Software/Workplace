@@ -41,7 +41,6 @@ clear_db.py
 clear_kirti.py
 count_pdfs.py
 create_new_tables.py
-cron_dry_run.py
 inspect_db.py
 migrate_db.py
 mock_populate.py
