@@ -143,7 +143,16 @@ async def _fresh_browser_session(playwright):
     or None if any step fails."""
     browser = None
     try:
-        browser = await playwright.chromium.launch(headless=True)
+        browser = await playwright.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-dev-shm-usage",          # use /tmp instead of /dev/shm (prevents OOM on small VMs)
+                "--disable-extensions",
+                "--disable-gpu",
+                "--no-sandbox",                     # required on most Linux VM setups
+                "--js-flags=--max-old-space-size=256",  # cap V8 JS heap to 256 MB per browser process
+            ],
+        )
         session = await _fresh_session(browser)
         if session:
             context, page, overview_page = session
@@ -338,7 +347,16 @@ async def run_scraper(db: AsyncSession, target_frequency: str = None, target_rep
         return
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-dev-shm-usage",          # use /tmp instead of /dev/shm (prevents OOM on small VMs)
+                "--disable-extensions",
+                "--disable-gpu",
+                "--no-sandbox",                     # required on most Linux VM setups
+                "--js-flags=--max-old-space-size=256",  # cap V8 JS heap to 256 MB per browser process
+            ],
+        )
         context = await browser.new_context(accept_downloads=True, ignore_https_errors=True)
         context.set_default_timeout(60000)  # 60s global timeout for all actions
         page = await context.new_page()
@@ -499,6 +517,10 @@ async def run_scraper(db: AsyncSession, target_frequency: str = None, target_rep
                 logger.error(f"Error scraping {vessel_name}/{report_code}: {e}")
                 await _mark_failed(db, vessel_imo, report_code, str(e),
                                    vessel_name=vessel_name, report_name=report_name)
+
+            # Yield CPU between reports so the OS can serve other processes
+            # on the shared VM without noticeable impact on total run time.
+            await asyncio.sleep(0.3)
 
         await browser.close()
         logger.info("Scraper run complete.")
@@ -2322,7 +2344,16 @@ async def run_halfyearly_scraper(db: AsyncSession, target_reports: str = None, t
         return
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-dev-shm-usage",          # use /tmp instead of /dev/shm (prevents OOM on small VMs)
+                "--disable-extensions",
+                "--disable-gpu",
+                "--no-sandbox",                     # required on most Linux VM setups
+                "--js-flags=--max-old-space-size=256",  # cap V8 JS heap to 256 MB per browser process
+            ],
+        )
         context = await browser.new_context(accept_downloads=True, ignore_https_errors=True)
         context.set_default_timeout(60000)
         page = await context.new_page()
@@ -2428,6 +2459,10 @@ async def run_halfyearly_scraper(db: AsyncSession, target_reports: str = None, t
                 logger.error(f"Error scraping {e['vessel_name']}/{e['report_code']}: {ex}")
                 await _mark_failed(db, e["vessel_imo"], e["report_code"], str(ex),
                                    vessel_name=e["vessel_name"], report_name=e["report_name"])
+
+            # Yield CPU between reports so the OS can serve other processes
+            # on the shared VM without noticeable impact on total run time.
+            await asyncio.sleep(0.3)
 
         await browser.close()
         logger.info(f"{freq_label} scrape complete.")
