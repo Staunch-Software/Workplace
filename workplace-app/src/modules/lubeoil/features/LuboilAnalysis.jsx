@@ -5843,7 +5843,7 @@ const LuboilAnalysis = () => {
                                   };
 
                                   // Drop target for a single report page (shore users). N/A cells are
-                                  // included: uploading enables the equipment for that vessel.
+                                  // excluded: no upload button or drop for non-applicable equipment.
                                   const dropTarget =
                                     amIShore && vesselImo
                                       ? {
@@ -5860,10 +5860,8 @@ const LuboilAnalysis = () => {
                                     return (
                                       <td
                                         key={vesselName}
-                                                                                className={`lub-data-cell empty-cell ${colFocusClass} ${pageDropClass(dropTarget)}`}
-                                        {...getCellDropProps(dropTarget)}
+                                        className={`lub-data-cell empty-cell ${colFocusClass}`}
                                       >
-                                        {renderPageDropTools(dropTarget)}
                                         <span className="na-text">N/A</span>
                                       </td>
                                     );
