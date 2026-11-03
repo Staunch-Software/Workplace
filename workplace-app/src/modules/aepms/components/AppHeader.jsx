@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import axiosAepms from '../api/axiosAepms';
-import { Database, Upload, X, LayoutDashboard, CheckCircle2, Loader2, AlertCircle, Trash2 } from "lucide-react";
+import { Database, Upload, X, LayoutDashboard, CheckCircle2, Loader2, AlertCircle, Trash2, Plus } from "lucide-react";
 import {
   Moon,
   SunMedium,
@@ -39,6 +39,7 @@ export default function AppHeader() {
   const vesselRef = useRef(null);
   const genRef = useRef(null);
   const engineRef = useRef(null);
+  const perfScrollRef = useRef(null);
   const [isVesselDropdownOpen, setIsVesselDropdownOpen] = useState(false);
   const [isGenDropdownOpen, setIsGenDropdownOpen] = useState(false);
   const [isEngineDropdownOpen, setIsEngineDropdownOpen] = useState(false);
@@ -288,6 +289,42 @@ export default function AppHeader() {
     }));
   };
 
+  // Append an empty load-point column so the user can key in a load point the
+  // extraction missed. Cells read p[key] || "", so an empty object is enough.
+  const handleAddLoadPoint = () => {
+    if (!extractedData) return;
+    setExtractedData(prev => ({
+      ...prev,
+      performance_table: [...(prev.performance_table || []), { load_percentage: "" }],
+    }));
+    setTimeout(() => {
+      const el = perfScrollRef.current;
+      if (el) el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' });
+    }, 0);
+  };
+
+  // Mirrors the DB rules so a bad manual column is caught here instead of as a 500 on save.
+  const validatePerformanceTable = () => {
+    const isAux = syncConfig.engineType === 'auxiliaryEngine';
+    const outputKey = isAux ? 'load_kw' : 'engine_output_kw';
+    const outputLabel = isAux ? 'Generator Load (kW)' : 'Engine Output (kW)';
+    const seen = new Set();
+    const table = extractedData?.performance_table || [];
+    for (let i = 0; i < table.length; i++) {
+      const p = table[i];
+      const m = String(p.load_percentage ?? "").match(/(\d+(\.\d+)?)/);
+      if (!m) return `Column ${i + 1}: Load % is required.`;
+      const load = parseFloat(m[1]);
+      if (load > 110) return `Column ${i + 1}: Load % (${load}) cannot be greater than 110.`;
+      if (String(p[outputKey] ?? "").trim() === "") return `Column ${i + 1} (${load}%): ${outputLabel} is required.`;
+      if (isAux) {
+        if (seen.has(load)) return `Load ${load}% appears more than once. Each load point must be unique for an Auxiliary Engine.`;
+        seen.add(load);
+      }
+    }
+    return null;
+  };
+
   const handleFinalSubmit = async () => {
     const vesselName = extractedData?.vessel_info?.vessel_name?.trim();
     const imoNumber  = extractedData?.vessel_info?.imo_number?.trim();
@@ -303,6 +340,12 @@ export default function AppHeader() {
     }
     if (!imoNumber) {
       alert("⚠️ IMO Number is missing.\nPlease fill it in the Vessel Specs tab before saving.");
+      return;
+    }
+
+    const tableError = validatePerformanceTable();
+    if (tableError) {
+      alert(`⚠️ ${tableError}\nPlease fix it in the Performance Matrix tab before saving.`);
       return;
     }
 
@@ -863,10 +906,18 @@ export default function AppHeader() {
                   {/* Performance Matrix */}
                   {activeReviewTab === "performance" && (
                     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
-                      <div className="review-section-title">
-                        {syncConfig.engineType === 'auxiliaryEngine' ? 'Aux Engine Shop Trial Performance Matrix' : 'Shop Trial Performance Matrix'}
+                      <div className="review-section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                        <span>{syncConfig.engineType === 'auxiliaryEngine' ? 'Aux Engine Shop Trial Performance Matrix' : 'Shop Trial Performance Matrix'}</span>
+                        <button
+                          type="button"
+                          title="Add a new load point column"
+                          onClick={handleAddLoadPoint}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f0f9ff', border: '1.5px dashed #0ea5e9', color: '#0369a1', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontWeight: 600, fontSize: '11.5px', whiteSpace: 'nowrap', flexShrink: 0 }}
+                        >
+                          <Plus size={13} /> Add Load Point
+                        </button>
                       </div>
-                      <div style={{ overflow: 'auto', flex: 1, minHeight: 0, position: 'relative' }}>
+                      <div ref={perfScrollRef} style={{ overflow: 'auto', flex: 1, minHeight: 0, position: 'relative' }}>
                         <table className="perf-table" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
                           <thead>
                             <tr>
