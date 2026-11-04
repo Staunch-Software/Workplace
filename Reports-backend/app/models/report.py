@@ -88,6 +88,9 @@ class Report(Base):
     aepms_push_status = Column(String(30), nullable=True)
     aepms_pushed_at    = Column(DateTime,   nullable=True)
 
+    # -- Missing attachment retry tracking (capped at 2 attempts) --
+    attachment_retry_count = Column(Integer, default=0, server_default='0', nullable=False)
+
     created_at      = Column(DateTime, default=datetime.utcnow)
     updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

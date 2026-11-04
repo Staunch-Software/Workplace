@@ -469,8 +469,10 @@ async def record_vessel_sync_time(
         if not vessel:
             return
 
-        vessel_update = {"updated_at": now}
-        vessel_update["last_push_at" if is_vessel_pushing else "last_pull_at"] = now
+        # vessels.* time columns are TIMESTAMP WITHOUT TIME ZONE; asyncpg rejects aware datetimes
+        now_naive = now.replace(tzinfo=None)
+        vessel_update = {"updated_at": now_naive}
+        vessel_update["last_push_at" if is_vessel_pushing else "last_pull_at"] = now_naive
 
         if telemetry is not None or error_msg:
             reported_count = telemetry.get("failed_items_count", 0) if telemetry else 0
