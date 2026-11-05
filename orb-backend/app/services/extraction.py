@@ -4217,10 +4217,14 @@ async def run_extraction(
             entries_data = _split_swallowed_weekly_inventory(entries_data)
             entries_data = _propagate_shared_officer(entries_data)
             entries_data = _reconcile_tank_capacity_readings(entries_data)
-            entries_data = _reconcile_year_outliers(entries_data, await _vessel_last_entry_date(session_factory, vessel_id, upload_id))
+            last_known = await _vessel_last_entry_date(session_factory, vessel_id, upload_id)
+            entries_data = _reconcile_year_outliers(entries_data, last_known)
             entries_data = _reconcile_chronology(entries_data)
             entries_data = _reconcile_entry_date_vs_own_header(entries_data)
             entries_data = _reconcile_entry_date_vs_own_signature(entries_data)
+            # The two date reconcilers above trust the dates written in an entry's own text, so a year the
+            # model misread in both the header and the signature puts the wrong year straight back.
+            entries_data = _reconcile_year_outliers(entries_data, last_known)
             entries_data = _dedupe_cross_date_duplicates(entries_data)
             entries_data = _flag_self_referential_transfers(entries_data)
             entries_data = _flag_retained_exceeds_capacity(entries_data)
