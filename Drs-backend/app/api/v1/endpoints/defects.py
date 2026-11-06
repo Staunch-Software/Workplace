@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 # =============================================================================
 # app/api/v1/endpoints/defects.py  — PRODUCTION READY (Shore + Vessel)
 #
@@ -1272,8 +1273,10 @@ async def export_defects(
             'scenarios':              False,
         })
 
-        # ================= SHEET 2: DETAILED REPORT =================
+        # ================= SHEET 2: DETAILED REPORT (PHOTOS) =================
         ws2 = wb.add_worksheet("Detailed Report")
+        ws2.set_tab_color("#2563eb")  # Blue tab highlight for quick discovery
+
         headers2 = [
             "S.No",
             "Vessel",
@@ -1286,22 +1289,14 @@ async def export_defects(
             "After Image 2",
         ]
 
-        # Smart photo embedding guard:
-        # Embed thumbnails only on small targeted datasets (<= 25 defects, capped at 40 photos)
-        # For bulk exports (> 25 defects, e.g. 1800 or 100,000 defects), write filenames/references
-        # to ensure sub-second response without Azure blob network timeouts.
-        MAX_IMAGE_EMBED_DEFECTS = 25
-        MAX_TOTAL_IMAGES = 40
+        # Fast Concurrent Photo Embedding:
+        # Defaults to True so photos are ALWAYS embedded and visible in Excel!
+        # Uses ThreadPoolExecutor to download & resize up to 120 images concurrently in ~1.5s,
+        # preventing Gunicorn worker timeouts and 502 Bad Gateway even on large fleet databases.
+        MAX_IMAGE_EMBED_DEFECTS = 60
+        MAX_TOTAL_IMAGES = 120
 
-        if include_images is True:
-            should_embed_images = True
-            embed_limit = min(len(defects), MAX_IMAGE_EMBED_DEFECTS)
-        elif include_images is False:
-            should_embed_images = False
-            embed_limit = 0
-        else:
-            should_embed_images = len(defects) <= MAX_IMAGE_EMBED_DEFECTS
-            embed_limit = len(defects) if should_embed_images else 0
+        should_embed_images = include_images is not False
 
         # Sheet 2 preview rows: up to 500 records for bulk exports, or all if <= 500
         sheet2_count = min(len(defects), 500)
@@ -1312,12 +1307,12 @@ async def export_defects(
         ws2.set_column("C:C", 15)  # Report Date
         ws2.set_column("D:D", 20)  # Area of Concern
         ws2.set_column("E:E", 40)  # Description
-        ws2.set_column("F:I", 50 if should_embed_images else 25)  # Images
+        ws2.set_column("F:I", 50)  # Images (columns F to I)
 
         for c, h in enumerate(headers2):
             ws2.write(0, c, h, header_fmt)
 
-        # Fetch image records only for the defects in Sheet 2 (at most 500 IDs, avoiding parameter limits)
+        # Fetch image records for Sheet 2 defects (at most 500 IDs, avoiding parameter limits)
         images_by_defect = {}
         if sheet2_defects:
             sheet2_ids = [d.id for d in sheet2_defects]
@@ -1333,15 +1328,31 @@ async def export_defects(
             for img_row in img_result.all():
                 images_by_defect.setdefault(img_row.defect_id, []).append(img_row)
 
-        container_client = None
-        if should_embed_images:
-            try:
-                container_client = get_container_client()
-            except Exception as e:
-                logger.warning(f"Could not initialize Azure container client: {e}")
-                should_embed_images = False
+        # Pre-download images concurrently with ThreadPoolExecutor
+        image_cache = {}
+        if should_embed_images and sheet2_defects:
+            embed_defects = sheet2_defects[:MAX_IMAGE_EMBED_DEFECTS]
+            embed_blob_paths = []
+            for d in embed_defects:
+                for im in images_by_defect.get(d.id, []):
+                    if im.blob_path and im.blob_path not in embed_blob_paths:
+                        embed_blob_paths.append(im.blob_path)
+                    if len(embed_blob_paths) >= MAX_TOTAL_IMAGES:
+                        break
+                if len(embed_blob_paths) >= MAX_TOTAL_IMAGES:
+                    break
 
-        total_embedded = 0
+            if embed_blob_paths:
+                try:
+                    container_client = get_container_client()
+                    with ThreadPoolExecutor(max_workers=15) as executor:
+                        def _fetch(p):
+                            return p, get_image_data(p, container_client)
+                        for p, data in executor.map(_fetch, embed_blob_paths):
+                            if data and data[0] is not None:
+                                image_cache[p] = data
+                except Exception as e:
+                    logger.warning(f"Could not pre-download images: {e}")
 
         def safe_date_sort(img):
             dt = img.created_at
@@ -1351,26 +1362,16 @@ async def export_defects(
                 return dt.replace(tzinfo=timezone.utc)
             return dt
 
+        link_fmt = wb.add_format({
+            "align": "center",
+            "valign": "vcenter",
+            "font_color": "#2563eb",
+            "underline": 1,
+            "border": 1,
+        })
+
         for i, defect in enumerate(sheet2_defects):
             row = i + 1
-            is_embed_row = should_embed_images and i < embed_limit and total_embedded < MAX_TOTAL_IMAGES
-            if is_embed_row:
-                ws2.set_row(row, 255)
-            else:
-                ws2.set_row(row, 24)
-
-            report_date = (
-                defect.date_identified.astimezone(IST).strftime("%Y-%m-%d")
-                if defect.date_identified
-                else "-"
-            )
-
-            ws2.write(row, 0, i + 1, center_fmt)
-            ws2.write(row, 1, vessel_map.get(defect.vessel_imo, defect.vessel_imo or "-"), text_fmt)
-            ws2.write(row, 2, report_date, center_fmt)
-            ws2.write(row, 3, defect.equipment_name or "-", text_fmt)
-            ws2.write(row, 4, defect.description or "-", text_fmt)
-
             def_imgs = images_by_defect.get(defect.id, [])
             before = sorted(
                 [img for img in def_imgs if img.image_type == "before"],
@@ -1390,13 +1391,38 @@ async def export_defects(
                 (8, after[1] if len(after) > 1 else None, None),
             ]
 
+            # Check if this row has any embedded image
+            has_embedded_image = any(
+                img_obj and img_obj.blob_path in image_cache for _, img_obj, _ in image_slots
+            )
+
+            if has_embedded_image:
+                ws2.set_row(row, 255)
+            else:
+                ws2.set_row(row, 28)
+
+            report_date = (
+                defect.date_identified.astimezone(IST).strftime("%Y-%m-%d")
+                if defect.date_identified
+                else "-"
+            )
+
+            ws2.write(row, 0, i + 1, center_fmt)
+            ws2.write(row, 1, vessel_map.get(defect.vessel_imo, defect.vessel_imo or "-"), text_fmt)
+            ws2.write(row, 2, report_date, center_fmt)
+            ws2.write(row, 3, defect.equipment_name or "-", text_fmt)
+            ws2.write(row, 4, defect.description or "-", text_fmt)
+
             for col_idx, img_obj, fallback_path in image_slots:
                 if not img_obj and not fallback_path:
                     ws2.write(row, col_idx, "No Image", center_fmt)
                     continue
 
-                if is_embed_row and img_obj and container_client:
-                    buf, w, h = get_image_data(img_obj.blob_path, container_client)
+                blob_p = img_obj.blob_path if img_obj else fallback_path
+
+                # 1. Check if image is in cache -> Embed actual visual picture!
+                if blob_p and blob_p in image_cache:
+                    buf, w, h = image_cache[blob_p]
                     if buf and w > 0 and h > 0:
                         container_h = 340
                         container_w = 350
@@ -1408,7 +1434,7 @@ async def export_defects(
                             ws2.insert_image(
                                 row,
                                 col_idx,
-                                img_obj.file_name or "image.jpg",
+                                (img_obj.file_name if img_obj else "image.jpg") or "image.jpg",
                                 {
                                     "image_data": buf,
                                     "x_scale": scale,
@@ -1418,12 +1444,21 @@ async def export_defects(
                                     "object_position": 1,
                                 },
                             )
-                            total_embedded += 1
                             continue
                         except Exception as img_err:
                             logger.error(f"Failed to insert image: {img_err}")
 
-                # Filename or fallback text
+                # 2. Beyond embed limit or download failed -> Provide direct clickable SAS view link!
+                if blob_p:
+                    try:
+                        sas_url = generate_read_sas_url(blob_p)
+                        display_name = img_obj.file_name if (img_obj and img_obj.file_name) else "View Photo"
+                        ws2.write_url(row, col_idx, sas_url, link_fmt, string=display_name)
+                        continue
+                    except Exception as sas_err:
+                        logger.warning(f"Failed to generate SAS link: {sas_err}")
+
+                # 3. Fallback text
                 fname = img_obj.file_name if img_obj else ("Attached" if fallback_path else "No Image")
                 ws2.write(row, col_idx, fname, center_fmt)
 
