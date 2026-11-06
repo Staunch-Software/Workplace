@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { defectApi } from '@drs/services/defectApi';
 import { DEFECT_SOURCE_OPTIONS } from '../../components/shared/constants';
+import { formatFeedDateTime, getIstDateKey, parseTs } from '../../utils/time';
 import "../../components/shared/live-feed.css"
 
 import {
@@ -204,14 +205,8 @@ const Select = ({ value, onChange, options, placeholder }) => {
   );
 };
 
-// ── Format date ────────────────────────────────────────────────────────────
-const formatDateTime = (dt) => {
-  if (!dt) return '—';
-  const d = new Date(dt);
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-    + ' · '
-    + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
-};
+// ── Format date (IST) ─────────────────────────────────────────────────────
+const formatDateTime = formatFeedDateTime;
 
 // ── Shared filter logic ────────────────────────────────────────────────────
 const applyCommonFilters = (items, { vesselFilter, priorityFilter, sourceFilter, dateFrom, dateTo, search }) => {
@@ -219,11 +214,9 @@ const applyCommonFilters = (items, { vesselFilter, priorityFilter, sourceFilter,
     if (vesselFilter && String(item.vessel_imo) !== String(vesselFilter)) return false;
     if (priorityFilter && item.defect?.priority !== priorityFilter) return false;
     if (sourceFilter && item.defect?.defect_source !== sourceFilter) return false;
-    if (dateFrom && new Date(item.created_at) < new Date(dateFrom)) return false;
-    if (dateTo) {
-      const end = new Date(dateTo); end.setHours(23, 59, 59, 999);
-      if (new Date(item.created_at) > end) return false;
-    }
+    const itemIstDate = getIstDateKey(item.created_at);
+    if (dateFrom && itemIstDate < dateFrom) return false;
+    if (dateTo && itemIstDate > dateTo) return false;
     if (search) {
       const q = search.toLowerCase();
       const matchesLive =
@@ -342,11 +335,12 @@ const LiveFeed = () => {
   const liveFeedFiltered = useMemo(() => {
     const base = feedItems.filter(item => item.event_type !== 'MENTION');
     const filtered = applyCommonFilters(base, { vesselFilter, priorityFilter, sourceFilter, dateFrom, dateTo, search });
+    const todayKey = getIstDateKey();
     return filtered.sort((a, b) => {
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      const dA = new Date(a.created_at), dB = new Date(b.created_at);
-      const getGroup = (item, date) => item.is_read ? 3 : date >= today ? 1 : 2;
-      const gA = getGroup(a, dA), gB = getGroup(b, dB);
+      const dA = parseTs(a.created_at)?.getTime() || 0;
+      const dB = parseTs(b.created_at)?.getTime() || 0;
+      const getGroup = (item) => item.is_read ? 3 : getIstDateKey(item.created_at) === todayKey ? 1 : 2;
+      const gA = getGroup(a), gB = getGroup(b);
       if (gA !== gB) return gA - gB;
       if (gA === 1) return dB - dA;
       const pA = PRIORITY_ORDER[a.defect?.priority || a.meta?.new_priority] || 99;
@@ -358,7 +352,7 @@ const LiveFeed = () => {
 
   const myFeedFiltered = useMemo(() => {
     return applyCommonFilters(myMentions, { vesselFilter, priorityFilter, sourceFilter, dateFrom, dateTo, search }).sort(
-      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+      (a, b) => (parseTs(b.created_at)?.getTime() || 0) - (parseTs(a.created_at)?.getTime() || 0)
     );
   }, [myMentions, vesselFilter, priorityFilter, sourceFilter, search, dateFrom, dateTo]);
 
@@ -372,14 +366,14 @@ const LiveFeed = () => {
 
   const unreadCount = activeList.filter(i => !i.is_read).length;
 
-  // Group for section headers
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  // Group for section headers (IST)
+  const todayKey = getIstDateKey();
   const grouped = useMemo(() => {
-    const todayUnread = displayItems.filter(i => !i.is_read && new Date(i.created_at) >= today);
-    const olderUnread = displayItems.filter(i => !i.is_read && new Date(i.created_at) < today);
+    const todayUnread = displayItems.filter(i => !i.is_read && getIstDateKey(i.created_at) === todayKey);
+    const olderUnread = displayItems.filter(i => !i.is_read && getIstDateKey(i.created_at) < todayKey);
     const read = displayItems.filter(i => i.is_read);
     return { todayUnread, olderUnread, read };
-  }, [displayItems]);
+  }, [displayItems, todayKey]);
 
   return (
     <div className="live-feed-page">
