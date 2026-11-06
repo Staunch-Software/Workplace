@@ -664,12 +664,13 @@ def get_image_data(blob_path, container_client=None):
             if img.mode in ("RGBA", "P"):
                 img = img.convert("RGB")
 
-            # Standardized thumbnail sizing (max 200x200) with fast bilinear resampling
-            img.thumbnail((310, 310), PILImage.Resampling.BILINEAR)
+            # High-Definition 1000x1000 with Lanczos antialiasing and zero subsampling (subsampling=0)
+            # Replicates exact crisp quality of original export for clear defect inspection
+            img.thumbnail((1000, 1000), PILImage.Resampling.LANCZOS)
             width, height = img.size
 
             output_buffer = io.BytesIO()
-            img.save(output_buffer, format="JPEG", quality=80, optimize=True)
+            img.save(output_buffer, format="JPEG", quality=95, subsampling=0)
             output_buffer.seek(0)
 
             return output_buffer, width, height
