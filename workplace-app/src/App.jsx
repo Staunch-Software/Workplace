@@ -17,6 +17,7 @@ const JiraModule = lazy(() => import('./modules/jira/JiraModule'));
 const AepmsModule = lazy(() => import('./modules/aepms/AepmsModule'));
 const ReportsModule = lazy(() => import('./modules/reports/ReportsModule'));
 const OrbModule = lazy(() => import('./modules/orb/OrbModule'));
+const IncidentModule = lazy(() => import('./modules/incident/IncidentModule'));
 const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
 
 const moduleLoaderStyle = {
@@ -139,6 +140,15 @@ function App() {
             <ProtectedRoute allowedRoles={['SHORE', 'ADMIN', 'VESSEL']}>
               <Suspense fallback={<ModuleLoader label="Loading ORB..." />}>
                 <OrbModule />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+
+          {/* ── INCIDENT REPORTS (shore only; the module checks its own permission) ─── */}
+          <Route path="/incident/*" element={
+            <ProtectedRoute allowedRoles={['SHORE', 'ADMIN']}>
+              <Suspense fallback={<ModuleLoader label="Loading Incident Reports..." />}>
+                <IncidentModule />
               </Suspense>
             </ProtectedRoute>
           } />

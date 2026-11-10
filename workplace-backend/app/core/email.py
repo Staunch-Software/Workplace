@@ -72,6 +72,10 @@ MODULE_INFO = {
         "name": "Oil Record Book (ORB)",
         "desc": "Upload Oil Record Book PDFs, review the digitised entries and resolve compliance alerts.",
     },
+    "incident_report": {
+        "name": "Incident Reports",
+        "desc": "Browse the incident report repository, review evidence and discuss each incident with the team.",
+    },
 }
 
 # ROLE_RESPONSIBILITIES = {

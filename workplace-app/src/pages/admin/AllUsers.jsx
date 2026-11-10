@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, Filter, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Activity, FileBarChart2, BookOpen, Mail, Trash2 } from "lucide-react";
+import { Search, Filter, Pencil, Ban, X, FileText, Trello, Ship, Droplet, Activity, FileBarChart2, BookOpen, Mail, Trash2, ShieldAlert, FilePlus2 } from "lucide-react";
 import { getUsers, updateUser, assignVessels, getVessels, resendWelcomeEmail, deleteUser } from "./lib/adminApi";
 import ConfirmModal from "./ConfirmModal";
 
@@ -16,6 +16,8 @@ const MODULE_ICONS = [
     { key: "engine_performance", Icon: () => <Activity size={14} />, label: "Engine" },
     { key: "report_tracker", Icon: () => <FileBarChart2 size={14} />, label: "Reports" },
     { key: "orb", Icon: () => <BookOpen size={14} />, label: "ORB" },
+    { key: "incident_report", Icon: () => <ShieldAlert size={14} />, label: "Incident Reports" },
+    { key: "incident_create", Icon: () => <FilePlus2 size={14} />, label: "Incidents: can create" },
 ];
 
 function roleBadgeClass(role) {
