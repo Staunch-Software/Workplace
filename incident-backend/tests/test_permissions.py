@@ -76,3 +76,26 @@ def test_local_mode_stores_and_deletes(monkeypatch, tmp_path):
 def test_blob_url_parsing_for_azure_and_azurite():
     assert storage._parse_blob_url("https://acct.blob.core.windows.net/incident-files/abc/x.jpg") == ("incident-files", "abc/x.jpg")
     assert storage._parse_blob_url("http://127.0.0.1:10000/devstoreaccount1/incident-chat/abc/x.pdf") == ("incident-chat", "abc/x.pdf")
+
+
+def test_container_creation_race_is_not_an_error():
+    from azure.core.exceptions import ResourceExistsError
+
+    class Lost:
+        container_name = "incident-files"
+
+        def create_container(self):
+            raise ResourceExistsError("The specified container already exists.")
+
+    storage._ensure_container(Lost())   # another worker created it first: must not raise
+
+
+def test_container_creation_other_errors_still_raise():
+    class Broken:
+        container_name = "incident-files"
+
+        def create_container(self):
+            raise RuntimeError("storage unreachable")
+
+    with pytest.raises(RuntimeError):
+        storage._ensure_container(Broken())

@@ -69,23 +69,36 @@ def container_names() -> list[str]:
     return [settings.AZURE_STORAGE_INCIDENT_CONTAINER, settings.AZURE_STORAGE_INCIDENT_CHAT_CONTAINER]
 
 
+def _ensure_container(container) -> None:
+    """Create a container if it is missing. Several gunicorn workers start at once and can all find it missing, so
+    losing the race ("already exists") is success, not an error."""
+    from azure.core.exceptions import ResourceExistsError
+    try:
+        container.create_container()
+        logger.info("Created blob container '%s'", container.container_name)
+    except ResourceExistsError:
+        pass
+
+
 def ensure_containers() -> None:
-    """Create the containers if they are missing (called at startup; also safe to call again)."""
+    """Make sure the containers exist (called at startup; also safe to call again)."""
     client = _client()
     for name in container_names():
-        c = client.get_container_client(name)
-        if not c.exists():
-            c.create_container()
-            logger.info("Created blob container '%s'", name)
+        _ensure_container(client.get_container_client(name))
 
 
 def _upload_blob(content: bytes, blob_path: str, content_type: str, container_name: str) -> str:
     from azure.storage.blob import ContentSettings
+    from azure.core.exceptions import ResourceNotFoundError
     container = _client().get_container_client(container_name)
-    if not container.exists():
-        container.create_container()
     blob = container.get_blob_client(blob_path)
-    blob.upload_blob(content, overwrite=True, content_settings=ContentSettings(content_type=content_type))
+    settings_ = ContentSettings(content_type=content_type)
+    try:
+        blob.upload_blob(content, overwrite=True, content_settings=settings_)
+    except ResourceNotFoundError:
+        # The container is missing (storage was down at startup, or it was removed): create it and retry once.
+        _ensure_container(container)
+        blob.upload_blob(content, overwrite=True, content_settings=settings_)
     return blob.url
 
 
