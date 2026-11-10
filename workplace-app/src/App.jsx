@@ -45,7 +45,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   return (
     <AuthProvider>
-      <Toaster position="top-right" />
+      <Toaster position="top-right" containerStyle={{ zIndex: 99999 }} toastOptions={{ style: { zIndex: 99999 } }} />
       <BrowserRouter>
         <Routes>
           {/* ── PUBLIC ─────────────────────────────────── */}

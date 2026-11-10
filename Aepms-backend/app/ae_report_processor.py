@@ -226,7 +226,8 @@ def validate_ae_report_type(raw_data: dict) -> bool:
 async def save_ae_monthly_report_from_pdf(
     pdf_file_stream: BinaryIO,
     filename: str,
-    session: AsyncSession
+    session: AsyncSession,
+    target_imo: Optional[Any] = None
 ) -> Optional[Dict[str, Any]]:
     """
     Main entry point for processing and saving an AE monthly report from PDF.
@@ -269,8 +270,22 @@ async def save_ae_monthly_report_from_pdf(
         imo = raw_data.get("imo")
         rpt_date = raw_data.get("performancedate")
 
-        if not imo:
-            raise ValueError("IMO number missing in PDF.")
+        if not imo or str(imo).strip() in ['', 'None', 'null']:
+            raise ValueError("Upload Rejected: IMO number is missing in the uploaded AE PDF.")
+
+        # Validate Vessel IMO Match
+        if target_imo is not None and str(target_imo).strip() not in ['', '0', 'None', 'null']:
+            try:
+                target_imo_clean = int(float(str(target_imo).strip()))
+                pdf_imo_clean = int(float(str(imo).strip()))
+                if target_imo_clean != pdf_imo_clean:
+                    v_name = raw_data.get("vesselname") or "Unknown Vessel"
+                    raise ValueError(
+                        f"Vessel Mismatch: You selected vessel IMO {target_imo_clean}, but the uploaded AE PDF belongs to '{v_name}' (IMO: {pdf_imo_clean}). Please upload the matching report for this vessel."
+                    )
+            except ValueError as val_err:
+                if "Vessel Mismatch" in str(val_err):
+                    raise
         if not isinstance(rpt_date, date):
             raise ValueError(f"Invalid report date: {rpt_date}")
 

@@ -513,12 +513,54 @@ def validate_parameter_intervals(raw_data: Dict[str, Any]) -> List[str]:
                 
     return interval_errors
 
-async def save_monthly_report(pdf_file_stream: BinaryIO, filename: str, session: AsyncSession, mapping: Dict) -> Optional[Dict]:
-    logger.info(f"Processing monthly report: {filename}")
+async def save_monthly_report(pdf_file_stream: BinaryIO, filename: str, session: AsyncSession, mapping: Dict, target_imo: Optional[Any] = None) -> Optional[Dict]:
+    logger.info(f"Processing monthly report: {filename} (target_imo={target_imo})")
     
     # 1. Extract Raw Data from PDF
     raw_data = extract_data_from_monthly_report_pdf(pdf_file_stream, filename)
-    if not raw_data: return None
+    if not raw_data:
+        raise ValueError("Could not extract data from PDF. Please ensure the file is a valid, readable performance report.")
+
+    # --- CRITICAL PRE-INGESTION VALIDATIONS ---
+    # A. Validate IMO existence
+    pdf_imo = raw_data.get('imo')
+    if not pdf_imo or str(pdf_imo).strip() in ['', 'None', 'null']:
+        raise ValueError("Upload Rejected: IMO Number is missing in the uploaded PDF report.")
+
+    # B. Validate Vessel IMO Match (against target vessel selected in UI)
+    if target_imo is not None and str(target_imo).strip() not in ['', '0', 'None', 'null']:
+        try:
+            target_imo_clean = int(float(str(target_imo).strip()))
+            pdf_imo_clean = int(float(str(pdf_imo).strip()))
+            if target_imo_clean != pdf_imo_clean:
+                pdf_vessel_name = raw_data.get('vesselname') or "Unknown Vessel"
+                raise ValueError(
+                    f"Vessel Mismatch: You selected vessel IMO {target_imo_clean}, but the uploaded PDF belongs to '{pdf_vessel_name}' (IMO: {pdf_imo_clean}). Please select the matching vessel or upload the correct report."
+                )
+        except ValueError as val_err:
+            if "Vessel Mismatch" in str(val_err):
+                raise
+
+    # C. Validate Engine Load % (Mandatory & Non-Zero)
+    load_val = raw_data.get('load')
+    if load_val is None or str(load_val).strip() in ['', 'None', 'null', '0', '0.0']:
+        raise ValueError(
+            "Upload Rejected: Engine Load % is missing or 0 in the uploaded PDF. A valid operational load percentage (e.g., 25% - 100%) is required to calculate baseline deviations and performance analytics."
+        )
+    try:
+        load_float = float(load_val)
+        if load_float <= 0 or load_float > 120:
+            raise ValueError(
+                f"Upload Rejected: Invalid Engine Load ({load_float}%). Expected an operating load between 1% and 120%."
+            )
+    except (ValueError, TypeError):
+        raise ValueError(f"Upload Rejected: Engine Load % '{load_val}' is not a valid number.")
+
+    # D. Validate Report Date
+    rpt_date = raw_data.get('date')
+    if not rpt_date:
+        raise ValueError("Upload Rejected: Report Date is missing or invalid in the uploaded PDF.")
+
     num_cyls = int(float(str(raw_data.get('noofcyl', 6))))
     # 2. Run Integrity Checks
     missing_params = check_parameters_integrity(raw_data)

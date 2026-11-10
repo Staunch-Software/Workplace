@@ -712,6 +712,7 @@ class AuxPerformanceGraphGenerator:
 @app.post("/upload-monthly-report/", summary="Upload a monthly performance report PDF")
 async def upload_monthly_report(
     file: UploadFile = File(...),
+    target_imo: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: Any = Depends(auth.get_current_user)
 ):
@@ -737,7 +738,8 @@ async def upload_monthly_report(
                 pdf_file_stream=pdf_stream,
                 filename=file.filename,
                 session=db,
-                mapping=FIELD_METADATA_MAPPING
+                mapping=FIELD_METADATA_MAPPING,
+                target_imo=target_imo
             )
            
             if save_result and isinstance(save_result, dict) and save_result.get("report_id"):
@@ -911,6 +913,7 @@ async def upload_monthly_report(
 @app.post("/aux/upload-auxiliary-report/", summary="Upload a monthly AE performance report PDF")
 async def upload_auxiliary_report(
     file: UploadFile = File(...),
+    target_imo: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: Any = Depends(auth.get_current_user)
 ):
@@ -936,7 +939,8 @@ async def upload_auxiliary_report(
             result = await save_ae_monthly_report_from_pdf(
                 pdf_file_stream=pdf_stream,
                 filename=file.filename,
-                session=db
+                session=db,
+                target_imo=target_imo
             )
 
             # ✅ FIX 2: Check result BEFORE accessing it (prevents crash if result is None)

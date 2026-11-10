@@ -1,6 +1,6 @@
 // lib/api.js - Updated API Client with Report-based Filtering and URL Parameter Cleansing
 const isDev = import.meta.env.DEV;
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (isDev ? 'http://localhost:8005' : '/aepms/api');
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (isDev ? 'http://localhost:8055' : '/aepms/api');
 import { handleExpiredSession } from "../../../utils/authGuard";
 
 class ApiService {
@@ -661,11 +661,14 @@ class ApiService {
     return response.blob(); // Return as blob instead of json
   }
 
-  async uploadCsv(vesselId, file) {
-    console.log("📤 Upload CSV for vessel:", vesselId);
+  async uploadCsv(vesselId, file, targetImo = null) {
+    console.log("📤 Upload CSV for vessel:", vesselId, "target IMO:", targetImo);
 
     const formData = new FormData();
     formData.append("file", file);
+    if (targetImo) {
+      formData.append("target_imo", String(targetImo));
+    }
     const token = this.getToken();
 
     const response = await fetch(`${this.baseURL}/upload-monthly-report/`, {
@@ -675,8 +678,25 @@ class ApiService {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Upload failed (${response.status}): ${errorText}`);
+      let errorMessage = `Upload failed (${response.status})`;
+      try {
+        const errorData = await response.json();
+        if (errorData) {
+          if (typeof errorData.detail === "string") {
+            errorMessage = errorData.detail;
+          } else if (Array.isArray(errorData.detail)) {
+            errorMessage = errorData.detail.map((d) => d.msg || JSON.stringify(d)).join(", ");
+          } else if (typeof errorData.message === "string") {
+            errorMessage = errorData.message;
+          } else if (errorData.detail) {
+            errorMessage = JSON.stringify(errorData.detail);
+          }
+        }
+      } catch (e) {
+        const text = await response.text().catch(() => "");
+        if (text) errorMessage = text;
+      }
+      throw new Error(errorMessage);
     }
 
     const result = await response.json();
@@ -822,13 +842,15 @@ class ApiService {
    * @param {number} imoNumber - Vessel IMO number
    * @param {File} file - PDF file to upload
    */
-  async uploadAuxReport(imoNumber, file) {
-    console.log("📤 Upload Auxiliary Engine Report for IMO:", imoNumber);
+  async uploadAuxReport(imoNumber, file, targetImo = null) {
+    console.log("📤 Upload Auxiliary Engine Report for IMO:", imoNumber, "target IMO:", targetImo);
 
     const formData = new FormData();
     formData.append("file", file);
-    // ❌ REMOVE: formData.append('imo_number', imoNumber.toString());
-    // The backend doesn't need imo_number in the form - it extracts it from the PDF
+    const finalTargetImo = targetImo || (imoNumber && imoNumber !== 0 ? imoNumber : null);
+    if (finalTargetImo) {
+      formData.append("target_imo", String(finalTargetImo));
+    }
 
     const token = this.getToken();
 
@@ -843,8 +865,25 @@ class ApiService {
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Upload failed (${response.status}): ${errorText}`);
+      let errorMessage = `Upload failed (${response.status})`;
+      try {
+        const errorData = await response.json();
+        if (errorData) {
+          if (typeof errorData.detail === "string") {
+            errorMessage = errorData.detail;
+          } else if (Array.isArray(errorData.detail)) {
+            errorMessage = errorData.detail.map((d) => d.msg || JSON.stringify(d)).join(", ");
+          } else if (typeof errorData.message === "string") {
+            errorMessage = errorData.message;
+          } else if (errorData.detail) {
+            errorMessage = JSON.stringify(errorData.detail);
+          }
+        }
+      } catch (e) {
+        const text = await response.text().catch(() => "");
+        if (text) errorMessage = text;
+      }
+      throw new Error(errorMessage);
     }
 
     const result = await response.json();

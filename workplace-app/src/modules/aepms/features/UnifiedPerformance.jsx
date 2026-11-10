@@ -13,7 +13,7 @@ import {
 import Select from "../components/ui/Select";
 import Button from "../components/ui/Button";
 import DiagnosisPanel from "../components/DiagnosisPanel";
-import { Download, Upload } from "lucide-react";
+import { Download, Upload, AlertTriangle, CheckCircle, X, Loader2, FileText, Ship, FileCheck2, ArrowRight } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -2394,8 +2394,12 @@ const confirmDelete = async () => {
 
   useEffect(() => {
     if (showReport && analysisResultsRef.current) {
+      // Don't auto-scroll down on upload; let the user stay at the control bar & see their toast
+      if (isUploadInProgressRef.current) {
+        return;
+      }
       setTimeout(() => {
-        analysisResultsRef.current.scrollIntoView({
+        analysisResultsRef.current?.scrollIntoView({
           behavior: "smooth",
           block: "start",
         });
@@ -3789,8 +3793,8 @@ const confirmDelete = async () => {
       // We need a timeout to allow React to render the charts and tables
       // with the new data. 1500ms is usually safe for animations to finish.
       const timer = setTimeout(() => {
-        // 🔴 CHANGE THIS LINE: from 'local' to 'cloud'
-        downloadPDF("cloud").then(() => {
+        // Run cloud upload silently in background without popping alert
+        downloadPDF("cloud", { silent: true }).then(() => {
           console.log("✅ Auto-upload complete");
           setTriggerAutoDownload(false);
           setIsDataLoaded(false);
@@ -3893,33 +3897,63 @@ const confirmDelete = async () => {
   const [modalFile, setModalFile] = useState(null);
   const [modalDragOver, setModalDragOver] = useState(false);
   const [modalUploading, setModalUploading] = useState(false);
+  const [modalError, setModalError] = useState(null);
+  const [modalSuccess, setModalSuccess] = useState(null);
   const modalFileInputRef = useRef(null);
+
+  const openUploadModal = () => {
+    setIsUploadModalOpen(true);
+    setModalFile(null);
+    setModalDragOver(false);
+    setModalUploading(false);
+    setModalError(null);
+    setModalSuccess(null);
+  };
 
   const closeUploadModal = () => {
     if (modalUploading) return;
     setIsUploadModalOpen(false);
     setModalFile(null);
     setModalDragOver(false);
+    setModalError(null);
+    setModalSuccess(null);
   };
 
   const pickModalFile = (file) => {
     if (!file) return;
     if (!(file.type === "application/pdf" || /\.pdf$/i.test(file.name))) {
-      showAlert("Please select a PDF file.");
+      setModalError("Invalid file type: Please select a valid PDF report (.pdf).");
       return;
     }
+    setModalError(null);
+    setModalSuccess(null);
     setModalFile(file);
   };
 
   const handleModalUpload = async () => {
     if (!modalFile || modalUploading) return;
     setModalUploading(true);
+    setModalError(null);
+    setModalSuccess(null);
     try {
-      await handleFileUpload({ target: { files: [modalFile] } });
+      const res = await handleFileUpload({ target: { files: [modalFile] } }, true);
+      if (res && res.success === false) {
+        setModalError(res.error || "Upload rejected by server.");
+      } else {
+        const successMsg = res?.message || "Report uploaded and verified successfully!";
+        setModalSuccess(successMsg);
+        setTimeout(() => {
+          setIsUploadModalOpen(false);
+          setModalFile(null);
+          setModalError(null);
+          setModalSuccess(null);
+          toast.success(successMsg, { duration: 4000 });
+        }, 1000);
+      }
+    } catch (err) {
+      setModalError(err.message || "Upload failed.");
     } finally {
       setModalUploading(false);
-      setIsUploadModalOpen(false);
-      setModalFile(null);
     }
   };
 
@@ -3972,9 +4006,20 @@ const confirmDelete = async () => {
       ? `${(bytes / (1024 * 1024)).toFixed(2)} MB`
       : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
-  const handleFileUpload = async (event) => {
+  const handleFileUpload = async (event, isModalTrigger = false) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) return { success: false, error: "No file selected." };
+
+    const currentShip = fleet.find((s) => String(s.id) === String(shipId));
+    const currentShipIMO = currentShip
+      ? (currentShip.imo || currentShip.imo_number)?.toString()
+      : null;
+
+    if (!shipId || !currentShipIMO) {
+      const err = "Please select a vessel with a valid IMO number before uploading.";
+      if (!isModalTrigger) showAlert("❌ " + err);
+      return { success: false, error: err };
+    }
 
     try {
       setLoading(true);
@@ -3982,7 +4027,7 @@ const confirmDelete = async () => {
       if (typeof setMissingFields === "function") setMissingFields([]);
 
       if (uploadMode === "mainEngine") {
-        const response = await axiosAepms.uploadCsv(shipId, file);
+        const response = await axiosAepms.uploadCsv(shipId, file, currentShipIMO);
 
         // --- 🔥 INTEGRITY CHECK (Capture missing fields even if status is success) ---
         const extractedMissing =
@@ -3996,17 +4041,16 @@ const confirmDelete = async () => {
 
         // --- HARD STOP: VALIDATION_FAILED ---
         if (response.error_type === "VALIDATION_FAILED") {
+          const missingArr = response.missing_fields || response.missing_parameters || [];
+          const err = `Critical Parameters Missing:\n${missingArr.join("\n")}`;
           if (typeof setMissingFields === "function") {
-            setMissingFields(
-              response.missing_fields || response.missing_parameters,
-            );
-          } else {
-            showAlert(
-              `❌ Critical Parameters Missing:\n${(response.missing_fields || response.missing_parameters).join("\n")}`,
-            );
+            setMissingFields(missingArr);
+          }
+          if (!isModalTrigger) {
+            showAlert(`❌ ${err}`);
           }
           setLoading(false);
-          return;
+          return { success: false, error: err };
         }
 
         if (response.graph_data) {
@@ -4025,11 +4069,10 @@ const confirmDelete = async () => {
             uploadedVesselIMO &&
             currentShipIMO !== uploadedVesselIMO
           ) {
-            showAlert(
-              `❌ Upload Error: You selected "${currentShip.name}" but uploaded a report for a different vessel.\n\nPlease upload the correct report for ${currentShip.name}.`,
-            );
+            const err = `Upload Error: You selected "${currentShip.name}" (IMO: ${currentShipIMO}), but uploaded a report for a different vessel (IMO: ${uploadedVesselIMO}). Please upload the correct report.`;
+            if (!isModalTrigger) showAlert(`❌ ${err}`);
             setLoading(false);
-            return;
+            return { success: false, error: err };
           }
 
           // Transform Baseline
@@ -4102,7 +4145,9 @@ const confirmDelete = async () => {
 
           setMonthlyReports([newReport]);
 
-          showAlert(response.message || "✅ Upload successful!");
+          if (!isModalTrigger) {
+            toast.success(response.message || "Upload successful!", { duration: 4000 });
+          }
           isUploadInProgressRef.current = true;
           if (onUploadSuccess) onUploadSuccess(); 
           setRefreshReportsTrigger((prev) => prev + 1);
@@ -4128,9 +4173,14 @@ const confirmDelete = async () => {
 
           // Trigger download AFTER history is ready
           setTriggerAutoDownload(true);
+          return { success: true, message: response.message || "Upload successful!" };
         }
       } else if (uploadMode === "auxiliaryEngine") {
-        const result = await axiosAepms.uploadAuxReport(0, file);
+        const result = await axiosAepms.uploadAuxReport(
+          currentShipIMO || 0,
+          file,
+          currentShipIMO
+        );
 
         // --- 🔥 INTEGRITY CHECK (Capture missing fields for AE) ---
         const extractedMissingAE =
@@ -4144,17 +4194,16 @@ const confirmDelete = async () => {
 
         // --- HARD STOP: VALIDATION_FAILED (AUX) ---
         if (result.error_type === "VALIDATION_FAILED") {
+          const missingArr = result.missing_fields || result.missing_parameters || [];
+          const err = `Missing Parameters:\n${missingArr.join("\n")}`;
           if (typeof setMissingFields === "function") {
-            setMissingFields(
-              result.missing_fields || result.missing_parameters,
-            );
-          } else {
-            showAlert(
-              `❌ Missing Parameters:\n${(result.missing_fields || result.missing_parameters).join("\n")}`,
-            );
+            setMissingFields(missingArr);
+          }
+          if (!isModalTrigger) {
+            showAlert(`❌ ${err}`);
           }
           setLoading(false);
-          return;
+          return { success: false, error: err };
         }
 
         if (result.graph_data) {
@@ -4173,11 +4222,10 @@ const confirmDelete = async () => {
             uploadedVesselIMO &&
             currentShipIMO !== uploadedVesselIMO
           ) {
-            showAlert(
-              `❌ Upload Error: You selected "${currentShip.name}" but uploaded a report for a different vessel.\n\nPlease upload the correct report for ${currentShip.name}.`,
-            );
+            const err = `Upload Error: You selected "${currentShip.name}" (IMO: ${currentShipIMO}), but uploaded a report for a different vessel (IMO: ${uploadedVesselIMO}). Please upload the correct report.`;
+            if (!isModalTrigger) showAlert(`❌ ${err}`);
             setLoading(false);
-            return;
+            return { success: false, error: err };
           }
 
           const uploadedGeneratorId =
@@ -4243,7 +4291,9 @@ const confirmDelete = async () => {
 
           setMonthlyReports([newReport]);
 
-          showAlert(result.message || "✅ Upload successful!");
+          if (!isModalTrigger) {
+            toast.success(result.message || "Upload successful!", { duration: 4000 });
+          }
           isUploadInProgressRef.current = true;
           if (onUploadSuccess) onUploadSuccess();
           setRefreshReportsTrigger((prev) => prev + 1);
@@ -4278,11 +4328,21 @@ const confirmDelete = async () => {
 
           // Trigger download AFTER history is ready
           setTriggerAutoDownload(true);
+          return { success: true, message: result.message || "Upload successful!" };
         }
       }
+      return { success: true };
     } catch (error) {
       console.error("Upload failed:", error);
-      showAlert("❌ " + (error.response?.data?.message || error.message));
+      const errMsg =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        "Upload failed.";
+      if (!isModalTrigger) {
+        showAlert("❌ " + errMsg);
+      }
+      return { success: false, error: errMsg };
     } finally {
       setLoading(false);
     }
@@ -10323,7 +10383,7 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
           {!isVesselUser && (
             <div className="perf-upload-field">
               <Button
-                onClick={() => setIsUploadModalOpen(true)}
+                onClick={openUploadModal}
                 disabled={
                   !shipId ||
                   (analysisMode === "auxiliaryEngine" && !selectedGeneratorId)
@@ -10381,31 +10441,132 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
 
           {isUploadModalOpen &&
             createPortal(
-              <div className="perf-modal-backdrop" onMouseDown={closeUploadModal}>
+              <div
+                className="perf-modal-backdrop"
+                onMouseDown={(e) => {
+                  if (e.target === e.currentTarget && !modalUploading) {
+                    closeUploadModal();
+                  }
+                }}
+              >
                 <div
                   className="perf-modal"
                   role="dialog"
                   aria-modal="true"
                   onMouseDown={(e) => e.stopPropagation()}
                 >
-                  <h3 className="perf-modal__title">
-                    Upload {analysisMode === "auxiliaryEngine" ? "AE" : "ME"} Report
-                  </h3>
-                  <p className="perf-modal__subtitle">
-                    {formatVesselName(
-                      fleet.find((sh) => String(sh.id) === String(shipId))?.name,
-                    )?.toUpperCase()}
-                    {analysisMode === "auxiliaryEngine" &&
-                      (() => {
-                        const g = generators.find(
-                          (x) => x.generator_id === selectedGeneratorId,
-                        );
-                        return g
-                          ? ` · ${g.designation || `Aux Engine No.${g.generator_id}`}`
-                          : "";
-                      })()}
-                  </p>
+                  {/* Top Maritime Accent Bar */}
+                  <div className="perf-modal__accent-bar" />
 
+                  {/* Modal Header */}
+                  <div className="perf-modal__header">
+                    <div className="perf-modal__header-left">
+                      <div className="perf-modal__title-icon">
+                        <Upload size={20} />
+                      </div>
+                      <div>
+                        <h3 className="perf-modal__title">
+                          Upload {analysisMode === "auxiliaryEngine" ? "Auxiliary Engine" : "Main Engine"} Report
+                        </h3>
+                        <p className="perf-modal__header-hint">
+                          ISO 15016 / 3046 Baseline Verification & Automated Analytics
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="perf-modal__close-btn"
+                      onClick={closeUploadModal}
+                      disabled={modalUploading}
+                      aria-label="Close modal"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  {/* Target Vessel Information Card */}
+                  {(() => {
+                    const currentShip = fleet.find((sh) => String(sh.id) === String(shipId));
+                    const currentImo = currentShip ? (currentShip.imo || currentShip.imo_number) : null;
+                    const g = analysisMode === "auxiliaryEngine"
+                      ? generators.find((x) => x.generator_id === selectedGeneratorId)
+                      : null;
+
+                    return (
+                      <div className="perf-modal__vessel-target">
+                        <div className="perf-modal__vessel-target-left">
+                          <div className="perf-modal__vessel-icon-wrap">
+                            <Ship size={18} />
+                          </div>
+                          <div>
+                            <div className="perf-modal__vessel-label">Target Vessel</div>
+                            <div className="perf-modal__vessel-name">
+                              {formatVesselName(currentShip?.name || "Selected Vessel")?.toUpperCase()}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="perf-modal__vessel-badges">
+                          {currentImo && (
+                            <span className="perf-modal__imo-badge">
+                              <span className="perf-modal__beacon" />
+                              IMO {currentImo}
+                            </span>
+                          )}
+                          {g && (
+                            <span className="perf-modal__unit-badge">
+                              {g.designation || `Aux Engine No.${g.generator_id}`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* In-Modal Error Display */}
+                  {modalError && (
+                    <div className="perf-modal__alert perf-modal__alert--error" role="alert">
+                      <div className="perf-modal__alert-icon">
+                        <AlertTriangle size={18} />
+                      </div>
+                      <div className="perf-modal__alert-content">
+                        <div className="perf-modal__alert-title">
+                          {modalError.toLowerCase().includes("vessel mismatch") || modalError.toLowerCase().includes("imo")
+                            ? "Vessel IMO Mismatch"
+                            : modalError.toLowerCase().includes("load")
+                            ? "Engine Load Required"
+                            : "Upload Validation Error"}
+                        </div>
+                        <div className="perf-modal__alert-msg">{modalError}</div>
+                        <button
+                          type="button"
+                          className="perf-modal__alert-btn"
+                          onClick={() => {
+                            setModalError(null);
+                            setModalFile(null);
+                            modalFileInputRef.current?.click();
+                          }}
+                        >
+                          <span>Change File</span>
+                          <ArrowRight size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* In-Modal Success Display */}
+                  {modalSuccess && (
+                    <div className="perf-modal__alert perf-modal__alert--success" role="status">
+                      <div className="perf-modal__alert-icon">
+                        <CheckCircle size={18} />
+                      </div>
+                      <div className="perf-modal__alert-content">
+                        <div className="perf-modal__alert-title">Report Verified & Processed</div>
+                        <div className="perf-modal__alert-msg">{modalSuccess}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hidden File Input */}
                   <input
                     ref={modalFileInputRef}
                     type="file"
@@ -10417,23 +10578,38 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
                     }}
                   />
 
+                  {/* Dropzone or Selected File */}
                   {modalFile ? (
                     <div className="perf-modal__file">
-                      <div className="perf-modal__file-icon">PDF</div>
+                      <div className="perf-modal__file-icon">
+                        <FileText size={22} />
+                        <span className="perf-modal__file-badge">PDF</span>
+                      </div>
                       <div className="perf-modal__file-info">
-                        <span className="perf-modal__file-name">{modalFile.name}</span>
-                        <span className="perf-modal__file-size">
-                          {formatFileSize(modalFile.size)}
+                        <span className="perf-modal__file-name" title={modalFile.name}>
+                          {modalFile.name}
                         </span>
+                        <div className="perf-modal__file-meta">
+                          <span className="perf-modal__file-size">{formatFileSize(modalFile.size)}</span>
+                          <span className="perf-modal__file-dot">·</span>
+                          <span className="perf-modal__file-status">
+                            <FileCheck2 size={13} style={{ display: 'inline', verticalAlign: '-1px', marginRight: '3px' }} />
+                            Ready to verify
+                          </span>
+                        </div>
                       </div>
                       {!modalUploading && (
                         <button
                           type="button"
                           className="perf-modal__file-remove"
-                          onClick={() => setModalFile(null)}
+                          onClick={() => {
+                            setModalFile(null);
+                            setModalError(null);
+                          }}
+                          title="Remove file"
                           aria-label="Remove file"
                         >
-                          ✕
+                          <X size={15} />
                         </button>
                       )}
                     </div>
@@ -10450,22 +10626,36 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
                         setModalDragOver(false);
                         pickModalFile(e.dataTransfer.files?.[0]);
                       }}
+                      onClick={() => modalFileInputRef.current?.click()}
                     >
-                      <Upload size={32} />
+                      <div className="perf-modal__drop-icon-wrap">
+                        <Upload size={24} />
+                      </div>
                       <p className="perf-modal__drop-text">
-                        {modalDragOver ? "Drop to select" : "Drag & drop your PDF here"}
+                        {modalDragOver ? "Drop report to upload" : "Drag & drop monthly PDF report here"}
                       </p>
-                      <p className="perf-modal__drop-or">or</p>
+                      <div className="perf-modal__drop-divider">
+                        <span>or</span>
+                      </div>
                       <button
                         type="button"
                         className="perf-modal__browse"
-                        onClick={() => modalFileInputRef.current?.click()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          modalFileInputRef.current?.click();
+                        }}
                       >
-                        Browse files
+                        Browse Files
                       </button>
+                      <div className="perf-modal__drop-specs">
+                        <span className="perf-modal__spec-tag">Official PDF AcroForm</span>
+                        <span className="perf-modal__spec-tag">ISO 15016 / 3046</span>
+                        <span className="perf-modal__spec-tag">Max 25 MB</span>
+                      </div>
                     </div>
                   )}
 
+                  {/* Modal Footer */}
                   <div className="perf-modal__footer">
                     <button
                       type="button"
@@ -10481,7 +10671,17 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
                       onClick={handleModalUpload}
                       disabled={!modalFile || modalUploading}
                     >
-                      {modalUploading ? "Uploading..." : "Upload"}
+                      {modalUploading ? (
+                        <>
+                          <Loader2 size={16} className="perf-spin" />
+                          <span>Verifying & Calculating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Upload & Verify</span>
+                          <ArrowRight size={15} />
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
