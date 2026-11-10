@@ -10,6 +10,7 @@ import {
   MessageSquare, AlertOctagon, Info, Columns, FileText, ArrowLeft, ChevronLeft, Menu, ListTodo
 } from 'lucide-react';
 import './Vessel.css';
+import { formatNotificationDateTime } from '@drs/utils/time';
 import "../../components/shared/vessel-responsive.css"
 
 const VesselLayout = () => {
@@ -359,13 +360,7 @@ const VesselLayout = () => {
                                 color: '#94a3b8',
                                 fontWeight: '500'
                               }}>
-                                {new Date(n.created_at).toLocaleString('en-GB', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: 'numeric',
-                                  minute: '2-digit',
-                                  hour12: false
-                                })}
+                                {formatNotificationDateTime(n.created_at)}
                               </span>
 
                               <span

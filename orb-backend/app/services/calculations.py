@@ -28,6 +28,7 @@ The 14 earlier checks:
 import uuid
 import re
 import logging
+import contextvars
 from datetime import timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
@@ -185,6 +186,8 @@ async def create_alert_if_new(
     cfg = cfg_now()
     if not cfg.is_enabled(alert_type):
         return
+    if entry_id and entry_id in _CARRY_IN_IDS.get():
+        return
     if not keep_severity:
         severity = cfg.severity(alert_type, severity)
 
@@ -254,6 +257,7 @@ async def run_all_checks(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: 
         cfg = alert_config.RunConfig()
 
     token = alert_config.set_current(cfg)
+    carry_token = _CARRY_IN_IDS.set(set())
     try:
         for check, codes in _checks():
             if not any(cfg.is_enabled(c) for c in codes):
@@ -261,7 +265,25 @@ async def run_all_checks(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, db: 
             await check(vessel_id, upload_id, db)
         await db.commit()
     finally:
+        _CARRY_IN_IDS.reset(carry_token)
         alert_config.reset_current(token)
+
+
+async def run_checks_for_following_upload(vessel_id: uuid.UUID, upload_id: uuid.UUID, db: AsyncSession):
+    """An upload that arrives after the one that follows it in the book changes where that one starts:
+    run the checks again for the vessel's next upload (alerts already raised are not repeated)."""
+    from app.models.orb_upload import OrbUpload
+    dates = (await db.execute(
+        select(OrbEntry.upload_id, func.min(OrbEntry.entry_date)).where(OrbEntry.vessel_id == vessel_id).group_by(OrbEntry.upload_id)
+    )).all()
+    mine = next((d for u, d in dates if u == upload_id), None)
+    if mine is None:
+        return
+    later = sorted(((d, u) for u, d in dates if u != upload_id and d > mine), key=lambda x: x[0])
+    for _, uid in later[:1]:
+        up = await db.get(OrbUpload, uid)
+        if up is not None and up.status == "completed":
+            await run_all_checks(vessel_id, uid, db)
 
 # ─────────────────────────────────────────────────────────────────────────
 # Check 1 — Wrong Item Code
@@ -322,13 +344,37 @@ async def check_item_numbers(vessel_id: uuid.UUID, upload_id: uuid.UUID | None, 
 # Fetch broadly and match tank-by-tank in Python using _norm_tank() instead
 # of relying on exact SQL equality, which silently drops most real entries.
 # ─────────────────────────────────────────────────────────────────────────
-async def _fetch_vessel_qty_rows(db: AsyncSession, vessel_id: uuid.UUID, upload_id: uuid.UUID | None, extra_filters=None):
+# Entries of EARLIER uploads that a balance walk reads only to know where each tank stood when this upload begins.
+# They never get an alert of their own from this run (create_alert_if_new skips them): the run that processed
+# their upload already judged them.
+_CARRY_IN_IDS: contextvars.ContextVar[set] = contextvars.ContextVar("orb_carry_in_ids", default=set())
+CARRY_IN_DAYS = 14
+
+
+async def _fetch_vessel_qty_rows(db: AsyncSession, vessel_id: uuid.UUID, upload_id: uuid.UUID | None, extra_filters=None,
+                                 carry_in: bool = False):
+    """The quantity rows of the upload being checked. carry_in=True adds the readings of the vessel's other
+    uploads in the CARRY_IN_DAYS before this upload's first entry, so an upload that starts mid-book is
+    compared with where the previous one ended (a tank that closed at 16 m3 may not open at 8)."""
     q = select(OrbEntry, OrbEntryQuantity).join(OrbEntryQuantity).where(OrbEntry.vessel_id == vessel_id)
     if upload_id:
         q = q.where(OrbEntry.upload_id == upload_id)
     if extra_filters:
         q = q.where(and_(*extra_filters))
     rows = (await db.execute(q)).all()
+    if carry_in and upload_id and rows:
+        first = min(e.entry_date for e, _ in rows)
+        pq = (select(OrbEntry, OrbEntryQuantity).join(OrbEntryQuantity)
+              .where(OrbEntry.vessel_id == vessel_id, OrbEntry.upload_id != upload_id,
+                     OrbEntry.entry_date <= first, OrbEntry.entry_date >= first - timedelta(days=CARRY_IN_DAYS)))
+        if extra_filters:
+            pq = pq.where(and_(*extra_filters))
+        prior = (await db.execute(pq)).all()
+        if prior:
+            ids = set(_CARRY_IN_IDS.get())
+            ids.update(e.id for e, _ in prior)
+            _CARRY_IN_IDS.set(ids)
+            rows = list(prior) + list(rows)
     # Sort in Python (stable) rather than via SQL ORDER BY: Postgres does not
     # guarantee tie order for rows sharing an entry_date, and a single
     # physical ORB line commonly produces a "transferred" row immediately
@@ -444,7 +490,7 @@ async def check_mass_balance_error(vessel_id: uuid.UUID, upload_id: uuid.UUID | 
     tanks = (await db.execute(select(VesselTank).where(VesselTank.vessel_id == vessel_id, VesselTank.is_active == True))).scalars().all()
     if not tanks: return
     protect = _compute_protected_tank_words(tanks)
-    all_rows = await _fetch_vessel_qty_rows(db, vessel_id, upload_id)
+    all_rows = await _fetch_vessel_qty_rows(db, vessel_id, upload_id, carry_in=True)
 
     for tank in tanks:
         tn = _norm_tank(tank.tank_name, protect)
@@ -558,7 +604,7 @@ async def check_sludge_generation_rate(vessel_id: uuid.UUID, upload_id: uuid.UUI
     protect = _compute_protected_tank_words(tanks_all)
     sludge_tanks = [t for t in tanks_all if _get_effective_group(t) == "SLUDGE"]
     if not sludge_tanks: return
-    all_rows = await _fetch_vessel_qty_rows(db, vessel_id, upload_id)
+    all_rows = await _fetch_vessel_qty_rows(db, vessel_id, upload_id, carry_in=True)
 
     for tank in sludge_tanks:
         tn = _norm_tank(tank.tank_name, protect)
@@ -595,7 +641,7 @@ async def check_bilge_increasing_rate(vessel_id: uuid.UUID, upload_id: uuid.UUID
     bilge_tanks = [t for t in tanks_all if _get_effective_group(t) == "BILGE"]
     if not bilge_tanks: return
     discharge_dates = [e.entry_date for e in (await db.execute(select(OrbEntry).where(OrbEntry.vessel_id == vessel_id, OrbEntry.orb_code.in_(["D", "E"])))).scalars().all()]
-    all_rows = await _fetch_vessel_qty_rows(db, vessel_id, upload_id, [OrbEntryQuantity.qty_type == "retained"])
+    all_rows = await _fetch_vessel_qty_rows(db, vessel_id, upload_id, [OrbEntryQuantity.qty_type == "retained"], carry_in=True)
 
     for tank in bilge_tanks:
         tn = _norm_tank(tank.tank_name, protect)
@@ -742,7 +788,7 @@ async def check_bilge_transfer_vs_soundings(vessel_id: uuid.UUID, upload_id: uui
     # (the previous approach) never matches real handwritten ORB entries
     # against the registered vessel_tanks.tank_name ("BILGE TANK" vs
     # "Bilge Holding Tank"), so this check found zero rows in practice.
-    all_rows = await _fetch_vessel_qty_rows(db, vessel_id, upload_id)
+    all_rows = await _fetch_vessel_qty_rows(db, vessel_id, upload_id, carry_in=True)
     for tank in bilge_tanks:
         tn = _norm_tank(tank.tank_name, protect)
         rows = _rows_for_tank(all_rows, tn, protect)

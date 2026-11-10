@@ -62,6 +62,7 @@ const ShoreReports = () => {
 
 
   const [showColumnModal, setShowColumnModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [file, setFile] = useState(null);
@@ -342,8 +343,11 @@ const ShoreReports = () => {
   }, [filters]);
 
   // ==================== EXCEL EXPORT ====================
-  const handleExport = () => {
-    const activeFilters = {};
+  const handleExport = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const activeFilters = {};
 
     // Date Filters
     if (filters.date_identified_from) {
@@ -409,7 +413,12 @@ const ShoreReports = () => {
     console.log('📊 Exporting columns:', columnsToExport);
 
     // Call Export API
-    defectApi.exportDefects(activeFilters, columnsToExport);
+    await defectApi.exportDefects(activeFilters, columnsToExport);
+    } catch (err) {
+      console.error('Export error in ShoreReports:', err);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
 
@@ -673,23 +682,28 @@ const ShoreReports = () => {
             {/* Download Excel Button */}
             <button
               onClick={handleExport}
-              disabled={filteredData.length === 0}
+              disabled={filteredData.length === 0 || isExporting}
               style={{
-                background: filteredData.length > 0 ? '#10b981' : '#d1d5db',
+                background: (filteredData.length > 0 && !isExporting) ? '#10b981' : '#9ca3af',
                 color: 'white',
                 border: 'none',
                 padding: '8px 16px',
                 borderRadius: '6px',
                 fontSize: '13px',
                 fontWeight: '600',
-                cursor: filteredData.length > 0 ? 'pointer' : 'not-allowed',
+                cursor: (filteredData.length > 0 && !isExporting) ? 'pointer' : 'not-allowed',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
+                transition: 'all 0.2s',
               }}
             >
-              <Download size={16} />
-              Export ({filteredData.length})
+              {isExporting ? (
+                <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Download size={16} />
+              )}
+              {isExporting ? "Exporting..." : `Export (${filteredData.length})`}
             </button>
           </div>
         </div>

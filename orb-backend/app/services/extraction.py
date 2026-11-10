@@ -11,7 +11,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy import select
 
-from sqlalchemy import select as sa_select
+from sqlalchemy import select as sa_select, func
 
 from app.config import get_settings
 from app.services.gemini_config import generate as gemini_generate, gemini_model, create_prompt_cache, delete_prompt_cache
@@ -3593,7 +3593,7 @@ _DIGIT_CONFUSIONS = {
 _DATE_AMBIGUITY_CONFIDENCE_THRESHOLD = 0.8
 
 
-def _reconcile_year_outliers(entries_data: list[dict]) -> list[dict]:
+def _reconcile_year_outliers(entries_data: list[dict], last_known: date | None = None) -> list[dict]:
     """Fix an entry whose YEAR was misread when every other entry agrees on one.
 
     A log covers a short span, so almost every entry shares one year. A lone
@@ -3603,6 +3603,10 @@ def _reconcile_year_outliers(entries_data: list[dict]) -> list[dict]:
     plus a wrong "Period covered" in every report. The correction is applied
     only when putting the dominant year back makes the entry fit between its
     neighbours, so a genuinely backdated entry is never rewritten.
+
+    The year the entries agree on needs only half of them (a page of misread years used to leave 2026
+    at 68% and the fix idle). When they do not agree, the vessel's last stored entry (last_known)
+    decides: the observed year closest to it that is not in the future.
     """
     from collections import Counter
     from datetime import timedelta
@@ -3618,7 +3622,15 @@ def _reconcile_year_outliers(entries_data: list[dict]) -> list[dict]:
     if not years:
         return entries_data
     dominant, count = years.most_common(1)[0]
-    if count < 5 or count / sum(years.values()) < 0.7:
+    share = count / sum(years.values())
+    if sum(years.values()) < 5:
+        return entries_data
+    if share < 0.7 and last_known:
+        today = datetime.now(timezone.utc).date()
+        seen = [y for y in years if y <= today.year]
+        if seen:
+            dominant = min(seen, key=lambda y: (abs(y - last_known.year), -years[y]))
+    elif share < 0.5:
         return entries_data
 
     outliers = {i for i, d in enumerate(parsed) if d and d.year != dominant and abs(d.year - dominant) <= 12}
@@ -3643,6 +3655,18 @@ def _reconcile_year_outliers(entries_data: list[dict]) -> list[dict]:
         conf = entries_data[i].get("confidence_score")
         entries_data[i]["confidence_score"] = min(conf, 0.7) if conf is not None else 0.7
     return entries_data
+
+
+async def _vessel_last_entry_date(session_factory, vessel_id: uuid.UUID, upload_id: uuid.UUID) -> date | None:
+    """Date of the vessel's latest stored entry from earlier uploads, the anchor for a misread year."""
+    try:
+        async with session_factory() as s:
+            return (await s.execute(
+                sa_select(func.max(OrbEntry.entry_date)).where(OrbEntry.vessel_id == vessel_id, OrbEntry.upload_id != upload_id)
+            )).scalar_one_or_none()
+    except Exception:
+        logger.exception("Could not read the vessel's last entry date")
+        return None
 
 
 def _reconcile_chronology(entries_data: list[dict]) -> list[dict]:
@@ -4193,10 +4217,14 @@ async def run_extraction(
             entries_data = _split_swallowed_weekly_inventory(entries_data)
             entries_data = _propagate_shared_officer(entries_data)
             entries_data = _reconcile_tank_capacity_readings(entries_data)
-            entries_data = _reconcile_year_outliers(entries_data)
+            last_known = await _vessel_last_entry_date(session_factory, vessel_id, upload_id)
+            entries_data = _reconcile_year_outliers(entries_data, last_known)
             entries_data = _reconcile_chronology(entries_data)
             entries_data = _reconcile_entry_date_vs_own_header(entries_data)
             entries_data = _reconcile_entry_date_vs_own_signature(entries_data)
+            # The two date reconcilers above trust the dates written in an entry's own text, so a year the
+            # model misread in both the header and the signature puts the wrong year straight back.
+            entries_data = _reconcile_year_outliers(entries_data, last_known)
             entries_data = _dedupe_cross_date_duplicates(entries_data)
             entries_data = _flag_self_referential_transfers(entries_data)
             entries_data = _flag_retained_exceeds_capacity(entries_data)
@@ -4623,8 +4651,9 @@ async def run_extraction(
 
             # Run compliance checks
             try:
-                from app.services.calculations import run_all_checks
+                from app.services.calculations import run_all_checks, run_checks_for_following_upload
                 await run_all_checks(vessel_id, upload_id, db)
+                await run_checks_for_following_upload(vessel_id, upload_id, db)
             except Exception as e:
                 logger.error(f"Calculations failed: {e}")
 

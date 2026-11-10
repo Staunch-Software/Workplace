@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import './Shore.css';
 import { createVessel } from '@drs/api/vessels';
+import { formatNotificationDateTime } from '@drs/utils/time';
 import DrsAiAssistant from './DrsAiAssistant';
 import "../../components/shared/defects-responsive.css"
 
@@ -381,13 +382,7 @@ const ShoreLayout = () => {
                                 color: '#94a3b8',
                                 fontWeight: '500'
                               }}>
-                                {new Date(n.created_at).toLocaleString('en-GB', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: 'numeric',
-                                  minute: '2-digit',
-                                  hour12: false
-                                })}
+                                {formatNotificationDateTime(n.created_at)}
                               </span>
 
                               <span className="notif-badge-scaling" style={{

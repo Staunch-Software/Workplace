@@ -161,6 +161,17 @@ async def get_upload(
     return success(data=data)
 
 
+async def _delete_upload_batch_alerts(db: AsyncSession, upload_id: uuid.UUID) -> None:
+    """Unresolved alerts raised for the upload as a whole (no entry, e.g. sludge vs fuel burn) go with a
+    re-run: they were worked out from the old entries and would otherwise stay behind next to the new
+    ones. An alert with chat messages or one already resolved is kept."""
+    from app.models.orb_alert_thread import OrbAlertThread
+    await db.execute(delete(OrbAlert).where(
+        OrbAlert.upload_id == upload_id, OrbAlert.entry_id.is_(None), OrbAlert.is_resolved.is_(False),
+        OrbAlert.id.not_in(select(OrbAlertThread.alert_id)),
+    ))
+
+
 # ── TEMPORARY (testing only) ─────────────────────────────────────────────────
 # Re-run extraction on an existing upload so older uploads pick up newer
 # extraction rules (e.g. item_lines / item-number alerts). Remove once testing
@@ -203,6 +214,7 @@ async def reprocess_upload(
     # vessel, so leaving the old ones would turn the whole re-run into duplicates.
     entry_ids = select(OrbEntry.id).where(OrbEntry.upload_id == upload_id)
     await db.execute(delete(OrbAlert).where(OrbAlert.entry_id.in_(entry_ids)))
+    await _delete_upload_batch_alerts(db, upload_id)
     await db.execute(delete(OrbEntryQuantity).where(OrbEntryQuantity.entry_id.in_(entry_ids)))
     await db.execute(delete(OrbEntry).where(OrbEntry.upload_id == upload_id))
     upload.status = "pending"
@@ -246,6 +258,7 @@ async def reprocess_saved(
 
     entry_ids = select(OrbEntry.id).where(OrbEntry.upload_id == upload_id)
     await db.execute(delete(OrbAlert).where(OrbAlert.entry_id.in_(entry_ids)))
+    await _delete_upload_batch_alerts(db, upload_id)
     await db.execute(delete(OrbEntryQuantity).where(OrbEntryQuantity.entry_id.in_(entry_ids)))
     await db.execute(delete(OrbEntry).where(OrbEntry.upload_id == upload_id))
     upload.status = "pending"

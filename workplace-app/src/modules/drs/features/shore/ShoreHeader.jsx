@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { defectApi } from '@drs/services/defectApi';
 import { Bell, ChevronDown, UserPlus, LogOut, X } from 'lucide-react';
+import { formatNotificationDateTime } from '@drs/utils/time';
 import './Shore.css';
 
 const ShoreHeader = () => {
@@ -109,7 +110,7 @@ const ShoreHeader = () => {
                         <p style={{ fontWeight: '600', marginBottom: '4px', fontSize: '13px' }}>{n.title}</p>
                         <p style={{ fontSize: '12px', margin: 0 }}>{n.message}</p>
                         <span className="notif-time" style={{ fontSize: '10px', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
-                          {new Date(n.created_at).toLocaleString()}
+                          {formatNotificationDateTime(n.created_at)}
                         </span>
                       </div>
                     </div>

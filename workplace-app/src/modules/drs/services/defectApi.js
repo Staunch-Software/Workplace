@@ -346,6 +346,10 @@ export const defectApi = {
       let errorMessage = "Failed to export defects.";
       if (error.response?.status === 500) {
         errorMessage += " Server error occurred. Please try again.";
+      } else if (error.response?.status === 502) {
+        errorMessage += " The server took too long to generate the export or is temporarily unavailable (502 Bad Gateway). Please try narrowing down your filters.";
+      } else if (error.response?.status === 504) {
+        errorMessage += " The export request timed out (504 Gateway Timeout). Please try applying filters to narrow down the records.";
       } else if (error.response?.status === 404) {
         errorMessage += " Export endpoint not found.";
       } else if (!navigator.onLine) {
