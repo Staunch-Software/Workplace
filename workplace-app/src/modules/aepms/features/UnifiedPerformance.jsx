@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import {
   Card,
   CardContent,
@@ -12,7 +13,7 @@ import {
 import Select from "../components/ui/Select";
 import Button from "../components/ui/Button";
 import DiagnosisPanel from "../components/DiagnosisPanel";
-import { Download } from "lucide-react";
+import { Download, Upload } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -2257,6 +2258,22 @@ export default function Performance({
   const [xAxisType, setXAxisType] = useState("load_percentage");
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [uploadMode, setUploadMode] = useState("mainEngine");
+
+  // --- Styled message dialog (replaces browser alert) ---
+  const [alertQueue, setAlertQueue] = useState([]);
+  const showAlert = (message) => {
+    const raw = String(message ?? "").trim();
+    const text = raw.replace(/^(✅|❌|⚠️|⚠)\s*/u, "");
+    let type = "info";
+    if (/^✅/u.test(raw)) type = "success";
+    else if (/^❌/u.test(raw)) type = "error";
+    else if (/^⚠/u.test(raw)) type = "warning";
+    else if (/fail|could not|error/i.test(raw)) type = "error";
+    else if (/success|uploaded|downloaded/i.test(raw)) type = "success";
+    else if (/^please/i.test(raw)) type = "warning";
+    setAlertQueue((q) => [...q, { text, type }]);
+  };
+  const dismissAlert = () => setAlertQueue((q) => q.slice(1));
   const [showShopTrialMap, setShowShopTrialMap] = useState({});
   // const [selectedYear, setSelectedYear] = useState("");
   // const [selectedMonth, setSelectedMonth] = useState("");
@@ -3871,6 +3888,90 @@ const confirmDelete = async () => {
     triggerLocalDownload,
   ]);
 
+  // --- Upload modal (drag & drop / browse; reuses handleFileUpload) ---
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [modalFile, setModalFile] = useState(null);
+  const [modalDragOver, setModalDragOver] = useState(false);
+  const [modalUploading, setModalUploading] = useState(false);
+  const modalFileInputRef = useRef(null);
+
+  const closeUploadModal = () => {
+    if (modalUploading) return;
+    setIsUploadModalOpen(false);
+    setModalFile(null);
+    setModalDragOver(false);
+  };
+
+  const pickModalFile = (file) => {
+    if (!file) return;
+    if (!(file.type === "application/pdf" || /\.pdf$/i.test(file.name))) {
+      showAlert("Please select a PDF file.");
+      return;
+    }
+    setModalFile(file);
+  };
+
+  const handleModalUpload = async () => {
+    if (!modalFile || modalUploading) return;
+    setModalUploading(true);
+    try {
+      await handleFileUpload({ target: { files: [modalFile] } });
+    } finally {
+      setModalUploading(false);
+      setIsUploadModalOpen(false);
+      setModalFile(null);
+    }
+  };
+
+  // --- Drag & drop directly onto the control bar (reuses handleFileUpload) ---
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragDepthRef = useRef(0);
+
+  const canUploadNow =
+    !isVesselUser &&
+    !!shipId &&
+    !(analysisMode === "auxiliaryEngine" && !selectedGeneratorId);
+
+  const hasFiles = (e) =>
+    Array.from(e.dataTransfer?.types || []).includes("Files");
+
+  const handleDragEnter = (e) => {
+    if (isVesselUser || isUploadModalOpen || !hasFiles(e)) return;
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDragOver(true);
+  };
+  const handleDragOver = (e) => {
+    if (isVesselUser || isUploadModalOpen || !hasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = canUploadNow ? "copy" : "none";
+  };
+  const handleDragLeave = (e) => {
+    if (isVesselUser || isUploadModalOpen || !hasFiles(e)) return;
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setIsDragOver(false);
+  };
+  const handleDrop = (e) => {
+    if (isVesselUser || isUploadModalOpen || !hasFiles(e)) return;
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragOver(false);
+    if (!canUploadNow || loading) return;
+    const pdf = Array.from(e.dataTransfer.files || []).find(
+      (f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name),
+    );
+    if (!pdf) {
+      showAlert("Please drop a PDF file.");
+      return;
+    }
+    handleFileUpload({ target: { files: [pdf] } });
+  };
+
+  const formatFileSize = (bytes) =>
+    bytes >= 1024 * 1024
+      ? `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+      : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+
   const handleFileUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -3900,7 +4001,7 @@ const confirmDelete = async () => {
               response.missing_fields || response.missing_parameters,
             );
           } else {
-            alert(
+            showAlert(
               `❌ Critical Parameters Missing:\n${(response.missing_fields || response.missing_parameters).join("\n")}`,
             );
           }
@@ -3924,7 +4025,7 @@ const confirmDelete = async () => {
             uploadedVesselIMO &&
             currentShipIMO !== uploadedVesselIMO
           ) {
-            alert(
+            showAlert(
               `❌ Upload Error: You selected "${currentShip.name}" but uploaded a report for a different vessel.\n\nPlease upload the correct report for ${currentShip.name}.`,
             );
             setLoading(false);
@@ -4001,7 +4102,7 @@ const confirmDelete = async () => {
 
           setMonthlyReports([newReport]);
 
-          alert(response.message || "✅ Upload successful!");
+          showAlert(response.message || "✅ Upload successful!");
           isUploadInProgressRef.current = true;
           if (onUploadSuccess) onUploadSuccess(); 
           setRefreshReportsTrigger((prev) => prev + 1);
@@ -4048,7 +4149,7 @@ const confirmDelete = async () => {
               result.missing_fields || result.missing_parameters,
             );
           } else {
-            alert(
+            showAlert(
               `❌ Missing Parameters:\n${(result.missing_fields || result.missing_parameters).join("\n")}`,
             );
           }
@@ -4072,7 +4173,7 @@ const confirmDelete = async () => {
             uploadedVesselIMO &&
             currentShipIMO !== uploadedVesselIMO
           ) {
-            alert(
+            showAlert(
               `❌ Upload Error: You selected "${currentShip.name}" but uploaded a report for a different vessel.\n\nPlease upload the correct report for ${currentShip.name}.`,
             );
             setLoading(false);
@@ -4142,7 +4243,7 @@ const confirmDelete = async () => {
 
           setMonthlyReports([newReport]);
 
-          alert(result.message || "✅ Upload successful!");
+          showAlert(result.message || "✅ Upload successful!");
           isUploadInProgressRef.current = true;
           if (onUploadSuccess) onUploadSuccess();
           setRefreshReportsTrigger((prev) => prev + 1);
@@ -4181,7 +4282,7 @@ const confirmDelete = async () => {
       }
     } catch (error) {
       console.error("Upload failed:", error);
-      alert("❌ " + (error.response?.data?.message || error.message));
+      showAlert("❌ " + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
@@ -9698,7 +9799,7 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
         // ======================================================================
         if (mode === "local") {
           pdf.save(fileName);
-          alert("✅ Report downloaded successfully!");
+          showAlert("✅ Report downloaded successfully!");
         } else if (mode === "cloud") {
           const pdfBlob = pdf.output("blob");
           const formData = new FormData();
@@ -9709,7 +9810,7 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
           if (silent) {
             console.log(`♻️ Stale analytical PDF refreshed: ${fileName}`);
           } else {
-            alert("Report uploaded to cloud!");
+            showAlert("Report uploaded to cloud!");
           }
         }
       } catch (err) {
@@ -9717,7 +9818,7 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
         // A failed background refresh is deliberately swallowed: the report the
         // user opened still displays, the old PDF is still served, and the
         // report stays flagged stale so the next view simply tries again.
-        if (!silent) alert("❌ Error: " + err.message);
+        if (!silent) showAlert("❌ Error: " + err.message);
       } finally {
         if (!silent) setIsGeneratingPDF(false);
         staleRefreshInFlightRef.current = false;
@@ -9728,7 +9829,7 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
   const handleDirectDownload = () => {
     // 1. Validation: Ensure a report is selected
     if (selectedReportIds.length === 0) {
-      alert("Please select a report first.");
+      showAlert("Please select a report first.");
       return;
     }
 
@@ -9763,7 +9864,7 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
     // -----------------------------------------------------------
 
     if (selectedReportIds.length === 0) {
-      alert("Please select a report first.");
+      showAlert("Please select a report first.");
       return;
     }
 
@@ -9884,7 +9985,7 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
   };
   const handleBatchRawDownload = async () => {
     if (selectedRawDownloadIds.length === 0) {
-      alert("Please select reports first.");
+      showAlert("Please select reports first.");
       return;
     }
 
@@ -9913,7 +10014,7 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
       setSelectedRawDownloadIds([]);
     } catch (error) {
       console.error("ZIP download failed:", error);
-      alert("Failed to generate ZIP file.");
+      showAlert("Failed to generate ZIP file.");
     } finally {
       setLoading(false);
     }
@@ -9936,11 +10037,11 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
         // 3. Open in new tab (browser will handle the SAS download header)
         window.open(finalUrl, "_blank");
       } else {
-        alert("Could not locate the original file for this report.");
+        showAlert("Could not locate the original file for this report.");
       }
     } catch (error) {
       console.error("Download failed:", error);
-      alert(
+      showAlert(
         "Failed to retrieve the original report link. It may not have been stored during the initial upload.",
       );
     } finally {
@@ -9950,7 +10051,7 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
   const handleDirectDownloadClick = () => {
     // 1. Validation
     if (selectedReportIds.length === 0) {
-      alert("Please select a report first.");
+      showAlert("Please select a report first.");
       return;
     }
 
@@ -10140,7 +10241,27 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
       >
         {/* --- UNIFIED CONTROL PANEL (Your Preferred Layout) --- */}
         {/* --- RESTRUCTURED PERFORMANCE CONTROL CONSOLE --- */}
-        <div className="perf-control-bar">
+        <div
+          className={`perf-control-bar ${isDragOver ? "perf-control-bar--dragover" : ""}`}
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {isDragOver && (
+            <div
+              className={`perf-dropzone-overlay ${canUploadNow ? "" : "perf-dropzone-overlay--disabled"}`}
+            >
+              <Upload size={20} />
+              <span>
+                {canUploadNow
+                  ? `Drop ${analysisMode === "auxiliaryEngine" ? "AE" : "ME"} report PDF to upload`
+                  : analysisMode === "auxiliaryEngine"
+                    ? "Select a vessel and unit before uploading"
+                    : "Select a vessel before uploading"}
+              </span>
+            </div>
+          )}
           {/* 1. VESSEL SELECTOR */}
           <div className="perf-vessel-field">
             <label className="perf-field-label">Vessel</label>
@@ -10201,17 +10322,8 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
           {/* 4. DIRECT + UPLOAD ACTION — shore users only */}
           {!isVesselUser && (
             <div className="perf-upload-field">
-              <input
-                type="file"
-                accept=".pdf"
-                id="direct-upload-input"
-                style={{ display: "none" }}
-                onChange={handleFileUpload}
-              />
               <Button
-                onClick={() =>
-                  document.getElementById("direct-upload-input").click()
-                }
+                onClick={() => setIsUploadModalOpen(true)}
                 disabled={
                   !shipId ||
                   (analysisMode === "auxiliaryEngine" && !selectedGeneratorId)
@@ -10222,6 +10334,160 @@ currentY = chartBoxY + chartBoxH + actualLegH + slotGap;
               </Button>
             </div>
           )}
+
+          {alertQueue.length > 0 &&
+            createPortal(
+              <div className="perf-modal-backdrop perf-modal-backdrop--top">
+                <div
+                  className="perf-modal perf-modal--message"
+                  role="alertdialog"
+                  aria-modal="true"
+                >
+                  <div
+                    className={`perf-modal__msg-icon perf-modal__msg-icon--${alertQueue[0].type}`}
+                  >
+                    {alertQueue[0].type === "success"
+                      ? "✓"
+                      : alertQueue[0].type === "error"
+                        ? "✕"
+                        : alertQueue[0].type === "warning"
+                          ? "!"
+                          : "i"}
+                  </div>
+                  <h3 className="perf-modal__title perf-modal__title--center">
+                    {alertQueue[0].type === "success"
+                      ? "Success"
+                      : alertQueue[0].type === "error"
+                        ? "Something went wrong"
+                        : alertQueue[0].type === "warning"
+                          ? "Attention"
+                          : "Notice"}
+                  </h3>
+                  <p className="perf-modal__msg-text">{alertQueue[0].text}</p>
+                  <div className="perf-modal__footer perf-modal__footer--center">
+                    <button
+                      type="button"
+                      autoFocus
+                      className="perf-modal__btn perf-modal__btn--upload"
+                      onClick={dismissAlert}
+                    >
+                      OK
+                    </button>
+                  </div>
+                </div>
+              </div>,
+              document.body,
+            )}
+
+          {isUploadModalOpen &&
+            createPortal(
+              <div className="perf-modal-backdrop" onMouseDown={closeUploadModal}>
+                <div
+                  className="perf-modal"
+                  role="dialog"
+                  aria-modal="true"
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  <h3 className="perf-modal__title">
+                    Upload {analysisMode === "auxiliaryEngine" ? "AE" : "ME"} Report
+                  </h3>
+                  <p className="perf-modal__subtitle">
+                    {formatVesselName(
+                      fleet.find((sh) => String(sh.id) === String(shipId))?.name,
+                    )?.toUpperCase()}
+                    {analysisMode === "auxiliaryEngine" &&
+                      (() => {
+                        const g = generators.find(
+                          (x) => x.generator_id === selectedGeneratorId,
+                        );
+                        return g
+                          ? ` · ${g.designation || `Aux Engine No.${g.generator_id}`}`
+                          : "";
+                      })()}
+                  </p>
+
+                  <input
+                    ref={modalFileInputRef}
+                    type="file"
+                    accept=".pdf"
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      pickModalFile(e.target.files?.[0]);
+                      e.target.value = "";
+                    }}
+                  />
+
+                  {modalFile ? (
+                    <div className="perf-modal__file">
+                      <div className="perf-modal__file-icon">PDF</div>
+                      <div className="perf-modal__file-info">
+                        <span className="perf-modal__file-name">{modalFile.name}</span>
+                        <span className="perf-modal__file-size">
+                          {formatFileSize(modalFile.size)}
+                        </span>
+                      </div>
+                      {!modalUploading && (
+                        <button
+                          type="button"
+                          className="perf-modal__file-remove"
+                          onClick={() => setModalFile(null)}
+                          aria-label="Remove file"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div
+                      className={`perf-modal__dropzone ${modalDragOver ? "perf-modal__dropzone--active" : ""}`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setModalDragOver(true);
+                      }}
+                      onDragLeave={() => setModalDragOver(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setModalDragOver(false);
+                        pickModalFile(e.dataTransfer.files?.[0]);
+                      }}
+                    >
+                      <Upload size={32} />
+                      <p className="perf-modal__drop-text">
+                        {modalDragOver ? "Drop to select" : "Drag & drop your PDF here"}
+                      </p>
+                      <p className="perf-modal__drop-or">or</p>
+                      <button
+                        type="button"
+                        className="perf-modal__browse"
+                        onClick={() => modalFileInputRef.current?.click()}
+                      >
+                        Browse files
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="perf-modal__footer">
+                    <button
+                      type="button"
+                      className="perf-modal__btn perf-modal__btn--cancel"
+                      onClick={closeUploadModal}
+                      disabled={modalUploading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="perf-modal__btn perf-modal__btn--upload"
+                      onClick={handleModalUpload}
+                      disabled={!modalFile || modalUploading}
+                    >
+                      {modalUploading ? "Uploading..." : "Upload"}
+                    </button>
+                  </div>
+                </div>
+              </div>,
+              document.body,
+            )}
 
           {/* 5. SELECT REPORTS (Preserving MultiSelect and availableReports connection) */}
           <div className="perf-select-reports-field">

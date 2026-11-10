@@ -2964,3 +2964,95 @@ thead .matrix-sticky-col-2 {
   .hist-td-load__pct     { font-size: 0.7rem !important; }
   .hist-td-load__kw      { font-size: 0.57rem !important; }
 }
+
+/* ============================================================
+   UPLOAD MODAL (ME / AE report PDFs)
+   ============================================================ */
+.perf-modal-backdrop {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(2px);
+}
+.perf-modal {
+  width: 100%; max-width: 480px; background: #fff; border-radius: 14px;
+  padding: 22px 24px; box-shadow: 0 20px 40px rgba(15, 23, 42, 0.25); box-sizing: border-box;
+}
+.perf-modal__title { margin: 0; font-size: 1.05rem; font-weight: 700; color: #0f172a; }
+.perf-modal__subtitle { margin: 4px 0 16px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; color: #64748b; }
+.perf-modal__dropzone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 28px 16px; border: 2px dashed #cbd5e1; border-radius: 12px;
+  background: #f8fafc; color: #64748b; transition: all 0.15s ease;
+}
+.perf-modal__dropzone--active { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
+.perf-modal__drop-text { margin: 10px 0 2px; font-size: 0.9rem; font-weight: 600; color: inherit; }
+.perf-modal__drop-or { margin: 2px 0 8px; font-size: 0.75rem; color: #94a3b8; }
+.perf-modal__browse {
+  padding: 7px 16px; border: 1px solid #3b82f6; border-radius: 8px;
+  background: #fff; color: #2563eb; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+}
+.perf-modal__browse:hover { background: #eff6ff; }
+.perf-modal__file {
+  display: flex; align-items: center; gap: 12px; padding: 14px;
+  border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;
+}
+.perf-modal__file-icon {
+  display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 40px; height: 40px; border-radius: 8px; background: #fee2e2; color: #dc2626;
+  font-size: 0.7rem; font-weight: 700;
+}
+.perf-modal__file-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.perf-modal__file-name { font-size: 0.85rem; font-weight: 600; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.perf-modal__file-size { font-size: 0.72rem; color: #64748b; }
+.perf-modal__file-remove { border: none; background: transparent; color: #94a3b8; font-size: 0.95rem; cursor: pointer; }
+.perf-modal__file-remove:hover { color: #dc2626; }
+.perf-modal__footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.perf-modal__btn { padding: 9px 20px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 1px solid transparent; }
+.perf-modal__btn--cancel { background: #fff; border-color: #cbd5e1; color: #475569; }
+.perf-modal__btn--cancel:hover:not(:disabled) { background: #f1f5f9; }
+.perf-modal__btn--upload { background: #2563eb; color: #fff; }
+.perf-modal__btn--upload:hover:not(:disabled) { background: #1d4ed8; }
+.perf-modal__btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+
+/* ============================================================
+   DRAG & DROP ON CONTROL BAR
+   ============================================================ */
+.perf-control-bar { position: relative; }
+.perf-control-bar--dragover {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18) !important;
+}
+.perf-dropzone-overlay {
+  position: absolute; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  border-radius: 12px; border: 2px dashed #3b82f6;
+  background: rgba(239, 246, 255, 0.94); color: #1d4ed8;
+  font-size: 0.85rem; font-weight: 600; letter-spacing: 0.02em;
+  pointer-events: none;
+}
+.perf-dropzone-overlay--disabled {
+  border-color: #f59e0b; background: rgba(255, 251, 235, 0.95); color: #b45309;
+}
+
+
+/* ============================================================
+   MESSAGE DIALOG (replaces browser alert)
+   ============================================================ */
+.perf-modal-backdrop--top { z-index: 10001; }
+.perf-modal--message { max-width: 420px; text-align: center; }
+.perf-modal__title--center { text-align: center; }
+.perf-modal__footer--center { justify-content: center; }
+.perf-modal__msg-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 48px; height: 48px; margin: 0 auto 12px; border-radius: 50%;
+  font-size: 1.4rem; font-weight: 700;
+}
+.perf-modal__msg-icon--success { background: #dcfce7; color: #16a34a; }
+.perf-modal__msg-icon--error   { background: #fee2e2; color: #dc2626; }
+.perf-modal__msg-icon--warning { background: #fef3c7; color: #d97706; }
+.perf-modal__msg-icon--info    { background: #dbeafe; color: #2563eb; }
+.perf-modal__msg-text {
+  margin: 8px 0 0; font-size: 0.85rem; line-height: 1.5; color: #475569;
+  white-space: pre-line; word-break: break-word; text-align: center;
+}
