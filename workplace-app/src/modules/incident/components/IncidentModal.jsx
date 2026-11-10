@@ -250,13 +250,16 @@ export default function IncidentModal({ id, me, siblings = [], onNavigate, onClo
             <div className="inc-split">
               <section className={`inc-half${pane === 'evidence' ? '' : ' inc-half--hidden'}`} aria-label="Evidence">
                 <div className="inc-tabs" role="tablist">
-                  {TABS.map(([key, label, Icon]) => (
-                    <button key={key} type="button" role="tab" aria-selected={tab === key}
-                            className={`inc-tab${tab === key ? ' inc-tab--on' : ''}`} onClick={() => setTab(key)}>
-                      <Icon size={14} /> {label}
-                      {key === 'photos' && <span className="inc-tab__n">{files.filter((f) => f.kind === 'PHOTO').length}</span>}
-                    </button>
-                  ))}
+                  {TABS.map(([key, label, tabIcon]) => {
+                    const Icon = tabIcon;
+                    return (
+                      <button key={key} type="button" role="tab" aria-selected={tab === key}
+                              className={`inc-tab${tab === key ? ' inc-tab--on' : ''}`} onClick={() => setTab(key)}>
+                        <Icon size={14} /> {label}
+                        {key === 'photos' && <span className="inc-tab__n">{files.filter((f) => f.kind === 'PHOTO').length}</span>}
+                      </button>
+                    );
+                  })}
                 </div>
                 <div className="inc-tabbody">
                   {tab === 'sof' && <FileTab incident={incident} kind="SOF" notesField="sof_notes" notesLabel="Statement of facts" canEdit={canEdit}

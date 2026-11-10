@@ -15,7 +15,7 @@ from app.dependencies import get_current_user
 from app.models.control_user import ControlUser
 from app.models.incident import Incident, IncidentThread, IncidentThreadAttachment, IncidentThreadRead
 from app.schemas.common import success
-from app.services import storage
+from app.services import incident_notify, storage
 
 settings = get_settings()
 router = APIRouter(prefix="/incidents", tags=["incident-chat"])
@@ -23,9 +23,11 @@ router = APIRouter(prefix="/incidents", tags=["incident-chat"])
 MAX_BODY_CHARS = 4000
 
 
-async def _incident_exists(db: AsyncSession, incident_id: uuid.UUID) -> None:
-    if (await db.execute(select(Incident.id).where(Incident.id == incident_id))).first() is None:
+async def _incident_exists(db: AsyncSession, incident_id: uuid.UUID) -> Incident:
+    incident = (await db.execute(select(Incident).where(Incident.id == incident_id))).scalar_one_or_none()
+    if incident is None:
         raise HTTPException(status_code=404, detail="Incident not found")
+    return incident
 
 
 def _thread_dict(t: IncidentThread, attachments: list) -> dict:
@@ -96,7 +98,7 @@ async def post_thread(
     control_db: AsyncSession = Depends(get_control_db),
     user: ControlUser = Depends(get_current_user),
 ):
-    await _incident_exists(db, incident_id)
+    incident = await _incident_exists(db, incident_id)
     body = (body or "").strip()
     if len(body) > MAX_BODY_CHARS:
         raise HTTPException(status_code=400, detail=f"Message is longer than {MAX_BODY_CHARS} characters")
@@ -152,6 +154,8 @@ async def post_thread(
     await _mark_read(db, incident_id, user.id)
     await db.commit()
     await db.refresh(thread)
+    await incident_notify.on_message_posted(db, control_db, incident=incident, thread=thread, author=user,
+                                            tagged=tagged, has_files=bool(saved))
     return success(data=_thread_dict(thread, saved), message="Message sent")
 
 
