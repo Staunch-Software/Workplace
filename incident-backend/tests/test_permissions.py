@@ -47,3 +47,32 @@ def test_size_and_type_limits():
 
 def test_safe_filename_strips_paths():
     assert storage.safe_filename("..\\..\\etc/pass wd.pdf") == "pass wd.pdf"
+
+
+# ── File storage: blob by default, never a silent local fallback ────────────────────────────────
+
+import asyncio  # noqa: E402
+import uuid  # noqa: E402
+
+
+def test_blob_mode_refuses_upload_without_connection_string(monkeypatch):
+    monkeypatch.setattr(storage.settings, "FILE_STORAGE", "blob")
+    monkeypatch.setattr(storage.settings, "AZURE_STORAGE_CONNECTION_STRING", "")
+    with pytest.raises(HTTPException) as e:
+        asyncio.run(storage.save(b"x", "a.jpg", "image/jpeg", uuid.uuid4()))
+    assert e.value.status_code == 503
+
+
+def test_local_mode_stores_and_deletes(monkeypatch, tmp_path):
+    monkeypatch.setattr(storage.settings, "FILE_STORAGE", "local")
+    monkeypatch.setattr(storage.settings, "UPLOAD_DIR", str(tmp_path))
+    path = asyncio.run(storage.save(b"hello", "a.txt", "text/plain", uuid.uuid4()))
+    assert asyncio.run(storage.read(path)) == b"hello"
+    asyncio.run(storage.delete(path))
+    assert not os.path.exists(path)
+    asyncio.run(storage.delete(path))   # deleting twice is harmless
+
+
+def test_blob_url_parsing_for_azure_and_azurite():
+    assert storage._parse_blob_url("https://acct.blob.core.windows.net/incident-files/abc/x.jpg") == ("incident-files", "abc/x.jpg")
+    assert storage._parse_blob_url("http://127.0.0.1:10000/devstoreaccount1/incident-chat/abc/x.pdf") == ("incident-chat", "abc/x.pdf")

@@ -305,6 +305,8 @@ async def delete_file(incident_id: uuid.UUID, file_id: uuid.UUID,
     f = (await db.execute(select(IncidentFile).where(IncidentFile.id == file_id, IncidentFile.incident_id == incident_id))).scalar_one_or_none()
     if f is None:
         raise HTTPException(status_code=404, detail="File not found")
+    path = f.storage_path
     await db.delete(f)
     await db.commit()
+    await storage.delete(path)   # the row is gone either way; this frees the blob
     return success(message="Deleted")

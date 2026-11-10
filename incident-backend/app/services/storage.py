@@ -1,9 +1,13 @@
 """Where incident files and chat attachments are kept.
 
-Azure Blob when AZURE_STORAGE_CONNECTION_STRING is set (the storage account has public access off, so downloads
-are proxied through the API), otherwise a folder under UPLOAD_DIR. Type and size limits are enforced here on the
-server, never trusted from the browser.
+Azure Blob (FILE_STORAGE=blob, the default), like DRS and ORB: the storage account has public access off, so
+downloads are proxied through the API with the account credentials. An upload is refused when the connection string
+is missing; it never quietly lands on the local disk. FILE_STORAGE=local keeps files under UPLOAD_DIR (throwaway dev
+only). Files stored locally earlier stay readable. Type and size limits are enforced here on the server, never
+trusted from the browser. The Azure SDK is blocking, so its calls run in a worker thread.
 """
+import asyncio
+import logging
 import os
 import re
 import uuid
@@ -14,6 +18,7 @@ from fastapi import HTTPException
 from app.config import get_settings
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 IMAGE_EXTENSIONS = {
     ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp",
@@ -48,35 +53,72 @@ def validate_file(filename: str, size: int, max_mb: int, images_only: bool = Fal
 
 def _client():
     from azure.storage.blob import BlobServiceClient
-    conn = settings.AZURE_STORAGE_CONNECTION_STRING
-    # Azurite (local) only understands older API versions.
-    if "127.0.0.1" in conn or "UseDevelopmentStorage" in conn or "localhost" in conn:
-        return BlobServiceClient.from_connection_string(conn, api_version="2021-06-08")
-    return BlobServiceClient.from_connection_string(conn)
+    # API version pinned like DRS: fine for real Azure and the Azurite emulator.
+    return BlobServiceClient.from_connection_string(settings.AZURE_STORAGE_CONNECTION_STRING, api_version="2021-06-08")
 
 
 def _parse_blob_url(blob_url: str) -> tuple[str, str]:
     u = urlparse(blob_url)
     parts = unquote(u.path).lstrip("/").split("/")
     if (u.hostname or "") in _LOCAL_HOSTS or (u.hostname or "").startswith("127."):
-        parts = parts[1:]
+        parts = parts[1:]   # Azurite puts the account name first in the path
     return parts[0], "/".join(parts[1:])
 
 
+def container_names() -> list[str]:
+    return [settings.AZURE_STORAGE_INCIDENT_CONTAINER, settings.AZURE_STORAGE_INCIDENT_CHAT_CONTAINER]
+
+
+def ensure_containers() -> None:
+    """Create the containers if they are missing (called at startup; also safe to call again)."""
+    client = _client()
+    for name in container_names():
+        c = client.get_container_client(name)
+        if not c.exists():
+            c.create_container()
+            logger.info("Created blob container '%s'", name)
+
+
+def _upload_blob(content: bytes, blob_path: str, content_type: str, container_name: str) -> str:
+    from azure.storage.blob import ContentSettings
+    container = _client().get_container_client(container_name)
+    if not container.exists():
+        container.create_container()
+    blob = container.get_blob_client(blob_path)
+    blob.upload_blob(content, overwrite=True, content_settings=ContentSettings(content_type=content_type))
+    return blob.url
+
+
+def _read_blob(blob_url: str) -> bytes:
+    container_name, blob_name = _parse_blob_url(blob_url)
+    blob = _client().get_container_client(container_name).get_blob_client(blob_name)
+    if not blob.exists():
+        raise FileNotFoundError(blob_name)
+    return blob.download_blob().readall()
+
+
+def _delete_blob(blob_url: str) -> None:
+    container_name, blob_name = _parse_blob_url(blob_url)
+    blob = _client().get_container_client(container_name).get_blob_client(blob_name)
+    if blob.exists():
+        blob.delete_blob()
+
+
 async def save(content: bytes, filename: str, content_type: str, incident_id: uuid.UUID, chat: bool = False) -> str:
-    """Store the file; returns the storage_path to keep in the database."""
+    """Store the file; returns the storage_path to keep in the database (the blob URL, or a local path)."""
     name = safe_filename(filename)
-    if settings.AZURE_STORAGE_CONNECTION_STRING:
-        from azure.storage.blob import ContentSettings
+    if settings.use_blob:
+        if not settings.AZURE_STORAGE_CONNECTION_STRING:
+            logger.error("Upload refused: FILE_STORAGE=blob but AZURE_STORAGE_CONNECTION_STRING is not set")
+            raise HTTPException(status_code=503, detail="File storage is not configured on the server")
         cname = settings.AZURE_STORAGE_INCIDENT_CHAT_CONTAINER if chat else settings.AZURE_STORAGE_INCIDENT_CONTAINER
-        container = _client().get_container_client(cname)
         try:
-            container.create_container()
+            return await asyncio.to_thread(_upload_blob, content, f"{incident_id}/{uuid.uuid4()}_{name}", content_type, cname)
+        except HTTPException:
+            raise
         except Exception:
-            pass  # already exists
-        blob = container.get_blob_client(f"{incident_id}/{uuid.uuid4()}_{name}")
-        blob.upload_blob(content, overwrite=True, content_settings=ContentSettings(content_type=content_type))
-        return blob.url
+            logger.exception("Blob upload failed")
+            raise HTTPException(status_code=502, detail="Could not store the file; please try again")
     folder = os.path.join(settings.UPLOAD_DIR, "chat" if chat else "files", str(incident_id))
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, f"{uuid.uuid4()}_{name}")
@@ -87,10 +129,18 @@ async def save(content: bytes, filename: str, content_type: str, incident_id: uu
 
 async def read(storage_path: str) -> bytes:
     if storage_path.startswith("http"):
-        container_name, blob_name = _parse_blob_url(storage_path)
-        blob = _client().get_container_client(container_name).get_blob_client(blob_name)
-        if not blob.exists():
-            raise FileNotFoundError(blob_name)
-        return blob.download_blob().readall()
-    with open(storage_path, "rb") as f:
+        return await asyncio.to_thread(_read_blob, storage_path)
+    with open(storage_path, "rb") as f:   # a file stored locally before blob storage was switched on
         return f.read()
+
+
+async def delete(storage_path: str) -> None:
+    """Remove the stored file. Best effort: a missing file or a storage hiccup is logged, never raised, because the
+    database row (what the user sees) is already gone."""
+    try:
+        if storage_path.startswith("http"):
+            await asyncio.to_thread(_delete_blob, storage_path)
+        elif os.path.exists(storage_path):
+            os.remove(storage_path)
+    except Exception:
+        logger.exception("Could not delete stored file %s", storage_path)
