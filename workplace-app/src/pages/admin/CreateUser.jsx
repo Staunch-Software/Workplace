@@ -13,6 +13,9 @@ const ReportsIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill=
 
 const OrbIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>);
 
+const IncidentIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>);
+const IncidentCreateIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="12" y1="18" x2="12" y2="12" /><line x1="9" y1="15" x2="15" y2="15" /></svg>);
+
 const MODULE_LIST = [
     { id: "drs", name: "Defect Reporting System", Icon: DrsIcon },
     { id: "jira", name: "SmartPAL JIRA", Icon: JiraIcon },
@@ -20,12 +23,14 @@ const MODULE_LIST = [
     { id: "engine_performance", name: "Engine Performance", Icon: EngineIcon },
     { id: "report_tracker", name: "SmartPAL Reports", Icon: ReportsIcon },
     { id: "orb", name: "Oil Record Book (ORB)", Icon: OrbIcon },
+    { id: "incident_report", name: "Incident Reports", Icon: IncidentIcon },
+    { id: "incident_create", name: "Incidents: can create", Icon: IncidentCreateIcon },
 ];
 
 export default function CreateUser() {
     const navigate = useNavigate();
     const [form, setForm] = useState({ full_name: "", email: "", password: "", job_title: "", role: "VESSEL" });
-    const [permissions, setPermissions] = useState({ drs: false, jira: false, lubeoil: false, engine_performance: false, report_tracker: false, orb: false });
+    const [permissions, setPermissions] = useState({ drs: false, jira: false, lubeoil: false, engine_performance: false, report_tracker: false, orb: false, incident_report: false, incident_create: false });
     const [selectedVessels, setSelectedVessels] = useState([]);
     const [canSelfAssign, setCanSelfAssign] = useState(false);
     const [vessels, setVessels] = useState([]);

@@ -253,6 +253,19 @@
   background: #0e7490;
 }
 
+.hm-card-incident .hm-icon-container {
+  background: #fff1f0;
+  color: #c2410c;
+}
+
+.hm-card-incident:hover {
+  border-color: rgba(194, 65, 12, 0.3);
+}
+
+.hm-card-incident:hover .hm-icon-container {
+  background: #c2410c;
+}
+
 /* ============================================================
    1. LARGE LAPTOPS & SMALL DESKTOPS (1500px to 1899px)
    ============================================================ */
