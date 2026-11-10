@@ -48,6 +48,7 @@ export const dayLabel = (iso) => {
   return dayName.format(parseTs(iso));
 };
 
-// The bell and the Feed tab badge refresh each other through this event (read/unread changes anywhere).
-export const UNREAD_EVENT = 'incident-unread-changed';
-export const announceUnreadChange = () => window.dispatchEvent(new Event(UNREAD_EVENT));
+// "12 Nov 2026 · 14:05" in IST, as the DRS feed shows its rows.
+const fullDate = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
+const clock = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+export const fmtDateTime = (iso) => (iso ? `${fullDate.format(parseTs(iso))} · ${clock.format(parseTs(iso))}` : '—');

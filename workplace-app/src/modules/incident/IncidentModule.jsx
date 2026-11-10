@@ -3,7 +3,7 @@
 // granted to a few named users only. Both are enforced by the incident API: the screens only hide what is refused.
 // An incident opens as a popup over the list (?open=<id>), so a link to one still works. The bell and the Feed page
 // show what happened on incidents (mentions, replies, closed/reopened, evidence added).
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ListChecks, Loader2, Rss, ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -11,7 +11,6 @@ import api, { errText } from './api/axiosIncident';
 import IncidentList from './pages/IncidentList';
 import IncidentFeed from './pages/IncidentFeed';
 import NotificationBell from './components/NotificationBell';
-import { UNREAD_EVENT } from './utils/format';
 import './styles/incident.css';
 import './styles/feed.css';
 
@@ -19,23 +18,6 @@ function Navbar({ user, enabled }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const onFeed = pathname.startsWith('/incident/feed');
-  const [feedUnread, setFeedUnread] = useState(0);
-
-  // Unread badge on the Feed tab: polled, and refreshed at once when something is read or unread anywhere.
-  const loadUnread = useCallback(async () => {
-    try {
-      const r = await api.get('/api/feed/unread-count');
-      setFeedUnread(r.data.data.unread_count || 0);
-    } catch { /* the badge must never break the page */ }
-  }, []);
-
-  useEffect(() => {
-    if (!enabled) return undefined;
-    loadUnread(); // eslint-disable-line react-hooks/set-state-in-effect -- async fetch on mount; state is set after the await
-    const id = setInterval(() => { if (!document.hidden) loadUnread(); }, 15000);
-    window.addEventListener(UNREAD_EVENT, loadUnread);
-    return () => { clearInterval(id); window.removeEventListener(UNREAD_EVENT, loadUnread); };
-  }, [enabled, loadUnread]);
 
   const name = user?.full_name || user?.name || 'User';
   const initials = name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
@@ -59,7 +41,6 @@ function Navbar({ user, enabled }) {
           </button>
           <button type="button" role="tab" aria-selected={onFeed} className={`inc-nav__link${onFeed ? ' inc-nav__link--on' : ''}`} onClick={() => navigate('/incident/feed')}>
             <Rss size={15} /> Feed
-            {feedUnread > 0 && <span className="inc-nav__badge">{feedUnread > 99 ? '99+' : feedUnread}</span>}
           </button>
         </div>
       )}
@@ -112,7 +93,7 @@ export default function IncidentModule() {
       ) : (
         <Routes>
           <Route index element={<IncidentList me={me} />} />
-          <Route path="feed" element={<IncidentFeed />} />
+          <Route path="feed" element={<IncidentFeed me={me} />} />
           <Route path="*" element={<Navigate to="/incident" replace />} />
         </Routes>
       )}
