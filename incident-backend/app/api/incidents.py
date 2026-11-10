@@ -14,7 +14,7 @@ from app.dependencies import can_create, get_current_user, require_creator
 from app.models.control_user import ControlUser
 from app.models.incident import Incident, IncidentFile
 from app.schemas.common import success
-from app.services import storage
+from app.services import incident_notify, storage
 
 settings = get_settings()
 router = APIRouter(tags=["incidents"])
@@ -179,6 +179,7 @@ async def create_incident(
     db.add(inc)
     await db.commit()
     await db.refresh(inc)
+    await incident_notify.on_incident_created(db, incident=inc, actor=user)
     return success(data=_incident_dict(inc), message="Incident created")
 
 
@@ -214,22 +215,30 @@ async def update_incident(
 
 
 @router.post("/incidents/{incident_id}/close")
-async def close_incident(incident_id: uuid.UUID, db: AsyncSession = Depends(get_db), user: ControlUser = Depends(require_creator)):
+async def close_incident(incident_id: uuid.UUID, db: AsyncSession = Depends(get_db),
+                         control_db: AsyncSession = Depends(get_control_db), user: ControlUser = Depends(require_creator)):
     inc = await _get_incident(db, incident_id)
+    if inc.status == "CLOSED":
+        return success(data=_incident_dict(inc), message="Incident is already closed")
     inc.status = "CLOSED"
     inc.closed_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(inc)
+    await incident_notify.on_status_changed(db, control_db, incident=inc, actor=user, closed=True)
     return success(data=_incident_dict(inc), message="Incident closed")
 
 
 @router.post("/incidents/{incident_id}/reopen")
-async def reopen_incident(incident_id: uuid.UUID, db: AsyncSession = Depends(get_db), user: ControlUser = Depends(require_creator)):
+async def reopen_incident(incident_id: uuid.UUID, db: AsyncSession = Depends(get_db),
+                          control_db: AsyncSession = Depends(get_control_db), user: ControlUser = Depends(require_creator)):
     inc = await _get_incident(db, incident_id)
+    if inc.status == "DRAFT":
+        return success(data=_incident_dict(inc), message="Incident is already open")
     inc.status = "DRAFT"
     inc.closed_at = None
     await db.commit()
     await db.refresh(inc)
+    await incident_notify.on_status_changed(db, control_db, incident=inc, actor=user, closed=False)
     return success(data=_incident_dict(inc), message="Incident reopened")
 
 
@@ -280,6 +289,7 @@ async def upload_files(
     await db.commit()
     for rec in saved:
         await db.refresh(rec)
+    await incident_notify.on_files_added(db, incident=inc, actor=user, kind=kind, count=len(saved))
     return success(data=[_file_dict(r) for r in saved], message="Uploaded")
 
 

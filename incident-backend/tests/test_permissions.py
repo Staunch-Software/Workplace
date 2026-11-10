@@ -99,3 +99,30 @@ def test_container_creation_other_errors_still_raise():
 
     with pytest.raises(RuntimeError):
         storage._ensure_container(Broken())
+
+
+# ── Notification text helpers ───────────────────────────────────────────────────────────────────
+
+from app.services import incident_notify as notify  # noqa: E402
+
+
+def test_snippet_collapses_whitespace_and_truncates():
+    assert notify.snippet("  hello \n  world ") == "hello world"
+    long = "x" * 500
+    out = notify.snippet(long)
+    assert len(out) == notify.SNIPPET and out.endswith("…")
+
+
+def test_snippet_for_attachment_only_message():
+    assert notify.snippet("", has_files=True) == "sent an attachment"
+    assert notify.snippet("", has_files=False) == ""
+
+
+def test_files_phrase_pluralises():
+    assert notify.files_phrase("PHOTO", 1) == "1 photo"
+    assert notify.files_phrase("PHOTO", 3) == "3 photos"
+    assert notify.files_phrase("LOG", 2) == "2 alarm/event log files"
+
+
+def test_incident_link_is_relative_to_the_module():
+    assert notify.incident_link("abc") == "?open=abc"

@@ -8,7 +8,7 @@ export const fmtDay = (ymd) => {
 };
 
 // Timestamps come from the API as UTC; shown in IST like the rest of the app (ORB).
-const parseTs = (iso) => {
+export const parseTs = (iso) => {
   const s = String(iso);
   return new Date(/([zZ]|[+-]\d\d:?\d\d)$/.test(s) ? s : `${s}Z`);
 };
@@ -26,3 +26,28 @@ export const newId = () => {
     return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
   });
 };
+
+// "5m ago", "3h ago", "2d ago", then the date.
+export const ago = (iso) => {
+  const s = Math.max(0, (Date.now() - parseTs(iso).getTime()) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  if (s < 7 * 86400) return `${Math.floor(s / 86400)}d ago`;
+  return stamp.format(parseTs(iso));
+};
+
+// Calendar day in IST, for grouping the feed under "Today" / "Yesterday" / a date.
+const dayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' });
+const dayName = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
+export const dayOf = (iso) => dayKey.format(parseTs(iso));
+export const dayLabel = (iso) => {
+  const key = dayOf(iso);
+  if (key === dayKey.format(new Date())) return 'Today';
+  if (key === dayKey.format(new Date(Date.now() - 86400000))) return 'Yesterday';
+  return dayName.format(parseTs(iso));
+};
+
+// The bell and the Feed tab badge refresh each other through this event (read/unread changes anywhere).
+export const UNREAD_EVENT = 'incident-unread-changed';
+export const announceUnreadChange = () => window.dispatchEvent(new Event(UNREAD_EVENT));

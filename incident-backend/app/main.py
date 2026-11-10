@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
 from app.config import get_settings
-from app.api import chat, incidents
+from app.api import chat, incidents, notifications
 from app.services import storage
 
 settings = get_settings()
@@ -48,6 +48,7 @@ app.add_middleware(
 
 app.include_router(incidents.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
 
 
 @app.get("/health")
