@@ -52,6 +52,8 @@ class DatabaseManager:
                 self.database_url,
                 pool_pre_ping=True,
                 pool_recycle=300,
+                pool_size=3,
+                max_overflow=2,
                 echo=False  # Set to True for SQL debugging
             )
             
