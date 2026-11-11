@@ -8,8 +8,8 @@ engine = create_async_engine(
     settings.SQLALCHEMY_DATABASE_URI,
     echo=True,
     future=True,
-    pool_size=5,
-    max_overflow=5,
+    pool_size=3,
+    max_overflow=2,
     pool_timeout=10,    # ← ADD
     pool_recycle=1800,  # ← ADD
 )
