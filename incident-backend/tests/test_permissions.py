@@ -126,3 +126,29 @@ def test_files_phrase_pluralises():
 
 def test_incident_link_is_relative_to_the_module():
     assert notify.incident_link("abc") == "?open=abc"
+
+
+# ── @ list: only users assigned to the module ───────────────────────────────────────────────────
+
+def test_mention_list_excludes_the_caller_and_is_sorted(monkeypatch):
+    from app.api import chat
+    me, a, b = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+
+    async def fake_users(_db):
+        return [{"id": b, "name": "bob", "role": "SHORE"}, {"id": me, "name": "Me", "role": "SHORE"},
+                {"id": a, "name": "Alice", "role": "ADMIN"}]
+
+    monkeypatch.setattr(notify, "module_users", fake_users)
+    out = asyncio.run(chat.fetch_mentionable(None, me))
+    assert [u["name"] for u in out] == ["Alice", "bob"]          # caller excluded, case-insensitive order
+    assert all(isinstance(u["id"], str) for u in out)            # ids are sent as strings
+
+
+def test_notifications_use_the_same_assigned_users(monkeypatch):
+    a = uuid.uuid4()
+
+    async def fake_users(_db):
+        return [{"id": a, "name": "Alice", "role": "SHORE"}]
+
+    monkeypatch.setattr(notify, "module_users", fake_users)
+    assert asyncio.run(notify.module_user_ids(None)) == {a}

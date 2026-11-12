@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -51,13 +51,9 @@ async def _attachments_by_thread(db: AsyncSession, thread_ids: list) -> dict:
 
 
 async def fetch_mentionable(control_db: AsyncSession, exclude_id: uuid.UUID) -> list[dict]:
-    """Users who can open the module (and so see the chat): admins and shore users with the permission."""
-    rows = await control_db.execute(text("""
-        SELECT u.id, u.full_name, u.role FROM users u
-        WHERE u.is_active AND (u.role = 'ADMIN'
-              OR (u.role = 'SHORE' AND COALESCE(u.permissions ->> 'incident_report', 'false') = 'true'))
-    """))
-    out = [{"id": str(uid), "name": name, "role": role} for uid, name, role in rows.fetchall() if uid != exclude_id]
+    """The people who can be tagged with @: only users assigned to the module (Incident Reports switched on)."""
+    out = [{"id": str(u["id"]), "name": u["name"], "role": u["role"]}
+           for u in await incident_notify.module_users(control_db) if u["id"] != exclude_id]
     out.sort(key=lambda u: u["name"].lower())
     return out
 

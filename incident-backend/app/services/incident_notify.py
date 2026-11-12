@@ -41,14 +41,21 @@ def files_phrase(kind: str, count: int) -> str:
     return f"{count} {label}{'' if count == 1 else 's'}"
 
 
-async def module_user_ids(control_db: AsyncSession) -> set[uuid.UUID]:
-    """People who can open the module: active admins and shore users with the incident_report permission."""
+async def module_users(control_db: AsyncSession) -> list[dict]:
+    """People assigned to the module: active shore/admin users who have Incident Reports switched on for them.
+
+    One definition for everything that picks people: the @ list in the chat, who can be tagged, and who is notified.
+    An admin who was never assigned to the module is not listed, even though an admin can open it."""
     rows = await control_db.execute(text("""
-        SELECT u.id FROM users u
-        WHERE u.is_active AND (u.role = 'ADMIN'
-              OR (u.role = 'SHORE' AND COALESCE(u.permissions ->> 'incident_report', 'false') = 'true'))
+        SELECT u.id, u.full_name, u.role FROM users u
+        WHERE u.is_active AND u.role IN ('ADMIN', 'SHORE')
+          AND COALESCE(u.permissions ->> 'incident_report', 'false') = 'true'
     """))
-    return {r[0] for r in rows.fetchall()}
+    return [{"id": uid, "name": name, "role": role} for uid, name, role in rows.fetchall()]
+
+
+async def module_user_ids(control_db: AsyncSession) -> set[uuid.UUID]:
+    return {u["id"] for u in await module_users(control_db)}
 
 
 async def audience_of(db: AsyncSession, control_db: AsyncSession, incident: Incident) -> set[uuid.UUID]:
