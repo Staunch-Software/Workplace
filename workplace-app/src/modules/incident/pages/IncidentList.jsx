@@ -12,6 +12,7 @@ const STATUS_TABS = [['', 'All'], ['DRAFT', 'Draft'], ['CLOSED', 'Closed']];
 export default function IncidentList({ me }) {
   const [params, setParams] = useSearchParams();
   const openId = params.get('open') || '';
+  const openTab = params.get('tab') || 'sof';
   const filters = useMemo(() => ({
     status: params.get('status') || '',
     vessel_imo: params.get('vessel') || '',
@@ -76,7 +77,23 @@ export default function IncidentList({ me }) {
 
   const rows = useMemo(() => (status ? all.filter((r) => r.status === status) : all), [all, status]);
   const stop = (e) => e.stopPropagation();
-  const openIncident = (id) => setParam('open', id);
+  const openIncident = useCallback((id, tabName) => {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (id) next.set('open', id); else next.delete('open');
+      if (tabName && tabName !== 'sof') next.set('tab', tabName); else next.delete('tab');
+      return next;
+    }, { replace: true });
+  }, [setParams]);
+
+  const closeIncident = useCallback(() => {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('open');
+      next.delete('tab');
+      return next;
+    }, { replace: true });
+  }, [setParams]);
 
   return (
     <div className="inc-body">
@@ -138,14 +155,14 @@ export default function IncidentList({ me }) {
             <thead>
               <tr>
                 <th>Status</th><th>Incident ID</th><th>Vessel</th><th>Date</th><th>Description</th><th>Category</th>
-                <th>PIC</th><th>Offhire</th><th>Comments</th><th>Report</th>
+                <th>PIC</th><th>Offhire</th><th>Report</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={10} className="inc-empty"><Loader2 size={20} className="inc-spin" /></td></tr>
+                <tr><td colSpan={9} className="inc-empty"><Loader2 size={20} className="inc-spin" /></td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={10} className="inc-empty">
+                <tr><td colSpan={9} className="inc-empty">
                   <FileWarning size={30} />
                   <span>No incidents match these filters.</span>
                 </td></tr>
@@ -158,16 +175,37 @@ export default function IncidentList({ me }) {
                   <td className="inc-nowrap inc-col-date">{fmtDay(r.incident_date)}</td>
                   <td className="inc-clamp" title={r.description}>{r.description || <span className="inc-muted">—</span>}</td>
                   <td>{r.category ? <span className="inc-cat">{r.category}</span> : <span className="inc-muted">—</span>}</td>
-                  <td>
+                  <td onClick={(e) => {
+                    if (r.first_photo_id) {
+                      e.stopPropagation();
+                      openIncident(r.id, 'photos');
+                    }
+                  }}>
                     {r.first_photo_id ? (
-                      <span className="inc-thumb">
-                        <AuthedImage incidentId={r.id} fileId={r.first_photo_id} alt="" />
+                      <span
+                        className="inc-thumb inc-thumb--clickable"
+                        role="button"
+                        tabIndex={0}
+                        title="Click to view photo evidence"
+                        aria-label="View photo evidence"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openIncident(r.id, 'photos');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openIncident(r.id, 'photos');
+                          }
+                        }}
+                      >
+                        <AuthedImage incidentId={r.id} fileId={r.first_photo_id} alt="Photo" />
                         {r.photo_count > 1 && <span className="inc-thumb__n"><Images size={10} /> {r.photo_count}</span>}
                       </span>
                     ) : <span className="inc-muted">—</span>}
                   </td>
                   <td>{r.offhire ? <span className="inc-badge inc-badge--off" title={r.offhire_details}>Off-hire</span> : <span className="inc-muted">No</span>}</td>
-                  <td className="inc-clamp" title={r.comments}>{r.comments || <span className="inc-muted">—</span>}</td>
                   <td onClick={stop}>
                     {r.first_report ? (
                       <button type="button" className="inc-viewbtn" title={r.first_report.file_name}
@@ -187,9 +225,10 @@ export default function IncidentList({ me }) {
         <IncidentModal
           id={openId}
           me={me}
+          initialTab={openTab}
           siblings={rows.map((r) => r.id)}
           onNavigate={openIncident}
-          onClose={() => setParam('open', '')}
+          onClose={closeIncident}
           onChanged={() => load(true)}
         />
       )}

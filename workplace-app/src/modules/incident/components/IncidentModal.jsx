@@ -116,10 +116,10 @@ function ReportFiles({ incident, canEdit, files, onFilesChange, setError }) {
 
 // An incident, opened as a popup over the list (like the DRS feed popup): header facts, the evidence tabs on the
 // left half and the internal chat on the right. Arrow buttons / keys step through the incidents of the list.
-export default function IncidentModal({ id, me, siblings = [], onNavigate, onClose, onChanged }) {
+export default function IncidentModal({ id, me, siblings = [], initialTab = 'sof', onNavigate, onClose, onChanged }) {
   const [incident, setIncident] = useState(null);
   const [files, setFiles] = useState([]);
-  const [tab, setTab] = useState('sof');
+  const [tab, setTab] = useState(initialTab || 'sof');
   const [pane, setPane] = useState('evidence');   // narrow screens: which half is shown
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -148,7 +148,7 @@ export default function IncidentModal({ id, me, siblings = [], onNavigate, onClo
     }
   }, [id]);
 
-  useEffect(() => { load(); setTab('sof'); }, [load]);
+  useEffect(() => { load(); setTab(initialTab || 'sof'); }, [load, initialTab]);
 
   const close = useCallback(() => {
     if (dirtyRef.current) onChanged?.();
@@ -165,12 +165,12 @@ export default function IncidentModal({ id, me, siblings = [], onNavigate, onClo
       if (document.querySelector('.inc-lightbox, .inc-backdrop--form, .inc-backdrop--confirm')) return;
       const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
       if (e.key === 'Escape') close();
-      if (!typing && e.key === 'ArrowLeft' && prevId) onNavigate(prevId);
-      if (!typing && e.key === 'ArrowRight' && nextId) onNavigate(nextId);
+      if (!typing && e.key === 'ArrowLeft' && prevId) onNavigate(prevId, tab);
+      if (!typing && e.key === 'ArrowRight' && nextId) onNavigate(nextId, tab);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [close, prevId, nextId, onNavigate]);
+  }, [close, prevId, nextId, onNavigate, tab]);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -193,7 +193,7 @@ export default function IncidentModal({ id, me, siblings = [], onNavigate, onClo
 
   return (
     <div className="inc-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}>
-      <button type="button" className="inc-swipe inc-swipe--l" onClick={() => prevId && onNavigate(prevId)} disabled={!prevId} aria-label="Previous incident">
+      <button type="button" className="inc-swipe inc-swipe--l" onClick={() => prevId && onNavigate(prevId, tab)} disabled={!prevId} aria-label="Previous incident">
         <ChevronLeft size={22} />
       </button>
       <div className="inc-dialog" role="dialog" aria-modal="true" aria-label="Incident">
@@ -278,7 +278,7 @@ export default function IncidentModal({ id, me, siblings = [], onNavigate, onClo
           </>
         )}
       </div>
-      <button type="button" className="inc-swipe inc-swipe--r" onClick={() => nextId && onNavigate(nextId)} disabled={!nextId} aria-label="Next incident">
+      <button type="button" className="inc-swipe inc-swipe--r" onClick={() => nextId && onNavigate(nextId, tab)} disabled={!nextId} aria-label="Next incident">
         <ChevronRight size={22} />
       </button>
 
