@@ -1,0 +1,144 @@
+import logging
+import time
+import sys
+import os
+from playwright.sync_api import sync_playwright
+
+# Add project root to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from backend.config import config
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+log = logging.getLogger(__name__)
+
+def run_automated_login():
+    log.info("Starting background automated secure Microsoft SSO login...")
+    log.info(f"  ↳ MARIAPPS_HEADLESS={os.getenv('MARIAPPS_HEADLESS', 'true')} (unset defaults to headless=True)")
+
+    # Credentials come from .env (never hardcode). The account must have MFA
+    # disabled so this can complete without human interaction.
+    username = config.MARIAPPS_USERNAME
+    password = config.MARIAPPS_PASSWORD
+    if not username or not password:
+        raise RuntimeError(
+            "MARIAPPS_USERNAME / MARIAPPS_PASSWORD are not set in .env — "
+            "cannot run automated MariApps login."
+        )
+
+    # Defaults to headless=True so this can run on the (headless, no-XServer)
+    # deployment server. Set MARIAPPS_HEADLESS=false in .env when running this
+    # locally if you want to watch/debug the SSO flow in a visible browser.
+    headless = os.getenv("MARIAPPS_HEADLESS", "true").lower() != "false"
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=headless)
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            # TEMPORARY: DeploymentVM01's CA trust store is missing the root that
+            # signed smartpal.ozellar.com's cert chain (Comodo AAA Certificate
+            # Services). This disables TLS cert validation entirely for this
+            # session — remove once the VM's ca-certificates bundle is fixed.
+            ignore_https_errors=True,
+        )
+        page = context.new_page()
+        
+        # Add the visibility bypass
+        context.add_init_script("""
+            Object.defineProperty(document, 'visibilityState', { get: () => 'visible', configurable: true });
+        """)
+
+        log.info(f"Navigating to: {config.MARIAPPS_URL}")
+        page.goto(config.MARIAPPS_URL, wait_until="domcontentloaded")
+        
+        # --- STEP 1: Aggressive "SIGN IN" click ---
+        log.info("Looking for 'SIGN IN' gate button...")
+        try:
+            # Look for the exact Microsoft logo or the text 'SIGN IN'
+            signin_btn = page.locator("text='SIGN IN'").first
+            signin_btn.wait_for(state="visible", timeout=10000)
+            signin_btn.click(force=True)
+            log.info("  ↳ Successfully clicked gate SIGN IN.")
+        except Exception as e:
+            log.warning(f"  ↳ Could not find/click sign-in gate: {e}")
+        
+        # --- STEP 2: Email ---
+        log.info("Waiting for Microsoft email input...")
+        try:
+            page.wait_for_selector("input[name='loginfmt'], #i0116", timeout=20000)
+            page.locator("input[name='loginfmt'], #i0116").fill(username)
+            page.locator("#idSIButton9").click()
+            time.sleep(2)
+        except Exception as e:
+            log.error(f"Failed to enter email: {e}")
+            browser.close(); return
+
+        # --- STEP 2b: "Choose a way to sign in" (new MFA-method picker Microsoft added
+        # after this script was written) — defaults to "Approve a request on my
+        # Microsoft Authenticator app" instead of going straight to the password
+        # field, which is what made Step 3 below time out. Click "Use my password"
+        # if this screen shows up; skip silently if it doesn't (older/direct flow).
+        try:
+            use_password = page.locator("text='Use my password'").first
+            use_password.wait_for(state="visible", timeout=5000)
+            use_password.click()
+            log.info("  ↳ 'Choose a way to sign in' screen shown — clicked 'Use my password'.")
+            time.sleep(1)
+        except Exception:
+            pass  # screen didn't appear — proceed straight to the password field
+
+        # --- STEP 3: Password ---
+        log.info("Entering password...")
+        try:
+            page.wait_for_selector("input[name='passwd'], #i0118", timeout=10000)
+            page.locator("input[name='passwd'], #i0118").fill(password)
+            page.locator("#idSIButton9").click()
+            time.sleep(2)
+        except Exception as e:
+            log.error(f"Failed to enter password: {e}")
+            browser.close(); return
+            
+        # --- STEP 4: Stay Signed In ---
+        log.info("Handling 'Stay signed in'...")
+        try:
+            page.wait_for_selector("#idSIButton9", timeout=5000)
+            page.locator("#idSIButton9").click()
+        except: pass
+        
+# --- REPLACE STEP 5 ---
+        log.info("Waiting for successful Landing or LogApproval redirection...")
+        try:
+            # We wait for EITHER page instead of failing if it doesn't hit LogApproval
+            page.wait_for_load_state("networkidle", timeout=30000)
+        except Exception as e:
+            log.error(f"Redirection timed out: {e}")
+            raise e
+
+        # --- STEP 6: REAL verification before trusting/saving this session ---
+        # Bug found 2026-09: this function used to save storage_state right
+        # after networkidle, with no check that login actually succeeded —
+        # if the SSO flow silently landed somewhere unexpected (a changed
+        # Microsoft screen, a transient hiccup, anything), it would still
+        # write that broken session to auth.json as if it were valid,
+        # clobbering a previously-good session the daily pipeline depends
+        # on. Verify the SAME way navigator.py's navigate_to_log_validation()
+        # does — actually reach LogApproval, not redirected to a login page,
+        # with the vessel search box present — before saving anything.
+        target_url = "https://smartpal.ozellar.com/PerformancePALApp/Performance/LogApproval"
+        log.info(f"Verifying session by navigating to: {target_url}")
+        page.goto(target_url, wait_until="load", timeout=60000)
+        if "Account/Index" in page.url or "Login" in page.url:
+            raise RuntimeError(
+                f"Automated login did NOT actually succeed — landed on {page.url} "
+                "instead of LogApproval. Not saving this session (would overwrite "
+                "a previously-good auth.json with a broken one)."
+            )
+        page.wait_for_selector("input[aria-owns='vesselSearchBox_listbox']", timeout=30000)
+
+        context.storage_state(path=str(config.MARIAPPS_AUTH_JSON))
+        log.info(f"SSO Session verified and saved to {config.MARIAPPS_AUTH_JSON}")
+
+if __name__ == "__main__":
+    run_automated_login()

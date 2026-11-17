@@ -1,0 +1,547 @@
+import axios from 'axios'
+import { handleExpiredSession } from '../../../utils/authGuard'
+
+// Vessel Performance API (vp-backend). Endpoints below are written relative to /api/v1.
+// Dev: the service on :8008. Production: nginx serves it under /vp.
+const isDev = import.meta.env.DEV
+const api = axios.create({
+  baseURL: isDev ? 'http://localhost:8009/api/v1' : '/vp/api/v1',
+})
+
+// Signed-in user: the workplace token. The headless browser that renders the voyage-report PDF has no
+// user session; it is handed a short-lived read-only token as window.__VP_RENDER_TOKEN__.
+api.interceptors.request.use((config) => {
+  const token = window.__VP_RENDER_TOKEN__
+    || localStorage.getItem('platform_token') || sessionStorage.getItem('platform_token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const status = err.response?.status
+    const detail = err.response?.data?.detail || ''
+    if (!window.__VP_RENDER_TOKEN__ && (status === 401 || (status === 403 && detail === 'Could not validate credentials'))) {
+      handleExpiredSession()
+    }
+    return Promise.reject(err)
+  },
+)
+
+export async function fetchVessels() {
+  const { data } = await api.get('/vessels')
+  return Array.isArray(data) ? data : []
+}
+
+export async function addVessel(imoNumber, vesselName) {
+  const { data } = await api.post('/vessels', { imo_number: imoNumber, vessel_name: vesselName })
+  return data
+}
+
+// Toggle which pipelines include a vessel. payload: { wni_enabled?, mari_enabled? }
+export async function updateVesselSources(imo, payload) {
+  const { data } = await api.patch(`/vessels/${imo}/sources`, payload)
+  return data
+}
+
+export async function fetchVoyages(vesselImo, sourceId, loadingCond) {
+  const params = { vessel_imo: vesselImo }
+  if (sourceId && sourceId !== 'all') params.source_id = sourceId
+  if (loadingCond && loadingCond !== 'all') params.loading_cond = loadingCond
+  const { data } = await api.get('/voyages', { params })
+  return Array.isArray(data) ? data : []
+}
+
+export async function queryAnalysis(filters) {
+  const { data } = await api.post('/query', filters)
+  return data
+}
+
+export async function fetchVesselReport(year, shipGroup) {
+  const params = {}
+  if (year)                            params.year       = year
+  if (shipGroup && shipGroup !== 'All') params.ship_group = shipGroup
+  const { data } = await api.get('/vessel-report', { params })
+  return data
+}
+
+export async function fetchShipGroups() {
+  const { data } = await api.get('/vessel-report/groups')
+  return data
+}
+
+export async function runScan(payload) {
+  const { data } = await api.post('/scan/run', payload)
+  return data
+}
+
+export async function fetchExpandedColumns(source, vesselImo = null) {
+  const params = { source }
+  if (vesselImo) params.vessel_imo = vesselImo
+  const { data } = await api.get('/expanded/columns', { params })
+  return Array.isArray(data) ? data : []
+}
+
+export async function queryExpandedData(source, filters) {
+  const endpoint = source === 'mari_apps' ? '/expanded/mariapps' : '/expanded/wni'
+  const params = {}
+  if (filters.vessel_imo)    params.vessel_imo   = filters.vessel_imo
+  if (filters.fromDate)      params.from_date    = filters.fromDate
+  if (filters.toDate)        params.to_date      = filters.toDate
+  // Multi-voyage: send comma-separated; fall back to single voyageNo
+  if (Array.isArray(filters.voyageNos) && filters.voyageNos.length)
+                             params.voyage_no    = filters.voyageNos.join(',')
+  else if (filters.voyageNo) params.voyage_no    = filters.voyageNo
+  if (filters.loadingCond && filters.loadingCond !== 'all')
+                             params.loading_cond = filters.loadingCond
+  const { data } = await api.get(endpoint, { params })
+  return Array.isArray(data) ? data : []
+}
+
+export async function toggleExpandedColumn(colId, isActive) {
+  const { data } = await api.patch(`/expanded/columns/${colId}`, { is_active: isActive })
+  return data
+}
+
+// Persist a user-defined column order for a source. order = array of db_column
+// names in the desired order. target='primary' (default) saves each column's
+// real position; target='emission' saves the Emission picker bucket's own
+// independent order instead (always global — vesselImo is ignored for it).
+// For target='primary': pass vesselImo to save it for THAT VESSEL ONLY
+// ("This Vessel" scope); omit it to save the shared Global order, which also
+// overrides any vessel-specific order already saved for these same columns.
+export async function reorderColumns(source, order, target = 'primary', vesselImo = null) {
+  const payload = { source, order, target }
+  if (vesselImo) payload.vessel_imo = vesselImo
+  const { data } = await api.put('/expanded/columns/reorder', payload)
+  return data
+}
+
+// Revert a source's column order back to the default. Pass `columns` (an array
+// of db_column names, e.g. one category's columns) to reset only those; omit
+// it to reset the entire source's order. `target` selects which order field
+// to clear — 'primary' (default) or 'emission'. For target='primary', pass
+// vesselImo to clear only that vessel's own order (falls back to Global);
+// omit it to clear the Global order.
+export async function resetColumnOrder(source, columns = null, target = 'primary', vesselImo = null) {
+  const params = { source, target }
+  if (columns && columns.length) params.columns = columns.join(',')
+  if (vesselImo) params.vessel_imo = vesselImo
+  const { data } = await api.delete('/expanded/columns/reorder', { params })
+  return data
+}
+
+// ── Data sync status (read-only) ───────────────────────────────────────────────
+export async function fetchSyncStatus(vesselImo) {
+  const params = {}
+  if (vesselImo) params.vessel_imo = vesselImo
+  const { data } = await api.get('/sync/status', { params })
+  return Array.isArray(data?.vessels) ? data : { vessels: [] }
+}
+
+// ── MDM / Vessel Design Data ──────────────────────────────────────────────────
+export async function fetchDesignData(imo) {
+  const { data } = await api.get(`/vessels/${imo}/design-data`)
+  return data
+}
+
+export async function saveDesignData(imo, payload) {
+  const { data } = await api.post(`/vessels/${imo}/design-data`, payload)
+  return data
+}
+
+export async function patchDesignData(imo, payload) {
+  const { data } = await api.patch(`/vessels/${imo}/design-data`, payload)
+  return data
+}
+
+// ── Charter-Party Description ─────────────────────────────────────────
+export async function fetchCPDescriptionVessels() {
+  const { data } = await api.get('/cp-description/vessels')
+  return Array.isArray(data) ? data : []
+}
+
+export async function fetchCPDescription(imo) {
+  const { data } = await api.get(`/cp-description/${imo}`)
+  return data
+}
+
+export async function updateCPHeader(imo, payload) {
+  const { data } = await api.patch(`/cp-description/${imo}/header`, payload)
+  return data
+}
+
+export async function replaceCPSeaWarranty(imo, rows) {
+  const { data } = await api.put(`/cp-description/${imo}/sea-warranty`, rows)
+  return data
+}
+
+export async function replaceCPPortWarranty(imo, rows) {
+  const { data } = await api.put(`/cp-description/${imo}/port-warranty`, rows)
+  return data
+}
+
+export async function updateCPConditions(imo, payload) {
+  const { data } = await api.patch(`/cp-description/${imo}/conditions`, payload)
+  return data
+}
+
+// ── Charter-Party Compliance v2 (Phase 3a pilot — see CLAUDE.md) ──────────
+export async function fetchCPCompliancePilotVessels() {
+  const { data } = await api.get('/cp-compliance/pilot-vessels')
+  return Array.isArray(data) ? data : []
+}
+
+export async function fetchCPCompliance(imo, source) {
+  const { data } = await api.get(`/cp-compliance/${imo}`, { params: source ? { source } : {} })
+  return data
+}
+
+export async function fetchSpeedPowerData(imo, loadingCondition = 'all') {
+  const { data } = await api.get(`/vessels/${imo}/speed-power-data`, {
+    params: { loading_condition: loadingCondition },
+  })
+  return data
+}
+
+// ── MariApps Bunker Report ─────────────────────────────────────────────────
+export async function fetchBunkerReportVessels() {
+  const { data } = await api.get('/bunker-report/vessels')
+  return Array.isArray(data) ? data : []
+}
+
+export async function fetchBunkerReport(imo) {
+  const { data } = await api.get(`/bunker-report/${imo}`)
+  return Array.isArray(data) ? data : []
+}
+
+// ── Biofuel Calc ──────────────────────────────────────────────────────────────
+export async function fetchBiofuelStems(imo) {
+  const { data } = await api.get(`/biofuel/${imo}/stems`)
+  return data
+}
+
+export async function fetchBiofuelBunkerCandidates(imo) {
+  const { data } = await api.get(`/biofuel/${imo}/bunker-candidates`)
+  return Array.isArray(data) ? data : []
+}
+
+export async function createBiofuelStem(payload) {
+  const { data } = await api.post('/biofuel/stems', payload)
+  return data
+}
+
+export async function updateBiofuelStem(id, payload) {
+  const { data } = await api.patch(`/biofuel/stems/${id}`, payload)
+  return data
+}
+
+export async function deleteBiofuelStem(id) {
+  const { data } = await api.delete(`/biofuel/stems/${id}`)
+  return data
+}
+
+export async function fetchBiofuelPoS() {
+  const { data } = await api.get('/biofuel/pos')
+  return Array.isArray(data) ? data : []
+}
+
+export async function createBiofuelPoS(payload) {
+  const { data } = await api.post('/biofuel/pos', payload)
+  return data
+}
+
+export async function updateBiofuelPoS(id, payload) {
+  const { data } = await api.patch(`/biofuel/pos/${id}`, payload)
+  return data
+}
+
+export async function deleteBiofuelPoS(id) {
+  const { data } = await api.delete(`/biofuel/pos/${id}`)
+  return data
+}
+
+// ── ISO 19030 ─────────────────────────────────────────────────────────────────
+export async function fetchISOConfig(imo) {
+  const { data } = await api.get(`/iso19030/${imo}/config`)
+  return data
+}
+export async function saveISOConfig(imo, payload) {
+  const { data } = await api.post(`/iso19030/${imo}/config`, payload)
+  return data
+}
+export async function fetchBaselineCurves(imo) {
+  const { data } = await api.get(`/iso19030/${imo}/baseline-curves`)
+  return data
+}
+export async function saveBaselineCurve(imo, payload) {
+  const { data } = await api.post(`/iso19030/${imo}/baseline-curves`, payload)
+  return data
+}
+export async function fetchMaintenanceEvents(imo) {
+  const { data } = await api.get(`/iso19030/${imo}/events`)
+  return data
+}
+export async function addMaintenanceEvent(imo, payload) {
+  const { data } = await api.post(`/iso19030/${imo}/events`, payload)
+  return data
+}
+export async function deleteMaintenanceEvent(imo, eventId) {
+  const { data } = await api.delete(`/iso19030/${imo}/events/${eventId}`)
+  return data
+}
+export async function fetchISOKPIs(imo, dataSource = 'mariapps') {
+  const { data } = await api.get(`/iso19030/${imo}/kpis`, { params: { data_source: dataSource } })
+  return data
+}
+export async function fetchISOSpeedLoss(imo, loadingCondition = 'all', baseline = 'B2', dataSource = 'mariapps') {
+  const { data } = await api.get(`/iso19030/${imo}/speed-loss`, {
+    params: { loading_condition: loadingCondition, baseline, data_source: dataSource }
+  })
+  return data
+}
+export async function runISO19030(imo, dataSource = 'mariapps') {
+  const { data } = await api.post(`/iso19030/${imo}/run`, null, { params: { data_source: dataSource } })
+  return data
+}
+
+export async function fetchSpeedPowerISO(imo, loadingCondition = 'all') {
+  const { data } = await api.get(`/iso19030/${imo}/speed-power-iso`, {
+    params: { loading_condition: loadingCondition },
+  })
+  return data
+}
+
+// ── Voyage Summary & Series (used for PDF export) ────────────────────────────
+// `source`: pass the vessel's actually-selected single source ('wni' |
+// 'mari_apps') whenever known — WNI and MariApps can share the exact same
+// Voyage_No string for one vessel (confirmed: AM UMANG's "82 B"), and
+// without this filter every day gets counted twice. Omit only when you
+// genuinely want both sources blended together.
+export async function fetchVoyageSummary(voyageNo, vesselImo, source) {
+  const { data } = await api.get('/voyage/summary', {
+    params: { voyage_no: voyageNo, vessel_imo: vesselImo, ...(source ? { source } : {}) },
+  })
+  return data
+}
+
+export async function fetchVoyageSeries(voyageNo, vesselImo, source) {
+  const { data } = await api.get('/voyage/series', {
+    params: { voyage_no: voyageNo, vessel_imo: vesselImo, ...(source ? { source } : {}) },
+  })
+  return Array.isArray(data) ? data : []
+}
+
+// ── Charter-Party (CP) performance config ───────────────────────────────────────
+// Returns { vessel_imo, configs: { Laden: {...}, Ballast: {...} }, _empty }
+export async function fetchCPConfig(imo) {
+  const { data } = await api.get(`/cp/${imo}/config`)
+  return data
+}
+// payload must include loading_cond ('Laden' | 'Ballast') plus warranty fields
+export async function saveCPConfig(imo, payload) {
+  const { data } = await api.post(`/cp/${imo}/config`, payload)
+  return data
+}
+
+// Per-voyage CP performance (all-weather vs fair-weather, compliance, time, fuel).
+// voyages: array of Voyage_No; source: 'wni' | 'mari_apps' | undefined (both)
+export async function fetchCPPerformance(imo, voyages, source, loadingCond) {
+  const params = {}
+  if (Array.isArray(voyages) && voyages.length) params.voyages = voyages.join(',')
+  if (source && source !== 'all') params.source = source
+  if (loadingCond && loadingCond !== 'all') params.loading_cond = loadingCond
+  const { data } = await api.get(`/cp/${imo}/performance`, { params })
+  return data
+}
+
+// ── CP Manual Overrides (manager request 2026-10) ───────────────────────
+export async function fetchCPOverrides(imo, voyageNo, source) {
+  const params = {}
+  if (voyageNo) params.voyage_no = voyageNo
+  if (source && source !== 'all') params.source = source
+  const { data } = await api.get(`/cp-overrides/${imo}`, { params })
+  return Array.isArray(data) ? data : []
+}
+
+export async function saveCPOverride(imo, payload) {
+  const { data } = await api.post(`/cp-overrides/${imo}`, payload)
+  return data
+}
+
+export async function deleteCPOverride(imo, overrideId) {
+  const { data } = await api.delete(`/cp-overrides/${imo}/${overrideId}`)
+  return data
+}
+
+// ── Column Preferences ───────────────────────────────────────────────────────
+
+export async function fetchUserColumnPrefs(source, vesselImo = null) {
+  const params = { source }
+  if (vesselImo) params.vessel_imo = vesselImo
+  const { data } = await api.get('/column-prefs', { params })
+  return data // returns { visible: [...], order: [...] } or {}
+}
+
+export async function saveUserColumnPrefs(source, vesselImo = null, columnPrefs) {
+  const payload = { source, column_prefs: columnPrefs }
+  if (vesselImo) payload.vessel_imo = vesselImo
+  const { data } = await api.put('/column-prefs', payload)
+  return data
+}
+
+export async function fetchVesselColumnDefaults(source, vesselImo) {
+  const { data } = await api.get('/vessel-column-defaults', { params: { source, vessel_imo: vesselImo } })
+  return data
+}
+
+export async function saveVesselColumnDefaults(source, vesselImo, columnPrefs) {
+  const payload = { source, vessel_imo: vesselImo, column_prefs: columnPrefs }
+  const { data } = await api.put('/vessel-column-defaults', payload)
+  return data
+}
+
+// ── Column Configurator (admin-only "Configure Columns" page) ────────────────
+export async function fetchCategoryOrder(source) {
+  const { data } = await api.get('/category-order', { params: { source } })
+  return data.categories || []
+}
+
+export async function saveCategoryOrder(source, categories) {
+  const { data } = await api.put('/category-order', { source, categories })
+  return data
+}
+
+export async function fetchCalculationCategories(source) {
+  const { data } = await api.get('/calculation-categories', { params: { source } })
+  return Array.isArray(data) ? data : []
+}
+
+export async function createCalculationCategory(source, name) {
+  const { data } = await api.post('/calculation-categories', { source, name })
+  return data
+}
+
+export async function deleteCalculationCategory(id) {
+  const { data } = await api.delete(`/calculation-categories/${id}`)
+  return data
+}
+
+export async function fetchCalcCategoryColumns(id) {
+  const { data } = await api.get(`/calculation-categories/${id}/columns`)
+  return data.db_columns || []
+}
+
+export async function saveCalcCategoryColumns(id, dbColumns) {
+  const { data } = await api.put(`/calculation-categories/${id}/columns`, { db_columns: dbColumns })
+  return data
+}
+
+// ── Fleet Status Monitoring ───────────────────────────────────────────────────
+export async function fetchFleetVoyages() {
+  const { data } = await api.get('/fleet/voyages')
+  return Array.isArray(data) ? data : []
+}
+
+export async function fetchVesselTrack(vesselImo) {
+  const { data } = await api.get(`/${vesselImo}/track`)
+  return data
+}
+
+// ── Emission (AER & CII) ───────────────────────────────────────────────────
+export async function fetchEmissionYears(imo) {
+  const { data } = await api.get(`/emission/${imo}/years`)
+  return Array.isArray(data) ? data : []
+}
+
+export async function fetchEmissionCII(imo, year, source) {
+  const { data } = await api.get(`/emission/${imo}/cii`, { params: { year, ...(source ? { source } : {}) } })
+  return data
+}
+
+export async function fetchImoDcs(imo, year, source) {
+  const { data } = await api.get(`/emission/${imo}/imo-dcs`, { params: { year, ...(source ? { source } : {}) } })
+  return data
+}
+
+export async function saveInnovativeTech(imo, category) {
+  const { data } = await api.patch(`/emission/${imo}/innovative-tech`, { category })
+  return data
+}
+
+// source is required here (never blended) — pass 'wni' or 'mari_apps'.
+export async function fetchImoDcsMonthly(imo, year, source) {
+  const { data } = await api.get(`/emission/${imo}/imo-dcs/monthly`, { params: { year, source } })
+  return data
+}
+
+export async function fetchImoDcsLegs(imo, year, source) {
+  const { data } = await api.get(`/emission/${imo}/imo-dcs/legs`, { params: { year, source } })
+  return data
+}
+
+export async function fetchImoDcsEvents(imo, year, source) {
+  const { data } = await api.get(`/emission/${imo}/imo-dcs/events`, { params: { year, source } })
+  return data
+}
+
+export async function fetchEuMrv(imo, year, source) {
+  const { data } = await api.get(`/emission/${imo}/eu-mrv`, { params: { year, source } })
+  return data
+}
+
+export async function fetchEuMrvLegs(imo, year, source) {
+  const { data } = await api.get(`/emission/${imo}/eu-mrv/legs`, { params: { year, source } })
+  return data
+}
+
+export async function fetchEuEts(imo, year, source, euaPrice) {
+  const { data } = await api.get(`/emission/${imo}/eu-ets`, {
+    params: { year, source, ...(euaPrice != null && euaPrice !== '' ? { eua_price: euaPrice } : {}) },
+  })
+  return data
+}
+
+export async function fetchEuEtsLegs(imo, year, source) {
+  const { data } = await api.get(`/emission/${imo}/eu-ets/legs`, { params: { year, source } })
+  return data
+}
+
+export async function fetchFuelEu(imo, year, source) {
+  const { data } = await api.get(`/emission/${imo}/fueleu`, { params: { year, source } })
+  return data
+}
+
+export async function fetchFuelEuLegs(imo, year, source) {
+  const { data } = await api.get(`/emission/${imo}/fueleu/legs`, { params: { year, source } })
+  return data
+}
+
+// ── Data Discrepancy & Voyage Review ────────────────────────────────────
+export async function fetchDataQualityFindings(vesselImo, status) {
+  const params = {}
+  if (vesselImo && vesselImo !== 'all') params.vessel_imo = vesselImo
+  if (status && status !== 'all') params.status = status
+  const { data } = await api.get('/data-quality/findings', { params })
+  return Array.isArray(data) ? data : []
+}
+
+export async function updateDataQualityFindingStatus(findingId, status) {
+  const { data } = await api.patch(`/data-quality/findings/${findingId}`, { status })
+  return data
+}
+
+export async function fetchDataQualityThreads(findingId, channel) {
+  const params = {}
+  if (channel) params.channel = channel
+  const { data } = await api.get(`/data-quality/findings/${findingId}/threads`, { params })
+  return Array.isArray(data) ? data : []
+}
+
+export async function postDataQualityThread(findingId, body, isInternal) {
+  const { data } = await api.post(`/data-quality/findings/${findingId}/threads`, {
+    body, is_internal: isInternal,
+  })
+  return data
+}

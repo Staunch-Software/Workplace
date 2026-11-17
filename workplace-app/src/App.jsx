@@ -18,6 +18,8 @@ const AepmsModule = lazy(() => import('./modules/aepms/AepmsModule'));
 const ReportsModule = lazy(() => import('./modules/reports/ReportsModule'));
 const OrbModule = lazy(() => import('./modules/orb/OrbModule'));
 const IncidentModule = lazy(() => import('./modules/incident/IncidentModule'));
+const VpModule = lazy(() => import('./modules/vp/VpModule'));
+const VpRenderPage = lazy(() => import('./modules/vp/VpRenderPage'));
 const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
 
 const moduleLoaderStyle = {
@@ -151,6 +153,22 @@ function App() {
                 <IncidentModule />
               </Suspense>
             </ProtectedRoute>
+          } />
+
+          {/* ── VESSEL PERFORMANCE (shore only; the module checks its own permission) ─── */}
+          <Route path="/vp/*" element={
+            <ProtectedRoute allowedRoles={['SHORE', 'ADMIN']}>
+              <Suspense fallback={<ModuleLoader label="Loading Vessel Performance..." />}>
+                <VpModule />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+          {/* Opened only by the server's headless browser to render the voyage report PDF. It shows nothing and
+              holds no session: the API accepts only the short-lived read-only token that browser is given. */}
+          <Route path="/vp-render" element={
+            <Suspense fallback={null}>
+              <VpRenderPage />
+            </Suspense>
           } />
 
           {/* ── USER GUIDE ─────────────────────────────── */}

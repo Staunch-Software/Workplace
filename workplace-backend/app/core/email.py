@@ -72,6 +72,10 @@ MODULE_INFO = {
         "name": "Oil Record Book (ORB)",
         "desc": "Upload Oil Record Book PDFs, review the digitised entries and resolve compliance alerts.",
     },
+    "vessel_performance": {
+        "name": "Vessel Performance",
+        "desc": "Noon-report data, charter-party and ISO 19030 performance, emissions and fleet status for the shore team.",
+    },
     "incident_report": {
         "name": "Incident Reports",
         "desc": "Browse the incident report repository, review evidence and discuss each incident with the team.",

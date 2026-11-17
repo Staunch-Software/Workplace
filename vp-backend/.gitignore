@@ -1,0 +1,16 @@
+# secrets
+.env
+**/auth.json
+.wartsila_session/
+
+# python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# runtime data
+logs/
+data/
+*.log
+.tmp_preview/

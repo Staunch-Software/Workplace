@@ -1,0 +1,114 @@
+"""
+Headless render of the Voyage Audit Report PDF for the voyage-completion mail.
+
+The report is built client-side (frontend/src/utils/voyagePdfExport.js — jsPDF
++ html2canvas charts). Rather than re-implementing a ~30-page report in
+Python and letting the two drift apart, this loads the built frontend in
+headless Chromium (the workplace `/vp-render` page, which exposes
+window.__vpGenerateVoyagePdf — see workplace-app/src/modules/vp) and asks it
+to generate the exact same PDF the Logbook+ download button produces.
+
+The headless browser is not a user session: it is handed a short-lived,
+read-only render token (backend.auth.create_render_token) as
+window.__VP_RENDER_TOKEN__, which the page sends to this API.
+
+Runs in a SUBPROCESS (render_voyage_pdf -> `python -m ...voyage_report_pdf`)
+because save_log() is called from inside the MariApps scraper's own running
+Playwright sync session, and Playwright's sync API cannot be nested.
+
+Config: VOYAGE_PDF_FRONTEND_URL — where the workplace frontend is reachable
+from the server (default http://localhost, i.e. nginx on the VM; use
+http://localhost:5173 against `npm run dev` locally).
+"""
+import argparse
+import base64
+import logging
+import os
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+log = logging.getLogger(__name__)
+
+FRONTEND_URL = os.getenv("VOYAGE_PDF_FRONTEND_URL", "http://localhost")
+RENDER_TIMEOUT_S = 240
+
+
+def render_voyage_pdf(vessel_imo, vessel_name, voyage_no, source="mari_apps"):
+    """Returns the path of the generated PDF, or None on any failure."""
+    out_dir = tempfile.mkdtemp(prefix="voyage_report_")
+    cmd = [
+        sys.executable, "-m", "backend.mariapps_pipeline.voyage_report_pdf",
+        "--imo", str(vessel_imo), "--name", str(vessel_name or ""),
+        "--voyage", str(voyage_no), "--source", source, "--out-dir", out_dir,
+    ]
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=RENDER_TIMEOUT_S + 30,
+            cwd=str(Path(__file__).resolve().parents[2]),
+        )
+    except subprocess.TimeoutExpired:
+        log.error(f"Voyage PDF render timed out for {vessel_name} {voyage_no}")
+        return None
+    if proc.returncode != 0:
+        log.error(f"Voyage PDF render failed for {vessel_name} {voyage_no}: {proc.stderr[-800:]}")
+        return None
+    path = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else ""
+    return path if path and os.path.exists(path) else None
+
+
+def _render(imo, name, voyage_no, source, out_dir):
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        try:
+            # ignore_https_errors: on the VM nginx redirects http://localhost to
+            # HTTPS, whose cert is for the public hostname, not "localhost"
+            # (ERR_CERT_COMMON_NAME_INVALID). We only ever load our own frontend.
+            context = browser.new_context(
+                viewport={"width": 1400, "height": 1000}, ignore_https_errors=True
+            )
+            from backend.auth import create_render_token
+            context.add_init_script(f"window.__VP_RENDER_TOKEN__ = {create_render_token()!r};")
+            page = context.new_page()
+            page.set_default_timeout(RENDER_TIMEOUT_S * 1000)
+            page.goto(f"{FRONTEND_URL.rstrip('/')}/vp-render", wait_until="networkidle")
+            try:
+                page.wait_for_function(
+                    "typeof window.__vpGenerateVoyagePdf === 'function'", timeout=30000
+                )
+            except Exception:
+                raise RuntimeError(
+                    f"Render hook not found at {page.url} (page title: {page.title()!r}). "
+                    f"VOYAGE_PDF_FRONTEND_URL={FRONTEND_URL} is probably answered by a "
+                    "different nginx site, or the deployed frontend build is stale."
+                )
+            result = page.evaluate(
+                "args => window.__vpGenerateVoyagePdf(args)",
+                {
+                    "vesselImo": imo, "vesselName": name,
+                    "voyageNo": voyage_no, "voyageNos": [voyage_no],
+                    "source": source, "loadingCond": "all",
+                },
+            )
+        finally:
+            browser.close()
+
+    if result.get("dataWarning"):
+        log.warning(f"Voyage PDF generated with a data warning: {result['dataWarning']}")
+    path = Path(out_dir) / result["filename"]
+    path.write_bytes(base64.b64decode(result["base64"]))
+    return str(path)
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--imo", required=True)
+    ap.add_argument("--name", default="")
+    ap.add_argument("--voyage", required=True)
+    ap.add_argument("--source", default="mari_apps")
+    ap.add_argument("--out-dir", required=True)
+    a = ap.parse_args()
+    print(_render(a.imo, a.name, a.voyage, a.source, a.out_dir))

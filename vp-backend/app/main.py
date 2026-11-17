@@ -1,0 +1,516 @@
+import logging
+import os
+import threading
+from fastapi import FastAPI, Depends, HTTPException, APIRouter
+from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
+from api.routes.vessel_routes import router as vessel_router
+from api.routes.expanded_routes import router as expanded_router
+from api.routes.vessel_design_routes import router as vessel_design_router
+from api.routes.iso_routes import router as iso_router
+from api.routes.sync_routes import router as sync_router
+from api.routes.cp_routes import router as cp_router
+from api.routes.column_pref_routes import router as column_pref_router
+from api.routes.column_config_routes import router as column_config_router
+from api.routes.cp_description_routes import router as cp_description_router
+from api.routes.cp_compliance_routes import router as cp_compliance_router
+from api.routes.emission_routes import router as emission_router
+from api.routes.bunker_report_routes import router as bunker_report_router
+from api.routes.biofuel_routes import router as biofuel_router
+from api.routes.data_quality_routes import router as data_quality_router
+from api.routes.cp_override_routes import router as cp_override_router
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from typing import List, Dict, Any
+from datetime import datetime
+
+# Import necessary components from your existing backend structure
+from backend.database import engine, init_db
+from backend.database_utils import init_mariapps_database
+from backend.pipeline.processor import save_to_db # Example import
+from backend.models import AnalysisData
+from api.routes.vessel_routes import get_db 
+from backend.auth import User, get_current_user
+
+# Setup logging for the FastAPI application
+log = logging.getLogger("uvicorn")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# --- Lifespan Management (Startup/Shutdown Events) ---
+
+# Single-leader guard for the one-shot ISO 19030 startup backfill (step 5
+# below) — same port-bind trick as the Fleet Status (65432) and Email
+# (65433) schedulers, on its own port so it doesn't collide with either.
+_iso_backfill_socket = None
+
+def _try_claim_iso_backfill_leader():
+    """True if this worker should run the ISO19030 startup backfill; False if
+    another worker (this boot) already claimed it. The socket is left open
+    for the process lifetime purely to hold the port, matching the existing
+    schedulers' convention."""
+    import socket
+    global _iso_backfill_socket
+    try:
+        _iso_backfill_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        _iso_backfill_socket.bind(("127.0.0.1", 65434))
+        return True
+    except socket.error:
+        return False
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- STARTUP EVENT ---
+    log.info("🚀 FastAPI Application Startup: Initializing Database Schema and Data Sources")
+    
+    # 1. Initialize WNI/General DB Schema (Creates tables, seeds providers)
+    try:
+        init_db()
+        log.info("✅ WNI/Core Database initialized.")
+    except Exception as e:
+        log.error(f"Failed to initialize core database: {e}")
+        # In a real app, you might raise an exception here to stop startup
+
+    # 1b. Ensure per-source scrape flags exist on `vessels` (wni_enabled /
+    #     mari_enabled) so the ORM model matches the DB. Idempotent — adds the
+    #     columns if missing and seeds only NULLs. Prevents "column does not
+    #     exist" errors on existing databases after deploy.
+    try:
+        from backend.database import _ensure_scrape_flags
+        _ensure_scrape_flags()
+        log.info("✅ Vessel scrape flags (wni_enabled/mari_enabled) ensured.")
+    except Exception as e:
+        log.error(f"Failed to ensure vessel scrape flags: {e}")
+
+    # 2. Initialize MariApps specific schema changes
+    try:
+        init_mariapps_database()
+        log.info("✅ MariApps specific database schema adjustments complete.")
+    except Exception as e:
+        log.error(f"Failed to initialize MariApps database utilities: {e}")
+
+    # 3. Backfill AE_FOC_MT for existing rows where it is NULL.
+    #    WNI:       map_analysis_row() never set AE_FOC_MT — pull from noon_report_data.ae_total_cons
+    #    MariApps:  fuel search term "Aux Engine" didn't match "Auxilary Engine" (MariApps typo)
+    #               — pull directly from raw_mariapps_logs.raw_json Excel_Data
+    # Both queries are idempotent (only touch rows where AE_FOC_MT IS NULL).
+
+    # 3a. MariApps backfill
+    try:
+        from sqlalchemy import text as _text
+        from backend.database import engine as _eng
+        with _eng.connect() as _conn:
+            result = _conn.execute(_text("""
+                UPDATE analysis_data a
+                SET    "AE_FOC_MT" = (
+                    TRIM(r.raw_json->'Excel_Data'->>'Auxilary Engine Consumption (MT) - AE Total Cons')
+                )::float
+                FROM   raw_mariapps_logs r
+                WHERE  r.id            = a.raw_mariapps_id
+                  AND  a."AE_FOC_MT"  IS NULL
+                  AND  a.source_id    = 'mari_apps'
+                  AND  TRIM(COALESCE(
+                         r.raw_json->'Excel_Data'->>'Auxilary Engine Consumption (MT) - AE Total Cons',
+                         ''
+                       )) ~ '^[0-9]+\\.?[0-9]*$'
+            """))
+            _conn.commit()
+            log.info(f"✅ AE_FOC_MT MariApps backfill: {result.rowcount} rows updated.")
+    except Exception as e:
+        log.error(f"AE_FOC_MT MariApps backfill failed: {e}")
+
+    # 3b. WNI backfill — pull ae_total_cons from noon_report_data (already mapped by map_row())
+    # Backfill AE_FOC_MT for existing WNI analysis_data rows where it is NULL.
+    #    Root cause: map_analysis_row() in pipeline/mapping.py never set AE_FOC_MT.
+    #    Fix: pull ae_total_cons from noon_report_data (already computed by map_row).
+    #    This is idempotent — only touches rows where AE_FOC_MT IS NULL.
+    try:
+        from sqlalchemy import text as _text
+        from backend.database import engine as _eng
+        with _eng.connect() as _conn:
+            result = _conn.execute(_text("""
+                UPDATE analysis_data a
+                SET    "AE_FOC_MT" = n.ae_total_cons::float
+                FROM   noon_report_data n
+                WHERE  n.raw_report_id = a.raw_report_id
+                  AND  a."AE_FOC_MT"  IS NULL
+                  AND  a.source_id    = 'wni'
+                  AND  n.ae_total_cons IS NOT NULL
+            """))
+            _conn.commit()
+            log.info(f"✅ AE_FOC_MT backfill: {result.rowcount} WNI rows updated.")
+    except Exception as e:
+        log.error(f"AE_FOC_MT backfill failed: {e}")
+
+    # 3c. BF_Wind backfill — Beaufort per analysis_data row (drives CP fair-weather filter).
+    #     WNI:      from noon_report_data.true_wind_force (already mapped by map_row)
+    #     MariApps: from raw_mariapps_logs.raw_json Excel_Data 'True Wind Force (Bft)'
+    #     Both idempotent — only touch rows where "BF_Wind" IS NULL.
+    try:
+        from sqlalchemy import text as _text
+        from backend.database import engine as _eng
+        with _eng.connect() as _conn:
+            wni_res = _conn.execute(_text("""
+                UPDATE analysis_data a
+                SET    "BF_Wind" = n.true_wind_force
+                FROM   noon_report_data n
+                WHERE  n.raw_report_id = a.raw_report_id
+                  AND  a."BF_Wind"     IS NULL
+                  AND  a.source_id     = 'wni'
+                  AND  n.true_wind_force IS NOT NULL
+            """))
+            mari_res = _conn.execute(_text("""
+                UPDATE analysis_data a
+                SET    "BF_Wind" = TRIM(r.raw_json->'Excel_Data'->>'True Wind Force (Bft)')::float
+                FROM   raw_mariapps_logs r
+                WHERE  r.id          = a.raw_mariapps_id
+                  AND  a."BF_Wind"   IS NULL
+                  AND  a.source_id   = 'mari_apps'
+                  AND  TRIM(COALESCE(
+                         r.raw_json->'Excel_Data'->>'True Wind Force (Bft)', ''
+                       )) ~ '^[0-9]+\\.?[0-9]*$'
+            """))
+            _conn.commit()
+            log.info(f"✅ BF_Wind backfill: {wni_res.rowcount} WNI, {mari_res.rowcount} MariApps rows updated.")
+    except Exception as e:
+        log.error(f"BF_Wind backfill failed: {e}")
+
+    # 4. Set up expanded flat tables (creates + backfills on first run)
+    try:
+        from backend.pipeline.expander import setup_expanded_tables
+        from backend.database import engine as db_engine
+        setup_expanded_tables(db_engine)
+        log.info("✅ Expanded tables ready.")
+    except Exception as e:
+        log.error(f"Failed to setup expanded tables: {e}")
+
+    # 4b. Genuine-WNI-extras backfill — populate STW / Apparent Slip / Swell Height
+    #     for existing expanded_wni_data rows (the full backfill_wni only re-runs on
+    #     a schema rebuild). New WNI records get these via the live write path.
+    #     Idempotent: only fills rows where the target column is still NULL.
+    try:
+        from sqlalchemy import text as _text
+        from backend.database import engine as _eng
+        with _eng.connect() as _conn:
+            res = _conn.execute(_text("""
+                UPDATE expanded_wni_data e
+                SET "Vessel_STW_avg_operational_LF"
+                        = COALESCE(e."Vessel_STW_avg_operational_LF",       r.raw_json->>'Speed_TW Spd. (kts)'),
+                    "VoyageMeta_apparent_slip_operational_LF"
+                        = COALESCE(e."VoyageMeta_apparent_slip_operational_LF", r.raw_json->>'Engine_Slip (%)'),
+                    "Weather_Hsl_avg_operational_LF"
+                        = COALESCE(e."Weather_Hsl_avg_operational_LF",       r.raw_json->>'Wave (WNI)_Swell Hgt. (m)')
+                FROM raw_noon_reports r
+                WHERE r.id = e.raw_report_id
+                  AND (e."Vessel_STW_avg_operational_LF"        IS NULL
+                    OR e."VoyageMeta_apparent_slip_operational_LF" IS NULL
+                    OR e."Weather_Hsl_avg_operational_LF"        IS NULL)
+            """))
+            _conn.commit()
+            log.info(f"✅ WNI extras backfill (STW/slip/swell): {res.rowcount} rows touched.")
+    except Exception as e:
+        log.error(f"WNI extras backfill failed: {e}")
+
+    # 5. ISO 19030 backfill — process all existing analysis_data records for
+    #    any vessel that already has an ISO config saved.
+    #    Idempotent: uses ON CONFLICT UPDATE so re-running is safe.
+    #    Skipped if no vessel has ISO config yet (user hasn't set it up).
+    #
+    #    Single-leader guard (same port-bind trick as the Fleet Status/Email
+    #    schedulers below) — found 2026-09: with no guard, every Gunicorn
+    #    worker independently re-ran this FLEET-WIDE backfill on its own
+    #    boot. When several workers restarted together, that meant several
+    #    full backfills firing simultaneously on top of normal request
+    #    traffic, and this was a major contributor to a Postgres
+    #    connection-pool exhaustion incident (a client PDF export failed
+    #    mid-request when the DB briefly had no free connection slots left).
+    #    This step is one-shot at startup (not a recurring loop like the
+    #    schedulers), so the socket only needs to be claimed once per
+    #    process — but it's kept open for the process lifetime anyway
+    #    (never closed), matching the existing schedulers' convention, so a
+    #    later worker restart can still correctly detect "someone else has
+    #    this" for as long as an earlier worker is still alive.
+    if _try_claim_iso_backfill_leader():
+        try:
+            from sqlalchemy import text as _text
+            from backend.database import engine as _eng
+            from backend.iso19030.runner import run_for_vessel
+            from backend.database import SessionLocal as _SL
+
+            with _eng.connect() as _conn:
+                configured_vessels = _conn.execute(_text(
+                    "SELECT vessel_imo FROM vessel_iso_config"
+                )).fetchall()
+
+            if configured_vessels:
+                db = _SL()
+                try:
+                    for (imo,) in configured_vessels:
+                        log.info(f"ISO 19030 backfill: processing {imo} …")
+                        summary = run_for_vessel(imo, db)
+                        log.info(
+                            f"✅ ISO 19030 backfill {imo}: "
+                            f"{summary['pass']} PASS, {summary['excl']} EXCL, "
+                            f"{summary['errors']} errors"
+                        )
+                finally:
+                    db.close()
+            else:
+                log.info("ISO 19030 backfill: no configured vessels yet — skipping.")
+        except Exception as e:
+            log.error(f"ISO 19030 backfill failed: {e}")
+    else:
+        log.info("ISO 19030 backfill: already claimed by another worker this boot. Skipping in this process.")
+
+    # NOTE: You might want to run your historical importers (like import_history.py) 
+    # here if you want them to run once upon application start, but typically 
+    # importers are run as separate cron jobs or CLI commands.
+
+    # 6. Start Fleet Status background scheduler
+    threading.Thread(target=_fleet_status_scheduler, daemon=True).start()
+    
+    # 7. Start Email Scraper background scheduler
+    threading.Thread(target=_email_scraper_scheduler, daemon=True).start()
+    
+    yield
+    
+    # --- SHUTDOWN EVENT ---
+    log.info("🛑 FastAPI Application Shutdown")
+    # Signal the fleet-status scheduler to stop sleeping
+    _fleet_stop_event.set()
+    _email_stop_event.set()
+    # Clean up resources if necessary (e.g., closing Playwright browser instances if they were global)
+
+
+# ============================================================
+# FLEET STATUS BACKGROUND SCHEDULER
+# ============================================================
+
+_fleet_stop_event = threading.Event()
+_fleet_scheduler_socket = None
+
+def _fleet_status_scheduler():
+    """
+    Daemon thread: runs run_fleet_status_only() once immediately on startup,
+    then repeats every FLEET_STATUS_INTERVAL_MINUTES minutes.
+    Set FLEET_STATUS_INTERVAL_MINUTES=0 in .env to disable.
+    """
+    import time
+    import socket
+    _log = logging.getLogger("fleet_scheduler")
+    
+    # Prevent multiple Gunicorn workers from running this simultaneously
+    global _fleet_scheduler_socket
+    try:
+        _fleet_scheduler_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        _fleet_scheduler_socket.bind(("127.0.0.1", 65432))
+    except socket.error:
+        _log.info("[FLEET_SCHED]  Scheduler already running in another worker. Skipping in this process.")
+        return
+
+    interval_minutes = int(os.getenv("FLEET_STATUS_INTERVAL_MINUTES", "30"))
+    if interval_minutes <= 0:
+        _log.info("[FLEET_SCHED]  Disabled (FLEET_STATUS_INTERVAL_MINUTES=0)")
+        return
+
+    _log.info(f"[FLEET_SCHED]  Scheduler started — interval={interval_minutes}min")
+
+    while not _fleet_stop_event.is_set():
+        try:
+            from backend.pipeline.main_pipeline import run_fleet_status_only
+            _log.info("[FLEET_SCHED]  Triggering fleet status scrape ...")
+            run_fleet_status_only()
+            _log.info("[FLEET_SCHED]  Scrape done. Next run in %d minutes.", interval_minutes)
+        except Exception as e:
+            _log.error(f"[FLEET_SCHED]  Scrape error: {e}", exc_info=True)
+
+        # Sleep in small chunks so shutdown signal is detected quickly
+        for _ in range(interval_minutes * 60):
+            if _fleet_stop_event.is_set():
+                break
+            time.sleep(1)
+
+    _log.info("[FLEET_SCHED]  Scheduler stopped.")
+
+
+# ============================================================
+# EMAIL SCRAPER BACKGROUND SCHEDULER
+# ============================================================
+
+_email_stop_event = threading.Event()
+_email_scheduler_socket = None
+
+def _email_scraper_scheduler():
+    """
+    Daemon thread: runs check_inbox() once immediately on startup,
+    then repeats every EMAIL_SCRAPER_INTERVAL_MINUTES minutes.
+    """
+    import time
+    import socket
+    _log = logging.getLogger("email_scheduler")
+    
+    # Prevent multiple Gunicorn workers from running this simultaneously
+    global _email_scheduler_socket
+    try:
+        _email_scheduler_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        _email_scheduler_socket.bind(("127.0.0.1", 65433)) # Use a different port
+    except socket.error:
+        _log.info("[EMAIL_SCHED]  Scheduler already running in another worker. Skipping in this process.")
+        return
+
+    interval_minutes = int(os.getenv("EMAIL_SCRAPER_INTERVAL_MINUTES", "15"))
+    if interval_minutes <= 0:
+        _log.info("[EMAIL_SCHED]  Disabled (EMAIL_SCRAPER_INTERVAL_MINUTES=0)")
+        return
+
+    _log.info(f"[EMAIL_SCHED]  Scheduler started — interval={interval_minutes}min")
+
+    while not _email_stop_event.is_set():
+        try:
+            from backend.pipeline.email_scraper import check_inbox
+            _log.info("[EMAIL_SCHED]  Triggering email inbox check ...")
+            check_inbox()
+            _log.info("[EMAIL_SCHED]  Inbox check done. Next run in %d minutes.", interval_minutes)
+        except Exception as e:
+            _log.error(f"[EMAIL_SCHED]  Scrape error: {e}", exc_info=True)
+
+        # Sleep in small chunks so shutdown signal is detected quickly
+        for _ in range(interval_minutes * 60):
+            if _email_stop_event.is_set():
+                break
+            time.sleep(1)
+
+    _log.info("[EMAIL_SCHED]  Scheduler stopped.")
+
+
+# --- FastAPI Application Setup ---
+app = FastAPI(
+    title="Maritime Data Backend",
+    description="API for managing WNI, MariApps, and Eyegauge data ingestion.",
+    version="0.1.0",
+    lifespan=lifespan
+)
+# --- CORS CONFIGURATION ---
+# --- LOCAL (original hardcoded origins — uncomment to use) ---
+# origins = [
+#     "http://localhost:3000",
+#     "http://127.0.0.1:3000",
+#     "http://localhost:5173",
+#     "http://localhost:5174",
+# ]
+# --- VM / CROSS-PLATFORM (env var CORS_ORIGINS, comma-separated; default = local dev origins) ---
+_cors_env = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:5174")
+origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # Allow requests from these origins
+    allow_credentials=False, # Allow cookies/credentials (important if you use session auth)
+    allow_methods=["*"],    # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],    # Allow all headers
+)
+# --- Register Routes ---
+app.include_router(vessel_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(expanded_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(vessel_design_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(iso_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(sync_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(cp_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(column_pref_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(column_config_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(cp_description_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(cp_compliance_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(emission_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(bunker_report_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(biofuel_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(data_quality_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(cp_override_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+
+
+# --- DEFINE /analysis/query ENDPOINT DIRECTLY HERE ---
+# This bypasses potential issues with router registration for this specific endpoint.
+@app.post("/analysis/query", response_model=List[Dict[str, Any]])
+async def query_analysis_data_direct(filters: dict, db: Session = Depends(get_db), _user: User = Depends(get_current_user)):
+    """
+    Fetches analysis data based on provided filters (voyageNo, fromDate, toDate, loadingConditions).
+    """
+    try:
+        # Extract filters from the request body
+        voyage_no = filters.get("voyageNo")
+        from_date_str = filters.get("fromDate")
+        to_date_str = filters.get("toDate")
+        loading_conditions = filters.get("loadingConditions", [])
+
+        # --- Build the base query ---
+        query = db.query(AnalysisData)
+
+        # --- Apply filters ---
+        if voyage_no:
+            query = query.filter(AnalysisData.Voyage_No == voyage_no)
+        
+        if from_date_str:
+            from_date = datetime.strptime(from_date_str, '%Y-%m-%d')
+            query = query.filter(AnalysisData.Date >= from_date)
+        
+        if to_date_str:
+            to_date = datetime.strptime(to_date_str, '%Y-%m-%d')
+            query = query.filter(AnalysisData.Date <= to_date)
+        
+        if loading_conditions:
+            query = query.filter(AnalysisData.Loading_Cond.in_(loading_conditions))
+
+        # --- Execute the query ---
+        results = query.all()
+
+        # --- Format results ---
+        analysis_results = []
+        for row in results:
+            row_dict = {
+                "id": row.id, "Voyage_No": row.Voyage_No, "Loading_Cond": row.Loading_Cond,
+                "From_Port": row.From_Port, "To_Port": row.To_Port,
+                "Date": row.Date.isoformat() if row.Date else None, "Record_ID": row.Record_ID,
+                "ME_FOC_MT": row.ME_FOC_MT, "Duration_h": row.Duration_h,
+                "vlsfo": row.ME_FOC_MT, "lsmgo": row.AE_FOC_MT, "bio": row.AE_FOC_MT,
+                "timeSaved": row.Duration_h
+            }
+            analysis_results.append(row_dict)
+
+        return analysis_results
+
+    except Exception as e:
+        logging.error(f"Error in /analysis/query endpoint: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to load analysis: {e}")
+# --- END OF DIRECTLY DEFINED ENDPOINT ---
+
+
+# --- Root Endpoint ---
+@app.get("/")
+async def root():
+    return {"message": "Backend Service Running", "status": "OK"}
+
+
+@app.get("/health")
+@app.get("/api/health")
+async def health():
+    return {"status": "ok"}
+
+# --- Example Endpoint to trigger a pipeline function (Optional) ---
+# This shows how you would call your existing logic from a route
+# @app.post("/pipeline/import_history")
+# async def trigger_history_import():
+#     from backend.pipeline.import_history import import_historical_data
+#     # Note: Running blocking I/O like Playwright in an async endpoint requires
+#     # running it in a thread pool executor (using run_in_executor), 
+#     # but for simple testing, we'll just log it.
+#     log.warning("Triggering import_historical_data. This is a blocking call and should be handled asynchronously in production.")
+#     # import_historical_data() # Don't run blocking code directly in production API routes!
+#     return {"status": "Import triggered (check logs for execution status)"}
+
+# --- Example Endpoint to trigger a reporting function (Optional) ---
+# @app.post("/reporting/run_weekly")
+# async def trigger_weekly_report():
+#     from backend.reporting.run_weekly_report import main as run_weekly_main
+#     # This is also blocking I/O (DB queries + Email sending)
+#     log.warning("Triggering weekly report generation. This is a blocking call.")
+#     # run_weekly_main() # Again, handle blocking tasks via background tasks or Celery in production
+#     return {"status": "Weekly report generation initiated (check logs)"}

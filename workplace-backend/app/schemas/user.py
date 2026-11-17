@@ -15,6 +15,7 @@ class UserCreate(BaseModel):
         "voyage": False, "lubeoil": False,
         "engine_performance": False,
         "orb": False,
+        "vessel_performance": False,
         "incident_report": False,
         "incident_create": False,
     }

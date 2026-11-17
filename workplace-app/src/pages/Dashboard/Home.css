@@ -253,6 +253,19 @@
   background: #0e7490;
 }
 
+.hm-card-vp .hm-icon-container {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.hm-card-vp:hover {
+  border-color: rgba(67, 56, 202, 0.3);
+}
+
+.hm-card-vp:hover .hm-icon-container {
+  background: #4338ca;
+}
+
 .hm-card-incident .hm-icon-container {
   background: #fff1f0;
   color: #c2410c;

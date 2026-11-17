@@ -1,0 +1,185 @@
+import datetime
+import hashlib
+import logging
+import pandas as pd
+from ..database import SessionLocal
+from ..models import Vessel, RawNoonReport, NoonReportData, AnalysisData, DataQualityLog, VesselParticulars
+from .mapping import map_row, map_analysis_row
+
+def clean_dict(d):
+    """Replaces NaN with None so Postgres accepts JSONB"""
+    return {k: (None if pd.isna(v) else v) for k, v in d.items()}
+
+def get_audit_label(source_id):
+    """Generates a label like 'WNI-FEB-W1-2026'"""
+    now = datetime.datetime.now() # Use full datetime module
+    source_tag = str(source_id).upper()
+    month = now.strftime('%b').upper()
+    week_of_month = (now.day - 1) // 7 + 1
+    year = now.year
+    return f"{source_tag}-{month}-W{week_of_month}-{year}"
+
+def save_to_db(vessel_name_raw, raw_data_dict, file_name):
+    db = SessionLocal()
+    try:
+        # 1. Vessel Lookup
+        clean_name = vessel_name_raw.split("/")[0].strip()
+        vessel = db.query(Vessel).filter(Vessel.vessel_name.ilike(clean_name)).first()
+        if not vessel:
+            logging.error(f"Vessel '{clean_name}' not found in DB.")
+            return "error"
+
+        cleaned_json = clean_dict(raw_data_dict)
+        
+        # 1. CREATE PRECISE FINGERPRINT
+        # We use the full Date string (Time included) and Event Type
+        raw_date_str = str(cleaned_json.get("Date", "")).strip()
+        event_type = str(cleaned_json.get("Event Type", "")).strip().upper()
+        
+        fp_str = f"{vessel.imo_number}|{raw_date_str}|{event_type}"
+        fingerprint = hashlib.sha256(fp_str.encode()).hexdigest()
+
+        # 3. CHECK IF DUPLICATE / CORRECTED
+        # Identity alone (fingerprint) can't tell "already seen, unchanged"
+        # from "already seen, but corrected since" — both share the same
+        # vessel|date|event_type. WNI's CSV re-download already covers a wide
+        # historical range on every run (no cheap pre-filter to bypass, unlike
+        # MariApps' per-log detail-tab open), so every row already reaches
+        # this point every run regardless of age — compare content directly
+        # rather than adding a separate recheck-window concept here.
+        existing_raw = db.query(RawNoonReport).filter(RawNoonReport.fingerprint == fingerprint).first()
+        is_correction = False
+
+        if existing_raw is not None:
+            if cleaned_json == existing_raw.raw_json:
+                db.add(DataQualityLog(
+                    raw_report_id=existing_raw.id,
+                    source_id="wni",
+                    vessel_name=vessel.vessel_name,
+                    vessel_imo=vessel.imo_number,
+                    issue_type="DUPLICATE_REPORT",
+                    event_type=cleaned_json.get('Event Type'),
+                    report_date=pd.to_datetime(cleaned_json.get('Date'), errors='coerce'),
+                    audit_period=get_audit_label("wni")
+                ))
+                db.commit()
+                return "duplicate"
+
+            # Content differs from what's stored — a genuine correction.
+            # Update the existing raw row and its derived rows in place
+            # instead of discarding it (previously: ANY correction to an
+            # already-staged WNI report was invisible forever — confirmed
+            # 2026-10 via the same gap found on the MariApps side).
+            is_correction = True
+            existing_raw.raw_json = cleaned_json
+            db.add(DataQualityLog(
+                raw_report_id=existing_raw.id,
+                source_id="wni",
+                vessel_name=vessel.vessel_name,
+                vessel_imo=vessel.imo_number,
+                issue_type="REPORT_CORRECTED",
+                event_type=cleaned_json.get('Event Type'),
+                report_date=pd.to_datetime(cleaned_json.get('Date'), errors='coerce'),
+                audit_period=get_audit_label("wni")
+            ))
+            raw_id = existing_raw.id
+            db.flush()
+        else:
+            # 4. SAVE RAW (The Staging layer)
+            raw_rec = RawNoonReport(
+                vessel_imo=vessel.imo_number,
+                source_id="wni",
+                raw_json=cleaned_json,
+                file_name=file_name,
+                fingerprint=fingerprint,
+                is_duplicate=False,
+            )
+            db.add(raw_rec)
+            db.flush()
+            raw_id = raw_rec.id
+
+        # 5. SAVE NOON REPORT (160 Columns)
+        noon_data = map_row(cleaned_json).to_dict()
+
+        # MANDATORY FIELD CHECK
+        if not noon_data.get('log_date_utc') or not noon_data.get('log_type'):
+            logging.error(f"Mandatory fields missing for {vessel.vessel_name}")
+            db.rollback()
+            return "error"
+
+        _noon_valid_cols = set(NoonReportData.__table__.columns.keys())
+        noon_data_filtered = {k: v for k, v in clean_dict(noon_data).items() if k in _noon_valid_cols}
+        existing_noon = (
+            db.query(NoonReportData).filter_by(raw_report_id=raw_id).first()
+            if is_correction else None
+        )
+        if existing_noon:
+            for k, v in noon_data_filtered.items():
+                setattr(existing_noon, k, v)
+        else:
+            db.add(NoonReportData(
+                **noon_data_filtered,
+                vessel_imo=vessel.imo_number,
+                source_id="wni",
+                raw_report_id=raw_id
+            ))
+
+         # 6. FETCH VESSEL SPECS AND SAVE ANALYSIS DATA
+        specs = db.query(VesselParticulars).filter(VesselParticulars.vessel_imo == vessel.imo_number).first()
+
+        if not specs:
+            logging.warning(f"No VesselParticulars found for IMO {vessel.imo_number}. Using defaults.")
+
+        analysis_data = map_analysis_row(cleaned_json, specs=specs)
+
+        _analysis_valid_cols = set(AnalysisData.__table__.columns.keys())
+        analysis_data_filtered = {k: v for k, v in clean_dict(analysis_data).items() if k in _analysis_valid_cols}
+        existing_analysis = (
+            db.query(AnalysisData).filter_by(raw_report_id=raw_id).first()
+            if is_correction else None
+        )
+        if existing_analysis:
+            for k, v in analysis_data_filtered.items():
+                setattr(existing_analysis, k, v)
+        else:
+            db.add(AnalysisData(
+                **analysis_data_filtered,
+                vessel_imo=vessel.imo_number,
+                source_id="wni",
+                raw_report_id=raw_id
+            ))
+
+        db.commit()
+
+        # ── Live-sync to expanded_wni_data (non-critical) ────────────────────
+        # write_expanded_wni() upserts by raw_report_id (ON CONFLICT DO
+        # UPDATE), so this is correct for both a fresh insert and a correction.
+        try:
+            from ..pipeline.expander import write_expanded_wni
+            write_expanded_wni(db, raw_id, vessel.imo_number, cleaned_json)
+            db.commit()
+        except Exception as exc:
+            logging.warning(f"Expanded WNI write failed (non-critical): {exc}")
+
+        # ── ISO 19030 calculation for this record (non-critical) ──────────────
+        try:
+            from ..iso19030.runner import run_single
+            # Find the analysis_data id just inserted/updated
+            ad = db.query(AnalysisData).filter(
+                AnalysisData.raw_report_id == raw_id
+            ).first()
+            if ad:
+                run_single(ad.id, db)
+                db.commit()
+        except Exception as exc:
+            logging.warning(f"ISO 19030 calc failed (non-critical): {exc}")
+
+        return "success"
+
+    except Exception as e:
+        db.rollback()
+        logging.error(f"DB Error for {vessel_name_raw}: {e}")
+        return "error"
+    
+    finally:
+        db.close()

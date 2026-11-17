@@ -1,0 +1,683 @@
+import { useState, useEffect, useCallback } from 'react'
+import { memoryStore } from '../utils/memoryStore'
+import { Loader2, AlertTriangle, Droplet, Plus, Pencil, Trash2, X, Info, Link2, Download } from 'lucide-react'
+import {
+  fetchVessels, fetchBiofuelStems, fetchBiofuelBunkerCandidates,
+  createBiofuelStem, updateBiofuelStem, deleteBiofuelStem,
+  fetchBiofuelPoS, createBiofuelPoS, updateBiofuelPoS, deleteBiofuelPoS,
+} from '../api/vesselApi'
+import './BiofuelCalcPage.css'
+
+// This page rebuilds the "Biofuel_Calc" worksheet in the client's
+// Unified_Emissions_2026_v6 - Final.xlsx — same input columns (A-I, R on that
+// sheet), same calculated columns (J-Q, S, T), same weighted-average summary
+// row. See backend/emission/biofuel_calculator.py for the cell-by-cell formula
+// citations. The one deliberate departure (client Emission Reference Check,
+// 2026-10): biofuel WtW is no longer the sheet's fixed 16.38. Proof of
+// Sustainability records are held separately (section C), each stem links to
+// one with an allocated quantity, and WtW = E + 1.48 (FAME) / + 2.74
+// (bio-methanol); with no PoS the HFO fossil default applies.
+
+const BASE_GRADES = ['HFO', 'LFO', 'MDO']
+const INPUT_BASES = ['Mass%', 'Vol%']
+const POS_TYPES = { 'FAME Biodiesel': 1.48, 'Bio-methanol': 2.74 }
+
+const EMPTY_FORM = {
+  bunker_report_id: null, bdn_number: '', delivery_date: '', port: '', base_fuel_grade: 'HFO',
+  biofuel_type: 'FAME Biodiesel', input_basis: 'Mass%', bio_pct: '', rho_base: '', rho_bio: '', quantity_mt: '',
+  pos_id: '', pos_allocated_mt: '',
+}
+const EMPTY_POS = { pos_reference: '', supplier: '', biofuel_type: 'FAME Biodiesel', emission_intensity: '', quantity_mt: '', notes: '' }
+
+const fmt = (v, d = 2) => (v === null || v === undefined || isNaN(v) ? '—' : (+v).toFixed(d))
+
+// Same client-side ExcelJS pattern used on the other Emission pages — one row
+// per stem plus the weighted-average/total summary row, matching the on-screen
+// table exactly (both the input columns and the calculated ones).
+async function exportBiofuelStemsExcel(stems, summary, vesselName) {
+  const ExcelJS = (await import('exceljs')).default
+  const { saveAs } = (await import('file-saver')).default
+
+  const cols = [
+    { key: 'bdn_number', header: 'BDN #', width: 14 },
+    { key: 'delivery_date', header: 'Date', width: 12 },
+    { key: 'port', header: 'Port', width: 18 },
+    { key: 'base_fuel_grade', header: 'Base Fuel', width: 10 },
+    { key: 'biofuel_type', header: 'Biofuel Type', width: 16 },
+    { key: 'input_basis', header: 'Input Basis', width: 12 },
+    { key: 'bio_pct', header: 'Bio %', width: 10 },
+    { key: 'rho_base', header: 'rho Base', width: 10 },
+    { key: 'rho_bio', header: 'rho Bio', width: 10 },
+    { key: 'bio_pct_by_mass', header: 'Bio % by Mass', width: 14 },
+    { key: 'cf_base', header: 'Cf Base (t/t)', width: 12 },
+    { key: 'cf_blend', header: 'Cf Blend (t/t)', width: 12 },
+    { key: 'lcv_base', header: 'LCV Base', width: 10 },
+    { key: 'lcv_bio', header: 'LCV Bio', width: 10 },
+    { key: 'wtw_base', header: 'WtW Base', width: 10 },
+    { key: 'wtw_bio', header: 'WtW Bio', width: 10 },
+    { key: 'wtw_bio_source', header: 'WtW Bio Source', width: 24 },
+    { key: 'wtw_blend', header: 'WtW Blend', width: 10 },
+    { key: 'quantity_mt', header: 'Total Qty (MT)', width: 14 },
+    { key: 'fossil_portion_mt', header: 'Fossil (MT)', width: 12 },
+    { key: 'bio_portion_mt', header: 'Bio (MT)', width: 12 },
+    { key: 'pos_reference', header: 'PoS', width: 16 },
+    { key: 'pos_allocated_mt', header: 'PoS Allocated (MT)', width: 16 },
+  ]
+
+  const workbook = new ExcelJS.Workbook()
+  const sheet = workbook.addWorksheet('Bunker Stems', { views: [{ state: 'frozen', ySplit: 1 }] })
+  sheet.columns = cols.map(c => ({ header: c.header, key: c.key, width: c.width }))
+
+  const headerRow = sheet.getRow(1)
+  headerRow.height = 22
+  headerRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } }
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 }
+    cell.alignment = { horizontal: 'center', vertical: 'middle' }
+  })
+
+  stems.forEach((s, idx) => {
+    const excelRow = sheet.addRow(s)
+    if (idx % 2 === 1) {
+      excelRow.eachCell(cell => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEBF0FA' } }
+      })
+    }
+  })
+
+  if (summary) {
+    const summaryRow = sheet.addRow({
+      bdn_number: 'WEIGHTED AVG / TOTAL',
+      cf_blend: summary.cf_blend_avg,
+      wtw_blend: summary.wtw_blend_avg,
+      quantity_mt: summary.total_qty_mt,
+      fossil_portion_mt: summary.total_fossil_mt,
+      bio_portion_mt: summary.total_bio_mt,
+    })
+    summaryRow.font = { bold: true }
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const safeName = (vesselName || 'Vessel').replace(/[^a-z0-9]+/gi, '_')
+  saveAs(blob, `${safeName}_Biofuel_Calc_${new Date().toISOString().slice(0, 10)}.xlsx`)
+}
+
+function StemModal({ imo, initial, posList, onClose, onSaved }) {
+  const [form, setForm] = useState(initial ? {
+    ...EMPTY_FORM,
+    ...Object.fromEntries(Object.entries(initial).map(([k, v]) => [k, v === null ? '' : v])),
+  } : EMPTY_FORM)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const [candidates, setCandidates] = useState([])
+  const [candidatesLoading, setCandidatesLoading] = useState(false)
+  // 'bunker' (pick a real scraped delivery) vs 'manual' (type everything by
+  // hand) — defaults to 'bunker' once candidates load if any exist and this
+  // is a new, unlinked stem; an existing linked stem always shows as bunker.
+  const [source, setSource] = useState(initial?.bunker_report_id ? 'bunker' : 'manual')
+  const isEdit = !!initial
+  const isVol = form.input_basis === 'Vol%'
+  const isLinked = !!form.bunker_report_id
+
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  useEffect(() => {
+    if (isEdit) return  // don't offer re-picking a source on an existing stem
+    setCandidatesLoading(true)
+    fetchBiofuelBunkerCandidates(imo)
+      .then(list => { setCandidates(list); if (list.length > 0) setSource('bunker') })
+      .catch(() => setCandidates([]))
+      .finally(() => setCandidatesLoading(false))
+  }, [imo, isEdit])
+
+  function set(field, val) { setForm(f => ({ ...f, [field]: val })) }
+
+  function pickCandidate(bunkerReportId) {
+    const c = candidates.find(x => String(x.bunker_report_id) === String(bunkerReportId))
+    if (!c) { setForm(f => ({ ...f, bunker_report_id: null })); return }
+    setForm(f => ({
+      ...f,
+      bunker_report_id: c.bunker_report_id,
+      bdn_number: c.bdn_number || '',
+      delivery_date: c.delivery_date || '',
+      port: c.port || '',
+      base_fuel_grade: c.base_fuel_grade || f.base_fuel_grade,
+      quantity_mt: c.quantity_mt ?? '',
+    }))
+  }
+
+  function switchToManual() {
+    setSource('manual')
+    setForm(f => ({ ...f, bunker_report_id: null }))
+  }
+
+  async function handleSave() {
+    setError(null)
+    const payload = {
+      vessel_imo: imo,
+      bunker_report_id: form.bunker_report_id || null,
+      bdn_number: form.bdn_number || null,
+      delivery_date: form.delivery_date || null,
+      port: form.port || null,
+      base_fuel_grade: form.base_fuel_grade,
+      biofuel_type: form.biofuel_type || 'FAME Biodiesel',
+      input_basis: form.input_basis,
+      bio_pct: Number(form.bio_pct) || 0,
+      rho_base: form.rho_base === '' ? null : Number(form.rho_base),
+      rho_bio: form.rho_bio === '' ? null : Number(form.rho_bio),
+      quantity_mt: Number(form.quantity_mt),
+      pos_id: form.pos_id === '' ? null : Number(form.pos_id),
+      pos_allocated_mt: form.pos_id === '' || form.pos_allocated_mt === '' ? null : Number(form.pos_allocated_mt),
+    }
+    if (source === 'bunker' && !isLinked) { setError('Select a bunker report from the list, or switch to manual entry.'); return }
+    if (!payload.quantity_mt || payload.quantity_mt <= 0) { setError('Total Qty (mt) must be a positive number.'); return }
+    if (payload.bio_pct < 0 || payload.bio_pct > 100) { setError('Bio % must be between 0 and 100.'); return }
+    if (isVol && (payload.rho_base === null || payload.rho_bio === null)) { setError('ρ Base and ρ Bio are required when Input Basis is Vol%.'); return }
+    setSaving(true)
+    try {
+      if (isEdit) await updateBiofuelStem(initial.id, payload)
+      else await createBiofuelStem(payload)
+      onSaved()
+    } catch (e) {
+      setError(e?.response?.data?.detail ?? 'Failed to save stem.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bf-modal-backdrop" onClick={onClose}>
+      <div className="bf-modal" onClick={e => e.stopPropagation()}>
+        <div className="bf-modal-header">
+          <span className="bf-modal-title">{isEdit ? 'Edit Bunker Stem' : 'Add Bunker Stem'}</span>
+          <button className="bf-modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="bf-modal-body">
+          {!isEdit && (
+            <div className="bf-source-toggle">
+              <button type="button" className={`bf-source-tab${source === 'bunker' ? ' active' : ''}`}
+                onClick={() => setSource('bunker')} disabled={candidatesLoading || candidates.length === 0}>
+                From Bunker Report {candidates.length > 0 ? `(${candidates.length})` : ''}
+              </button>
+              <button type="button" className={`bf-source-tab${source === 'manual' ? ' active' : ''}`} onClick={switchToManual}>
+                Manual Entry
+              </button>
+            </div>
+          )}
+
+          {!isEdit && source === 'bunker' && (
+            <div className="bf-candidate-picker">
+              {candidatesLoading && <div className="bf-empty small"><Loader2 size={13} className="icon-spin" /> Loading scraped deliveries…</div>}
+              {!candidatesLoading && candidates.length === 0 && (
+                <div className="bf-empty small">No scraped bunker deliveries for this vessel — use Manual Entry.</div>
+              )}
+              {!candidatesLoading && candidates.length > 0 && (
+                <select value={form.bunker_report_id || ''} onChange={e => pickCandidate(e.target.value)}>
+                  <option value="">— select a delivery —</option>
+                  {candidates.map(c => (
+                    <option key={c.bunker_report_id} value={c.bunker_report_id}>
+                      BDN {c.bdn_number || '—'} · {c.delivery_date || 'no date'} · {c.port || 'unknown port'} · {c.imo_fuel_grade || '?'} · {c.quantity_mt ?? '?'} MT
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {isEdit && isLinked && (
+            <div className="bf-linked-banner"><Link2 size={13} /> Linked to scraped bunker report — BDN #/Date/Port/Total Qty are read-only.</div>
+          )}
+
+          <div className="bf-form-grid">
+            <label className={isLinked ? 'bf-field-inactive' : ''}>BDN #
+              <input type="text" value={form.bdn_number} onChange={e => set('bdn_number', e.target.value)} disabled={isLinked} />
+            </label>
+            <label className={isLinked ? 'bf-field-inactive' : ''}>Date
+              <input type="date" value={form.delivery_date} onChange={e => set('delivery_date', e.target.value)} disabled={isLinked} />
+            </label>
+            <label className={isLinked ? 'bf-field-inactive' : ''}>Port
+              <input type="text" value={form.port} onChange={e => set('port', e.target.value)} disabled={isLinked} />
+            </label>
+            <label>Base Fuel
+              <select value={form.base_fuel_grade} onChange={e => set('base_fuel_grade', e.target.value)}>
+                {BASE_GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </label>
+            <label>Biofuel Type
+              <select value={form.biofuel_type} onChange={e => set('biofuel_type', e.target.value)}>
+                <option value="FAME Biodiesel">FAME Biodiesel</option>
+              </select>
+            </label>
+            <label>Input Basis
+              <select value={form.input_basis} onChange={e => set('input_basis', e.target.value)}>
+                {INPUT_BASES.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </label>
+            <label>Bio % {isVol ? '(by volume)' : '(by mass)'}
+              <input type="number" step="0.01" min="0" max="100" value={form.bio_pct} onChange={e => set('bio_pct', e.target.value)} />
+            </label>
+            <label className={isVol ? '' : 'bf-field-inactive'}>ρ Base (kg/m³)
+              <input type="number" step="1" value={form.rho_base} onChange={e => set('rho_base', e.target.value)} placeholder="e.g. 991 (HFO)" disabled={!isVol} />
+            </label>
+            <label className={isVol ? '' : 'bf-field-inactive'}>ρ Bio (kg/m³)
+              <input type="number" step="1" value={form.rho_bio} onChange={e => set('rho_bio', e.target.value)} placeholder="e.g. 880 (FAME)" disabled={!isVol} />
+            </label>
+            <label className={isLinked ? 'bf-field-inactive' : ''}>Total Qty (MT)
+              <input type="number" step="0.01" value={form.quantity_mt} onChange={e => set('quantity_mt', e.target.value)} disabled={isLinked} />
+            </label>
+            <label>Proof of Sustainability
+              <select value={form.pos_id} onChange={e => set('pos_id', e.target.value)}>
+                <option value="">— none (HFO default) —</option>
+                {posList.filter(p => p.biofuel_type === form.biofuel_type || String(p.id) === String(form.pos_id)).map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.pos_reference} · WtW {p.wtw.toFixed(2)} · {p.remaining_mt} mt left
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={form.pos_id === '' ? 'bf-field-inactive' : ''}>PoS Allocated (MT)
+              <input type="number" step="0.01" value={form.pos_allocated_mt} onChange={e => set('pos_allocated_mt', e.target.value)}
+                disabled={form.pos_id === ''} placeholder="blank = whole bio portion" />
+            </label>
+          </div>
+          <p className="bf-form-hint">
+            A PoS can serve several stems; total allocations can't exceed its quantity. Any bio portion not covered by
+            an allocation (or all of it, with no PoS) is priced at the HFO fossil default (FuelEU Art. 10(1)(a)).
+          </p>
+          <p className="bf-form-hint">
+            Densities from the BDN where stated; typical values: HFO ≈ 991, LFO ≈ 960, MDO ≈ 850, FAME
+            biofuel ≈ 880 kg/m³. ρ columns are only used when Input Basis = Vol% — Bio % by Mass is then
+            derived as (V%×ρ_bio) / ((1-V%)×ρ_base + V%×ρ_bio); with Mass%, Bio % is used as entered.
+          </p>
+          {error && <div className="bf-form-error"><AlertTriangle size={13} /> {error}</div>}
+        </div>
+        <div className="bf-modal-footer">
+          <button className="bf-btn secondary" onClick={onClose}>Cancel</button>
+          <button className="bf-btn" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PoSModal({ initial, onClose, onSaved }) {
+  const [form, setForm] = useState(initial ? {
+    ...EMPTY_POS,
+    ...Object.fromEntries(Object.entries(initial).map(([k, v]) => [k, v === null ? '' : v])),
+  } : EMPTY_POS)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const isEdit = !!initial
+  const adder = POS_TYPES[form.biofuel_type]
+  const e = form.emission_intensity === '' ? null : Number(form.emission_intensity)
+
+  useEffect(() => {
+    const onKey = ev => { if (ev.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  function set(field, val) { setForm(f => ({ ...f, [field]: val })) }
+
+  async function handleSave() {
+    setError(null)
+    const payload = {
+      pos_reference: form.pos_reference.trim(),
+      supplier: form.supplier || null,
+      biofuel_type: form.biofuel_type,
+      emission_intensity: Number(form.emission_intensity),
+      quantity_mt: Number(form.quantity_mt),
+      notes: form.notes || null,
+    }
+    if (!payload.pos_reference) { setError('PoS reference is required.'); return }
+    if (form.emission_intensity === '' || isNaN(payload.emission_intensity)) { setError('Emission intensity (E) is required.'); return }
+    if (!payload.quantity_mt || payload.quantity_mt <= 0) { setError('Quantity (mt) must be a positive number.'); return }
+    setSaving(true)
+    try {
+      if (isEdit) await updateBiofuelPoS(initial.id, payload)
+      else await createBiofuelPoS(payload)
+      onSaved()
+    } catch (err) {
+      setError(err?.response?.data?.detail ?? 'Failed to save PoS.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bf-modal-backdrop" onClick={onClose}>
+      <div className="bf-modal" onClick={ev => ev.stopPropagation()}>
+        <div className="bf-modal-header">
+          <span className="bf-modal-title">{isEdit ? 'Edit Proof of Sustainability' : 'Add Proof of Sustainability'}</span>
+          <button className="bf-modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="bf-modal-body">
+          <div className="bf-form-grid">
+            <label>PoS Reference
+              <input type="text" value={form.pos_reference} onChange={ev => set('pos_reference', ev.target.value)} placeholder="certificate / consignment no." />
+            </label>
+            <label>Supplier
+              <input type="text" value={form.supplier} onChange={ev => set('supplier', ev.target.value)} />
+            </label>
+            <label>Biofuel Type
+              <select value={form.biofuel_type} onChange={ev => set('biofuel_type', ev.target.value)}>
+                {Object.keys(POS_TYPES).map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </label>
+            <label>Emission Intensity E (gCO₂e/MJ)
+              <input type="number" step="0.01" value={form.emission_intensity} onChange={ev => set('emission_intensity', ev.target.value)} />
+            </label>
+            <label>Quantity covered (MT)
+              <input type="number" step="0.01" value={form.quantity_mt} onChange={ev => set('quantity_mt', ev.target.value)} />
+            </label>
+            <label>Notes
+              <input type="text" value={form.notes} onChange={ev => set('notes', ev.target.value)} />
+            </label>
+          </div>
+          <p className="bf-form-hint">
+            The PoS states the emission intensity E per consignment — not WtW. WtW = E + {adder} for {form.biofuel_type}
+            {e !== null && !isNaN(e) ? <> → <b>{(e + adder).toFixed(2)} gCO₂e/MJ</b></> : null}.
+          </p>
+          {error && <div className="bf-form-error"><AlertTriangle size={13} /> {error}</div>}
+        </div>
+        <div className="bf-modal-footer">
+          <button className="bf-btn secondary" onClick={onClose}>Cancel</button>
+          <button className="bf-btn" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function BiofuelCalcPage() {
+  const [vessels, setVessels] = useState([])
+  const [selectedImo, setImo] = useState('')
+  const [stems, setStems] = useState([])
+  const [summary, setSummary] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [modal, setModal] = useState(null) // null | 'new' | stem object
+  const [posList, setPosList] = useState([])
+  const [posModal, setPosModal] = useState(null) // null | 'new' | PoS object
+  const [exporting, setExporting] = useState(false)
+
+  const loadPoS = useCallback(() => {
+    fetchBiofuelPoS().then(setPosList).catch(() => setPosList([]))
+  }, [])
+
+  useEffect(() => { loadPoS() }, [loadPoS])
+
+  useEffect(() => {
+    fetchVessels().then(list => {
+      setVessels(list)
+      if (list.length > 0) {
+        const saved = memoryStore.getItem('vp_last_vessel_biofuel')
+        setImo(saved && list.find(v => v.imo_number === saved) ? saved : list[0].imo_number)
+      }
+    }).catch(console.error)
+  }, [])
+
+  const load = useCallback((imo) => {
+    if (!imo) return
+    setLoading(true)
+    setError(null)
+    fetchBiofuelStems(imo)
+      .then(r => { setStems(r.stems || []); setSummary(r.summary || null) })
+      .catch(e => { setError(e?.response?.data?.detail ?? 'Failed to load biofuel stems.'); setStems([]); setSummary(null) })
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => { load(selectedImo) }, [selectedImo, load])
+
+  async function handleExport() {
+    if (exporting || stems.length === 0) return
+    setExporting(true)
+    try {
+      const vesselName = vessels.find(v => v.imo_number === selectedImo)?.vessel_name
+      await exportBiofuelStemsExcel(stems, summary, vesselName)
+    } catch (err) {
+      alert('Export failed: ' + (err?.message || err))
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm('Delete this bunker stem record? This cannot be undone.')) return
+    try {
+      await deleteBiofuelStem(id)
+      load(selectedImo)
+      loadPoS()
+    } catch (e) {
+      alert(e?.response?.data?.detail ?? 'Failed to delete stem.')
+    }
+  }
+
+  async function handleDeletePoS(id) {
+    if (!window.confirm('Delete this PoS record? This cannot be undone.')) return
+    try {
+      await deleteBiofuelPoS(id)
+      loadPoS()
+    } catch (e) {
+      alert(e?.response?.data?.detail ?? 'Failed to delete PoS.')
+    }
+  }
+
+  return (
+    <div className="bf-page">
+      <div className="bf-topbar">
+        <div className="bf-topbar-left">
+          <span className="bf-title"><Droplet size={14} /> Biofuel Calc</span>
+          <select
+            className="bf-vessel-select"
+            value={selectedImo}
+            onChange={e => { setImo(e.target.value); memoryStore.setItem('vp_last_vessel_biofuel', e.target.value) }}
+          >
+            {vessels.map(v => <option key={v.imo_number} value={v.imo_number}>{v.vessel_name} ({v.imo_number})</option>)}
+          </select>
+        </div>
+        <button
+          className="bf-btn secondary"
+          onClick={handleExport}
+          disabled={exporting || stems.length === 0}
+          title="Export the Per-Bunker Calculations table to Excel"
+        >
+          {exporting ? <Loader2 size={14} className="icon-spin" /> : <Download size={14} />} Export Excel
+        </button>
+        <button className="bf-btn" onClick={() => setModal('new')}><Plus size={14} /> Add Stem</button>
+      </div>
+
+      <div className="bf-body">
+        <div className="bf-section-title">A. Methodology <span>MEPC.1/Circ.905-Rev.1</span></div>
+        <div className="bf-methodology">
+          <div><b>Blended Cf:</b> Cf_blend = Σ(mᵢ × Cfᵢ) / Σ(mᵢ) — mass-weighted (biogenic Cf = 0 for CII).</div>
+          <div><b>Volume vs Mass:</b> B24 = 24% by volume (industry convention); the regulation uses mass fractions — select Vol% or Mass% per BDN; a Vol% entry is converted automatically.</div>
+          <div><b>FuelEU (WtW):</b> Biofuel WtW comes from its Proof of Sustainability — WtW = E + 1.48 (FAME) / + 2.74 (bio-methanol), E being the PoS emission intensity. With no PoS (or the part of the bio portion a PoS doesn't cover) the HFO default 91.74 applies (FuelEU Art. 10(1)(a)); fossil base: HFO 91.74, LFO 91.39, MDO 90.77 gCO2e/MJ — energy-weighted blend.</div>
+        </div>
+
+        {loading && <div className="bf-empty"><Loader2 size={16} className="icon-spin" /> Loading…</div>}
+        {!loading && error && <div className="bf-empty error"><AlertTriangle size={13} /> {error}</div>}
+
+        <div className="bf-section-title">B. Per-Bunker Calculations <span>one row per bunker stem (BDN)</span></div>
+
+        {!loading && !error && stems.length === 0 && (
+          <div className="bf-empty">No bunker stems logged for this vessel yet — click "Add Stem" to record one.</div>
+        )}
+
+        {!loading && !error && stems.length > 0 && (
+          <div className="bf-table-wrap">
+            <table className="bf-table">
+              <thead>
+                <tr>
+                  <th title="Whether this row was linked to a real scraped bunker report, or typed by hand">Src</th>
+                  <th className="bf-col-input">BDN #</th>
+                  <th className="bf-col-input">Date</th>
+                  <th className="bf-col-input">Port</th>
+                  <th className="bf-col-input">Base Fuel</th>
+                  <th className="bf-col-input">Biofuel Type</th>
+                  <th className="bf-col-input">Input Basis</th>
+                  <th className="bf-col-input">Bio %</th>
+                  <th className="bf-col-input">ρ Base</th>
+                  <th className="bf-col-input">ρ Bio</th>
+                  <th className="bf-col-calc">Bio % by Mass</th>
+                  <th className="bf-col-calc">Cf Base (t/t)</th>
+                  <th className="bf-col-calc">Cf Blend (t/t)</th>
+                  <th className="bf-col-calc">LCV Base</th>
+                  <th className="bf-col-calc">LCV Bio</th>
+                  <th className="bf-col-calc">WtW Base</th>
+                  <th className="bf-col-calc">WtW Bio</th>
+                  <th className="bf-col-calc">WtW Blend</th>
+                  <th className="bf-col-input">Total Qty (MT)</th>
+                  <th className="bf-col-calc">Fossil (MT)</th>
+                  <th className="bf-col-calc">Bio (MT)</th>
+                  <th className="bf-col-input" title="Linked Proof of Sustainability and the mass allocated to this stem">PoS</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {stems.map(s => (
+                  <tr key={s.id}>
+                    <td className="bf-src-cell" title={s.bunker_report_id ? 'Linked to a scraped bunker report' : 'Manually entered'}>
+                      {s.bunker_report_id ? <Link2 size={12} /> : <span className="bf-src-manual">—</span>}
+                    </td>
+                    <td className="bf-col-input">{s.bdn_number || '—'}</td>
+                    <td className="bf-col-input bf-dt">{s.delivery_date || '—'}</td>
+                    <td className="bf-col-input">{s.port || '—'}</td>
+                    <td className="bf-col-input">{s.base_fuel_grade}</td>
+                    <td className="bf-col-input">{s.biofuel_type}</td>
+                    <td className="bf-col-input">{s.input_basis}</td>
+                    <td className="bf-col-input bf-num">{fmt(s.bio_pct, 2)}%</td>
+                    <td className="bf-col-input bf-num">{s.rho_base ?? '—'}</td>
+                    <td className="bf-col-input bf-num">{s.rho_bio ?? '—'}</td>
+                    <td className="bf-col-calc bf-num">{fmt(s.bio_pct_by_mass, 2)}%</td>
+                    <td className="bf-col-calc bf-num">{fmt(s.cf_base, 3)}</td>
+                    <td className="bf-col-calc bf-num bf-highlight">{fmt(s.cf_blend, 4)}</td>
+                    <td className="bf-col-calc bf-num">{fmt(s.lcv_base, 1)}</td>
+                    <td className="bf-col-calc bf-num">{fmt(s.lcv_bio, 1)}</td>
+                    <td className="bf-col-calc bf-num">{fmt(s.wtw_base, 2)}</td>
+                    <td className="bf-col-calc bf-num" title={s.wtw_bio_source}>{fmt(s.wtw_bio, 2)}</td>
+                    <td className="bf-col-calc bf-num bf-highlight">{fmt(s.wtw_blend, 2)}</td>
+                    <td className="bf-col-input bf-num">{fmt(s.quantity_mt)}</td>
+                    <td className="bf-col-calc bf-num">{fmt(s.fossil_portion_mt)}</td>
+                    <td className="bf-col-calc bf-num">{fmt(s.bio_portion_mt)}</td>
+                    <td className="bf-col-input" title={s.wtw_bio_source}>
+                      {s.pos_reference ? `${s.pos_reference} (${fmt(s.pos_allocated_mt)} mt)` : '—'}
+                    </td>
+                    <td className="bf-actions">
+                      <button className="bf-icon-btn" onClick={() => setModal(s)} title="Edit"><Pencil size={13} /></button>
+                      <button className="bf-icon-btn danger" onClick={() => handleDelete(s.id)} title="Delete"><Trash2 size={13} /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              {summary && (
+                <tfoot>
+                  <tr className="bf-summary-row-tr">
+                    <td colSpan={12} className="bf-summary-label">WEIGHTED AVG / TOTAL</td>
+                    <td className="bf-num bf-highlight">{fmt(summary.cf_blend_avg, 4)}</td>
+                    <td colSpan={4}></td>
+                    <td className="bf-num bf-highlight">{fmt(summary.wtw_blend_avg, 2)}</td>
+                    <td className="bf-num">{fmt(summary.total_qty_mt)}</td>
+                    <td className="bf-num">{fmt(summary.total_fossil_mt)}</td>
+                    <td className="bf-num">{fmt(summary.total_bio_mt)}</td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        )}
+
+        <div className="bf-section-title">
+          C. Proof of Sustainability Records <span>shared across vessels · one PoS can serve several stems</span>
+          <button className="bf-btn secondary" style={{ marginLeft: 'auto' }} onClick={() => setPosModal('new')}><Plus size={14} /> Add PoS</button>
+        </div>
+        {posList.length === 0 ? (
+          <div className="bf-empty">No PoS records yet — add one to price a stem from its certificate instead of the HFO default.</div>
+        ) : (
+          <div className="bf-table-wrap">
+            <table className="bf-table">
+              <thead>
+                <tr>
+                  <th className="bf-col-input">PoS Reference</th>
+                  <th className="bf-col-input">Supplier</th>
+                  <th className="bf-col-input">Biofuel Type</th>
+                  <th className="bf-col-input">E (gCO₂e/MJ)</th>
+                  <th className="bf-col-calc">WtW (E + adder)</th>
+                  <th className="bf-col-input">Quantity (MT)</th>
+                  <th className="bf-col-calc">Allocated (MT)</th>
+                  <th className="bf-col-calc">Remaining (MT)</th>
+                  <th className="bf-col-calc">Stems</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {posList.map(p => (
+                  <tr key={p.id}>
+                    <td className="bf-col-input">{p.pos_reference}</td>
+                    <td className="bf-col-input">{p.supplier || '—'}</td>
+                    <td className="bf-col-input">{p.biofuel_type}</td>
+                    <td className="bf-col-input bf-num">{fmt(p.emission_intensity, 2)}</td>
+                    <td className="bf-col-calc bf-num bf-highlight">{fmt(p.wtw, 2)}</td>
+                    <td className="bf-col-input bf-num">{fmt(p.quantity_mt)}</td>
+                    <td className="bf-col-calc bf-num">{fmt(p.allocated_mt)}</td>
+                    <td className="bf-col-calc bf-num">{fmt(p.remaining_mt)}</td>
+                    <td className="bf-col-calc bf-num">{p.stem_count}</td>
+                    <td className="bf-actions">
+                      <button className="bf-icon-btn" onClick={() => setPosModal(p)} title="Edit"><Pencil size={13} /></button>
+                      <button className="bf-icon-btn danger" onClick={() => handleDeletePoS(p.id)} title="Delete"><Trash2 size={13} /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="bf-section-title">D. Quick Reference <span>regulatory notes</span></div>
+        <div className="bf-refnotes">
+          <div><b>MEPC.1/Circ.905-Rev.1:</b> Guidance on Cf calculation for fuel oil blends containing biofuel.</div>
+          <div><b>IMO DCS:</b> Reports fuel consumption in tonnes by type/consumer/status — no Cf calculation at DCS level.</div>
+          <div><b>CII/AER (Reg. 28):</b> Uses DCS data for AER = CO2/(DWT×Dist). Cf_bio = 0 for sustainable biofuel — use Cf Blend. B24 ≈ 19% CII reduction.</div>
+          <div><b>EU MRV/ETS:</b> Biofuel CO2 (Cf=2.834) calculated in the IMO DCS pages — all regimes treat biogenic CO2 as zero or separate.</div>
+          <div><b>FuelEU:</b> WtW approach — a PoS-covered biofuel is priced at E + 1.48 (FAME) vs HFO 91.74 gCO2e/MJ; without a PoS the HFO default applies (Art. 10(1)(a)), so no credit is taken. Use WtW Blend.</div>
+          <div><b>Sustainability:</b> Biofuel must meet EU RED II/III sustainability criteria for FuelEU WtW credit and for CII Cf_bio=0 credit.</div>
+          <div><b>FAME sources:</b> UCOME (used cooking oil), TME (tallow), RME (rapeseed), SME (soybean), PME (palm) — all share Cf=2.834 and LCV=37.0; their WtW differs per consignment, from the PoS (E + 1.48).</div>
+        </div>
+
+        <div className="bf-note">
+          <Info size={13} />
+          <span>
+            This calculator prices what was bunkered per stem, exactly reproducing the Biofuel_Calc
+            worksheet's formulas (see backend/emission/biofuel_calculator.py). It is not yet reconciled
+            against the daily consumption figures FuelEU Maritime / EU ETS use elsewhere in this app.
+          </span>
+        </div>
+      </div>
+
+      {modal && (
+        <StemModal
+          imo={selectedImo}
+          initial={modal === 'new' ? null : modal}
+          posList={posList}
+          onClose={() => setModal(null)}
+          onSaved={() => { setModal(null); load(selectedImo); loadPoS() }}
+        />
+      )}
+
+      {posModal && (
+        <PoSModal
+          initial={posModal === 'new' ? null : posModal}
+          onClose={() => setPosModal(null)}
+          onSaved={() => { setPosModal(null); loadPoS(); load(selectedImo) }}
+        />
+      )}
+    </div>
+  )
+}
