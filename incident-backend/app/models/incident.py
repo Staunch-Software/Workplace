@@ -20,6 +20,7 @@ class Incident(Base):
     incident_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     category: Mapped[str] = mapped_column(String(80), nullable=False, default="")
+    pic_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     offhire: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     offhire_details: Mapped[str] = mapped_column(Text, nullable=False, default="")
     comments: Mapped[str] = mapped_column(Text, nullable=False, default="")

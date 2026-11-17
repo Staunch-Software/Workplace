@@ -31,6 +31,7 @@ CATEGORIES = [
 class IncidentIn(BaseModel):
     vessel_imo: str = Field(min_length=1, max_length=7)
     incident_date: date
+    pic_name: str = ""
     description: str = ""
     category: str = ""
     offhire: bool = False
@@ -41,6 +42,7 @@ class IncidentIn(BaseModel):
 class IncidentPatch(BaseModel):
     vessel_imo: Optional[str] = Field(default=None, min_length=1, max_length=7)
     incident_date: Optional[date] = None
+    pic_name: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
     offhire: Optional[bool] = None
@@ -64,7 +66,7 @@ def _incident_dict(i: Incident, extra: Optional[dict] = None) -> dict:
     d = {
         "id": str(i.id), "incident_no": i.incident_no, "status": i.status, "vessel_imo": i.vessel_imo,
         "vessel_name": i.vessel_name, "incident_date": _iso(i.incident_date), "description": i.description,
-        "category": i.category, "offhire": i.offhire, "offhire_details": i.offhire_details, "comments": i.comments,
+        "category": i.category, "pic_name": i.pic_name, "offhire": i.offhire, "offhire_details": i.offhire_details, "comments": i.comments,
         "sof_notes": i.sof_notes, "log_notes": i.log_notes, "writeup": i.writeup,
         "created_by": str(i.created_by), "created_by_name": i.created_by_name,
         "closed_at": _iso(i.closed_at), "created_at": _iso(i.created_at), "updated_at": _iso(i.updated_at),
@@ -137,7 +139,8 @@ async def list_incidents(
     if q and q.strip():
         like = f"%{q.strip()}%"
         stmt = stmt.where(or_(Incident.incident_no.ilike(like), Incident.description.ilike(like),
-                              Incident.vessel_name.ilike(like), Incident.comments.ilike(like)))
+                              Incident.vessel_name.ilike(like), Incident.comments.ilike(like),
+                              Incident.pic_name.ilike(like)))
     incidents = (await db.execute(stmt)).scalars().all()
 
     ids = [i.id for i in incidents]
@@ -168,11 +171,13 @@ async def create_incident(
     user: ControlUser = Depends(require_creator),
 ):
     name = await _vessel_name(control_db, body.vessel_imo)
+    year = datetime.now(timezone.utc).year
     seq = (await db.execute(text("SELECT nextval('incident_no_seq')"))).scalar_one()
     inc = Incident(
-        id=uuid.uuid4(), incident_no=f"INC-{body.incident_date.year}-{seq:04d}", status="DRAFT",
+        id=uuid.uuid4(), incident_no=f"OZ-INC/{year}/{seq:04d}", status="DRAFT",
         vessel_imo=body.vessel_imo, vessel_name=name, incident_date=body.incident_date,
-        description=body.description.strip(), category=body.category.strip(), offhire=body.offhire,
+        description=body.description.strip(), category=body.category.strip(),
+        pic_name=body.pic_name.strip(), offhire=body.offhire,
         offhire_details=body.offhire_details.strip(), comments=body.comments.strip(),
         created_by=user.id, created_by_name=user.full_name,
     )

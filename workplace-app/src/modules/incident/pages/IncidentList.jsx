@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Search, Paperclip, Images, Loader2, FileWarning } from 'lucide-react';
+import { Plus, Search, Paperclip, Images, Loader2, FileWarning, Ship, Layers } from 'lucide-react';
 import api, { errText, openFile } from '../api/axiosIncident';
 import AuthedImage from '../components/AuthedImage';
+import CardSelect from '../components/CardSelect';
 import IncidentForm from '../components/IncidentForm';
 import IncidentModal from '../components/IncidentModal';
 import { fmtDay } from '../utils/format';
@@ -129,14 +130,25 @@ export default function IncidentList({ me }) {
             </button>
           ))}
         </div>
-        <select className="inc-select" value={filters.vessel_imo} onChange={(e) => setParam('vessel', e.target.value)} aria-label="Vessel">
-          <option value="">All vessels</option>
-          {vessels.map((v) => <option key={v.imo} value={v.imo}>{v.name}</option>)}
-        </select>
-        <select className="inc-select" value={filters.category} onChange={(e) => setParam('category', e.target.value)} aria-label="Category">
-          <option value="">All categories</option>
-          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <CardSelect
+          value={filters.vessel_imo}
+          onChange={(val) => setParam('vessel', val)}
+          options={vessels}
+          placeholder="All vessels"
+          ariaLabel="Filter by vessel"
+          icon={Ship}
+          size="sm"
+          searchable
+        />
+        <CardSelect
+          value={filters.category}
+          onChange={(val) => setParam('category', val)}
+          options={categories}
+          placeholder="All categories"
+          ariaLabel="Filter by category"
+          icon={Layers}
+          size="sm"
+        />
         <label className="inc-datef">From <input type="date" value={filters.date_from} onChange={(e) => setParam('from', e.target.value)} /></label>
         <label className="inc-datef">To <input type="date" value={filters.date_to} onChange={(e) => setParam('to', e.target.value)} /></label>
       </div>
@@ -181,29 +193,32 @@ export default function IncidentList({ me }) {
                       openIncident(r.id, 'photos');
                     }
                   }}>
-                    {r.first_photo_id ? (
-                      <span
-                        className="inc-thumb inc-thumb--clickable"
-                        role="button"
-                        tabIndex={0}
-                        title="Click to view photo evidence"
-                        aria-label="View photo evidence"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openIncident(r.id, 'photos');
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                      {r.first_photo_id && (
+                        <span
+                          className="inc-thumb inc-thumb--clickable"
+                          role="button"
+                          tabIndex={0}
+                          title="Click to view photo evidence"
+                          aria-label="View photo evidence"
+                          onClick={(e) => {
                             e.stopPropagation();
                             openIncident(r.id, 'photos');
-                          }
-                        }}
-                      >
-                        <AuthedImage incidentId={r.id} fileId={r.first_photo_id} alt="Photo" />
-                        {r.photo_count > 1 && <span className="inc-thumb__n"><Images size={10} /> {r.photo_count}</span>}
-                      </span>
-                    ) : <span className="inc-muted">—</span>}
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openIncident(r.id, 'photos');
+                            }
+                          }}
+                        >
+                          <AuthedImage incidentId={r.id} fileId={r.first_photo_id} alt="Photo" />
+                          {r.photo_count > 1 && <span className="inc-thumb__n"><Images size={10} /> {r.photo_count}</span>}
+                        </span>
+                      )}
+                      <span>{r.pic_name || (!r.first_photo_id && <span className="inc-muted">—</span>)}</span>
+                    </div>
                   </td>
                   <td>{r.offhire ? <span className="inc-badge inc-badge--off" title={r.offhire_details}>Off-hire</span> : <span className="inc-muted">No</span>}</td>
                   <td onClick={stop}>

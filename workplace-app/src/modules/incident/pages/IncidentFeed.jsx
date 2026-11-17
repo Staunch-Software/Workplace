@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Anchor, AtSign, CheckCheck, CheckCircle, FilePlus2, Image as ImageIcon, Mail, MailOpen, MessageSquare,
-  RefreshCw, Search, Unlock, X,
+  RefreshCw, Search, Unlock, X, Ship, Layers, Activity,
 } from 'lucide-react';
 import api, { errText } from '../api/axiosIncident';
 import FeedSelect from '../components/FeedSelect';
@@ -230,9 +230,9 @@ export default function IncidentFeed({ me }) {
         </div>
 
         <div className="inc-lf__toolbar">
-          <FeedSelect value={filters.vessel} onChange={setFilter('vessel')} options={vesselOptions} placeholder="All Vessels" />
-          <FeedSelect value={filters.category} onChange={setFilter('category')} options={categoryOptions} placeholder="All Categories" />
-          {tab === 'live' && <FeedSelect value={filters.type} onChange={setFilter('type')} options={typeOptions} placeholder="All Events" />}
+          <FeedSelect value={filters.vessel} onChange={setFilter('vessel')} options={vesselOptions} placeholder="All Vessels" icon={Ship} />
+          <FeedSelect value={filters.category} onChange={setFilter('category')} options={categoryOptions} placeholder="All Categories" icon={Layers} />
+          {tab === 'live' && <FeedSelect value={filters.type} onChange={setFilter('type')} options={typeOptions} placeholder="All Events" icon={Activity} />}
           <div className="inc-lf__dates">
             <span className="inc-lf__dlab">From</span>
             <input type="date" value={filters.from} onChange={setFilter('from')} className="inc-lf__date" />

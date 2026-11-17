@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { X, Loader2, Ship, Layers } from 'lucide-react';
 import api, { errText } from '../api/axiosIncident';
+import CardSelect from './CardSelect';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -13,6 +14,7 @@ export default function IncidentForm({ incident, onClose, onSaved }) {
     vessel_imo: incident?.vessel_imo || '',
     incident_date: incident?.incident_date || today(),
     category: incident?.category || '',
+    pic_name: incident?.pic_name || '',
     description: incident?.description || '',
     offhire: incident?.offhire || false,
     offhire_details: incident?.offhire_details || '',
@@ -25,6 +27,12 @@ export default function IncidentForm({ incident, onClose, onSaved }) {
     api.get('/api/vessels').then((r) => setVessels(r.data.data || [])).catch(() => {});
     api.get('/api/categories').then((r) => setCategories(r.data.data || [])).catch(() => {});
   }, []);
+
+  const categoryOptions = useMemo(() => {
+    const list = [...categories];
+    if (form.category && !list.includes(form.category)) list.push(form.category);
+    return list;
+  }, [categories, form.category]);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
 
@@ -56,22 +64,38 @@ export default function IncidentForm({ incident, onClose, onSaved }) {
         <div className="inc-modal__body">
           <div className="inc-grid2">
             <label className="inc-field">Vessel
-              <select value={form.vessel_imo} onChange={set('vessel_imo')} required>
-                <option value="">Select vessel…</option>
-                {vessels.map((v) => <option key={v.imo} value={v.imo}>{v.name}</option>)}
-              </select>
+              <CardSelect
+                value={form.vessel_imo}
+                onChange={(val) => setForm((f) => ({ ...f, vessel_imo: val }))}
+                options={vessels}
+                placeholder="Select vessel…"
+                icon={Ship}
+                isBlock
+                required
+                searchable
+                error={!!error && !form.vessel_imo}
+              />
             </label>
             <label className="inc-field">Date of incident
               <input type="date" value={form.incident_date} onChange={set('incident_date')} max={today()} required />
             </label>
           </div>
-          <label className="inc-field">Incident category
-            <select value={form.category} onChange={set('category')}>
-              <option value="">Select category…</option>
-              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-              {form.category && !categories.includes(form.category) && <option value={form.category}>{form.category}</option>}
-            </select>
-          </label>
+          <div className="inc-grid2">
+            <label className="inc-field">Incident category
+              <CardSelect
+                value={form.category}
+                onChange={(val) => setForm((f) => ({ ...f, category: val }))}
+                options={categoryOptions}
+                placeholder="Select category…"
+                icon={Layers}
+                isBlock
+              />
+            </label>
+            <label className="inc-field">Person In Charge (PIC)
+              <input type="text" value={form.pic_name} onChange={set('pic_name')}
+                     placeholder="e.g. Master, Chief Engineer, Superintendent…" />
+            </label>
+          </div>
           <label className="inc-field">Incident description
             <textarea rows={4} value={form.description} onChange={set('description')} />
           </label>

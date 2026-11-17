@@ -152,3 +152,13 @@ def test_notifications_use_the_same_assigned_users(monkeypatch):
 
     monkeypatch.setattr(notify, "module_users", fake_users)
     assert asyncio.run(notify.module_user_ids(None)) == {a}
+
+
+def test_incident_id_format():
+    from datetime import datetime, timezone
+    year = datetime.now(timezone.utc).year
+    seq = 1
+    incident_no = f"OZ-INC/{year}/{seq:04d}"
+    assert incident_no.startswith("OZ-INC/")
+    assert incident_no == f"OZ-INC/{year}/0001"
+

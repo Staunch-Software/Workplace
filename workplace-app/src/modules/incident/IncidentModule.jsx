@@ -65,6 +65,10 @@ export default function IncidentModule() {
   const allowed = user?.role === 'ADMIN' || (user?.role === 'SHORE' && user?.permissions?.incident_report === true);
 
   useEffect(() => {
+    document.title = 'Incident Report';
+  }, []);
+
+  useEffect(() => {
     if (!allowed) return;
     api.get('/api/me')
       .then((r) => {

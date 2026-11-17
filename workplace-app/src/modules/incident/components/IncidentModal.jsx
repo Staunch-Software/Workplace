@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  X, Pencil, Lock, Unlock, Loader2, Paperclip, Upload, Trash2, Ship, CalendarDays, Tag,
+  X, Pencil, Lock, Unlock, Loader2, Paperclip, Upload, Trash2, Ship, CalendarDays, Tag, User,
   ChevronLeft, ChevronRight, FileText, ListChecks, Images, PenLine, MessageSquare,
 } from 'lucide-react';
 import api, { errText, openFile } from '../api/axiosIncident';
@@ -228,12 +228,13 @@ export default function IncidentModal({ id, me, siblings = [], initialTab = 'sof
                 <span><Ship size={14} /> {incident.vessel_name}</span>
                 <span><CalendarDays size={14} /> {fmtDay(incident.incident_date)}</span>
                 {incident.category && <span><Tag size={14} /> {incident.category}</span>}
+                {incident.pic_name && <span><User size={14} /> PIC: {incident.pic_name}</span>}
                 {siblings.length > 1 && idx >= 0 && <span className="inc-facts__pos">{idx + 1} of {siblings.length}</span>}
               </div>
               <div className="inc-summary">
                 <div><span className="inc-label">Description</span><p>{incident.description || <span className="inc-muted">—</span>}</p></div>
+                <div><span className="inc-label">Person In Charge (PIC)</span><p>{incident.pic_name || <span className="inc-muted">—</span>}</p></div>
                 {incident.offhire && <div><span className="inc-label">Offhire record</span><p>{incident.offhire_details || <span className="inc-muted">Off-hire, no details</span>}</p></div>}
-                <div><span className="inc-label">Comments</span><p>{incident.comments || <span className="inc-muted">—</span>}</p></div>
               </div>
               <ReportFiles incident={incident} canEdit={canEdit} files={files} onFilesChange={setFilesChanged} setError={setError} />
               {error && <div className="inc-error" role="alert">{error}</div>}

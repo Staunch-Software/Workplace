@@ -1,0 +1,349 @@
+/* CardSelect - Premium Modern Card-Style Dropdown */
+.inc-cselect {
+  position: relative;
+  display: inline-block;
+  user-select: none;
+  font-family: inherit;
+}
+
+.inc-cselect--block {
+  display: block;
+  width: 100%;
+}
+
+.inc-cselect--sm {
+  min-width: 180px;
+}
+
+/* Trigger Card Button */
+.inc-cselect__trigger {
+  width: 100%;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px;
+  background: #ffffff;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--radius-sm, 8px);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  font: inherit;
+  font-size: 0.83rem;
+  color: var(--text-2, #334155);
+  cursor: pointer;
+  outline: none;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.inc-cselect--md .inc-cselect__trigger {
+  height: 40px;
+  font-size: 0.88rem;
+  border-radius: 9px;
+  padding: 0 14px;
+}
+
+.inc-cselect__trigger:hover:not(:disabled) {
+  border-color: #cbd5e1;
+  background: #ffffff;
+  box-shadow: 0 2px 8px -1px rgba(0, 0, 0, 0.07);
+}
+
+.inc-cselect__trigger--open {
+  border-color: var(--p2, #6366f1) !important;
+  box-shadow: 0 0 0 3px var(--p-glow, rgba(99, 102, 241, 0.18)) !important;
+  background: #ffffff;
+}
+
+.inc-cselect__trigger--has {
+  color: var(--text, #0f172a);
+  font-weight: 600;
+}
+
+.inc-cselect__trigger--error {
+  border-color: var(--red, #dc2626) !important;
+  box-shadow: 0 0 0 3px var(--red-bg, #fef2f2) !important;
+}
+
+.inc-cselect__trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #f8fafc;
+}
+
+/* Inner content of trigger */
+.inc-cselect__content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.inc-cselect__icon {
+  flex-shrink: 0;
+  color: var(--p2, #6366f1);
+  display: flex;
+  align-items: center;
+}
+
+.inc-cselect__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inc-cselect__placeholder {
+  color: var(--muted, #64748b);
+  font-weight: 500;
+}
+
+/* Actions in trigger (Clear + Chevron) */
+.inc-cselect__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.inc-cselect__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.inc-cselect__clear:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.inc-cselect__chev {
+  color: #94a3b8;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease;
+}
+
+.inc-cselect__chev--open {
+  transform: rotate(180deg);
+  color: var(--p2, #6366f1);
+}
+
+/* The Card Dropdown Menu (Fixed / Portaled) */
+.inc-cselect__menu {
+  background: #ffffff;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 20px 40px -4px rgba(15, 23, 42, 0.22), 0 8px 16px -2px rgba(15, 23, 42, 0.08);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  animation: incCardSelectIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.inc-cselect__menu--up {
+  animation: incCardSelectInUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes incCardSelectIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes incCardSelectInUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Search Box Inside Menu */
+.inc-cselect__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  margin: 2px 2px 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.inc-cselect__search-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.inc-cselect__search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--text, #0f172a);
+}
+
+.inc-cselect__search input::placeholder {
+  color: #94a3b8;
+}
+
+/* Clear icon for search input */
+.inc-cselect__search-clear {
+  border: 0;
+  background: transparent;
+  padding: 2px;
+  cursor: pointer;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+}
+.inc-cselect__search-clear:hover {
+  color: #0f172a;
+  background: #e2e8f0;
+}
+
+/* Scroll List */
+.inc-cselect__list {
+  max-height: 250px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inc-cselect__list::-webkit-scrollbar {
+  width: 5px;
+}
+.inc-cselect__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.inc-cselect__list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+.inc-cselect__list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Items */
+.inc-cselect__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.83rem;
+  font-weight: 500;
+  color: var(--text-2, #334155);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.inc-cselect__item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  transform: translateX(2px);
+}
+
+.inc-cselect__item--active {
+  background: var(--p-bg, #eef2ff) !important;
+  color: var(--p, #4f46e5) !important;
+  font-weight: 700 !important;
+}
+
+.inc-cselect__item--all {
+  color: var(--muted, #64748b);
+  border-bottom: 1px solid #f1f5f9;
+  border-radius: 6px 6px 0 0;
+  margin-bottom: 3px;
+  font-weight: 600;
+}
+
+.inc-cselect__item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Vessel / Category name: show fully without truncation */
+.inc-cselect__item-text {
+  white-space: nowrap;
+  font-weight: 600;
+  color: inherit;
+  flex-shrink: 0;
+}
+
+/* IMO badge: neatly styled pill that NEVER wraps */
+.inc-cselect__item-sub {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+  font-family: inherit;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 1px 7px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
+  letter-spacing: 0.02em;
+}
+
+.inc-cselect__item--active .inc-cselect__item-sub {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.25);
+  color: var(--p, #4f46e5);
+}
+
+.inc-cselect__check {
+  color: var(--p, #4f46e5);
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.inc-cselect__empty {
+  padding: 16px 12px;
+  text-align: center;
+  color: var(--muted, #64748b);
+  font-size: 0.8rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .inc-cselect--sm {
+    min-width: 140px;
+    flex: 1 1 140px;
+  }
+}
+
+@media (max-width: 560px) {
+  .inc-cselect--sm {
+    min-width: 100%;
+    width: 100%;
+  }
+}
