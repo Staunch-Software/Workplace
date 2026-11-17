@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Search, Paperclip, Images, Loader2, FileWarning, Ship, Layers } from 'lucide-react';
+import { Plus, Search, Paperclip, Images, Loader2, FileWarning, Ship, Layers, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import api, { errText, openFile } from '../api/axiosIncident';
 import AuthedImage from '../components/AuthedImage';
 import CardSelect from '../components/CardSelect';
@@ -30,6 +30,19 @@ export default function IncidentList({ me }) {
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState(filters.q);
+  const [sortField, setSortField] = useState('incident_no');
+  const [sortOrder, setSortOrder] = useState('asc');
+
+  const toggleSort = useCallback((field) => {
+    setSortField((currField) => {
+      if (currField === field) {
+        setSortOrder((currOrder) => (currOrder === 'asc' ? 'desc' : 'asc'));
+        return currField;
+      }
+      setSortOrder('asc');
+      return field;
+    });
+  }, []);
 
   const setParam = useCallback((key, value) => {
     setParams((prev) => {
@@ -78,10 +91,21 @@ export default function IncidentList({ me }) {
 
   const rows = useMemo(() => {
     const list = status ? all.filter((r) => r.status === status) : all;
-    return [...list].sort((a, b) =>
-      (a.incident_no || '').localeCompare(b.incident_no || '', undefined, { numeric: true }),
-    );
-  }, [all, status]);
+    return [...list].sort((a, b) => {
+      let cmp = 0;
+      if (sortField === 'incident_no') {
+        cmp = (a.incident_no || '').localeCompare(b.incident_no || '', undefined, { numeric: true });
+      } else if (sortField === 'incident_date') {
+        const da = a.incident_date ? new Date(a.incident_date).getTime() : 0;
+        const db = b.incident_date ? new Date(b.incident_date).getTime() : 0;
+        cmp = da - db;
+        if (cmp === 0) {
+          cmp = (a.incident_no || '').localeCompare(b.incident_no || '', undefined, { numeric: true });
+        }
+      }
+      return sortOrder === 'desc' ? -cmp : cmp;
+    });
+  }, [all, status, sortField, sortOrder]);
   const stop = (e) => e.stopPropagation();
   const openIncident = useCallback((id, tabName) => {
     setParams((prev) => {
@@ -144,6 +168,7 @@ export default function IncidentList({ me }) {
           icon={Ship}
           size="sm"
           searchable
+          multi
         />
         <CardSelect
           value={filters.category}
@@ -153,6 +178,7 @@ export default function IncidentList({ me }) {
           ariaLabel="Filter by category"
           icon={Layers}
           size="sm"
+          multi
         />
         <label className="inc-datef">From <input type="date" value={filters.date_from} onChange={(e) => setParam('from', e.target.value)} /></label>
         <label className="inc-datef">To <input type="date" value={filters.date_to} onChange={(e) => setParam('to', e.target.value)} /></label>
@@ -171,8 +197,45 @@ export default function IncidentList({ me }) {
           <table className="inc-table">
             <thead>
               <tr>
-                <th>Status</th><th>Incident ID</th><th>Vessel</th><th>Date</th><th>Description</th><th>Category</th>
-                <th>PIC</th><th>Offhire</th><th>Report</th>
+                <th>Status</th>
+                <th
+                  className="inc-th-sortable"
+                  onClick={() => toggleSort('incident_no')}
+                  title="Click to sort by Incident ID"
+                >
+                  <div className="inc-th-sort-inner">
+                    <span>Incident ID</span>
+                    <span className={`inc-sort-icon${sortField === 'incident_no' ? ' inc-sort-icon--active' : ''}`}>
+                      {sortField === 'incident_no' ? (
+                        sortOrder === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />
+                      ) : (
+                        <ArrowUpDown size={13} />
+                      )}
+                    </span>
+                  </div>
+                </th>
+                <th>Vessel</th>
+                <th
+                  className="inc-th-sortable"
+                  onClick={() => toggleSort('incident_date')}
+                  title="Click to sort by Date"
+                >
+                  <div className="inc-th-sort-inner">
+                    <span>Date</span>
+                    <span className={`inc-sort-icon${sortField === 'incident_date' ? ' inc-sort-icon--active' : ''}`}>
+                      {sortField === 'incident_date' ? (
+                        sortOrder === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />
+                      ) : (
+                        <ArrowUpDown size={13} />
+                      )}
+                    </span>
+                  </div>
+                </th>
+                <th>Description</th>
+                <th>Category</th>
+                <th>PIC</th>
+                <th>Offhire</th>
+                <th>Report</th>
               </tr>
             </thead>
             <tbody>

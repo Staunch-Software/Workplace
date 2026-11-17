@@ -18,6 +18,7 @@ export default function CardSelect({
   disabled = false,
   name = undefined,
   ariaLabel = undefined,
+  multi = false,
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -44,9 +45,36 @@ export default function CardSelect({
     });
   }, [options]);
 
+  // Selected values as an array of strings
+  const selectedValues = useMemo(() => {
+    if (!multi) return value ? [String(value)] : [];
+    if (Array.isArray(value)) return value.map(String).filter(Boolean);
+    if (typeof value === 'string' && value.trim()) {
+      return value.split(',').map((v) => v.trim()).filter(Boolean);
+    }
+    return [];
+  }, [value, multi]);
+
   const selectedOption = useMemo(() => {
+    if (multi) return null;
     return normalizedOptions.find((o) => String(o.value) === String(value));
-  }, [normalizedOptions, value]);
+  }, [normalizedOptions, value, multi]);
+
+  // Compute trigger label
+  const triggerLabel = useMemo(() => {
+    if (!multi) {
+      return selectedOption ? selectedOption.label : placeholder;
+    }
+    if (selectedValues.length === 0) return placeholder;
+    const selectedLabels = normalizedOptions
+      .filter((o) => selectedValues.includes(String(o.value)))
+      .map((o) => o.label);
+
+    if (selectedLabels.length === 0) return placeholder;
+    if (selectedLabels.length === 1) return selectedLabels[0];
+    if (selectedLabels.length === 2) return `${selectedLabels[0]}, ${selectedLabels[1]}`;
+    return `${selectedLabels[0]}, ${selectedLabels[1]} +${selectedLabels.length - 2}`;
+  }, [multi, selectedOption, selectedValues, normalizedOptions, placeholder]);
 
   // Determine whether search is enabled (auto if > 5 options unless explicitly specified)
   const isSearchable = searchable !== undefined ? searchable : normalizedOptions.length > 5;
@@ -88,7 +116,7 @@ export default function CardSelect({
     setDropUp(shouldFlip);
 
     const availableHeight = shouldFlip ? roomAbove - 16 : roomBelow - 16;
-    const maxHeight = Math.min(300, Math.max(160, availableHeight));
+    const maxHeight = Math.min(320, Math.max(160, availableHeight));
 
     if (shouldFlip) {
       setPos({
@@ -171,99 +199,40 @@ export default function CardSelect({
     }
   }, [disabled, open]);
 
-  const handleSelect = (val) => {
-    onChange?.(val);
-    setOpen(false);
-    setQuery('');
+  const handleItemClick = (val) => {
+    if (multi) {
+      const s = String(val);
+      let next;
+      if (selectedValues.includes(s)) {
+        next = selectedValues.filter((v) => v !== s);
+      } else {
+        next = [...selectedValues, s];
+      }
+      onChange?.(typeof value === 'string' ? next.join(',') : next);
+    } else {
+      onChange?.(val);
+      setOpen(false);
+      setQuery('');
+    }
   };
 
   const handleClear = (e) => {
     e.stopPropagation();
-    onChange?.('');
-    setOpen(false);
+    onChange?.(typeof value === 'string' ? '' : []);
+    if (!multi) setOpen(false);
   };
 
-  const canClear = allowClear !== undefined ? allowClear : !!value && !required;
+  const handleSelectAll = (e) => {
+    e.stopPropagation();
+    const allVals = normalizedOptions.map((o) => o.value);
+    onChange?.(typeof value === 'string' ? allVals.join(',') : allVals);
+  };
+
+  const hasSelection = selectedValues.length > 0;
+  const canClear = allowClear !== undefined ? allowClear : (hasSelection && !required);
 
   // The portal host: document.body ensures it breaks out of modal overflow clipping
   const portalHost = typeof document !== 'undefined' ? document.body : null;
-
-  const menuElement = open && pos && (
-    <div
-      ref={menuRef}
-      style={pos}
-      className={`inc-cselect__menu${dropUp ? ' inc-cselect__menu--up' : ''}`}
-      role="listbox"
-      aria-label={ariaLabel || placeholder}
-    >
-      {isSearchable && (
-        <div className="inc-cselect__search">
-          <Search size={13} className="inc-cselect__search-icon" />
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={searchPlaceholder}
-            onClick={(e) => e.stopPropagation()}
-          />
-          {query && (
-            <button
-              type="button"
-              className="inc-cselect__search-clear"
-              onClick={(e) => {
-                e.stopPropagation();
-                setQuery('');
-                searchInputRef.current?.focus();
-              }}
-              title="Clear search"
-            >
-              <X size={12} />
-            </button>
-          )}
-        </div>
-      )}
-
-      <div className="inc-cselect__list">
-        {!required && !query && (
-          <div
-            className={`inc-cselect__item inc-cselect__item--all${!value ? ' inc-cselect__item--active' : ''}`}
-            onClick={() => handleSelect('')}
-            role="option"
-            aria-selected={!value}
-          >
-            <div className="inc-cselect__item-left">
-              <span className="inc-cselect__item-text">{placeholder}</span>
-            </div>
-            {!value && <Check size={14} className="inc-cselect__check" />}
-          </div>
-        )}
-
-        {filteredOptions.length === 0 ? (
-          <div className="inc-cselect__empty">No matching options</div>
-        ) : (
-          filteredOptions.map((opt) => {
-            const isSelected = String(opt.value) === String(value);
-            return (
-              <div
-                key={opt.value}
-                className={`inc-cselect__item${isSelected ? ' inc-cselect__item--active' : ''}`}
-                onClick={() => handleSelect(opt.value)}
-                role="option"
-                aria-selected={isSelected}
-              >
-                <div className="inc-cselect__item-left">
-                  <span className="inc-cselect__item-text" title={opt.label}>{opt.label}</span>
-                  {opt.sublabel && <span className="inc-cselect__item-sub">{opt.sublabel}</span>}
-                </div>
-                {isSelected && <Check size={14} className="inc-cselect__check" />}
-              </div>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
 
   return (
     <div
@@ -273,7 +242,7 @@ export default function CardSelect({
       <button
         type="button"
         className={`inc-cselect__trigger${open ? ' inc-cselect__trigger--open' : ''}${
-          value ? ' inc-cselect__trigger--has' : ''
+          hasSelection ? ' inc-cselect__trigger--has' : ''
         }${error ? ' inc-cselect__trigger--error' : ''}`}
         onClick={toggleOpen}
         disabled={disabled}
@@ -283,9 +252,12 @@ export default function CardSelect({
       >
         <span className="inc-cselect__content">
           {Icon && <span className="inc-cselect__icon"><Icon size={14} /></span>}
-          <span className={`inc-cselect__label${!value ? ' inc-cselect__placeholder' : ''}`}>
-            {selectedOption ? selectedOption.label : placeholder}
+          <span className={`inc-cselect__label${!hasSelection ? ' inc-cselect__placeholder' : ''}`}>
+            {triggerLabel}
           </span>
+          {multi && selectedValues.length > 1 && (
+            <span className="inc-cselect__count-badge">{selectedValues.length}</span>
+          )}
         </span>
         <span className="inc-cselect__actions">
           {canClear && (
@@ -306,10 +278,119 @@ export default function CardSelect({
       </button>
 
       {/* Hidden input for standard form serialization/required validation if name is given */}
-      {name && <input type="hidden" name={name} value={value} required={required} />}
+      {name && (
+        <input
+          type="hidden"
+          name={name}
+          value={Array.isArray(value) ? value.join(',') : value}
+          required={required}
+        />
+      )}
 
       {/* Render dropdown menu through portal so it never gets clipped by modals or containers */}
-      {portalHost ? createPortal(menuElement, portalHost) : menuElement}
+      {portalHost && open && pos && createPortal(
+        <div
+          ref={menuRef}
+          style={pos}
+          className={`inc-cselect__menu${dropUp ? ' inc-cselect__menu--up' : ''}`}
+          role="listbox"
+          aria-label={ariaLabel || placeholder}
+        >
+          {isSearchable && (
+            <div className="inc-cselect__search">
+              <Search size={13} className="inc-cselect__search-icon" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={searchPlaceholder}
+                onClick={(e) => e.stopPropagation()}
+              />
+              {query && (
+                <button
+                  type="button"
+                  className="inc-cselect__search-clear"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setQuery('');
+                    searchInputRef.current?.focus();
+                  }}
+                  title="Clear search"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          )}
+
+          {multi && (
+            <div className="inc-cselect__multibar">
+              <button
+                type="button"
+                className="inc-cselect__multibtn"
+                onClick={handleSelectAll}
+              >
+                Select all ({normalizedOptions.length})
+              </button>
+              {selectedValues.length > 0 && (
+                <button
+                  type="button"
+                  className="inc-cselect__multibtn inc-cselect__multibtn--clear"
+                  onClick={handleClear}
+                >
+                  Clear selection ({selectedValues.length})
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="inc-cselect__list">
+            {!multi && !required && !query && (
+              <div
+                className={`inc-cselect__item inc-cselect__item--all${!hasSelection ? ' inc-cselect__item--active' : ''}`}
+                onClick={() => handleItemClick('')}
+                role="option"
+                aria-selected={!hasSelection}
+              >
+                <div className="inc-cselect__item-left">
+                  <span className="inc-cselect__item-text">{placeholder}</span>
+                </div>
+                {!hasSelection && <Check size={14} className="inc-cselect__check" />}
+              </div>
+            )}
+
+            {filteredOptions.length === 0 ? (
+              <div className="inc-cselect__empty">No matching options</div>
+            ) : (
+              filteredOptions.map((opt) => {
+                const isSelected = selectedValues.includes(String(opt.value));
+                return (
+                  <div
+                    key={opt.value}
+                    className={`inc-cselect__item${isSelected ? ' inc-cselect__item--active' : ''}`}
+                    onClick={() => handleItemClick(opt.value)}
+                    role="option"
+                    aria-selected={isSelected}
+                  >
+                    <div className="inc-cselect__item-left">
+                      {multi && (
+                        <span className={`inc-cselect__checkbox${isSelected ? ' inc-cselect__checkbox--checked' : ''}`}>
+                          {isSelected && <Check size={11} strokeWidth={3} />}
+                        </span>
+                      )}
+                      <span className="inc-cselect__item-text" title={opt.label}>{opt.label}</span>
+                      {opt.sublabel && <span className="inc-cselect__item-sub">{opt.sublabel}</span>}
+                    </div>
+                    {!multi && isSelected && <Check size={14} className="inc-cselect__check" />}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>,
+        portalHost
+      )}
     </div>
   );
 }

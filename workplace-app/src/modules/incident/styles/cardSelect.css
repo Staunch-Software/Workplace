@@ -333,6 +333,83 @@
   font-size: 0.8rem;
 }
 
+/* Multiselect Checkbox */
+.inc-cselect__checkbox {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #ffffff;
+  transition: all 0.15s ease;
+}
+
+.inc-cselect__item:hover .inc-cselect__checkbox {
+  border-color: var(--p2, #6366f1);
+}
+
+.inc-cselect__checkbox--checked {
+  background: var(--p, #4f46e5) !important;
+  border-color: var(--p, #4f46e5) !important;
+}
+
+/* Multi-select Header Actions Bar */
+.inc-cselect__multibar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.75rem;
+}
+
+.inc-cselect__multibtn {
+  border: 0;
+  background: transparent;
+  color: var(--p, #4f46e5);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 0.74rem;
+  transition: all 0.12s;
+}
+
+.inc-cselect__multibtn:hover {
+  background: var(--p-bg, #eef2ff);
+}
+
+.inc-cselect__multibtn--clear {
+  color: var(--muted, #64748b);
+  font-weight: 600;
+}
+
+.inc-cselect__multibtn--clear:hover {
+  color: var(--red, #dc2626);
+  background: #fef2f2;
+}
+
+/* Count badge on trigger */
+.inc-cselect__count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--p-bg, #eef2ff);
+  color: var(--p, #4f46e5);
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .inc-cselect--sm {

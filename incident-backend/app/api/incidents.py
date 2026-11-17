@@ -131,7 +131,9 @@ async def list_incidents(
     if vessel_imo:
         stmt = stmt.where(Incident.vessel_imo.in_([v for v in vessel_imo.split(",") if v]))
     if category:
-        stmt = stmt.where(Incident.category == category)
+        cats = [c.strip() for c in category.split(",") if c.strip()]
+        if cats:
+            stmt = stmt.where(Incident.category.in_(cats))
     if date_from:
         stmt = stmt.where(Incident.incident_date >= date_from)
     if date_to:
