@@ -13,6 +13,8 @@ Run from vp-backend/ (dry run by default; nothing is written without --apply):
 
     --username-fallback   also match old users whose username equals the part of a workplace email before
                           the "@" when that is unambiguous (shown in the table; only applied with this flag)
+    --map OLD=EMAIL       link an old user to a named workplace account when the two have different emails
+                          (repeatable), e.g. --map admin=kunalchandra@ozellar.com; used for a shared login
     --rewrite-created-by  also rewrite cp_manual_overrides.created_by from the old username to the
                           workplace full name for matched users
 
@@ -70,6 +72,23 @@ def plan_matches(old_users: list[dict], control_users: list[dict]) -> list[Match
     return out
 
 
+def apply_manual_maps(matches: list[Match], control_users: list[dict], maps: list[str]) -> list[str]:
+    """--map OLD_USERNAME=workplace-email overrides. Returns problems (unknown old user / unknown email)."""
+    by_email = {(u["email"] or "").strip().lower(): u for u in control_users}
+    problems = []
+    for spec in maps:
+        old_name, _, email = spec.partition("=")
+        m = next((x for x in matches if x.username.strip().lower() == old_name.strip().lower()), None)
+        target = by_email.get(email.strip().lower())
+        if m is None:
+            problems.append(f"--map {spec}: no old user named '{old_name}'")
+        elif target is None:
+            problems.append(f"--map {spec}: no active workplace user with email '{email}'")
+        else:
+            m.new_id, m.new_name, m.how = str(target["id"]), target["full_name"], "manual"
+    return problems
+
+
 def _engine(url: str):
     return create_engine(re.sub(r"^postgres(ql)?(\+\w+)?://", "postgresql+psycopg2://", url))
 
@@ -78,6 +97,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--username-fallback", action="store_true")
+    ap.add_argument("--map", action="append", default=[], metavar="OLD=EMAIL")
     ap.add_argument("--rewrite-created-by", action="store_true")
     args = ap.parse_args()
 
@@ -100,6 +120,10 @@ def main() -> int:
     for m in matches:
         if m.how == "username" and not args.username_fallback:
             m.new_id = m.new_name = None
+    problems = apply_manual_maps(matches, control_users, args.map)
+    if problems:
+        print("\n".join(problems))
+        return 1
     with vp.connect() as c:
         for m in matches:
             m.prefs = c.execute(text("SELECT count(*) FROM user_column_preferences WHERE user_id = :i"), {"i": m.old_id}).scalar()

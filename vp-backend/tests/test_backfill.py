@@ -122,3 +122,15 @@ def test_init_db_is_repeatable():
     from backend.database import init_db
     init_db()
     init_db()
+
+
+def test_manual_map_links_a_shared_login_to_a_named_account():
+    from backfill_user_uuids import apply_manual_maps
+    old = [{"id": 1, "username": "admin", "email": "admin@vesselpref.com"}]
+    new = [{"id": uuid.uuid4(), "email": "Kunal@Example.com", "full_name": "Kunal C"}]
+    ms = plan_matches(old, new)
+    assert ms[0].new_id is None
+    assert apply_manual_maps(ms, new, ["admin=kunal@example.com"]) == []
+    assert ms[0].new_id == str(new[0]["id"]) and ms[0].how == "manual"
+    assert apply_manual_maps(ms, new, ["nobody=kunal@example.com"])      # unknown old user is reported
+    assert apply_manual_maps(ms, new, ["admin=nobody@example.com"])      # unknown email is reported

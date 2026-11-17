@@ -44,6 +44,7 @@ CREATE ROLE vp_ctl_ro LOGIN PASSWORD '<password>';
 GRANT CONNECT ON DATABASE workplace_control TO vp_ctl_ro;
 GRANT USAGE ON SCHEMA public TO vp_ctl_ro;
 GRANT SELECT (id, full_name, email, role, is_active, permissions) ON users TO vp_ctl_ro;
+GRANT SELECT (imo, name) ON vessels TO vp_ctl_ro;      -- only for scripts/check_vessel_links.py
 ```
 
 `.env` (see `.env.example` for everything): `DB_*` as in the old install, `CONTROL_DATABASE_URL` for
@@ -112,15 +113,32 @@ venv/bin/python scripts/backfill_user_uuids.py --apply # link the matched users'
 ```
 
 Users the dry run lists as not matched: create their workplace account (step 5) and run it again. Their
-rows are never deleted or reassigned. The old integer columns and the old `users` table stay as they are.
+rows are never deleted or reassigned. A shared old login (for example `admin`) can be given to a named person
+with `--map admin=person@ozellar.com`; discussion posts keep the author's name as text, so a user who only
+wrote posts does not need an account for them to stay visible. The old integer columns and the old `users` table stay as they are.
+
+## 6b. AMNS vessel IMOs (at cutover, not before)
+
+AMNS POLAR, AMNSI MAXIMUS and AMNSI STALLION carry different IMOs here (9961609, 9942768, 9942770) than in the
+workplace (9521813, 9628893, 9628910), so they cannot be linked and ORB finds no pipeline data for them.
+`scripts/correct_amns_imos.py` moves this database to the workplace numbers in one transaction, across every
+column named `vessel_imo` / `imo` (including tables without a foreign key). The Wartsila scraper in this folder
+already uses the workplace numbers; the old install's scraper still writes the old ones, so run it only when
+the old API and the old cron jobs are stopped:
+
+```bash
+venv/bin/python scripts/correct_amns_imos.py           # dry run, per table
+venv/bin/python scripts/correct_amns_imos.py --apply
+venv/bin/python scripts/check_vessel_links.py          # all 15 vessels should match
+```
 
 ## 7. Parallel run, then cutover
 
 1. Leave every cron line and the old API on the old path. Open `/vp` and compare with the old dashboard.
-2. Cutover, in this order: stop the old API service; change the four cron lines to
+2. Cutover, in this order: stop the old API service (`vessel-api`); change the four cron lines to
    `/opt/workplace/Workplace/vp-backend/scripts/...` (`scripts/CRON_SETUP.md`); set both scheduler variables
    in `.env` back to `30` and `15` and restart `workplace-vp`; run `backfill_user_uuids.py --apply` once more;
-   point the old address at `/vp`.
+   run `scripts/correct_amns_imos.py` (step 6b); point the old address at `/vp`.
 3. After a normal cron cycle check `logs/*_cron.log`, the Fleet Status page and one voyage-completion mail.
 4. Keep the old install stopped but intact for a week. Then the old `users` table and the legacy
    `user_column_preferences.user_id` / `data_quality_threads.author_user_id` columns can be dropped.

@@ -13,16 +13,16 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(mes
 WARTSILA_USERNAME = os.getenv("WARTSILA_USERNAME", "")
 WARTSILA_PASSWORD = os.getenv("WARTSILA_PASSWORD", "")
 
-# Wartsila internal vesselId mapping
+# Wartsila internal vesselId -> IMO as the workplace knows the vessel (scripts/correct_amns_imos.py aligned the database)
 AMNS_VESSELS = {
-    "6900-195": "9961609",  # AMNS POLAR
-    "6900-016": "9942768",  # AMNSI MAXIMUS
-    "6169-999": "9942770",  # AMNSI STALLION
+    "6900-195": "9521813",  # AMNS POLAR
+    "6900-016": "9628893",  # AMNSI MAXIMUS
+    "6169-999": "9628910",  # AMNSI STALLION
 }
 
 # Static general vessel info sourced from public maritime databases
 VESSEL_GENERAL_INFO = {
-    "9961609": {  # AMNS POLAR
+    "9521813": {  # AMNS POLAR
         "callsign": "VTWT",
         "flag_code": "IN",
         "ship_type": "BULK CARRIER",
@@ -32,7 +32,7 @@ VESSEL_GENERAL_INFO = {
         "dwt": "19560",
         "gross_tonnage": "13579",
     },
-    "9942768": {  # AMNSI MAXIMUS
+    "9628893": {  # AMNSI MAXIMUS
         "callsign": "VTOC",
         "flag_code": "IN",
         "ship_type": "BULK CARRIER",
@@ -42,7 +42,7 @@ VESSEL_GENERAL_INFO = {
         "dwt": "81666",
         "gross_tonnage": "44310",
     },
-    "9942770": {  # AMNSI STALLION
+    "9628910": {  # AMNSI STALLION
         "callsign": "VTNZ",
         "flag_code": "IN",
         "ship_type": "BULK CARRIER",
