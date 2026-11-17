@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { memoryStore } from './utils/memoryStore'
 
 import { Zap, AlertTriangle, FileText, Database, BarChart2, ChevronDown, Users, LogOut, Shield, BookOpen, Map, ScrollText, Leaf, Fuel, Columns, Droplet } from 'lucide-react'
@@ -38,6 +39,7 @@ const MAX_TOP = 520
 
 // ── Avatar dropdown ────────────────────────────────────────────────────────────
 function AvatarMenu({ user, isAdmin, onColumnConfig, onLogout }) {
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const menuRef = useRef(null)
 
@@ -99,7 +101,7 @@ function AvatarMenu({ user, isAdmin, onColumnConfig, onLogout }) {
           {/* Back to the workplace home */}
           <button
             className="av-dropdown-item"
-            onClick={() => { setOpen(false); window.location.href = '/dashboard' }}
+            onClick={() => { setOpen(false); navigate('/dashboard') }}
           >
             <Shield size={13} />
             Back to Workplace
@@ -155,6 +157,7 @@ const NAV_GROUPS = [
 ]
 
 function PageTabBar({ active, onChange, isAdmin, onLogout, currentUser, onColumnConfig }) {
+  const navigate = useNavigate()
   const [openGroup, setOpenGroup] = useState(null)
   const navRef = useRef(null)
 
@@ -188,6 +191,20 @@ function PageTabBar({ active, onChange, isAdmin, onLogout, currentUser, onColumn
 
   return (
     <div className="page-tabs" ref={navRef}>
+      {/* Back to the workplace home: nine dots that turn into an arrow on hover, as in the other modules */}
+      <button
+        className="vp-nav-home-btn"
+        onClick={() => navigate('/dashboard')}
+        title="Back to Dashboard"
+        aria-label="Back to Dashboard"
+      >
+        <div className="vp-dots-grid">
+          {[...Array(9)].map((_, i) => <span key={i} className="vp-dot" />)}
+        </div>
+        <div className="vp-dots-arrow">&#8249;</div>
+      </button>
+      <div className="vp-nav-divider" />
+
       {NAV_GROUPS.map(group => (
         <div key={group.id} className="page-tab-group">
           <div

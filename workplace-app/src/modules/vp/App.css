@@ -22,6 +22,30 @@
   flex-shrink: 0;
 }
 
+/* Back to the workplace: nine dots that turn into an arrow on hover (same as the other modules) */
+.vp-nav-home-btn {
+  width: 32px; height: 32px; margin: 0 12px 0 16px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: none; border-radius: 7px;
+  cursor: pointer; flex-shrink: 0; position: relative;
+  transition: background 0.2s; padding: 0;
+}
+.vp-nav-home-btn:hover { background: rgba(255, 255, 255, 0.07); }
+.vp-dots-grid {
+  display: grid; grid-template-columns: repeat(3, 5px);
+  gap: 2px; position: absolute; transition: opacity 0.2s; opacity: 1;
+}
+.vp-dot { width: 5px; height: 5px; border-radius: 1.5px; background: #94a3b8; display: block; }
+.vp-dots-arrow {
+  position: absolute; opacity: 0; width: 32px; height: 32px;
+  transition: opacity 0.2s; color: var(--text-primary); font-size: 1.25rem; font-weight: 700;
+  line-height: 1; display: flex; align-items: center; justify-content: center;
+  background: var(--bg-panel); border-radius: 7px; border: 1px solid var(--border);
+}
+.vp-nav-home-btn:hover .vp-dots-grid { opacity: 0; }
+.vp-nav-home-btn:hover .vp-dots-arrow { opacity: 1; }
+.vp-nav-divider { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; margin-right: 4px; }
+
 .page-tab {
   padding: 0 24px;
   height: 42px;
