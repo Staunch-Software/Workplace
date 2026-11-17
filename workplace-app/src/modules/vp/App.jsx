@@ -104,15 +104,6 @@ function AvatarMenu({ user, isAdmin, onColumnConfig, onLogout }) {
             <Shield size={13} />
             Back to Workplace
           </button>
-
-          {/* Sign out */}
-          <button
-            className="av-dropdown-item danger"
-            onClick={() => { setOpen(false); onLogout() }}
-          >
-            <LogOut size={13} />
-            Sign Out
-          </button>
         </div>
       )}
     </div>
