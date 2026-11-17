@@ -76,7 +76,12 @@ export default function IncidentList({ me }) {
     offhire: all.filter((r) => r.offhire).length,
   }), [all]);
 
-  const rows = useMemo(() => (status ? all.filter((r) => r.status === status) : all), [all, status]);
+  const rows = useMemo(() => {
+    const list = status ? all.filter((r) => r.status === status) : all;
+    return [...list].sort((a, b) =>
+      (a.incident_no || '').localeCompare(b.incident_no || '', undefined, { numeric: true }),
+    );
+  }, [all, status]);
   const stop = (e) => e.stopPropagation();
   const openIncident = useCallback((id, tabName) => {
     setParams((prev) => {

@@ -123,7 +123,7 @@ async def list_incidents(
     db: AsyncSession = Depends(get_db),
     user: ControlUser = Depends(get_current_user),
 ):
-    stmt = select(Incident).order_by(Incident.incident_date.desc(), Incident.created_at.desc())
+    stmt = select(Incident).order_by(Incident.incident_no.asc(), Incident.created_at.asc())
     if status:
         if status.upper() not in STATUSES:
             raise HTTPException(status_code=400, detail="status must be DRAFT or CLOSED")
