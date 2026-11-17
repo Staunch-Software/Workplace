@@ -30,19 +30,25 @@ export default function IncidentList({ me }) {
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState(filters.q);
-  const [sortField, setSortField] = useState('incident_no');
-  const [sortOrder, setSortOrder] = useState('asc');
+  const [sortField, setSortField] = useState(null);
+  const [sortOrder, setSortOrder] = useState('normal'); // 'asc' | 'desc' | 'normal'
 
+  // 3-state sort: Ascending -> Descending -> Normal (reset)
   const toggleSort = useCallback((field) => {
-    setSortField((currField) => {
-      if (currField === field) {
-        setSortOrder((currOrder) => (currOrder === 'asc' ? 'desc' : 'asc'));
-        return currField;
-      }
+    if (sortField !== field) {
+      setSortField(field);
       setSortOrder('asc');
-      return field;
-    });
-  }, []);
+    } else {
+      if (sortOrder === 'asc') {
+        setSortOrder('desc');
+      } else if (sortOrder === 'desc') {
+        setSortField(null);
+        setSortOrder('normal');
+      } else {
+        setSortOrder('asc');
+      }
+    }
+  }, [sortField, sortOrder]);
 
   const setParam = useCallback((key, value) => {
     setParams((prev) => {
@@ -91,6 +97,12 @@ export default function IncidentList({ me }) {
 
   const rows = useMemo(() => {
     const list = status ? all.filter((r) => r.status === status) : all;
+    if (!sortField || sortOrder === 'normal') {
+      // Normal/Default mode: chronological order by incident_no (0001, 0002, 0003...)
+      return [...list].sort((a, b) =>
+        (a.incident_no || '').localeCompare(b.incident_no || '', undefined, { numeric: true })
+      );
+    }
     return [...list].sort((a, b) => {
       let cmp = 0;
       if (sortField === 'incident_no') {
@@ -199,15 +211,23 @@ export default function IncidentList({ me }) {
               <tr>
                 <th>Status</th>
                 <th
-                  className="inc-th-sortable"
+                  className={`inc-th-sortable${sortField === 'incident_no' && sortOrder !== 'normal' ? ' inc-th-sortable--active' : ''}`}
                   onClick={() => toggleSort('incident_no')}
-                  title="Click to sort by Incident ID"
+                  title={
+                    sortField === 'incident_no' && sortOrder === 'asc'
+                      ? 'Sorted: Ascending (0001 to 9999). Click to sort descending.'
+                      : sortField === 'incident_no' && sortOrder === 'desc'
+                      ? 'Sorted: Descending (9999 to 0001). Click for normal order.'
+                      : 'Click to sort by Incident ID (Ascending)'
+                  }
                 >
                   <div className="inc-th-sort-inner">
                     <span>Incident ID</span>
-                    <span className={`inc-sort-icon${sortField === 'incident_no' ? ' inc-sort-icon--active' : ''}`}>
-                      {sortField === 'incident_no' ? (
-                        sortOrder === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />
+                    <span className={`inc-sort-icon${sortField === 'incident_no' && sortOrder !== 'normal' ? ' inc-sort-icon--active' : ''}`}>
+                      {sortField === 'incident_no' && sortOrder === 'asc' ? (
+                        <ArrowUp size={13} />
+                      ) : sortField === 'incident_no' && sortOrder === 'desc' ? (
+                        <ArrowDown size={13} />
                       ) : (
                         <ArrowUpDown size={13} />
                       )}
@@ -216,15 +236,23 @@ export default function IncidentList({ me }) {
                 </th>
                 <th>Vessel</th>
                 <th
-                  className="inc-th-sortable"
+                  className={`inc-th-sortable${sortField === 'incident_date' && sortOrder !== 'normal' ? ' inc-th-sortable--active' : ''}`}
                   onClick={() => toggleSort('incident_date')}
-                  title="Click to sort by Date"
+                  title={
+                    sortField === 'incident_date' && sortOrder === 'asc'
+                      ? 'Sorted: Oldest first. Click to sort newest first.'
+                      : sortField === 'incident_date' && sortOrder === 'desc'
+                      ? 'Sorted: Newest first. Click for normal order.'
+                      : 'Click to sort by Date (Oldest first)'
+                  }
                 >
                   <div className="inc-th-sort-inner">
                     <span>Date</span>
-                    <span className={`inc-sort-icon${sortField === 'incident_date' ? ' inc-sort-icon--active' : ''}`}>
-                      {sortField === 'incident_date' ? (
-                        sortOrder === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />
+                    <span className={`inc-sort-icon${sortField === 'incident_date' && sortOrder !== 'normal' ? ' inc-sort-icon--active' : ''}`}>
+                      {sortField === 'incident_date' && sortOrder === 'asc' ? (
+                        <ArrowUp size={13} />
+                      ) : sortField === 'incident_date' && sortOrder === 'desc' ? (
+                        <ArrowDown size={13} />
                       ) : (
                         <ArrowUpDown size={13} />
                       )}

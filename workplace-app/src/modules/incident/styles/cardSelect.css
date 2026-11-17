@@ -147,6 +147,7 @@
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  overflow: hidden;
   animation: incCardSelectIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -226,15 +227,22 @@
 
 /* Scroll List */
 .inc-cselect__list {
+  flex: 1 1 auto;
+  min-height: 0;
   max-height: 250px;
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .inc-cselect__list::-webkit-scrollbar {
   width: 5px;
+  height: 0px;
 }
 .inc-cselect__list::-webkit-scrollbar-track {
   background: transparent;
@@ -252,20 +260,22 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 12px;
+  gap: 10px;
+  padding: 8px 10px;
   border-radius: 8px;
   font-size: 0.83rem;
   font-weight: 500;
   color: var(--text-2, #334155);
   cursor: pointer;
-  transition: all 0.12s ease;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  transition: background 0.12s ease, color 0.12s ease;
 }
 
 .inc-cselect__item:hover {
   background: #f1f5f9;
   color: #0f172a;
-  transform: translateX(2px);
 }
 
 .inc-cselect__item--active {
@@ -285,17 +295,21 @@
 .inc-cselect__item-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
-/* Vessel / Category name: show fully without truncation */
+/* Vessel / Category name: show fully without horizontal overflow */
 .inc-cselect__item-text {
   white-space: nowrap;
   font-weight: 600;
   color: inherit;
-  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
 }
 
 /* IMO badge: neatly styled pill that NEVER wraps */
@@ -366,6 +380,8 @@
   margin-bottom: 4px;
   border-bottom: 1px solid #f1f5f9;
   font-size: 0.75rem;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .inc-cselect__multibtn {
