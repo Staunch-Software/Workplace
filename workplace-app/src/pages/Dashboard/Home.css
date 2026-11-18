@@ -1,3 +1,9 @@
+/* The page canvas is white by default; paint it grey while the dashboard is
+   mounted so the area outside the centred container matches it. */
+html:has(.hm-container) {
+  background-color: #f8f9fa;
+}
+
 .hm-container {
   max-width: 1100px;
   margin: 0 auto;
