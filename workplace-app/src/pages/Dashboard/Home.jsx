@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { FileText, Trello, Droplet, Activity, FileBarChart2, BookOpen, ShieldAlert, BarChart2 } from "lucide-react";
+import { ClipboardList, Trello, Droplet, Activity, FileCheck2, BookOpen, ShieldAlert, Ship } from "lucide-react";
 import api from '../../api/axios';
 import './Home.css';
 
@@ -105,13 +105,13 @@ const Home = ({ searchQuery = '' }) => {
   };
 
   const allApps = [
-    { id: 'drs', permKey: 'drs', name: 'DRS', desc: 'Defect Reporting System', icon: <FileText size={32} />, class: 'hm-card-drs', delay: '0s' },
+    { id: 'drs', permKey: 'drs', name: 'DRS', desc: 'Defect Reporting System', icon: <ClipboardList size={32} />, class: 'hm-card-drs', delay: '0s' },
     { id: 'jira', permKey: 'jira', name: 'SmartPAL JIRA Portal', desc: 'Ticket Tracking for SmartPAL Portal', icon: <Trello size={32} />, class: 'hm-card-jira', delay: '0.1s' },
     { id: 'lube', permKey: 'lubeoil', name: 'Lubeoil Analysis', desc: 'Shore Analysis Portal', icon: <Droplet size={32} />, class: 'hm-card-lube', delay: '0.2s' },
     { id: 'engine', permKey: 'engine_performance', name: 'Engine Performance', desc: 'Metrics & Health', icon: <Activity size={32} />, class: 'hm-card-engine', delay: '0.3s' },
-    { id: 'reports', permKey: 'report_tracker', name: 'Report Tracker', desc: 'Report Tracking & Threads', icon: <FileBarChart2 size={32} />, class: 'hm-card-reports', delay: '0.4s' },
+    { id: 'reports', permKey: 'report_tracker', name: 'Report Tracker', desc: 'Report Tracking & Threads', icon: <FileCheck2 size={32} />, class: 'hm-card-reports', delay: '0.4s' },
     { id: 'orb', permKey: 'orb', name: 'Oil Record Book', desc: 'ORB Digitisation & Compliance', icon: <BookOpen size={32} />, class: 'hm-card-orb', delay: '0.5s' },
-    { id: 'vp', permKey: 'vessel_performance', name: 'Vessel Performance', desc: 'Noon Reports, CP, ISO 19030 & Emissions', icon: <BarChart2 size={32} />, class: 'hm-card-vp', delay: '0.7s' },
+    { id: 'vp', permKey: 'vessel_performance', name: 'Vessel Performance', desc: 'Noon Reports, CP, ISO 19030 & Emissions', icon: <Ship size={32} />, class: 'hm-card-vp', delay: '0.7s' },
     { id: 'incident', permKey: 'incident_report', name: 'Incident Reports', desc: 'Incident Repository & Investigation', icon: <ShieldAlert size={32} />, class: 'hm-card-incident', delay: '0.6s' },
   ];
 
