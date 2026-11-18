@@ -135,10 +135,20 @@ venv/bin/python scripts/check_vessel_links.py          # all 15 vessels should m
 ## 7. Parallel run, then cutover
 
 1. Leave every cron line and the old API on the old path. Open `/vp` and compare with the old dashboard.
-2. Cutover, in this order: stop the old API service (`vessel-api`); change the four cron lines to
-   `/opt/workplace/Workplace/vp-backend/scripts/...` (`scripts/CRON_SETUP.md`); set both scheduler variables
-   in `.env` back to `30` and `15` and restart `workplace-vp`; run `backfill_user_uuids.py --apply` once more;
-   run `scripts/correct_amns_imos.py` (step 6b); point the old address at `/vp`.
+2. Cutover, in this order (pick a time away from :00, :10, :30 and :40):
+   1. Back up the crontab (`crontab -l > ~/crontab.before-cutover`) and stop the old API (`vessel-api`).
+   2. There are six Vessel Performance cron lines (WNI, MariApps, email_scraper, Wartsila, bunker report,
+      data quality). Move them with
+      `crontab -l | sed 's#/opt/vessel_pipeline#/opt/workplace/Workplace/vp-backend#g' | crontab -`
+      and check that six `vp-backend` lines and no `vessel_pipeline` lines remain.
+   3. Make sure `run_wartsila_scraper.sh` and `scripts/*.sh` are executable (`chmod +x`); cron fails
+      silently with "Permission denied" otherwise.
+   4. Set `FLEET_STATUS_INTERVAL_MINUTES=30` and `EMAIL_SCRAPER_INTERVAL_MINUTES=15` in `.env` (they are 0 during
+      the parallel run), then restart `workplace-vp` and check the journal for `[FLEET_SCHED]` and `[EMAIL_SCHED]`
+      starting.
+   5. Run `backfill_user_uuids.py --apply` once more (add `--map admin=<email>` if the old admin was mapped).
+   6. Run `scripts/correct_amns_imos.py` (step 6b), then `check_vessel_links.py`.
+   7. Point the old address at `/vp`.
 3. After a normal cron cycle check `logs/*_cron.log`, the Fleet Status page and one voyage-completion mail.
 4. Keep the old install stopped but intact for a week. Then the old `users` table and the legacy
    `user_column_preferences.user_id` / `data_quality_threads.author_user_id` columns can be dropped.
