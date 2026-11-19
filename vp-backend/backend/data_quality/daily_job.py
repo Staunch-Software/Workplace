@@ -10,7 +10,8 @@
 #   2. Re-check every date that still has an OPEN finding from a previous
 #      run too — a vessel can correct an older report days later, so an old
 #      finding needs to keep being re-verified, not just created once and
-#      forgotten.
+#      forgotten. Dates resolved within the last RECHECK_RESOLVED_DAYS are
+#      re-checked as well, so a gap that reappears reopens its finding.
 #   3. Anything still missing -> upsert as 'open' (bumps notify_count next
 #      time it's mailed). Anything previously open but NOT found missing
 #      this pass -> flip to 'resolved', silently (no "fixed" confirmation
@@ -79,6 +80,12 @@ def _resolve_finding(db, row):
     row.last_checked_at = datetime.utcnow()
 
 
+# How long after resolution a finding keeps being re-checked. If the gap
+# reappears inside this window (e.g. a report is re-ingested) the finding is
+# reopened and mailed again instead of staying silently "resolved".
+RECHECK_RESOLVED_DAYS = 14
+
+
 def _dates_to_check(db, vessel_imo, yesterday):
     dates = {yesterday}
     open_dates = (
@@ -88,6 +95,19 @@ def _dates_to_check(db, vessel_imo, yesterday):
         .all()
     )
     dates.update(d for (d,) in open_dates)
+
+    cutoff = datetime.utcnow() - timedelta(days=RECHECK_RESOLVED_DAYS)
+    recent_resolved = (
+        db.query(DataQualityFinding.report_date)
+        .filter(
+            DataQualityFinding.vessel_imo == vessel_imo,
+            DataQualityFinding.status == "resolved",
+            DataQualityFinding.resolved_at >= cutoff,
+        )
+        .distinct()
+        .all()
+    )
+    dates.update(d for (d,) in recent_resolved)
     return sorted(dates)
 
 
