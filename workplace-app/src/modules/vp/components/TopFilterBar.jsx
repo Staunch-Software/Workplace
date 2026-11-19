@@ -400,7 +400,9 @@ export default function TopFilterBar({
                 if (vName === 'AMNS TUFMAX' || newImo === '9486295') {
                   onSourceChange('wni')
                 } else if (vName === 'AMNS POLAR' || newImo === '9521813') {
-                  onSourceChange('Wartsila FOS')
+                  // POLAR's Wartsila history ends in Aug 2026; current data comes from
+                  // MariApps, so open on MariApps (Wartsila stays available as a tab).
+                  onSourceChange('mari_apps')
                 } else {
                   // Every other vessel uses the normal All/WNI/MariApps source set, whose
                   // real default is 'mari_apps' (see LogbookPage's initial useState) — not
