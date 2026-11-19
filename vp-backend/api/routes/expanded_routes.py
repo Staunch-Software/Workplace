@@ -362,6 +362,22 @@ def query_mariapps(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+def _ensure_polar_wartsila_in_expanded(db: Session):
+    """Fill expanded_wni_data with AMNS POLAR's Wartsila reports when it has none yet."""
+    try:
+        from backend.pipeline.polar_wartsila_sync import (
+            polar_wartsila_rows_exist, sync_polar_wartsila,
+        )
+        if polar_wartsila_rows_exist(db):
+            return
+        sync_polar_wartsila(db)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        import logging
+        logging.getLogger("uvicorn").warning(f"Auto-sync of Polar Wartsila expanded records: {e}")
+
+
 @router.get("/wni")
 def query_wni(
     vessel_imo:   Optional[str] = None,
@@ -373,6 +389,11 @@ def query_wni(
 ):
     """Query expanded_wni_data with optional filters."""
     try:
+        # AMNS POLAR's Wartsila rows are copied in on first use (idempotent).
+        from backend.pipeline.polar_wartsila_sync import POLAR_IMO
+        if not vessel_imo or str(vessel_imo).strip() == POLAR_IMO:
+            _ensure_polar_wartsila_in_expanded(db)
+
         # Get actual columns in expanded_wni_data to guard against stale metadata
         actual_cols = {
             r[0] for r in db.execute(text(

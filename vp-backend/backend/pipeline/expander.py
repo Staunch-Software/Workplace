@@ -2201,6 +2201,15 @@ def backfill_wni(engine, batch_size: int = 50):
             if offset % 500 == 0 or offset >= total:
                 log.info(f"  wni: {min(offset, total)}/{total}")
 
+        # AMNS POLAR has no WNI feed: keep its Wartsila reports in expanded_wni_data.
+        try:
+            from .polar_wartsila_sync import sync_polar_wartsila
+            sync_polar_wartsila(conn)
+            conn.commit()
+        except Exception as sync_err:
+            conn.rollback()
+            log.warning(f"Could not sync Polar Wartsila expanded records: {sync_err}")
+
     log.info(f"WNI backfill: {processed} OK, {errors} errors.")
     return processed, errors
 

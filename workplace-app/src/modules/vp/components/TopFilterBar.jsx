@@ -396,9 +396,10 @@ export default function TopFilterBar({
                 const newImo = e.target.value
                 setVessel(newImo)
                 memoryStore.setItem('vp_last_vessel_logbook', newImo)
-                if (newImo === '9486295') {
+                const vName = vessels.find(v => v.imo_number === newImo)?.vessel_name
+                if (vName === 'AMNS TUFMAX' || newImo === '9486295') {
                   onSourceChange('wni')
-                } else if (newImo === '9521813') {
+                } else if (vName === 'AMNS POLAR' || newImo === '9521813') {
                   onSourceChange('Wartsila FOS')
                 } else {
                   // Every other vessel uses the normal All/WNI/MariApps source set, whose
@@ -572,7 +573,7 @@ export default function TopFilterBar({
                 Excel
               </label>
             ) : vessels.find(v => v.imo_number === selectedVessel)?.vessel_name === 'AMNS POLAR' ? (
-              [['all', 'All'], ['Wartsila FOS', 'Wartsila']].map(([val, label]) => (
+              [['all', 'All'], ['Wartsila FOS', 'Wartsila'], ['mari_apps', 'MariApps']].map(([val, label]) => (
                 <label key={val} className={`radio-option source-pill${source === val ? ' active' : ''}`}>
                   <input type="radio" name="source" value={val}
                     checked={source === val} onChange={() => onSourceChange(val)} />
