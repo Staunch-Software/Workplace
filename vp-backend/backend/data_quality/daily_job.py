@@ -83,7 +83,7 @@ def _resolve_finding(db, row):
 # How long after resolution a finding keeps being re-checked. If the gap
 # reappears inside this window (e.g. a report is re-ingested) the finding is
 # reopened and mailed again instead of staying silently "resolved".
-RECHECK_RESOLVED_DAYS = 14
+RECHECK_RESOLVED_DAYS = 30
 
 
 def _dates_to_check(db, vessel_imo, yesterday):
