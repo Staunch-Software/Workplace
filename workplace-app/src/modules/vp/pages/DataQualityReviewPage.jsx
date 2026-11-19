@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Loader2, AlertTriangle, MessageSquare, Send, RefreshCw } from 'lucide-react'
 import {
-  fetchVessels, fetchDataQualityFindings, updateDataQualityFindingStatus,
+  fetchVessels, fetchDataQualityFindings,
   fetchDataQualityThreads, postDataQualityThread,
 } from '../api/vesselApi'
 import './DataQualityReviewPage.css'
@@ -95,15 +95,6 @@ export default function DataQualityReviewPage() {
     }
   }
 
-  async function handleStatusChange(e) {
-    const newStatus = e.target.value
-    if (!active) return
-    try {
-      await updateDataQualityFindingStatus(active.id, newStatus)
-      loadFindings()
-    } catch {}
-  }
-
   return (
     <div className="dqr-page">
       <div className="dqr-topbar">
@@ -184,11 +175,7 @@ export default function DataQualityReviewPage() {
                     <span className="dqr-eyebrow">Data Discrepancy · {active.source_id}</span>
                     <h2>{active.rule_label}</h2>
                   </div>
-                  <select className="dqr-status-select" value={active.status} onChange={handleStatusChange}>
-                    <option value="open">Open</option>
-                    <option value="acknowledged">Acknowledged</option>
-                    <option value="resolved">Resolved</option>
-                  </select>
+                  <span className={`dqr-badge ${active.status}`}>{STATUS_LABEL[active.status] || active.status}</span>
                 </div>
                 <div className="dqr-detail-sub">
                   <span><b>{active.vessel_name}</b></span>

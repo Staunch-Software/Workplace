@@ -13,7 +13,7 @@
 # lands, rather than building a second thread model.
 #
 # GET   /api/v1/data-quality/findings                    — queue listing
-# PATCH /api/v1/data-quality/findings/{id}                — status change
+# (status is system-managed by the daily job; no manual PATCH)
 # GET   /api/v1/data-quality/findings/{id}/threads        — list messages
 # POST  /api/v1/data-quality/findings/{id}/threads        — add a message
 # ============================================================
@@ -45,10 +45,6 @@ _RULE_LABELS = {
 class ThreadPayload(BaseModel):
     body: str
     is_internal: bool = True
-
-
-class StatusPayload(BaseModel):
-    status: str
 
 
 def _finding_dict(row: DataQualityFinding, vessel_name: str, thread_counts: dict):
@@ -112,27 +108,6 @@ def list_findings(
         bucket["internal" if is_internal else "vessel"] = cnt
 
     return [_finding_dict(r, vessel_names.get(r.vessel_imo, r.vessel_imo), thread_counts) for r in rows]
-
-
-@router.patch("/findings/{finding_id}")
-def update_finding_status(
-    finding_id: int,
-    payload: StatusPayload,
-    db: Session = Depends(get_db_for_auth),
-    current_user: User = Depends(get_current_user),
-):
-    if payload.status not in _VALID_STATUSES:
-        raise HTTPException(status_code=400, detail=f"status must be one of {sorted(_VALID_STATUSES)}")
-    row = db.query(DataQualityFinding).filter(DataQualityFinding.id == finding_id).first()
-    if not row:
-        raise HTTPException(status_code=404, detail="Finding not found")
-
-    from datetime import datetime
-    row.status = payload.status
-    if payload.status == "resolved":
-        row.resolved_at = datetime.utcnow()
-    db.commit()
-    return {"id": row.id, "status": row.status}
 
 
 @router.get("/findings/{finding_id}/threads")
