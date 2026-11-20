@@ -80,6 +80,28 @@ def _resolve_finding(db, row):
     row.last_checked_at = datetime.utcnow()
 
 
+def recheck_open_findings(db, rows):
+    """On-demand re-check of OPEN findings (review-page buttons). Runs the same
+    checks as the daily job, resolves a finding only if its gap is really gone,
+    otherwise keeps it open with a refreshed detail. Never sends mail and never
+    touches notify_count. Caller commits. Returns one result dict per row."""
+    cache = {}
+    results = []
+    for row in rows:
+        key = (row.vessel_imo, row.report_date)
+        if key not in cache:
+            cache[key] = run_checks_for_date(db, row.vessel_imo, row.report_date)
+        found = cache[key].get((row.source_id, row.rule_key))
+        if found is None:
+            _resolve_finding(db, row)
+        else:
+            row.detail = found
+            row.last_checked_at = datetime.utcnow()
+        results.append({"id": row.id, "resolved": found is None, "status": row.status, "detail": row.detail})
+    db.flush()
+    return results
+
+
 # How long after resolution a finding keeps being re-checked. If the gap
 # reappears inside this window (e.g. a report is re-ingested) the finding is
 # reopened and mailed again instead of staying silently "resolved".

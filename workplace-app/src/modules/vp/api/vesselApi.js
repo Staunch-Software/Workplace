@@ -527,8 +527,15 @@ export async function fetchDataQualityFindings(vesselImo, status) {
   return Array.isArray(data) ? data : []
 }
 
-export async function updateDataQualityFindingStatus(findingId, status) {
-  const { data } = await api.patch(`/data-quality/findings/${findingId}`, { status })
+export async function recheckDataQualityFinding(findingId) {
+  const { data } = await api.post(`/data-quality/findings/${findingId}/recheck`)
+  return data
+}
+
+export async function recheckOpenDataQualityFindings(vesselImo) {
+  const params = {}
+  if (vesselImo && vesselImo !== 'all') params.vessel_imo = vesselImo
+  const { data } = await api.post('/data-quality/findings/recheck-open', null, { params })
   return data
 }
 

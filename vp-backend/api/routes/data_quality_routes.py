@@ -13,7 +13,9 @@
 # lands, rather than building a second thread model.
 #
 # GET   /api/v1/data-quality/findings                    — queue listing
-# (status is system-managed by the daily job; no manual PATCH)
+# (status is system-managed; no manual PATCH)
+# POST  /api/v1/data-quality/findings/{id}/recheck        — re-check one open finding now
+# POST  /api/v1/data-quality/findings/recheck-open        — re-check all open findings now
 # GET   /api/v1/data-quality/findings/{id}/threads        — list messages
 # POST  /api/v1/data-quality/findings/{id}/threads        — add a message
 # ============================================================
@@ -27,6 +29,7 @@ from sqlalchemy import func
 
 from backend.auth import User, get_current_user, get_db_for_auth
 from backend.models import DataQualityFinding, DataQualityThread, Vessel
+from backend.data_quality.daily_job import recheck_open_findings
 
 router = APIRouter(prefix="/data-quality", tags=["data-quality-review"])
 
@@ -108,6 +111,39 @@ def list_findings(
         bucket["internal" if is_internal else "vessel"] = cnt
 
     return [_finding_dict(r, vessel_names.get(r.vessel_imo, r.vessel_imo), thread_counts) for r in rows]
+
+
+@router.post("/findings/recheck-open")
+def recheck_all_open(
+    vessel_imo: Optional[str] = Query(None),
+    db: Session = Depends(get_db_for_auth),
+    current_user: User = Depends(get_current_user),
+):
+    """Re-check every open finding (optionally one vessel) right now. A finding
+    is resolved only if its gap is really gone; no mail is sent."""
+    q = db.query(DataQualityFinding).filter(DataQualityFinding.status == "open")
+    if vessel_imo:
+        q = q.filter(DataQualityFinding.vessel_imo == vessel_imo)
+    results = recheck_open_findings(db, q.all())
+    db.commit()
+    resolved = sum(1 for r in results if r["resolved"])
+    return {"checked": len(results), "resolved": resolved, "still_open": len(results) - resolved}
+
+
+@router.post("/findings/{finding_id}/recheck")
+def recheck_one(
+    finding_id: int,
+    db: Session = Depends(get_db_for_auth),
+    current_user: User = Depends(get_current_user),
+):
+    row = db.query(DataQualityFinding).filter(DataQualityFinding.id == finding_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Finding not found")
+    if row.status != "open":
+        raise HTTPException(status_code=400, detail="Only open findings can be re-checked")
+    result = recheck_open_findings(db, [row])[0]
+    db.commit()
+    return result
 
 
 @router.get("/findings/{finding_id}/threads")

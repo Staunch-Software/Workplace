@@ -3,6 +3,7 @@ import { Loader2, AlertTriangle, MessageSquare, Send, RefreshCw } from 'lucide-r
 import {
   fetchVessels, fetchDataQualityFindings,
   fetchDataQualityThreads, postDataQualityThread,
+  recheckDataQualityFinding, recheckOpenDataQualityFindings,
 } from '../api/vesselApi'
 import './DataQualityReviewPage.css'
 
@@ -46,6 +47,8 @@ export default function DataQualityReviewPage() {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const threadEndRef = useRef(null)
+  const [rechecking, setRechecking] = useState(false)
+  const [recheckMsg, setRecheckMsg] = useState(null)
 
   useEffect(() => { fetchVessels().then(setVessels).catch(() => {}) }, [])
 
@@ -95,6 +98,45 @@ export default function DataQualityReviewPage() {
     }
   }
 
+  function flashRecheck(text, kind) {
+    setRecheckMsg({ text, kind })
+    setTimeout(() => setRecheckMsg(null), 7000)
+  }
+
+  async function handleRecheckOne() {
+    if (!active || rechecking) return
+    setRechecking(true)
+    try {
+      const r = await recheckDataQualityFinding(active.id)
+      flashRecheck(
+        r.resolved ? 'Fixed — finding resolved.' : 'Still missing — finding stays open.',
+        r.resolved ? 'ok' : 'warn',
+      )
+      loadFindings()
+    } catch {
+      flashRecheck('Re-check failed. Please try again.', 'err')
+    } finally {
+      setRechecking(false)
+    }
+  }
+
+  async function handleRecheckAll() {
+    if (rechecking) return
+    setRechecking(true)
+    try {
+      const r = await recheckOpenDataQualityFindings(vesselFilter)
+      flashRecheck(
+        `Checked ${r.checked} open: ${r.resolved} resolved, ${r.still_open} still open.`,
+        r.resolved > 0 ? 'ok' : 'warn',
+      )
+      loadFindings()
+    } catch {
+      flashRecheck('Re-check failed. Please try again.', 'err')
+    } finally {
+      setRechecking(false)
+    }
+  }
+
   return (
     <div className="dqr-page">
       <div className="dqr-topbar">
@@ -115,11 +157,16 @@ export default function DataQualityReviewPage() {
             <option value="resolved">Resolved</option>
             <option value="">All statuses</option>
           </select>
+          <button className="dqr-btn" onClick={handleRecheckAll} disabled={rechecking}>
+            {rechecking ? <Loader2 className="spin" size={13} /> : <RefreshCw size={13} />} Re-check all open
+          </button>
           <button className="dqr-icon-btn" title="Refresh" onClick={() => { loadFindings(); loadThreads() }}>
             <RefreshCw size={14} />
           </button>
         </div>
       </div>
+
+      {recheckMsg && <div className={`dqr-recheck-msg ${recheckMsg.kind}`}>{recheckMsg.text}</div>}
 
       <div className="dqr-workspace">
         <div className="dqr-queue">
@@ -175,7 +222,14 @@ export default function DataQualityReviewPage() {
                     <span className="dqr-eyebrow">Data Discrepancy · {active.source_id}</span>
                     <h2>{active.rule_label}</h2>
                   </div>
-                  <span className={`dqr-badge ${active.status}`}>{STATUS_LABEL[active.status] || active.status}</span>
+                  <div className="dqr-head-actions">
+                    {active.status === 'open' && (
+                      <button className="dqr-btn" onClick={handleRecheckOne} disabled={rechecking}>
+                        {rechecking ? <Loader2 className="spin" size={13} /> : <RefreshCw size={13} />} Re-check now
+                      </button>
+                    )}
+                    <span className={`dqr-badge ${active.status}`}>{STATUS_LABEL[active.status] || active.status}</span>
+                  </div>
                 </div>
                 <div className="dqr-detail-sub">
                   <span><b>{active.vessel_name}</b></span>
