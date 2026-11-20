@@ -668,10 +668,19 @@ def _observed_speed_kn(data_rec):
 # expanded_*/Logbook+ layer. Both sources get these columns (unlike the
 # CP Warranty / Grade direct fields, which are MariApps-only).
 _EMISSION_FUEL_CORE_CONSUMERS = [("me", "ME"), ("ae", "AE"), ("bl", "Boiler")]
+# The Boiler columns cover EVERY boiler on the vessel: the aux boiler ("bl") and the
+# composite boiler ("combl"). The composite boiler used to fall into IG/Other, so a
+# vessel with only a composite boiler (AM KIRTI) showed 0.00 under Boiler and its
+# boiler fuel under IG/Other. Totals are unchanged by this; only the heading moves.
+_EMISSION_FUEL_BOILER_MEMBERS = {"bl": ["bl", "combl"]}
 # Every other consumer prefix in the shared raw schema — summed into one
 # "IG/Other" figure, matching the workbook's single blended column for
 # everything that isn't ME/AE/Boiler.
-_EMISSION_FUEL_OTHER_CONSUMERS = ["inc", "eg", "combl", "aeb", "blfo"]
+_EMISSION_FUEL_OTHER_CONSUMERS = ["inc", "eg", "aeb", "blfo"]
+
+
+def _emission_fuel_members(consumer):
+    return _EMISSION_FUEL_BOILER_MEMBERS.get(consumer, [consumer])
 # (raw suffix, column-name suffix, display suffix) — bio_fuel's raw suffix
 # differs from its column/display form ("biofuel"), everything else matches.
 _EMISSION_FUEL_GRADES = [
@@ -766,9 +775,10 @@ def _fetch_emission_fuel_raw_row(conn, source, raw_id):
     table = "noon_report_data" if source == "wni" else "mariapps_reports_data"
     cols = []
     for consumer, _ in _EMISSION_FUEL_CORE_CONSUMERS:
-        cols.append(f"{consumer}_total_cons")
-        for raw_suffix, _, _ in _EMISSION_FUEL_GRADES:
-            cols.append(f"{consumer}_{raw_suffix}")
+        for member in _emission_fuel_members(consumer):
+            cols.append(f"{member}_total_cons")
+            for raw_suffix, _, _ in _EMISSION_FUEL_GRADES:
+                cols.append(f"{member}_{raw_suffix}")
     for consumer in _EMISSION_FUEL_OTHER_CONSUMERS:
         cols.append(f"{consumer}_total_cons")
         for raw_suffix, _, _ in _EMISSION_FUEL_GRADES:
@@ -806,13 +816,14 @@ def _emission_log_fuel_fields(conn, source, raw_id, table_cols):
     grand_total = 0.0
 
     for consumer, _ in _EMISSION_FUEL_CORE_CONSUMERS:
+        members = _emission_fuel_members(consumer)
         for raw_suffix, col_suffix, _ in _EMISSION_FUEL_GRADES:
-            val = g(f"{consumer}_{raw_suffix}")
+            val = sum(g(f"{m}_{raw_suffix}") for m in members)
             total_by_grade[raw_suffix] += val
             col = f"emissionx_{consumer}_{col_suffix}_mt"
             if col in table_cols:
                 out[col] = _fmt_emission_mt(val)
-        grand_total += g(f"{consumer}_total_cons")
+        grand_total += sum(g(f"{m}_total_cons") for m in members)
 
     ig_other = 0.0
     for consumer in _EMISSION_FUEL_OTHER_CONSUMERS:

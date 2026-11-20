@@ -106,16 +106,22 @@ def hemisphere(value, letters):
          "N": "N", "NORTH": "N", "S": "S", "SOUTH": "S"}.get(str(value).strip().upper())
     return h if h and h in letters else None
 
-def find_key_all_terms(data_dict, required_terms):
+def find_key_all_terms(data_dict, required_terms, exclude_terms=None):
+    """First key containing ALL required_terms and NONE of exclude_terms (all matches
+    are case-insensitive substrings)."""
     if not data_dict:
         return None
+    excl = [t.lower() for t in (exclude_terms or [])]
     for key in data_dict.keys():
-        if all(term.lower() in key.lower() for term in required_terms):
+        kl = key.lower()
+        if excl and any(t in kl for t in excl):
+            continue
+        if all(term.lower() in kl for term in required_terms):
             return key
     return None
 
-def get_fuel(excel_dict, category, fuel_type):
-    key = find_key_all_terms(excel_dict, [category, fuel_type])
+def get_fuel(excel_dict, category, fuel_type, exclude_terms=None):
+    key = find_key_all_terms(excel_dict, [category, fuel_type], exclude_terms)
     if not key:
         return None
     return val_num(excel_dict, key)
@@ -346,16 +352,25 @@ def map_mariapps_to_160(payload, excel_data=None, header_data=None):
         "bio_fuel":    ["Bio"],
     }
 
+    # "Boiler" is a substring of "Composite Boiler" and of the BLFO cargo breakdown
+    # ("Boiler Cargo Consumption Breakdown"), so the plain aux-boiler lookup used to
+    # match the composite boiler's key whenever a vessel had no separate aux-boiler
+    # entry: aux (bl_*) became an exact copy of composite (combl_*) and the same fuel
+    # was counted twice in the totals (found 2026-11-20: ~792 t on GCL FOS, AMNSI
+    # MAXIMUS / STALLION, GCL SARASWATI, AMNS POLAR). Keep the categories apart.
+    fuel_category_exclude = {"bl": ["Composite", "Cargo"]}
+
     for cat_prefix, cat_search_terms in fuel_categories.items():
         total_cons = 0.0
         found_any  = False
+        exclude = fuel_category_exclude.get(cat_prefix)
         for fuel_prefix, fuel_search_terms in fuel_types.items():
-            key_cons = find_key_all_terms(cons_tab, cat_search_terms + fuel_search_terms)
+            key_cons = find_key_all_terms(cons_tab, cat_search_terms + fuel_search_terms, exclude)
             val = None
             if key_cons and cons_tab.get(key_cons) not in (None, ""):
                 val = val_num(cons_tab, key_cons)
             if val is None:
-                val = get_fuel(excel, cat_search_terms[0], fuel_search_terms[0])
+                val = get_fuel(excel, cat_search_terms[0], fuel_search_terms[0], exclude)
 
             out[f"{cat_prefix}_{fuel_prefix}"] = val
             if val is not None:
