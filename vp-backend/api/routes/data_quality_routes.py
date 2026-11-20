@@ -42,6 +42,8 @@ _RULE_LABELS = {
     "missing_weather": "Missing Weather Data",
     "missing_cp_instruction": "Missing CP Instruction",
     "missing_fuel": "Zero Fuel on Steaming Day",
+    "distance_no_me_consumption": "Distance Without ME Consumption",
+    "port_noon_with_distance": "Noon at Port With Distance",
 }
 
 

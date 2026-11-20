@@ -37,6 +37,8 @@ RULE_LABELS = {
     "missing_weather": "Missing weather data (BF Wind / Sig. Wave Height) on a steaming day",
     "missing_cp_instruction": "Missing CP instruction in remarks (Noon at sea / EOSP)",
     "missing_fuel": "Zero fuel logged across every grade on a real steaming day",
+    "distance_no_me_consumption": "Distance steamed but no ME fuel and no ME running hours",
+    "port_noon_with_distance": "'Noon at port' report carries steamed distance",
 }
 
 # Accent color per rule — same red/amber/green dot convention already used
@@ -49,6 +51,8 @@ RULE_ACCENT = {
     "missing_weather": "#d4a02a",
     "missing_cp_instruction": "#d4a02a",
     "missing_fuel": "#e05050",
+    "distance_no_me_consumption": "#e05050",
+    "port_noon_with_distance": "#d4a02a",
 }
 
 # Lands the recipient straight on the MariApps Log Approval grid so they don't

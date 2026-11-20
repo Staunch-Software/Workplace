@@ -119,6 +119,51 @@ def check_missing_cp_instruction(db, vessel_imo, report_date):
     }
 
 
+# Distance (nm) above which E01 / E11 apply - drifting / manoeuvring noise stays below it.
+_MIN_DISTANCE_NM = 5
+
+_ME_FUEL_EXPR = "(" + "+".join(
+    _numexpr(f"r.me_{g}::text") for g in ("total_cons", "hfo", "lfo", "mdo", "bio_fuel", "lng", "methanol", "ethanol",
+                                    "ammonia", "lpg_propane", "lpg_butane")) + ")"
+_ME_HOURS_EXPR = _numexpr('x."ME_RHME_dCnt_operational_LF"::text')
+_DIST_EXPR = _numexpr("r.distance_og::text")
+
+
+def _mariapps_rows(db, vessel_imo, report_date, where):
+    """MariApps reports of this vessel/date (retired duplicate copies excluded) that satisfy
+    `where` (a SQL condition over r = mariapps_reports_data, x = expanded_mariapps_data)."""
+    rows = db.execute(text(f"""
+        SELECT x.log_number
+        FROM expanded_mariapps_data x
+        JOIN mariapps_reports_data r ON r.raw_report_id = x.raw_log_id
+        JOIN raw_mariapps_logs l ON l.id = x.raw_log_id
+        WHERE x.vessel_imo = :imo AND x.log_date = :report_date
+          AND COALESCE(l.is_duplicate, false) = false
+          AND {where}
+    """), {"imo": vessel_imo, "report_date": report_date}).mappings().all()
+    if not rows:
+        return None
+    return {"count": len(rows), "logs": sorted({r["log_number"] for r in rows if r["log_number"]})}
+
+
+def check_distance_no_me(db, vessel_imo, report_date):
+    """E01 (MariApps only): distance steamed but no ME fuel and no ME running hours -
+    the burnt fuel is missing from every emission total. Port-type reports are excluded
+    (a vessel at port legitimately has the ME stopped; their stray distance is E11)."""
+    return _mariapps_rows(db, vessel_imo, report_date, f"""
+        {_DIST_EXPR} > {_MIN_DISTANCE_NM}
+        AND {_ME_FUEL_EXPR} = 0 AND {_ME_HOURS_EXPR} = 0
+        AND UPPER(TRIM(COALESCE(x.log_type, ''))) NOT IN ('NOON AT PORT', 'ARRIVAL REPORT', 'DEPARTURE REPORT')""")
+
+
+def check_port_noon_with_distance(db, vessel_imo, report_date):
+    """E11 (MariApps only): a 'Noon at port' report that carries steamed distance -
+    either the report type or the distance is wrong."""
+    return _mariapps_rows(db, vessel_imo, report_date, f"""
+        {_DIST_EXPR} > {_MIN_DISTANCE_NM}
+        AND UPPER(TRIM(COALESCE(x.log_type, ''))) LIKE 'NOON AT PORT%'""")
+
+
 def run_checks_for_date(db, vessel_imo, report_date):
     """Returns {(source_id, rule_key): detail_dict} for every rule that found
     a gap on this vessel/date — empty dict if everything's clean."""
@@ -134,5 +179,11 @@ def run_checks_for_date(db, vessel_imo, report_date):
     cp_instr = check_missing_cp_instruction(db, vessel_imo, report_date)
     if cp_instr:
         findings[("mari_apps", "missing_cp_instruction")] = cp_instr
+
+    for rule_key, fn in (("distance_no_me_consumption", check_distance_no_me),
+                         ("port_noon_with_distance", check_port_noon_with_distance)):
+        found = fn(db, vessel_imo, report_date)
+        if found:
+            findings[("mari_apps", rule_key)] = found
 
     return findings
