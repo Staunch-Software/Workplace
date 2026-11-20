@@ -112,7 +112,8 @@ class Settings(BaseSettings):
     EVENTS_MAIL_EVENTS: int = 7        # events per vessel
     # While set, EVERY mail goes only to these address(es) (comma separated) with a [TEST] subject.
     EVENTS_MAIL_TEST_TO: str = ""
-    # JSON list: [{"owner": "Name", "emails": ["a@x.com"], "vessels": ["9832925", ...]}, ...]
+    # Recipients are managed in the UI (Report Config > Event mails). This old JSON list is read ONCE, only
+    # when the recipients table is empty, to seed it: [{"owner": "Name", "emails": ["a@x.com"], "vessels": ["9832925"]}]
     EVENTS_MAIL_OWNERS: str = ""
 
     @property

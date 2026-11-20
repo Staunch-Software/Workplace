@@ -8,7 +8,7 @@ import { reportsApi } from '../../api/reportsApi';
 import {
   ArrowLeft, Plus, Trash2, Pencil, Check, X,
   Ship, AlertCircle, CheckCircle2,
-  Clock, RefreshCcw, Settings, Zap, ChevronDown
+  Clock, RefreshCcw, Settings, Zap, ChevronDown, Mail
 } from 'lucide-react';
 import '../../styles/ReportConfigPage.css';
 import { compareReportNames } from '../../reportOrder';
@@ -204,6 +204,9 @@ export default function ReportConfigPage() {
             title="Bulk assign all 72 master default reports to all vessels"
           >
             <Zap size={14} /> {isAssigningAll ? 'Assigning All...' : 'Assign Defaults to All Vessels'}
+          </button>
+          <button className="rcfg-btn rcfg-btn--ghost" onClick={() => navigate('/reports/config/mail')}>
+            <Mail size={15} /> Event mails
           </button>
           <button className="rcfg-btn rcfg-btn--ghost" onClick={() => refetch()}>
             <RefreshCcw size={15} /> Refresh

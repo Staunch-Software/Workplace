@@ -13,8 +13,9 @@ from sqlalchemy import text
 
 from app.api.v1.endpoints.events import build_logbook
 from app.core.config import settings
-from app.core.database import SessionLocal
+from app.core.database import Base, SessionLocal, engine
 from app.core.database_control import ControlSession
+from app.models.events_mail import EventsMailRecipient, EventsMailVessel, EventsMailSent
 from app.core.database_vessel_perf import VesselPerfSession
 
 logger = logging.getLogger(__name__)
@@ -136,22 +137,37 @@ def _emails(value: str) -> list:
     return [a.strip() for a in (value or "").split(",") if a.strip()]
 
 
-async def _owner_groups(control_db) -> list:
-    """[{owner, emails, vessels: [{imo, name}]}] from EVENTS_MAIL_OWNERS (JSON); with none configured,
-    one group holding every active vessel (only used together with EVENTS_MAIL_TEST_TO)."""
-    rows = (await control_db.execute(
-        text("SELECT imo, name FROM vessels WHERE is_active IS NOT FALSE ORDER BY name")
-    )).mappings().fetchall()
-    by_imo = {r["imo"]: {"imo": r["imo"], "name": r["name"]} for r in rows}
-    cfg = json.loads(settings.EVENTS_MAIL_OWNERS) if settings.EVENTS_MAIL_OWNERS.strip() else []
-    if not cfg:
-        return [{"owner": "All vessels", "emails": [], "vessels": list(by_imo.values())}]
-    groups = []
-    for g in cfg:
-        vs = [by_imo[i] for i in g.get("vessels", []) if i in by_imo]
-        if vs and g.get("emails"):
-            groups.append({"owner": g.get("owner", ""), "emails": g["emails"], "vessels": vs})
-    return groups
+async def _ensure_tables(db):
+    """Create the mail tables if the app has not yet (e.g. the CLI runs before the service restarts), and on
+    the very first run copy the old EVENTS_MAIL_OWNERS .env list into the recipients table once."""
+    async with engine.begin() as conn:
+        await conn.run_sync(lambda c: Base.metadata.create_all(
+            c, tables=[EventsMailRecipient.__table__, EventsMailVessel.__table__, EventsMailSent.__table__]))
+    empty = (await db.execute(text("SELECT count(*) FROM events_mail_recipient"))).scalar() == 0
+    if empty and settings.EVENTS_MAIL_OWNERS.strip():
+        try:
+            for g in json.loads(settings.EVENTS_MAIL_OWNERS):
+                for imo in g.get("vessels", []):
+                    for email in g.get("emails", []):
+                        db.add(EventsMailRecipient(vessel_imo=str(imo), email=email.strip().lower()))
+            await db.commit()
+            logger.info("[EVENTS-MAIL] Copied EVENTS_MAIL_OWNERS into the recipients table (managed in the UI from now on).")
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"[EVENTS-MAIL] Could not import EVENTS_MAIL_OWNERS: {e}")
+
+
+async def _vessel_targets(db, control_db, only_imo: str = "") -> dict:
+    """{imo: {"name", "emails"}} for the vessels to check: active vessels that are switched on and have at
+    least one recipient (the recipient list is edited on the Report Config > Event mails page)."""
+    vessels = (await control_db.execute(
+        text("SELECT imo, name FROM vessels WHERE is_active IS NOT FALSE ORDER BY name"))).fetchall()
+    emails: dict = {}
+    for imo, email in (await db.execute(text("SELECT vessel_imo, email FROM events_mail_recipient ORDER BY email"))).fetchall():
+        emails.setdefault(imo, []).append(email)
+    off = {r[0] for r in (await db.execute(text("SELECT vessel_imo FROM events_mail_vessel WHERE enabled = false"))).fetchall()}
+    return {imo: {"name": name, "emails": emails.get(imo, []), "enabled": imo not in off}
+            for imo, name in vessels if not only_imo or imo == only_imo}
 
 
 def _event_id(ev: dict) -> str:
@@ -164,14 +180,6 @@ def _event_id(ev: dict) -> str:
 
 
 _MAX_MAILS_PER_VESSEL = 10  # per check; older unseen events beyond this are recorded without a mail
-
-
-async def _ensure_sent_table(db):
-    await db.execute(text(
-        "CREATE TABLE IF NOT EXISTS events_mail_sent ("
-        "imo TEXT NOT NULL, event_id TEXT NOT NULL, sent_at TIMESTAMPTZ NOT NULL DEFAULT now(), "
-        "PRIMARY KEY (imo, event_id))"))
-    await db.commit()
 
 
 async def _seen_vessels(db) -> set:
@@ -193,7 +201,7 @@ async def _release(db, imo: str, event_id: str):
 
 
 async def send_new_event_mails(test_to: str = "", dry_run: bool = False, force: bool = False,
-                               end_date: date_type | None = None) -> dict:
+                               end_date: date_type | None = None, only_imo: str = "") -> dict:
     """Send one mail for every logbook report that has not been mailed yet, oldest first, each showing the
     last N events up to that report. Every mailed report is recorded (events_mail_sent) BEFORE sending, so
     several workers or overlapping checks can never send the same report twice; a failed send releases the
@@ -208,25 +216,18 @@ async def send_new_event_mails(test_to: str = "", dry_run: bool = False, force: 
     today = end_date or date_type.today()
     track = not (test_to or dry_run or force)
 
-    async with ControlSession() as control_db:
-        groups = await _owner_groups(control_db)
-    if not test_to:
-        groups = [g for g in groups if g["emails"]]
-    if not groups:
-        return {"sent": 0, "mails": 0, "previews": []}
-
-    # vessel -> recipient groups (a vessel can be listed under more than one owner)
-    vessels = {}
-    for g in groups:
-        for v in g["vessels"]:
-            vessels.setdefault(v["imo"], {"name": v["name"], "groups": []})["groups"].append(g)
-
     sent, previews = 0, []
-    async with SessionLocal() as state_db, VesselPerfSession() as perf_db:
-        seen = set()
-        if track:
-            await _ensure_sent_table(state_db)
-            seen = await _seen_vessels(state_db)
+    async with SessionLocal() as state_db, ControlSession() as control_db, VesselPerfSession() as perf_db:
+        await _ensure_tables(state_db)
+        vessels = await _vessel_targets(state_db, control_db, only_imo)
+        if test_to:  # test: any vessel, only the test address receives it
+            for v in vessels.values():
+                v["emails"] = _emails(test_to)
+        else:
+            vessels = {k: v for k, v in vessels.items() if v["emails"] and v["enabled"]}
+        if not vessels:
+            return {"sent": 0, "mails": 0, "previews": []}
+        seen = await _seen_vessels(state_db) if track else set()
         # Ask for plenty of events: days with no report come back as "missing" entries, dropped below.
         data = await build_logbook(perf_db, SOURCE, 60, 0, today, None)
         by_imo = {v["imo"]: [r for r in v["rows"] if not r.get("_missing")] for v in data["vessels"]}
@@ -258,16 +259,9 @@ async def send_new_event_mails(test_to: str = "", dry_run: bool = False, force: 
                 previews.append((subject, body))
                 if dry_run:
                     continue
-                ok = False
-                for g in info["groups"]:
-                    to = _emails(test_to) if test_to else g["emails"]
-                    if await _graph_send(to, subject, body):
-                        ok = True
-                        logger.info(f"[EVENTS-MAIL] Sent '{subject}' to {', '.join(to)}.")
-                        if test_to:
-                            break  # test mode: one copy to the test address is enough
-                if ok:
+                if await _graph_send(info["emails"], subject, body):
                     sent += 1
+                    logger.info(f"[EVENTS-MAIL] Sent '{subject}' to {', '.join(info['emails'])}.")
                 elif track:
                     await _release(state_db, imo, _event_id(ev))  # retry on the next check
     return {"sent": sent, "mails": len(previews), "previews": previews}

@@ -1,6 +1,6 @@
 # app/api/v1/api.py
 from fastapi import APIRouter
-from app.api.v1.endpoints import reports, threads, config, notifications, feed, sync, vessels, events, report_views
+from app.api.v1.endpoints import reports, threads, config, notifications, feed, sync, vessels, events, report_views, events_mail
 
 api_router = APIRouter()
 api_router.include_router(config.router)
@@ -12,3 +12,4 @@ api_router.include_router(sync.router)
 api_router.include_router(vessels.router)
 api_router.include_router(events.router)
 api_router.include_router(report_views.router)
+api_router.include_router(events_mail.router)

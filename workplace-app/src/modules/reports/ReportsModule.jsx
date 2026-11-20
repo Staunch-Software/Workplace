@@ -8,6 +8,7 @@ import VesselReportsPage from './features/vessel/VesselReportsPage';
 import ActivityFeedPage from './features/shared/ActivityFeedPage';
 import ReportConfigPage from './features/shore/ReportConfigPage';
 import OverviewPage from './features/shore/OverviewPage';
+import EventsMailPage from './features/shore/EventsMailPage';
 
 function DefaultRedirect() {
   return <Navigate to="overview" replace />;
@@ -39,6 +40,16 @@ export default function ReportsModule() {
       />
 
       {/* Overview matrix — shows all vessels for SHORE/ADMIN, only the assigned vessel for VESSEL */}
+      {/* Admin: who receives each vessel's new-report mail */}
+      <Route
+        path="config/mail"
+        element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <EventsMailPage />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="overview"
         element={

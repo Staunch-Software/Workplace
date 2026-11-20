@@ -55,6 +55,17 @@ const coreClient = makeClient(coreBase);
 // --- Shore API (SHORE + ADMIN) ---
 export const reportsApi = {
   getVessels: () => coreClient.get("/vessels").then((r) => r.data),
+  // Event mails: who receives each vessel's new-report mail (ADMIN)
+  listMailRecipients: () =>
+    shoreClient.get('/events-mail/recipients').then((r) => r.data),
+  addMailRecipient: (vessel_imo, email) =>
+    shoreClient.post('/events-mail/recipients', { vessel_imo, email }).then((r) => r.data),
+  deleteMailRecipient: (id) =>
+    shoreClient.delete(`/events-mail/recipients/${id}`).then((r) => r.data),
+  setMailVesselEnabled: (imo, enabled) =>
+    shoreClient.put(`/events-mail/vessels/${imo}/enabled`, { enabled }).then((r) => r.data),
+  sendMailTest: (imo) =>
+    shoreClient.post(`/events-mail/vessels/${imo}/test`).then((r) => r.data),
   listReports: (params = {}) =>
     shoreClient.get("/reports", { params }).then((r) => r.data),
   getReport: (reportId) =>
