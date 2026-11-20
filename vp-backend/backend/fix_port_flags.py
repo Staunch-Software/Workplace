@@ -23,10 +23,34 @@ import logging
 from collections import Counter
 
 from .database import engine
+from sqlalchemy import text
+
+from .pipeline import expander as _ex
 from .pipeline.expander import _port_flag_changes
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(levelname)-8s  %(message)s")
 log = logging.getLogger(__name__)
+
+
+def review_unmatched(_applied=False):
+    """Review list: destination ports flagged 'N' ONLY because no list knows them.
+    These are the ones that could hide an EU port (the Teneriffe case) - scan it."""
+    _ex._ensure_fleet_ports(force=True)
+    with engine.connect() as conn:
+        rows = conn.execute(text(
+            'SELECT "VoyageMeta_to_port_operational_LF", COUNT(*) FROM expanded_mariapps_data '
+            'WHERE NULLIF(TRIM("VoyageMeta_to_port_operational_LF"::text), \'\') IS NOT NULL GROUP BY 1')).fetchall()
+    by_src = Counter()
+    unmatched = []
+    for dest, n in rows:
+        _c, _eu, src = _ex._resolve_port(dest)
+        by_src[src] += n
+        if src == "unmatched":
+            unmatched.append((dest, n))
+    log.info("How MariApps destination ports are resolved (rows): " + ", ".join(f"{k} {v}" for k, v in by_src.most_common()))
+    log.info(f"REVIEW - destinations flagged N because NO list knows them ({len(unmatched)} names). Any EU/EEA port here is a gap:")
+    for dest, n in sorted(unmatched, key=lambda t: -t[1])[:60]:
+        log.info(f"    {dest!s:34} {n} rows")
 
 
 def main():
@@ -34,6 +58,9 @@ def main():
     ap.add_argument("--apply", action="store_true", help="actually write (default is a dry run)")
     args = ap.parse_args()
 
+    _ex._ensure_unlocode()
+    log.info(f"UN/LOCODE lookup: {len(_ex._UNLOCODE_EU)} EU/EEA port names loaded" if _ex._UNLOCODE_EU else
+             "UN/LOCODE lookup: not loaded (optional file absent) - using the fleet lookup and the hardcoded list")
     changes = _port_flag_changes(engine, apply=args.apply)
     total = sum(c[3] for c in changes)
     log.info(f"Rows whose Country / EU Port? will change: {total} across {len(changes)} port pairs")
@@ -56,6 +83,7 @@ def main():
     log.info("Destination ports that gain a Country (top 25):")
     for (dest, ctry), n in countries.most_common(25):
         log.info(f"    {dest!s:28} {ctry}   {n} rows")
+    review_unmatched(args.apply)
     log.info("APPLIED." if args.apply else "DRY RUN - nothing written. Re-run with --apply to fix the stored rows.")
 
 

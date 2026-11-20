@@ -36,3 +36,7 @@ vessel_orb_update/
 # Offline setup & install folders
 setup/
 update/
+
+# UN/LOCODE port list - optional data file, licence unclear, never commit it
+vp-backend/data/unlocode/
+unlocode*.csv

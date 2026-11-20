@@ -14,7 +14,9 @@ Column metadata (display names, categories, active/inactive) is stored in
 expanded_column_metadata and served to the frontend.
 """
 
+import csv
 import logging
+import os
 import re
 import time
 from collections import defaultdict
@@ -1038,29 +1040,111 @@ def _ensure_fleet_ports(force=False):
         log.warning(f"Fleet port lookup not refreshed ({exc}) - using the hardcoded EU list only.")
 
 
-def _resolve_port_country(raw_port):
-    """(country, eu_port_YN) for one port field, from whichever source has
-    data, most authoritative first:
-      1. the rich 'Name {LOCODE},Country' format (MariApps' Departure Port);
-      2. the fleet-learned lookup (_FLEET_PORTS) for bare names - EXCEPT where it
-         says non-EU for a name the hardcoded EU list knows (e.g. Valencia, ES vs
-         VE): that is ambiguous, so the hardcoded EU answer wins, as before;
-      3. the hardcoded EU/EEA ports list -> "Y";
-      4. otherwise a confident "N" with Country blank (see _EU_PORTS_BY_NAME)."""
+# ── Optional UN/LOCODE port list (EU/EEA names) ────────────────────────────
+# A larger, authoritative-ish source for bare EU/EEA port names than the
+# hand-written list. OPTIONAL and NOT shipped with the code: the licence of the
+# UN/LOCODE data itself is unclear (the DataHub mirror says so), so the file is
+# never committed (.gitignore covers vp-backend/data/unlocode/). Drop the
+# 'code-list.csv' from https://datahub.io/core/un-locode (or UNECE's own download)
+# at vp-backend/data/unlocode/code-list.csv, or point UNLOCODE_CSV_PATH at it, and
+# the lookup switches on at the next process start; without the file nothing changes.
+# Only port-function rows (Function starts with '1') are used. A name that is ALSO
+# a port outside the EU/EEA (Augusta, Cartagena, ...) is ambiguous and ignored here.
+# It uses local names (Antwerpen, Genova, Lisboa), so the hand-written English
+# aliases above are still needed, and "Teneriffe" is not in it at all (the official
+# name is "Santa Cruz de Tenerife") - it is one layer, not the whole answer.
+_UNLOCODE_EU_NAMES = {
+    "AT": "Austria", "BE": "Belgium", "BG": "Bulgaria", "HR": "Croatia", "CY": "Cyprus", "CZ": "Czech Republic",
+    "DK": "Denmark", "EE": "Estonia", "FI": "Finland", "FR": "France", "DE": "Germany", "GR": "Greece",
+    "HU": "Hungary", "IE": "Ireland", "IT": "Italy", "LV": "Latvia", "LT": "Lithuania", "LU": "Luxembourg",
+    "MT": "Malta", "NL": "Netherlands", "PL": "Poland", "PT": "Portugal", "RO": "Romania", "SK": "Slovakia",
+    "SI": "Slovenia", "ES": "Spain", "SE": "Sweden", "IS": "Iceland", "LI": "Liechtenstein", "NO": "Norway",
+}
+_UNLOCODE_SKIP_STATUS = {"XX", "RR"}      # marked for deletion / request rejected
+_UNLOCODE_EU = {}                         # normalized port name -> (country, 'Y'), unambiguous only
+_UNLOCODE_LOADED = False
+
+
+def _unlocode_csv_path():
+    p = os.environ.get("UNLOCODE_CSV_PATH")
+    if p:
+        return p
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data", "unlocode", "code-list.csv")
+
+
+def _build_unlocode_eu(rows):
+    """{normalized name: (country, 'Y')} for EU/EEA port-function rows whose name is
+    not also a port-function name outside the EU/EEA. `rows` are dicts with the
+    UN/LOCODE columns Country, Location, Name, NameWoDiacritics, Function, Status."""
+    eu_names, other_names = {}, set()
+    for r in rows:
+        if not (r.get("Location") or "").strip() or (r.get("Status") or "") in _UNLOCODE_SKIP_STATUS:
+            continue
+        if not (r.get("Function") or "").startswith("1"):
+            continue
+        iso = (r.get("Country") or "").strip().upper()
+        for nm in {_normalize_port_name(r.get("Name")), _normalize_port_name(r.get("NameWoDiacritics"))}:
+            if len(nm) < 3:
+                continue
+            if iso in _UNLOCODE_EU_NAMES:
+                eu_names[nm] = (_UNLOCODE_EU_NAMES[iso], "Y")
+            else:
+                other_names.add(nm)
+    return {n: v for n, v in eu_names.items() if n not in other_names}
+
+
+def _ensure_unlocode():
+    """Load the optional UN/LOCODE file once per process. Missing / unreadable file =
+    lookup stays empty and behaviour is exactly as without it."""
+    global _UNLOCODE_EU, _UNLOCODE_LOADED
+    if _UNLOCODE_LOADED:
+        return
+    _UNLOCODE_LOADED = True
+    path = _unlocode_csv_path()
+    if not os.path.isfile(path):
+        log.info(f"UN/LOCODE file not found at {os.path.abspath(path)} - using the fleet lookup and the hardcoded EU list only.")
+        return
+    try:
+        with open(path, encoding="utf-8", newline="") as fh:
+            _UNLOCODE_EU = _build_unlocode_eu(csv.DictReader(fh))
+        log.info(f"UN/LOCODE loaded: {len(_UNLOCODE_EU)} unambiguous EU/EEA port names from {os.path.abspath(path)}")
+    except Exception as exc:
+        _UNLOCODE_EU = {}
+        log.warning(f"UN/LOCODE file could not be read ({exc}) - ignoring it.")
+
+
+def _resolve_port(raw_port):
+    """(country, eu_port_YN, source) for one port field, most authoritative first:
+      1. 'rich'    - the 'Name {LOCODE},Country' format (MariApps' Departure Port);
+      2. 'fleet'   - the fleet-learned lookup (_FLEET_PORTS) for bare names - EXCEPT
+                     where it says non-EU for a name an EU list knows (Valencia, ES vs
+                     VE): ambiguous, so the EU answer wins, as before;
+      3. 'unlocode'- the optional UN/LOCODE EU/EEA port names (unambiguous only);
+      4. 'alias'   - the hardcoded EU/EEA list (English names, spelling variants);
+      5. 'unmatched' - nothing knows it: a confident "N" with Country blank.
+    Source 'none' = no port given."""
     if not raw_port or not raw_port.strip():
-        return None, None
+        return None, None, "none"
     country, eu = _parse_port_country(raw_port)
     if country:
-        return country, eu
+        return country, eu, "rich"
     key = _normalize_port_name(raw_port)
     fleet = _FLEET_PORTS.get(key)
+    unl = _UNLOCODE_EU.get(key)
     eu_hit = _EU_PORTS_BY_NAME.get(key)
-    if fleet and not (eu_hit and fleet[1] == "N"):
-        return fleet
+    if fleet and not ((unl or eu_hit) and fleet[1] == "N"):
+        return fleet[0], fleet[1], "fleet"
+    if unl:
+        return unl[0], "Y", "unlocode"
     if eu_hit:
-        return eu_hit[0], "Y"
-    return None, "N"
+        return eu_hit[0], "Y", "alias"
+    return None, "N", "unmatched"
 
+
+def _resolve_port_country(raw_port):
+    """(country, eu_port_YN) - see _resolve_port for the order of sources."""
+    country, eu, _src = _resolve_port(raw_port)
+    return country, eu
 
 def _emission_log_nav_fields(data_rec, table_cols):
     """Country/EU Port? (From/To) — pure string computation over already-
@@ -1073,6 +1157,7 @@ def _emission_log_nav_fields(data_rec, table_cols):
     needing per-source branching (see _resolve_port_country)."""
     out = {}
     _ensure_fleet_ports()
+    _ensure_unlocode()
     departure_port = data_rec.get("VoyageMeta_departure_port_last_leg_operational_LF")
     to_port = data_rec.get("VoyageMeta_to_port_operational_LF")
 
