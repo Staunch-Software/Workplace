@@ -160,6 +160,18 @@ def init_db():
     except Exception as exc:
         print(f"[WARN] VP updated_at columns migration skipped: {exc}")
 
+    # ── Run Alembic migrations to head if alembic.ini is present ────────────
+    try:
+        from alembic.config import Config
+        from alembic import command
+        alembic_ini_path = config.ROOT_DIR / "alembic.ini"
+        if alembic_ini_path.exists():
+            alembic_cfg = Config(str(alembic_ini_path))
+            command.upgrade(alembic_cfg, "head")
+            print("[OK] VP Alembic migrations applied to head.")
+    except Exception as alembic_err:
+        print(f"[WARN] VP Alembic migration check skipped/failed: {alembic_err}")
+
 
 # ============================================================
 # SCRAPE VESSEL LIST (per-source, DB-driven)

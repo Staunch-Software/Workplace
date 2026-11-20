@@ -39,3 +39,4 @@ zope.interface==8.2
 
 requests
 msal==1.39.0
+alembic>=1.13.0
