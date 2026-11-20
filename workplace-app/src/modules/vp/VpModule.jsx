@@ -11,7 +11,7 @@ import { loadMaplibre } from './utils/loadMaplibre'
 export default function VpModule() {
   const { user } = useWorkplaceAuth()
   const [ready, setReady] = useState(false)
-  const allowed = user?.role === 'ADMIN' || (user?.role === 'SHORE' && user?.permissions?.vessel_performance === true)
+  const allowed = user?.role === 'ADMIN' || ((user?.role === 'SHORE' || user?.role === 'VESSEL') && user?.permissions?.vessel_performance === true)
 
   useEffect(() => {
     if (!allowed) return undefined

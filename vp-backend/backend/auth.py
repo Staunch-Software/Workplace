@@ -121,7 +121,7 @@ def get_db_for_auth():
 def has_vp_access(user: User) -> bool:
     if user.role == "ADMIN":
         return True
-    return user.role == "SHORE" and user.permissions.get(PERMISSION_KEY) is True
+    return user.role in ("SHORE", "VESSEL") and user.permissions.get(PERMISSION_KEY) is True
 
 
 def get_current_user(

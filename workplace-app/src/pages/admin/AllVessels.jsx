@@ -15,6 +15,7 @@ const MODULE_META = [
   { key: "engine_performance", label: "Engine Performance", icon: <Zap size={14} />, color: "#22c55e" },
   { key: "report_tracker", label: "Report Tracker", icon: <FileBarChart2 size={14} />, color: "#7c3aed" },
   { key: "orb", label: "Oil Record Book", icon: <BookOpen size={14} />, color: "#10b981" },
+  { key: "vessel_performance", label: "Vessel Performance", icon: <Ship size={14} />, color: "#0ea5e9" },
 ];
 function getRoleStyle(role) {
   const r = role?.toUpperCase();

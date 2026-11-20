@@ -33,6 +33,7 @@ const MODULE_META = {
     engine_performance: { label: 'Engine Perf', icon: <Zap size={14} />, color: '#22c55e' },
     report_tracker: { label: 'Report Tracker', icon: <FileText size={14} />, color: '#7c3aed' },
     orb: { label: 'ORB (Oil Record)', icon: <BookOpen size={14} />, color: '#10b981' },
+    vessel_performance: { label: 'Vessel Performance', icon: <Ship size={14} />, color: '#0ea5e9' },
 };
 function formatAgo(iso) {
     if (!iso) return 'Never';

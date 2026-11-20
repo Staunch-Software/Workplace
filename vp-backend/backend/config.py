@@ -1,4 +1,5 @@
 import os
+import re
 import urllib.parse
 from pathlib import Path
 from dotenv import load_dotenv
@@ -45,9 +46,14 @@ class Config:
     DB_HOST    = os.getenv("DB_HOST", "localhost")
     DB_PORT    = os.getenv("DB_PORT", "5432")
     DB_NAME    = os.getenv("DB_NAME")
-    DATABASE_URL = (
-        f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-    )
+
+    _env_db_url = os.getenv("DATABASE_URL")
+    if _env_db_url:
+        DATABASE_URL = re.sub(r"^postgres(ql)?(\+\w+)?://", "postgresql+psycopg2://", _env_db_url)
+    else:
+        DATABASE_URL = (
+            f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+        )
 
     # =========================================================
     # WORKPLACE LOGIN (control database + token signing key)

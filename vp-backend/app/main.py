@@ -19,6 +19,7 @@ from api.routes.bunker_report_routes import router as bunker_report_router
 from api.routes.biofuel_routes import router as biofuel_router
 from api.routes.data_quality_routes import router as data_quality_router
 from api.routes.cp_override_routes import router as cp_override_router
+from api.routes.vessel_sync_routes import router as vessel_sync_router
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
@@ -266,11 +267,23 @@ async def lifespan(app: FastAPI):
     # here if you want them to run once upon application start, but typically 
     # importers are run as separate cron jobs or CLI commands.
 
-    # 6. Start Fleet Status background scheduler
-    threading.Thread(target=_fleet_status_scheduler, daemon=True).start()
-    
-    # 7. Start Email Scraper background scheduler
-    threading.Thread(target=_email_scraper_scheduler, daemon=True).start()
+    is_offline = os.getenv("STORAGE_MODE", "online").lower() == "offline"
+
+    if is_offline:
+        # On offline vessel: disable scrapers and start sync worker
+        try:
+            from backend.sync_worker import start_vp_sync_worker
+            threading.Thread(target=start_vp_sync_worker, daemon=True).start()
+            log.info("🚢 VP Offline Sync Worker started in background.")
+        except Exception as e:
+            log.error(f"Failed to start VP sync worker: {e}")
+    else:
+        # On shore: start schedulers
+        # 6. Start Fleet Status background scheduler
+        threading.Thread(target=_fleet_status_scheduler, daemon=True).start()
+        
+        # 7. Start Email Scraper background scheduler
+        threading.Thread(target=_email_scraper_scheduler, daemon=True).start()
     
     yield
     
@@ -425,6 +438,8 @@ app.include_router(bunker_report_router, prefix="/api/v1", dependencies=[Depends
 app.include_router(biofuel_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
 app.include_router(data_quality_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
 app.include_router(cp_override_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+# Vessel-sync: NO get_current_user dependency — API-key auth is handled inside the route
+app.include_router(vessel_sync_router, prefix="/api/v1")
 
 
 # --- DEFINE /analysis/query ENDPOINT DIRECTLY HERE ---

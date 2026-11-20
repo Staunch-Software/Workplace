@@ -19,8 +19,9 @@ The frontend picks the backend by module; in dev (`isDev`) each axios client har
 | `Aepms-backend` | Engine performance (ME/AE shop trials, PDFs) | 8005 | Has `docker-compose.yml` (Postgres + API on 8000) |
 | `Reports-backend` | Vessel reports / alerts | 8006 (`/api/v1`) | |
 | `orb-backend` | MARPOL Oil Record Book (PDF extraction via Gemini, alerts, offline sync) | 8007 (`/api`) | Most complex backend; see below |
+| `vp-backend` | Vessel Performance (VP: noon reports, WNI, MariApps, ISO 19030, EU ETS/MRV, FuelEU) | 8009 (`/api/v1`) | Connects to `vessel_perf` DB + read-only control DB; see `deploy/README.md` |
 | `taskmgmt-backend` | Task management | — | Not wired into the frontend at the time of writing |
-| `workplace-app/src/modules/{aepms,drs,jira,lubeoil,orb,reports}` | One frontend module per backend, each with its own `api/axios*.js` | | |
+| `workplace-app/src/modules/{aepms,drs,jira,lubeoil,orb,reports,vp}` | One frontend module per backend, each with its own `api/axios*.js` (or `vesselApi.js`) | | |
 
 `venv/` folders in some backends are untracked local virtualenvs; ignore them.
 
