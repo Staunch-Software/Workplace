@@ -6,7 +6,8 @@ the vessels. Writes nothing. Run from vp-backend with the app's venv:
 
     python audit_blank_fields.py > blanks.txt
 
-Blank = NULL, empty or whitespace. All codes are counted over every MariApps
+Blank = NULL, empty or whitespace. M04 is special: Op. Status is derived by our own
+expander, so its count is a backfill gap, not a MariApps blank. All codes are counted over every MariApps
 record unless the code is sea-only (M12, M13, M14, M15). Counts are comparable
 with the workbook only approximately: the export is a 19/11 snapshot and some
 definitions (M05, M12, M18) are interpreted from the workbook's wording.
@@ -53,7 +54,11 @@ CODES = [
      f"({blank('emissionx_from_country')} OR {blank('emissionx_to_country')})", None),
     ("M03", "EU Port? (From/To) flag blank", 2182,
      f"({blank('emissionx_from_eu_port')} OR {blank('emissionx_to_eu_port')})", None),
-    ("M04", "Op. Status (UW/NUW) blank", 1030, blank('emissionx_op_status'), None),
+    # NOT a MariApps blank: MariApps's raw data has no Op. Status field. Ours is derived by
+    # expander._backfill_op_status (BOSP/EOSP walk), so NULL here = our backfill has not covered
+    # the row. Not comparable with the report's M04 (the export's own Op. Status column).
+    ("M04", "Op. Status NULL in OUR table (derived by us - backfill gap, not a MariApps blank)", 1030,
+     blank('emissionx_op_status'), None),
     ("M05", "Any fuel consumption field blank (ME/AE/Boiler/IG/totals)", 408,
      "(" + " OR ".join(blank(c) for c in FUEL_EXP) + ")", None),
     ("M06", "ME total (me_total_cons) blank", 1868, rblank("me_total_cons"), FROM_RAW),
@@ -106,7 +111,9 @@ def main():
     print(f"SUMMARY  (our expanded_mariapps_data rows: {n_rows}; export had ~5,929 incl. duplicates)")
     print(f"{'code':5} {'ours':>7} {'report':>7}  reading")
     for code, (ours, rep) in totals.items():
-        if rep == 0:
+        if code == "M04":
+            read = "our derived column - NULL = backfill gap (not comparable)"
+        elif rep == 0:
             read = "n/a"
         elif ours == 0:
             read = "NOT in our data (export-only / different definition)"

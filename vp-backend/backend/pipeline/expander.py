@@ -2333,17 +2333,33 @@ _OP_STATUS_FORCE_NUW = {"ARRIVAL REPORT", "DEPARTURE REPORT", "NOON AT PORT"}
 _OP_STATUS_FORCE_UW = {"NOON AT SEA"}
 
 
-def _backfill_op_status(engine):
+def refresh_op_status(engine, tables=None):
+    """Re-derive Op. Status for already-ingested reports. Op. Status is NOT set
+    when a report is ingested (it needs the whole vessel history in order), so
+    every ingestion run must call this afterwards or new rows stay NULL and drop
+    out of the UW/NUW buckets in the emission reports (found 2026-11-20: 878
+    MariApps rows blank on the VM, AMNS POLAR 324 of 357). Never raises - a
+    failure here must not fail the ingestion run. `tables` limits the refresh
+    to e.g. ("expanded_mariapps_data",)."""
+    try:
+        _backfill_op_status(engine, tables=tables)
+    except Exception:
+        log.exception("Op. Status refresh failed - rows ingested this run may be missing Op. Status until the next run.")
+
+
+def _backfill_op_status(engine, tables=None):
     """Walk each vessel's reports in chronological order (both sources) and
     assign Op. Status (UW/NUW) from the BOSP/COSP → EOSP event sequence —
     this can't be computed per-row like the other direct fields, it needs the
     whole vessel history in order. EOSP itself is still UW (it's the last
     moment of being underway); NUW starts on the row after it. Defaults to
-    NUW for any reports before a vessel's first BOSP/COSP."""
-    tables = [
+    NUW for any reports before a vessel's first BOSP/COSP. `tables` (optional)
+    restricts the walk to the named expanded tables."""
+    all_tables = [
         ("expanded_mariapps_data", "log_date", "log_type"),
         ("expanded_wni_data", "date", "event_type"),
     ]
+    tables = [t for t in all_tables if tables is None or t[0] in tables]
     with engine.connect() as conn:
         for table, date_col, type_col in tables:
             vessels = [r[0] for r in conn.execute(text(

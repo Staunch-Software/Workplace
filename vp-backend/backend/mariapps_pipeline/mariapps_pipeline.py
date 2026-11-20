@@ -377,6 +377,13 @@ def run():
         main_page.context.storage_state(path=auth_file)
         browser.close()
         log.info("[BROWSER]  Browser closed.")
+        # Op. Status (UW/NUW) is derived from the whole vessel history, not set
+        # per row at ingestion - without this, every report saved this run
+        # stays NULL and drops out of the UW/NUW emission buckets.
+        from ..database import engine as _db_engine
+        from ..pipeline.expander import refresh_op_status
+        refresh_op_status(_db_engine, tables=("expanded_mariapps_data",))
+        log.info("[OPSTATUS] Op. Status refreshed for MariApps reports.")
         log.info("[EXPORT]   Exporting analysis_data to Excel...")
         try:
             export_path = export_analysis_data(
