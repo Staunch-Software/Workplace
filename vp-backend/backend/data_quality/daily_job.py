@@ -41,6 +41,12 @@ RULE_LABELS = {
     "port_noon_with_distance": "'Noon at port' report carries steamed distance",
 }
 
+# One line under each heading telling the vessel what to do about it.
+RULE_ACTIONS = {
+    "distance_no_me_consumption": "Enter the ME fuel consumption and ME running hours for this report.",
+    "port_noon_with_distance": "Check the report type (should it be a Noon at sea?) or correct the distance.",
+}
+
 # Accent color per rule — same red/amber/green dot convention already used
 # for the Compliance/Errors columns in the live dashboard (AnalysisTable.jsx),
 # so the email reads consistently with the app rather than inventing a new
@@ -195,6 +201,7 @@ def build_digest_html(vessel_name, entries):
               <tr>
                 <td style="border-left:3px solid {accent};padding-left:12px;">
                   <span style="font-size:13.5px;font-weight:700;color:#1a2b3c;">{RULE_LABELS.get(rule_key, rule_key)}</span>
+                  {('<br/><span style="font-size:12px;color:#5a6b7c;">' + RULE_ACTIONS[rule_key] + '</span>') if rule_key in RULE_ACTIONS else ''}
                 </td>
               </tr>
             </table>
@@ -227,8 +234,8 @@ def build_digest_html(vessel_name, entries):
           <tr>
             <td style="padding:20px 28px 0;">
               <p style="margin:0;color:#3a4a5c;font-size:13px;line-height:1.5;">
-                The mandatory data below is missing or incomplete for the dates/voyages listed.
-                Please review and correct the corresponding noon reports.
+                The data below needs your review for the dates/voyages listed.
+                Please check and correct the corresponding noon reports.
               </p>
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:14px;">
                 <tr>
@@ -297,7 +304,7 @@ def _send_digest(db, vessel_imo, open_rows):
     ]
     html = build_digest_html(vessel_name, entries)
     ok = send_email(
-        subject=f"[Data Quality] {vessel_name} — missing mandatory data",
+        subject=f"[Data Quality] {vessel_name} — data needs review",
         html_content=html,
         recipients=rec.to_emails,
         cc_recipients=rec.cc_emails,

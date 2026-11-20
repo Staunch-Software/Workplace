@@ -56,7 +56,7 @@ def run_test_send(test_recipient=DEFAULT_TEST_RECIPIENT, check_date=None):
             ]
             html = build_digest_html(vessel.vessel_name, entries)
             ok = send_email(
-                subject=f"[TEST] [Data Quality] {vessel.vessel_name} — missing mandatory data ({check_date})",
+                subject=f"[TEST] [Data Quality] {vessel.vessel_name} — data needs review ({check_date})",
                 html_content=html,
                 recipients=[test_recipient],
                 cc_recipients=None,

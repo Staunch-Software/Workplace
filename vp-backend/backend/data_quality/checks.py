@@ -180,10 +180,18 @@ def run_checks_for_date(db, vessel_imo, report_date):
     if cp_instr:
         findings[("mari_apps", "missing_cp_instruction")] = cp_instr
 
-    for rule_key, fn in (("distance_no_me_consumption", check_distance_no_me),
-                         ("port_noon_with_distance", check_port_noon_with_distance)):
-        found = fn(db, vessel_imo, report_date)
-        if found:
-            findings[("mari_apps", rule_key)] = found
+    # E01: a log already reported as "zero fuel on a steaming day" is the same problem told
+    # twice, so it is left out of E01 (E01 still catches the ones missing_fuel does not,
+    # e.g. ME at zero while the boiler or AE burnt fuel, or EOSP / BOSP reports).
+    e01 = check_distance_no_me(db, vessel_imo, report_date)
+    if e01:
+        already = set((findings.get(("mari_apps", "missing_fuel")) or {}).get("logs", []))
+        logs = [lg for lg in e01["logs"] if lg not in already]
+        if logs:
+            findings[("mari_apps", "distance_no_me_consumption")] = {"count": len(logs), "logs": logs}
+
+    e11 = check_port_noon_with_distance(db, vessel_imo, report_date)
+    if e11:
+        findings[("mari_apps", "port_noon_with_distance")] = e11
 
     return findings
