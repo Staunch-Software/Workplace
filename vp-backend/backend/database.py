@@ -133,6 +133,33 @@ def init_db():
     except Exception as exc:
         print(f"[WARN] vessel_column_defaults.vessel_imo nullable migration skipped: {exc}")
 
+    # ── Add updated_at columns and auto-update triggers for offline sync CDC ──
+    try:
+        with engine.begin() as conn:
+            for tbl in ("analysis_data", "vessels", "vessel_particulars", "fleet_status_data", "mariapps_bunker_reports"):
+                conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()"))
+
+            conn.execute(text("""
+                CREATE OR REPLACE FUNCTION set_updated_at_timestamp()
+                RETURNS TRIGGER AS '
+                BEGIN
+                    NEW.updated_at = CURRENT_TIMESTAMP;
+                    RETURN NEW;
+                END;
+                ' LANGUAGE plpgsql;
+            """))
+
+            for tbl in ("analysis_data", "vessels", "vessel_particulars", "fleet_status_data", "mariapps_bunker_reports"):
+                conn.execute(text(f"""
+                    DROP TRIGGER IF EXISTS trg_{tbl}_updated_at ON {tbl};
+                    CREATE TRIGGER trg_{tbl}_updated_at
+                    BEFORE UPDATE ON {tbl}
+                    FOR EACH ROW EXECUTE FUNCTION set_updated_at_timestamp();
+                """))
+        print("[OK] VP updated_at columns and auto-update triggers ready for sync.")
+    except Exception as exc:
+        print(f"[WARN] VP updated_at columns migration skipped: {exc}")
+
 
 # ============================================================
 # SCRAPE VESSEL LIST (per-source, DB-driven)

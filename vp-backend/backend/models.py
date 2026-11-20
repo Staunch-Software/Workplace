@@ -39,6 +39,7 @@ class Vessel(Base):
     
     # The owner company of the vessel
     owner_group = Column(String(255), nullable=True, default="Other")
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 # ============================================================
 # TABLE 2: DATA SOURCE REFERENCE
@@ -336,6 +337,7 @@ class AnalysisData(Base):
     # Drives the CP fair-weather filter (good weather = BF_Wind <= 4 AND Sig_Wave_Ht_m <= 2.0).
     BF_Wind = Column(Float)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 # ============================================================
 # TABLE 6: DATA QUALITY LOG (SHARED)
@@ -733,6 +735,7 @@ class VesselParticulars(Base):
     # Audit Fields
     extracted_at = Column(DateTime, default=datetime.utcnow)
     source_file = Column(String(255))
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class VesselParticularsResponse(BaseModel):
     # CHANGE ALL SQLALCHEMY TYPES TO STANDARD PYTHON TYPES:
@@ -1809,6 +1812,7 @@ class FleetStatusData(Base):
     report_missing    = Column(String(50), nullable=True)   # report missing alert
 
     scraped_at    = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at    = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 # ============================================================
 # TABLE: MARIAPPS BUNKER REPORT
@@ -1889,6 +1893,7 @@ class MariAppsBunkerReport(Base):
     raw_json      = Column(JSONB, nullable=True)   # full scraped row, for anything not mapped above
     fingerprint   = Column(String(255), index=True, unique=True)  # SHA256 of IMO|transactionDtId (one row per MariApps transaction)
     scraped_at    = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at    = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 # ============================================================

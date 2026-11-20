@@ -77,8 +77,26 @@ class VPSyncProcessor:
         self.cloud_base = os.getenv("CLOUD_BASE_URL", "https://workplace.ozellar.com/vp").rstrip("/")
         self.api_key = os.getenv("SYNC_API_KEY", "PROD_SECURE_SYNC_9922")
         self.vessel_imo = os.getenv("VESSEL_IMO", "")
+        self.state_file = os.path.join(os.path.dirname(__file__), "..", "data", "vp_sync_state.json")
         self.last_error = None
         self.failed_items = 0
+
+    def _get_last_pull(self) -> Optional[str]:
+        if os.path.exists(self.state_file):
+            try:
+                with open(self.state_file, "r") as f:
+                    return json.load(f).get("last_pull_at")
+            except Exception:
+                pass
+        return None
+
+    def _save_last_pull(self, ts: str):
+        try:
+            os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
+            with open(self.state_file, "w") as f:
+                json.dump({"last_pull_at": ts}, f)
+        except Exception as e:
+            log.warning(f"[VP SYNC] Could not save state: {e}")
 
     def _client(self) -> httpx.Client:
         return httpx.Client(
@@ -95,11 +113,17 @@ class VPSyncProcessor:
             return False
 
         url = f"{self.cloud_base}/api/v1/vessel-sync/vp/snapshot"
-        log.info(f"[VP SYNC] Pulling VP snapshot from {url} for IMO {self.vessel_imo}")
+        params = {"vessel_imo": self.vessel_imo}
+        last_pull = self._get_last_pull()
+        if last_pull:
+            params["since"] = last_pull
+            log.info(f"[VP SYNC] Incremental sync since {last_pull} for IMO {self.vessel_imo}")
+        else:
+            log.info(f"[VP SYNC] Initial sync from {url} for IMO {self.vessel_imo}")
 
         try:
             with self._client() as client:
-                resp = client.get(url, params={"vessel_imo": self.vessel_imo})
+                resp = client.get(url, params=params)
                 if resp.status_code != 200:
                     self.last_error = f"Shore HTTP {resp.status_code}: {resp.text[:200]}"
                     log.error(f"[VP SYNC] {self.last_error}")
@@ -112,6 +136,9 @@ class VPSyncProcessor:
                 self._apply_snapshot(snapshot)
                 self.last_error = None
                 self.failed_items = 0
+                gen_at = data.get("generated_at")
+                if gen_at:
+                    self._save_last_pull(gen_at)
                 log.info("[VP SYNC] Successfully applied snapshot to local DB.")
                 self.send_heartbeat()
                 return True

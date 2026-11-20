@@ -242,16 +242,16 @@ def get_vp_snapshot(
         vessel_rows = safe_query(Vessel, Vessel.imo_number == vessel_imo)
         particulars_rows = safe_query(VesselParticulars, VesselParticulars.vessel_imo == vessel_imo)
 
-        # 2. AnalysisData
+        # 2. AnalysisData (CDC via auto-updating updated_at trigger)
         an_filters = [AnalysisData.vessel_imo == vessel_imo]
         if since_dt:
-            an_filters.append(AnalysisData.Date >= since_dt.date())
+            an_filters.append(AnalysisData.updated_at >= since_dt)
         analysis_rows = safe_query(AnalysisData, *an_filters)
 
         # 3. FleetStatusData
         fleet_filters = [FleetStatusData.imo == vessel_imo]
         if since_dt:
-            fleet_filters.append(FleetStatusData.scraped_at >= since_dt)
+            fleet_filters.append(FleetStatusData.updated_at >= since_dt)
         fleet_rows = safe_query(FleetStatusData, *fleet_filters)
 
         # 4. VesselDesignData
@@ -263,7 +263,7 @@ def get_vp_snapshot(
         # 5. ISO19030Result
         iso_filters = [ISO19030Result.vessel_imo == vessel_imo]
         if since_dt:
-            iso_filters.append(ISO19030Result.record_date >= since_dt.date())
+            iso_filters.append(ISO19030Result.updated_at >= since_dt)
         iso_rows = safe_query(ISO19030Result, *iso_filters)
 
         # 6. VesselCPConfig & Warranties
@@ -279,7 +279,7 @@ def get_vp_snapshot(
         # 7. Bunker reports
         bunker_filters = [MariAppsBunkerReport.vessel_imo == vessel_imo]
         if since_dt:
-            bunker_filters.append(MariAppsBunkerReport.scraped_at >= since_dt)
+            bunker_filters.append(MariAppsBunkerReport.updated_at >= since_dt)
         bunker_rows = safe_query(MariAppsBunkerReport, *bunker_filters)
 
         # 8. Biofuel
