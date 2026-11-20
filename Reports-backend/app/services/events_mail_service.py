@@ -1,5 +1,5 @@
 # app/services/events_mail_service.py
-# Mail to vessel owners whenever a vessel's newest logbook event changes: that vessel's last N events,
+# Mail to vessel owners for every new logbook report of a vessel: that vessel's last N events,
 # latest first, laid out like the Overview "Events" tab. Sent through Microsoft Graph, like mail_service.py.
 import asyncio
 import html
@@ -154,26 +154,52 @@ async def _owner_groups(control_db) -> list:
     return groups
 
 
-async def _load_state(db) -> dict:
+def _event_id(ev: dict) -> str:
+    """Stable identity of one logbook report. Built from the log number, not the timestamp (the UTC time
+    can appear later and would make the same report look new)."""
+    num, typ = ev.get("log_number"), _report_type(ev)
+    if num not in (None, ""):
+        return f"{num}|{typ}"
+    return f"{ev['_ts'][:10]}|{typ}"
+
+
+_MAX_MAILS_PER_VESSEL = 10  # per check; older unseen events beyond this are recorded without a mail
+
+
+async def _ensure_sent_table(db):
     await db.execute(text(
-        "CREATE TABLE IF NOT EXISTS events_mail_state ("
-        "imo TEXT PRIMARY KEY, last_key TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT now())"))
+        "CREATE TABLE IF NOT EXISTS events_mail_sent ("
+        "imo TEXT NOT NULL, event_id TEXT NOT NULL, sent_at TIMESTAMPTZ NOT NULL DEFAULT now(), "
+        "PRIMARY KEY (imo, event_id))"))
     await db.commit()
-    return {r[0]: r[1] for r in (await db.execute(text("SELECT imo, last_key FROM events_mail_state"))).fetchall()}
 
 
-async def _save_state(db, imo: str, key: str):
-    await db.execute(text(
-        "INSERT INTO events_mail_state (imo, last_key) VALUES (:i, :k) "
-        "ON CONFLICT (imo) DO UPDATE SET last_key = :k, updated_at = now()"), {"i": imo, "k": key})
+async def _seen_vessels(db) -> set:
+    return {r[0] for r in (await db.execute(text("SELECT DISTINCT imo FROM events_mail_sent"))).fetchall()}
+
+
+async def _claim(db, imo: str, event_id: str) -> bool:
+    """Atomically mark the event as mailed. True only for the one process/run that gets to send it."""
+    row = (await db.execute(text(
+        "INSERT INTO events_mail_sent (imo, event_id) VALUES (:i, :e) ON CONFLICT DO NOTHING RETURNING event_id"),
+        {"i": imo, "e": event_id})).first()
+    await db.commit()
+    return row is not None
+
+
+async def _release(db, imo: str, event_id: str):
+    await db.execute(text("DELETE FROM events_mail_sent WHERE imo = :i AND event_id = :e"), {"i": imo, "e": event_id})
     await db.commit()
 
 
 async def send_new_event_mails(test_to: str = "", dry_run: bool = False, force: bool = False,
                                end_date: date_type | None = None) -> dict:
-    """Send one mail per vessel whose newest logbook event is new since the last mail. The first time a
-    vessel is seen its current newest event is only recorded (no mail), so enabling this never blasts old
-    reports. `test_to` (or EVENTS_MAIL_TEST_TO), `dry_run` and `force` ignore and never touch that state."""
+    """Send one mail for every logbook report that has not been mailed yet, oldest first, each showing the
+    last N events up to that report. Every mailed report is recorded (events_mail_sent) BEFORE sending, so
+    several workers or overlapping checks can never send the same report twice; a failed send releases the
+    record so the next check retries. The first time a vessel is seen its current reports are only recorded
+    (no mail), so enabling this never blasts old reports. `test_to` (or EVENTS_MAIL_TEST_TO), `dry_run` and
+    `force` send each vessel's latest report only and never touch the record."""
     if VesselPerfSession is None:
         logger.error("[EVENTS-MAIL] VESSEL_PERF_DATABASE_URL is not configured.")
         return {"sent": 0, "error": "vessel_perf not configured"}
@@ -189,45 +215,61 @@ async def send_new_event_mails(test_to: str = "", dry_run: bool = False, force: 
     if not groups:
         return {"sent": 0, "mails": 0, "previews": []}
 
+    # vessel -> recipient groups (a vessel can be listed under more than one owner)
+    vessels = {}
+    for g in groups:
+        for v in g["vessels"]:
+            vessels.setdefault(v["imo"], {"name": v["name"], "groups": []})["groups"].append(g)
+
     sent, previews = 0, []
     async with SessionLocal() as state_db, VesselPerfSession() as perf_db:
-        state = await _load_state(state_db) if track else {}
+        seen = set()
+        if track:
+            await _ensure_sent_table(state_db)
+            seen = await _seen_vessels(state_db)
         # Ask for plenty of events: days with no report come back as "missing" entries, dropped below.
         data = await build_logbook(perf_db, SOURCE, 60, 0, today, None)
         by_imo = {v["imo"]: [r for r in v["rows"] if not r.get("_missing")] for v in data["vessels"]}
 
-        done = {}  # imo -> key, for vessels a mail went out for
-        for g in groups:
-            for v in g["vessels"]:
-                real = by_imo.get(v["imo"])
-                if not real:
+        for imo, info in vessels.items():
+            real = by_imo.get(imo)
+            if not real:
+                continue
+            if track:
+                if imo not in seen:  # first sight: remember what exists, mail nothing
+                    for ev in real:
+                        await _claim(state_db, imo, _event_id(ev))
+                    logger.info(f"[EVENTS-MAIL] {info['name']}: baseline recorded ({len(real)} reports), no mail.")
                     continue
-                latest = real[-1]
-                key = f"{latest['_ts']}|{latest.get('_ev')}"
-                if track:
-                    if v["imo"] not in state:
-                        await _save_state(state_db, v["imo"], key)
-                        state[v["imo"]] = key
-                        logger.info(f"[EVENTS-MAIL] {v['name']}: baseline recorded, no mail.")
-                        continue
-                    if state[v["imo"]] == key:
-                        continue
-                rows = list(reversed(real[-n:]))  # latest first
-                day = date_type.fromisoformat(latest["_ts"][:10]).strftime("%d %b %Y")
-                subject = (f"{'[TEST] ' if test_to else ''}{v['name']} - {_log_number(latest)} - "
-                           f"{_report_type(latest)} - {day}")
-                body = render_events_html(data["columns"], {"name": v["name"], "rows": rows}, n)
+                todo = [i for i, ev in enumerate(real) if await _claim(state_db, imo, _event_id(ev))]
+                for i in todo[:-_MAX_MAILS_PER_VESSEL]:
+                    logger.warning(f"[EVENTS-MAIL] {info['name']}: too many new reports, skipping mail for {_event_id(real[i])}.")
+                todo = todo[-_MAX_MAILS_PER_VESSEL:]
+            else:
+                todo = [len(real) - 1]
+
+            for i in todo:  # oldest first
+                ev = real[i]
+                rows = list(reversed(real[max(0, i - n + 1):i + 1]))  # latest first
+                day = date_type.fromisoformat(ev["_ts"][:10]).strftime("%d %b %Y")
+                subject = (f"{'[TEST] ' if test_to else ''}{info['name']} - {_log_number(ev)} - "
+                           f"{_report_type(ev)} - {day}")
+                body = render_events_html(data["columns"], {"name": info["name"], "rows": rows}, n)
                 previews.append((subject, body))
                 if dry_run:
                     continue
-                to = _emails(test_to) if test_to else g["emails"]
-                if await _graph_send(to, subject, body):
+                ok = False
+                for g in info["groups"]:
+                    to = _emails(test_to) if test_to else g["emails"]
+                    if await _graph_send(to, subject, body):
+                        ok = True
+                        logger.info(f"[EVENTS-MAIL] Sent '{subject}' to {', '.join(to)}.")
+                        if test_to:
+                            break  # test mode: one copy to the test address is enough
+                if ok:
                     sent += 1
-                    done[v["imo"]] = key
-                    logger.info(f"[EVENTS-MAIL] Sent '{subject}' to {', '.join(to)}.")
-        if track:
-            for imo, key in done.items():
-                await _save_state(state_db, imo, key)
+                elif track:
+                    await _release(state_db, imo, _event_id(ev))  # retry on the next check
     return {"sent": sent, "mails": len(previews), "previews": previews}
 
 
