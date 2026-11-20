@@ -95,6 +95,17 @@ def find_key_fuzzy(data_dict, search_terms):
                 return key
     return None
 
+def hemisphere(value, letters):
+    """'East' / 'e' / 'W' / 'South' ... -> 'E' / 'W' / 'N' / 'S' (only letters in
+    `letters`); anything else -> None. Needed because the MariApps Excel export's
+    "Lon Direction" column holds the longitude DEGREES (e.g. '87'), not E/W - taking
+    it as-is lost every West longitude (the UI then defaulted all of them to E)."""
+    if value is None:
+        return None
+    h = {"E": "E", "EAST": "E", "W": "W", "WEST": "W",
+         "N": "N", "NORTH": "N", "S": "S", "SOUTH": "S"}.get(str(value).strip().upper())
+    return h if h and h in letters else None
+
 def find_key_all_terms(data_dict, required_terms):
     if not data_dict:
         return None
@@ -189,10 +200,19 @@ def map_mariapps_to_160(payload, excel_data=None, header_data=None):
 
     out["lat_degree"]    = val_num(excel, find_key_fuzzy(excel, ["Lat Deg", "Latitude Degree"]))
     out["lat_minutes"]   = val_num(excel, find_key_fuzzy(excel, ["Lat Min", "Latitude Minutes"]))
-    out["lat_direction"] = val_str(excel, find_key_fuzzy(excel, ["Lat Dir", "Latitude Direction"]))
+    # Direction: the detail page's Position tab carries the real E/W and N/S
+    # (its latitude key is spelled "Lattitude Direction"); the Excel column is
+    # only a fallback and is rejected when it is not a hemisphere (see hemisphere()).
+    out["lat_direction"] = (
+        hemisphere(val_str(pos, find_key_fuzzy(pos, ["Lattitude Direction", "Latitude Direction"])), "NS") or
+        hemisphere(val_str(excel, find_key_fuzzy(excel, ["Lat Dir", "Latitude Direction"])), "NS")
+    )
     out["lon_degree"]    = val_num(excel, find_key_fuzzy(excel, ["Lon Deg", "Longitude Degree"]))
     out["lon_minutes"]   = val_num(excel, find_key_fuzzy(excel, ["Lon Min", "Longitude Minutes"]))
-    out["lon_direction"] = val_str(excel, find_key_fuzzy(excel, ["Lon Dir", "Longitude Direction"]))
+    out["lon_direction"] = (
+        hemisphere(val_str(pos, find_key_fuzzy(pos, ["Longitude Direction"])), "EW") or
+        hemisphere(val_str(excel, find_key_fuzzy(excel, ["Lon Dir", "Longitude Direction"])), "EW")
+    )
 
     # WNI Fallback: parse raw combined strings like "22 14.5 N" or "22° 14.5' N"
     raw_lat = val_str(excel, find_key_fuzzy(excel, ["Latitude", "lat_raw"]))
