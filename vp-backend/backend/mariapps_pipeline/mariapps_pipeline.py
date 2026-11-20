@@ -381,9 +381,12 @@ def run():
         # per row at ingestion - without this, every report saved this run
         # stays NULL and drops out of the UW/NUW emission buckets.
         from ..database import engine as _db_engine
-        from ..pipeline.expander import refresh_op_status
+        from ..pipeline.expander import refresh_op_status, refresh_port_flags
         refresh_op_status(_db_engine, tables=("expanded_mariapps_data",))
         log.info("[OPSTATUS] Op. Status refreshed for MariApps reports.")
+        # Country / EU Port? are derived from the port strings (see expander) and a
+        # destination can be ingested before the fleet has left that port.
+        refresh_port_flags(_db_engine, tables=("expanded_mariapps_data",))
         log.info("[EXPORT]   Exporting analysis_data to Excel...")
         try:
             export_path = export_analysis_data(

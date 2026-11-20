@@ -1212,8 +1212,9 @@ def run():
     # Op. Status (UW/NUW) is derived from the whole vessel history, not set per
     # row at ingestion - refresh it so reports saved this run are not left NULL.
     from ..database import engine as _db_engine
-    from .expander import refresh_op_status
+    from .expander import refresh_op_status, refresh_port_flags
     refresh_op_status(_db_engine, tables=("expanded_wni_data",))
+    refresh_port_flags(_db_engine, tables=("expanded_wni_data",))
 
 
 

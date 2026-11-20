@@ -16,6 +16,8 @@ expanded_column_metadata and served to the frontend.
 
 import logging
 import re
+import time
+from collections import defaultdict
 from datetime import datetime
 
 from sqlalchemy import text, inspect
@@ -950,7 +952,7 @@ def _build_eu_ports_by_name():
                               "Ponta Delgada", "Praia Da Vitoria", "Funchal"]),
         ("Romania", "RO", ["Constanta", "Galati", "Braila", "Midia"]),
         ("Slovenia", "SI", ["Koper"]),
-        ("Spain", "ES", ["Algeciras", "Valencia", "Barcelona", "Bilbao", "Las Palmas", "Las Palmas De Gran Canaria",
+        ("Spain", "ES", ["Tenerife", "Teneriffe", "Santa Cruz Tenerife", "Granadilla", "Algeciras", "Valencia", "Barcelona", "Bilbao", "Las Palmas", "Las Palmas De Gran Canaria",
                            "Santa Cruz De Tenerife", "Tarragona", "Cartagena", "Huelva", "Gijon", "Vigo",
                            "A Coruna", "Coruna", "Ferrol", "Aviles", "Santander", "Castellon", "Alicante",
                            "Almeria", "Malaga", "Sagunto", "Ceuta", "Melilla"]),
@@ -985,22 +987,78 @@ def _normalize_port_name(raw):
 _EU_PORTS_BY_NAME = _build_eu_ports_by_name()
 
 
+# ── Fleet-learned ports (name -> country / EU flag) ────────────────────────
+# The hardcoded list above is knowledge-based, not complete: an EU port missing
+# from it was a confident "N" (found 2026-11: "Teneriffe", Spain, flagged N, so
+# legs arriving there fell out of EU MRV / ETS scope). MariApps' Departure Port
+# and Arrival Port (Current Leg) carry the authoritative 'Name {LOCODE},Country'
+# format, so every port the fleet has ever left or been headed to is already
+# known with its country. Learn name -> (country, EU flag) from those strings
+# and use it for the bare destination names. A name seen with two different
+# countries is ambiguous and ignored.
+_FLEET_PORTS = {}
+_FLEET_PORTS_LOADED_AT = 0.0
+_FLEET_PORTS_TTL_S = 3600
+
+
+def _build_fleet_ports(port_strings):
+    """{normalized port name: (country, 'Y'/'N')} from rich 'Name {LOCODE},Country'
+    strings. Names mapping to more than one (country, flag) are dropped."""
+    seen = defaultdict(set)
+    for s in port_strings:
+        if not s:
+            continue
+        country, eu = _parse_port_country(s)
+        if not country:
+            continue
+        name = _normalize_port_name(s.rsplit(",", 1)[0])
+        if name:
+            seen[name].add((country, eu))
+    return {n: next(iter(v)) for n, v in seen.items() if len(v) == 1}
+
+
+def _ensure_fleet_ports(force=False):
+    """(Re)load _FLEET_PORTS from the stored port strings, at most once per TTL.
+    Uses its own short connection so it can never disturb the caller's
+    transaction; on any failure the previous lookup (or none) stays in place and
+    behaviour falls back to the hardcoded list."""
+    global _FLEET_PORTS, _FLEET_PORTS_LOADED_AT
+    if not force and _FLEET_PORTS and (time.time() - _FLEET_PORTS_LOADED_AT) < _FLEET_PORTS_TTL_S:
+        return
+    try:
+        from ..database import engine as _eng
+        with _eng.connect() as c:
+            rows = c.execute(text(
+                'SELECT "VoyageMeta_departure_port_last_leg_operational_LF" AS p FROM expanded_mariapps_data '
+                'UNION SELECT "VoyageMeta_arrival_port_current_leg_operational_LF" FROM expanded_mariapps_data'
+            )).fetchall()
+        _FLEET_PORTS = _build_fleet_ports(r[0] for r in rows)
+        _FLEET_PORTS_LOADED_AT = time.time()
+    except Exception as exc:
+        log.warning(f"Fleet port lookup not refreshed ({exc}) - using the hardcoded EU list only.")
+
+
 def _resolve_port_country(raw_port):
     """(country, eu_port_YN) for one port field, from whichever source has
-    data: the rich 'Name {LOCODE},Country' format first (authoritative when
-    present — MariApps' Departure Port), falling back to a name lookup
-    against the EU/EEA ports list for bare names (everything else). A lookup
-    miss is a confident "N" (see _EU_PORTS_BY_NAME's docstring) with Country
-    left blank — a hit outside the EU list isn't something we can tell from
-    a bare name alone."""
+    data, most authoritative first:
+      1. the rich 'Name {LOCODE},Country' format (MariApps' Departure Port);
+      2. the fleet-learned lookup (_FLEET_PORTS) for bare names - EXCEPT where it
+         says non-EU for a name the hardcoded EU list knows (e.g. Valencia, ES vs
+         VE): that is ambiguous, so the hardcoded EU answer wins, as before;
+      3. the hardcoded EU/EEA ports list -> "Y";
+      4. otherwise a confident "N" with Country blank (see _EU_PORTS_BY_NAME)."""
     if not raw_port or not raw_port.strip():
         return None, None
     country, eu = _parse_port_country(raw_port)
     if country:
         return country, eu
-    hit = _EU_PORTS_BY_NAME.get(_normalize_port_name(raw_port))
-    if hit:
-        return hit[0], "Y"
+    key = _normalize_port_name(raw_port)
+    fleet = _FLEET_PORTS.get(key)
+    eu_hit = _EU_PORTS_BY_NAME.get(key)
+    if fleet and not (eu_hit and fleet[1] == "N"):
+        return fleet
+    if eu_hit:
+        return eu_hit[0], "Y"
     return None, "N"
 
 
@@ -1014,6 +1072,7 @@ def _emission_log_nav_fields(data_rec, table_cols):
     bare, so it naturally yields blank Country and EU Port?="N" rather than
     needing per-source branching (see _resolve_port_country)."""
     out = {}
+    _ensure_fleet_ports()
     departure_port = data_rec.get("VoyageMeta_departure_port_last_leg_operational_LF")
     to_port = data_rec.get("VoyageMeta_to_port_operational_LF")
 
@@ -2331,6 +2390,56 @@ _OP_STATUS_FORCE_NUW = {"ARRIVAL REPORT", "DEPARTURE REPORT", "NOON AT PORT"}
 # instead of At Sea. "Noon at sea" is by definition always underway,
 # regardless of same-day ordering against BOSP/COSP/EOSP.
 _OP_STATUS_FORCE_UW = {"NOON AT SEA"}
+
+
+def _port_flag_changes(engine, tables=None, apply=False):
+    """Recompute Country / EU Port? (From/To) for stored rows from their port
+    strings with the CURRENT rules (fleet-learned lookup + hardcoded list).
+    Returns [(table, dep, dest, n_rows, [(old cols...)], new_cols)]. Writes only
+    when apply=True. Idempotent; only ever sets non-blank computed values."""
+    dep_key = "VoyageMeta_departure_port_last_leg_operational_LF"
+    to_key = "VoyageMeta_to_port_operational_LF"
+    all_tables = ("expanded_mariapps_data", "expanded_wni_data")
+    changes = []
+    _ensure_fleet_ports(force=True)
+    with engine.connect() as conn:
+        for table in [t for t in all_tables if tables is None or t in tables]:
+            cols = _get_table_cols(conn, table)
+            if "emissionx_to_eu_port" not in cols:
+                continue
+            pairs = conn.execute(text(f'SELECT DISTINCT "{dep_key}", "{to_key}" FROM {table}')).fetchall()
+            for dep, dest in pairs:
+                new = _emission_log_nav_fields({dep_key: dep, to_key: dest}, cols)
+                if not new:
+                    continue
+                where = (f'"{dep_key}" IS NOT DISTINCT FROM :_dep AND "{to_key}" IS NOT DISTINCT FROM :_dest AND ('
+                         + " OR ".join(f'"{c}" IS DISTINCT FROM :{c}' for c in new) + ")")
+                params = {"_dep": dep, "_dest": dest, **new}
+                n = conn.execute(text(f"SELECT COUNT(*) FROM {table} WHERE {where}"), params).scalar()
+                if not n:
+                    continue
+                old = conn.execute(text(
+                    "SELECT DISTINCT " + ", ".join(f'"{c}"' for c in new) + f" FROM {table} WHERE {where}"), params).fetchall()
+                changes.append((table, dep, dest, n, [tuple(o) for o in old], dict(new)))
+                if apply:
+                    conn.execute(text(
+                        f"UPDATE {table} SET " + ", ".join(f'"{c}" = :{c}' for c in new) + f" WHERE {where}"), params)
+        if apply:
+            conn.commit()
+    return changes
+
+
+def refresh_port_flags(engine, tables=None):
+    """Re-derive Country / EU Port? for already-ingested rows. A destination can
+    be ingested before the fleet has left that port (so its country is unknown
+    then) - call this after each ingestion run, next to refresh_op_status().
+    Never raises: a failure must not fail the ingestion run."""
+    try:
+        changes = _port_flag_changes(engine, tables, apply=True)
+        if changes:
+            log.info(f"Port flags refreshed: {sum(c[3] for c in changes)} rows across {len(changes)} port pairs.")
+    except Exception:
+        log.exception("Port flag refresh failed - rows keep their previous Country / EU Port? until the next run.")
 
 
 def refresh_op_status(engine, tables=None):
