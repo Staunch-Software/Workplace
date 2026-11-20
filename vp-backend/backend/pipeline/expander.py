@@ -2509,8 +2509,14 @@ def _port_flag_changes(engine, tables=None, apply=False):
                 if apply:
                     conn.execute(text(
                         f"UPDATE {table} SET " + ", ".join(f'"{c}" = :{c}' for c in new) + f" WHERE {where}"), params)
-        if apply:
-            conn.commit()
+            # End the transaction after EACH table (commit when writing, otherwise just
+            # release): holding a read lock on one expanded table while asking for the
+            # next one deadlocked against the service's startup migration (ALTER TABLE
+            # takes exclusive locks on both) - seen 2026-11-20 right after a restart.
+            if apply:
+                conn.commit()
+            else:
+                conn.rollback()
     return changes
 
 
