@@ -2,7 +2,7 @@ import hashlib
 import logging
 import pandas as pd
 from datetime import datetime
-from sqlalchemy import text
+from sqlalchemy import text, func
 
 # ===========================================================================
 # IMPORTS
@@ -65,6 +65,32 @@ def _make_fingerprint(log_number: str, imo_number: str, log_date: str) -> str:
     normalized_date = _normalize_date(log_date)
     fp_string = f"{str(log_number).strip()}|{imo_number}|{normalized_date}"
     return hashlib.sha256(fp_string.encode()).hexdigest()
+
+
+def _find_existing_raw(db, imo_number, log_number, log_date, log_type, fingerprint):
+    """Find the raw row already stored for this report, or None.
+
+    The fingerprint (log_number|imo|date) is tried first. It is not enough on
+    its own: copies of the same report were stored with DIFFERENT fingerprints
+    (2026-11: ~720 log numbers on AMNS POLAR / AMNSI STALLION / AMNSI MAXIMUS
+    etc. were stored twice, doubling distance and fuel in analysis_data), so a
+    re-scrape inserted a second row instead of updating the first. Fall back
+    to the natural key vessel + log number + date (+ log type when known).
+    Different date or type = a genuinely reused log number, kept separate.
+    Rows already flagged is_duplicate are ignored; newest match wins."""
+    row = db.query(RawMariAppsLog).filter(RawMariAppsLog.fingerprint == fingerprint).first()
+    if row is not None:
+        return row
+    q = db.query(RawMariAppsLog).filter(
+        RawMariAppsLog.vessel_imo == imo_number,
+        RawMariAppsLog.log_number == log_number,
+        RawMariAppsLog.log_date == log_date,
+        func.coalesce(RawMariAppsLog.is_duplicate, False).is_(False),
+    )
+    lt = str(log_type or "").strip()
+    if lt and lt.upper() != "UNKNOWN":
+        q = q.filter(func.lower(func.trim(RawMariAppsLog.log_type)) == lt.lower())
+    return q.order_by(RawMariAppsLog.id.desc()).first()
 
 
 def _resolve_voyage_no(header: dict, excel: dict, nested: dict, row_data: dict) -> str:
@@ -170,7 +196,7 @@ def build_full_row_data(
 
 class MariAppsPersistenceHandler:
 
-    def is_already_processed(self, log_number: str, vessel_name: str, log_date: str) -> bool:
+    def is_already_processed(self, log_number: str, vessel_name: str, log_date: str, log_type: str = None) -> bool:
         db = SessionLocal()
         try:
             vessel_ref = db.query(Vessel).filter(
@@ -180,9 +206,10 @@ class MariAppsPersistenceHandler:
                 log.error(f"Vessel '{vessel_name}' not found in DB.")
                 return False
             fingerprint = _make_fingerprint(log_number, vessel_ref.imo_number, log_date)
-            return db.query(RawMariAppsLog).filter(
-                RawMariAppsLog.fingerprint == fingerprint
-            ).first() is not None
+            return _find_existing_raw(
+                db, vessel_ref.imo_number, str(log_number).strip(),
+                _normalize_date(log_date), log_type, fingerprint,
+            ) is not None
         except Exception as e:
             log.error(f"Error checking duplicate for {log_number}: {e}")
             return False
@@ -232,9 +259,11 @@ class MariAppsPersistenceHandler:
 
             leg_number   = _resolve_voyage_no(header, excel, nested, row_data)
             fingerprint  = _make_fingerprint(log_number, vessel_ref.imo_number, log_date)
-            existing_raw = db.query(RawMariAppsLog).filter(
-                RawMariAppsLog.fingerprint == fingerprint
-            ).first()
+            existing_raw = _find_existing_raw(
+                db, vessel_ref.imo_number, log_number, log_date,
+                nested.get("Log Type") or excel.get("Log Type") or row_data.get("log_type", "UNKNOWN"),
+                fingerprint,
+            )
 
             log_type = (
                 nested.get("Log Type") or
@@ -257,6 +286,10 @@ class MariAppsPersistenceHandler:
             # instead of silently discarding the correction.
             is_correction = False
             if existing_raw is not None:
+                if existing_raw.fingerprint != fingerprint:
+                    # Found by natural key, not fingerprint: heal the stale one
+                    # so later lookups match directly.
+                    existing_raw.fingerprint = fingerprint
                 if cleaned_payload == existing_raw.raw_json:
                     db.add(DataQualityLog(
                         raw_mariapps_id=existing_raw.id,

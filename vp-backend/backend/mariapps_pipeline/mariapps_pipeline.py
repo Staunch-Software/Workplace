@@ -278,7 +278,7 @@ def run():
                     continue
 
                 recheck = _is_within_recheck_window(log_date)
-                if not recheck and persistence.is_already_processed(ui_log_num, vessel_name, log_date):
+                if not recheck and persistence.is_already_processed(ui_log_num, vessel_name, log_date, row_data.get("log_type")):
                     log.info(f"[SKIP]     Log {ui_log_num} — already in database.")
                     skipped += 1
                     continue
