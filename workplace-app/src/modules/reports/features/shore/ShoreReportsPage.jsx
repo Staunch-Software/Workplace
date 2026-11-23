@@ -14,6 +14,7 @@ import {
   Ship, Filter, Search, ChevronDown, ChevronRight, X, CheckCircle2, Clock, AlertCircle, Paperclip, AlertTriangle, CalendarClock, MessageSquare, Download, Upload
 } from 'lucide-react';
 import '../../styles/Reports.css';
+import '../../styles/DashboardPageResponsive.css';
 import { compareReportNames, normalizeReportName } from '../../reportOrder';
 import { fmtDate } from '@/utils/dateUtils';
 
@@ -56,6 +57,7 @@ export default function ShoreReportsPage() {
   const [selectedFreq, setSelectedFreq] = useState('');
   const [search, setSearch] = useState('');
   const [sidebarSearch, setSidebarSearch] = useState('');
+  const [mobileTab, setMobileTab] = useState('reports'); // 'reports' | 'records'
   const [selectedRow, setSelectedRow] = useState(null); // The report opened in the Modal
   const [modalOpen, setModalOpen] = useState(false);
   const [modalFocusPane, setModalFocusPane] = useState(undefined); // 'thread' when opened from a mention notification
@@ -243,6 +245,7 @@ export default function ShoreReportsPage() {
     setSelectedReportName(name);
     setSelectedFreq(freq);
     setSelectedRow(null);
+    setMobileTab('records');
   }, []);
 
 function reportDate(r) {
@@ -370,11 +373,31 @@ function reportDate(r) {
         </div>
       </div>
 
+      {/* ── Mobile View Toggle Tabs ── */}
+      <div className="rt-mobile-tabs">
+        <button
+          type="button"
+          className={`rt-mobile-tab ${mobileTab === 'reports' ? 'active' : ''}`}
+          onClick={() => setMobileTab('reports')}
+        >
+          <Filter size={14} />
+          <span>Reports Catalog</span>
+        </button>
+        <button
+          type="button"
+          className={`rt-mobile-tab ${mobileTab === 'records' ? 'active' : ''}`}
+          onClick={() => setMobileTab('records')}
+        >
+          <Search size={14} />
+          <span>Records {selectedReportName ? `(${tableData.length})` : ''}</span>
+        </button>
+      </div>
+
       {/* ── Main Layout ── */}
       <div className="rt-main-content">
 
         {/* Card Accordion Sidebar */}
-        <div className="rt-freq-sidebar" style={{ paddingTop: 0 }}>
+        <div className={`rt-freq-sidebar ${mobileTab === 'records' ? 'rt-mobile-hidden' : ''}`} style={{ paddingTop: 0 }}>
           
           {/* Sidebar Search */}
           <div style={{ 
@@ -449,14 +472,27 @@ function reportDate(r) {
         </div>
 
         {/* Right area: table + detail panel stacked */}
-        <div className="rt-table-area">
+        <div className={`rt-table-area ${mobileTab === 'reports' ? 'rt-mobile-hidden' : ''}`}>
 
           {/* Table header */}
           {selectedReportName && (
             <div className="rt-table-header">
-              <div className="rt-table-title">{selectedReportName}</div>
-              <div className="rt-table-subtitle">
-                {tableData.length} record{tableData.length !== 1 ? 's' : ''} found
+              <div className="rt-table-header-top">
+                <div>
+                  <div className="rt-table-title">{selectedReportName}</div>
+                  <div className="rt-table-subtitle">
+                    {tableData.length} record{tableData.length !== 1 ? 's' : ''} found
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="rt-mobile-change-report-btn"
+                  onClick={() => setMobileTab('reports')}
+                  title="Choose a different report"
+                >
+                  <Filter size={12} />
+                  Change Report
+                </button>
               </div>
             </div>
           )}

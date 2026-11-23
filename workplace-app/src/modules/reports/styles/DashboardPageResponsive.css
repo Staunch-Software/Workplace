@@ -1,0 +1,1156 @@
+/* ==========================================================================
+   DashboardPageResponsive.css — Report Tracker Module (Shore & Vessel Dashboards)
+   Fully responsive across:
+     - 4K / Ultra-wide (>= 2560px)
+     - Standard Desktop & Laptop (1025px - 2559px)
+     - Tablet (701px - 1024px)
+     - Mobile (361px - 700px)
+     - Ultra-compact Mobile (<= 360px)
+   ========================================================================== */
+
+@import './OverviewPageResponsive.css';
+
+/* ── Base Mobile & Tablet Helper Rules (Hidden on Desktop by default) ── */
+.rt-mobile-tabs {
+  display: none;
+}
+
+.rt-mobile-change-report-btn {
+  display: none;
+}
+
+.rt-modal-mobile-tabs {
+  display: none;
+}
+
+.rt-table-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+
+/* ==========================================================================
+   1. 4K / ULTRA-WIDE DISPLAYS (>= 2560px)
+   ========================================================================== */
+@media (min-width: 2560px) {
+  .rt-control-bar {
+    height: 76px !important;
+    padding: 0 40px !important;
+    margin-top: 10px !important;
+  }
+
+  .rt-page-heading {
+    font-size: 2rem !important;
+    margin-right: 28px !important;
+  }
+
+  .rt-vessel-select-wrap {
+    height: 50px !important;
+    padding: 0 20px !important;
+    border-radius: 12px !important;
+    gap: 14px !important;
+  }
+
+  .rt-vessel-select-wrap svg {
+    transform: scale(1.3) !important;
+  }
+
+  .rt-vessel-select-value {
+    font-size: 1.2rem !important;
+    min-width: 180px !important;
+  }
+
+  .rt-vessel-dropdown {
+    min-width: 280px !important;
+    border-radius: 16px !important;
+    padding: 12px !important;
+    top: calc(100% + 10px) !important;
+  }
+
+  .rt-vessel-option {
+    padding: 14px 18px !important;
+    font-size: 1.15rem !important;
+    border-radius: 10px !important;
+  }
+
+  .rt-control-right {
+    gap: 20px !important;
+  }
+
+  .mu-trigger-btn,
+  .bdl-trigger-btn {
+    height: 50px !important;
+    padding: 0 26px !important;
+    font-size: 1.1rem !important;
+    border-radius: 12px !important;
+    gap: 12px !important;
+  }
+
+  .mu-trigger-btn svg,
+  .bdl-trigger-btn svg {
+    transform: scale(1.35) !important;
+  }
+
+  .rt-search-box {
+    height: 50px !important;
+    width: 380px !important;
+    border-radius: 12px !important;
+    padding: 0 18px !important;
+    gap: 14px !important;
+  }
+
+  .rt-search-box input {
+    font-size: 1.15rem !important;
+  }
+
+  .rt-search-box svg {
+    transform: scale(1.35) !important;
+  }
+
+  .rt-main-content {
+    padding: 0 40px 24px 40px !important;
+    gap: 24px !important;
+  }
+
+  .rt-freq-sidebar {
+    width: 440px !important;
+    padding: 24px 20px !important;
+    border-radius: 16px !important;
+    gap: 16px !important;
+  }
+
+  .rt-freq-sidebar input[type="text"] {
+    padding: 14px 16px 14px 42px !important;
+    font-size: 1.1rem !important;
+    border-radius: 12px !important;
+  }
+
+  .rt-freq-sidebar svg {
+    transform: scale(1.3) !important;
+  }
+
+  .rt-sidebar-group-card {
+    border-radius: 16px !important;
+  }
+
+  .rt-sidebar-group-header {
+    padding: 18px 20px !important;
+    border-radius: 16px !important;
+  }
+
+  .rt-sgh-left {
+    font-size: 1.15rem !important;
+    gap: 14px !important;
+  }
+
+  .rt-sgh-count {
+    font-size: 0.95rem !important;
+    padding: 4px 14px !important;
+    border-radius: 16px !important;
+  }
+
+  .rt-sgh-chevron {
+    transform: scale(1.4) !important;
+  }
+  .rt-sgh-chevron.expanded {
+    transform: rotate(90deg) scale(1.4) !important;
+  }
+
+  .rt-sidebar-group-items {
+    padding: 0 12px 12px 12px !important;
+    gap: 4px !important;
+  }
+
+  .rt-tree-leaf {
+    padding: 14px 16px !important;
+    border-radius: 10px !important;
+    font-size: 1.1rem !important;
+  }
+
+  .rt-tree-badge {
+    font-size: 0.85rem !important;
+    padding: 5px 12px !important;
+  }
+
+  .rt-table-area {
+    border-radius: 16px !important;
+    margin-right: 0 !important;
+  }
+
+  .rt-table-header {
+    padding: 18px 28px !important;
+  }
+
+  .rt-table-title {
+    font-size: 1.45rem !important;
+  }
+
+  .rt-table-subtitle {
+    font-size: 1.05rem !important;
+    margin-top: 4px !important;
+  }
+
+  .rt-data-table th {
+    padding: 16px 24px !important;
+    font-size: 0.95rem !important;
+  }
+
+  .rt-data-table td {
+    padding: 18px 24px !important;
+    font-size: 1.15rem !important;
+  }
+
+  .rt-btn-icon-only {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 8px !important;
+  }
+
+  .rt-btn-icon-only svg {
+    transform: scale(1.35) !important;
+  }
+
+  .rt-due-status-label {
+    font-size: 0.9rem !important;
+    padding: 6px 14px !important;
+  }
+
+  /* 4K Modal Dialogs */
+  .rt-modal-container {
+    max-width: 2000px !important;
+    max-height: 1350px !important;
+    border-radius: 24px !important;
+  }
+
+  .rt-modal-header {
+    padding: 18px 28px !important;
+  }
+
+  .rt-modal-title {
+    font-size: 1.45rem !important;
+  }
+
+  .rt-modal-subtitle {
+    font-size: 1.05rem !important;
+  }
+
+  .rt-modal-close {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 12px !important;
+  }
+
+  .rt-modal-close svg {
+    transform: scale(1.3) !important;
+  }
+
+  .rt-thread-composer-wrap {
+    padding: 20px 32px !important;
+  }
+
+  .rt-thread-messages-list {
+    padding: 30px 40px !important;
+    gap: 20px !important;
+  }
+
+  .rpt-bubble {
+    font-size: 1.15rem !important;
+    padding: 16px 24px !important;
+    border-radius: 20px !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .rpt-bubble-meta {
+    font-size: 0.85rem !important;
+  }
+
+  .rt-mention-picker {
+    min-width: 320px !important;
+    font-size: 1.1rem !important;
+    border-radius: 16px !important;
+  }
+
+  .mu-card {
+    width: 700px !important;
+    border-radius: 24px !important;
+  }
+
+  .mu-head {
+    padding: 24px 28px !important;
+  }
+
+  .mu-title {
+    font-size: 1.35rem !important;
+  }
+
+  .mu-subtitle {
+    font-size: 1rem !important;
+  }
+
+  .mu-body {
+    padding: 24px 28px !important;
+    gap: 22px !important;
+  }
+
+  .mu-field > label {
+    font-size: 0.95rem !important;
+    margin-bottom: 10px !important;
+  }
+
+  .mu-select-trigger {
+    padding: 14px 16px !important;
+    font-size: 1.1rem !important;
+    border-radius: 12px !important;
+  }
+
+  .mu-chip {
+    padding: 8px 18px !important;
+    font-size: 0.95rem !important;
+  }
+
+  .mu-date-wrap input {
+    padding: 14px 0 !important;
+    font-size: 1.1rem !important;
+  }
+
+  .mu-drop {
+    padding: 30px 20px !important;
+    border-radius: 16px !important;
+  }
+
+  .mu-drop-name {
+    font-size: 1.15rem !important;
+  }
+
+  .mu-drop-sub {
+    font-size: 0.95rem !important;
+  }
+
+  .mu-foot {
+    padding: 18px 28px !important;
+  }
+
+  .mu-btn {
+    padding: 14px 26px !important;
+    font-size: 1.1rem !important;
+    border-radius: 12px !important;
+  }
+}
+
+/* ==========================================================================
+   2. DESKTOP & LAPTOP (1025px - 2559px)
+   ========================================================================== */
+@media (min-width: 1025px) and (max-width: 2559px) {
+  .rt-mobile-tabs {
+    display: none !important;
+  }
+
+  .rt-mobile-change-report-btn {
+    display: none !important;
+  }
+
+  .rt-main-content {
+    display: flex !important;
+    flex-direction: row !important;
+  }
+
+  .rt-freq-sidebar {
+    display: flex !important;
+    width: 320px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .rt-table-area {
+    display: flex !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+}
+
+/* ==========================================================================
+   3. TABLET LANDSCAPE & PORTRAIT (701px - 1024px)
+   ========================================================================== */
+@media (min-width: 701px) and (max-width: 1024px) {
+  .rt-mobile-tabs {
+    display: none !important;
+  }
+
+  .rt-mobile-change-report-btn {
+    display: none !important;
+  }
+
+  .rt-control-bar {
+    height: auto !important;
+    min-height: 48px !important;
+    padding: 8px 16px !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    margin-top: 2px !important;
+  }
+
+  .rt-control-left {
+    gap: 10px !important;
+    flex: 1 1 auto !important;
+  }
+
+  .rt-page-heading {
+    font-size: 1.15rem !important;
+    margin-right: 8px !important;
+  }
+
+  .rt-vessel-select-wrap {
+    height: 34px !important;
+    padding: 0 10px !important;
+  }
+
+  .rt-vessel-select-value {
+    font-size: 0.82rem !important;
+    min-width: 110px !important;
+  }
+
+  .rt-control-right {
+    gap: 8px !important;
+    flex: 1 1 auto !important;
+    justify-content: flex-end !important;
+  }
+
+  .mu-trigger-btn,
+  .bdl-trigger-btn {
+    padding: 6px 12px !important;
+    font-size: 0.78rem !important;
+    height: 34px !important;
+    border-radius: 8px !important;
+  }
+
+  .rt-search-box {
+    width: 200px !important;
+    height: 34px !important;
+    padding: 0 10px !important;
+  }
+
+  .rt-search-box input {
+    font-size: 0.8rem !important;
+  }
+
+  .rt-main-content {
+    display: flex !important;
+    flex-direction: row !important;
+    padding: 0 12px 10px 12px !important;
+    gap: 10px !important;
+    overflow: hidden !important;
+  }
+
+  .rt-freq-sidebar {
+    display: flex !important;
+    width: 240px !important;
+    flex-shrink: 0 !important;
+    padding: 12px 10px !important;
+    gap: 10px !important;
+  }
+
+  .rt-freq-sidebar input[type="text"] {
+    font-size: 0.8rem !important;
+    padding: 8px 10px 8px 30px !important;
+  }
+
+  .rt-sidebar-group-header {
+    padding: 10px 12px !important;
+  }
+
+  .rt-sgh-left {
+    font-size: 0.75rem !important;
+    gap: 8px !important;
+  }
+
+  .rt-sgh-count {
+    font-size: 0.65rem !important;
+    padding: 2px 6px !important;
+  }
+
+  .rt-tree-leaf {
+    padding: 8px 10px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .rt-table-area {
+    display: flex !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .rt-table-header {
+    padding: 10px 14px !important;
+  }
+
+  .rt-table-title {
+    font-size: 0.9rem !important;
+  }
+
+  .rt-data-table th {
+    padding: 8px 12px !important;
+    font-size: 0.68rem !important;
+  }
+
+  .rt-data-table td {
+    padding: 10px 12px !important;
+    font-size: 0.8rem !important;
+  }
+
+  /* Sticky Job Order Column on Tablet */
+  .rt-data-table th:first-child {
+    position: sticky !important;
+    left: 0 !important;
+    background: #f8fafc !important;
+    z-index: 12 !important;
+    box-shadow: 2px 0 6px rgba(0,0,0,0.04) !important;
+  }
+  .rt-col-job {
+    position: sticky !important;
+    left: 0 !important;
+    background: #ffffff !important;
+    z-index: 2 !important;
+    box-shadow: 2px 0 6px rgba(0,0,0,0.04) !important;
+  }
+  tr:hover .rt-col-job {
+    background: #f8fafc !important;
+  }
+  tr.rt-row-overdue .rt-col-job,
+  tr.rt-row-today-planned .rt-col-job {
+    background: var(--rt-amber-bg) !important;
+  }
+
+  /* Modals on Tablet */
+  .rt-modal-container {
+    max-width: 95vw !important;
+    height: 90vh !important;
+  }
+
+  .rt-thread-messages-list {
+    padding: 16px !important;
+  }
+
+  .rt-mention-picker {
+    max-width: calc(100vw - 32px) !important;
+  }
+
+  .mu-card {
+    width: 480px !important;
+    max-width: 92vw !important;
+  }
+}
+
+/* ==========================================================================
+   4. MOBILE STANDARD & COMPACT (<= 700px)
+   ========================================================================== */
+@media (max-width: 700px) {
+  /* Prevent horizontal blowout */
+  html, body, #root, .rt-root {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+  }
+
+  .rt-dashboard-body {
+    flex: 1 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  /* Control Bar into neat responsive tiers */
+  .rt-control-bar {
+    height: auto !important;
+    min-height: unset !important;
+    padding: 10px 12px 6px 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    margin-top: 0 !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Tier 1: Heading & Vessel Select */
+  .rt-control-left {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+  }
+
+  .rt-page-heading {
+    font-size: 1.05rem !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+    letter-spacing: -0.01em !important;
+  }
+
+  .rt-vessel-select-wrap {
+    height: 32px !important;
+    padding: 0 10px !important;
+    gap: 6px !important;
+    max-width: 55% !important;
+    min-width: unset !important;
+    flex-shrink: 0 !important;
+    border-radius: 8px !important;
+  }
+
+  .rt-vessel-select-value {
+    font-size: 0.78rem !important;
+    min-width: 0 !important;
+    max-width: 120px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    padding-right: 4px !important;
+  }
+
+  /* Tier 2: Action Buttons & Search Box */
+  .rt-control-right {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    align-items: stretch !important;
+  }
+
+  .mu-trigger-btn,
+  .bdl-trigger-btn {
+    flex: 1 1 calc(50% - 3px) !important;
+    min-width: 0 !important;
+    height: 34px !important;
+    padding: 6px 8px !important;
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
+  }
+
+  .mu-trigger-btn svg,
+  .bdl-trigger-btn svg {
+    flex-shrink: 0 !important;
+  }
+
+  .rt-search-box {
+    width: 100% !important;
+    height: 34px !important;
+    padding: 0 10px !important;
+    border-radius: 8px !important;
+    gap: 8px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .rt-search-box input {
+    font-size: 0.8rem !important;
+    width: 100% !important;
+  }
+
+  /* Tier 3: Mobile Segmented Tab Bar */
+  .rt-mobile-tabs {
+    display: flex !important;
+    width: calc(100% - 24px) !important;
+    margin: 2px 12px 6px 12px !important;
+    background: #e2e8f0 !important;
+    padding: 3px !important;
+    border-radius: 10px !important;
+    gap: 3px !important;
+    flex-shrink: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .rt-mobile-tab {
+    flex: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    padding: 8px 10px !important;
+    border: none !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    color: #64748b !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+    white-space: nowrap !important;
+  }
+
+  .rt-mobile-tab svg {
+    flex-shrink: 0 !important;
+  }
+
+  .rt-mobile-tab.active {
+    background: #ffffff !important;
+    color: #4f46e5 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+  }
+
+  /* Main Layout Stacking on Mobile */
+  .rt-main-content {
+    flex: 1 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 12px 12px 12px !important;
+    overflow: hidden !important;
+    gap: 0 !important;
+  }
+
+  /* Controlled visibility based on mobile active tab */
+  .rt-freq-sidebar.rt-mobile-hidden,
+  .rt-table-area.rt-mobile-hidden {
+    display: none !important;
+  }
+
+  /* Mobile Full-width Sidebar when active */
+  .rt-freq-sidebar {
+    width: 100% !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    border-right: none !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 12px !important;
+    background: #f8fafc !important;
+    padding: 10px !important;
+    gap: 8px !important;
+    overflow-y: auto !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+  }
+
+  .rt-freq-sidebar > div[style*="sticky"] {
+    position: sticky !important;
+    top: 0 !important;
+    background: #f8fafc !important;
+    padding: 4px 0 8px 0 !important;
+    margin: 0 !important;
+  }
+
+  .rt-freq-sidebar input[type="text"] {
+    padding: 8px 10px 8px 32px !important;
+    font-size: 0.8rem !important;
+    border-radius: 8px !important;
+  }
+
+  .rt-sidebar-group-card {
+    border-radius: 10px !important;
+  }
+
+  .rt-sidebar-group-header {
+    padding: 11px 12px !important;
+    border-radius: 10px !important;
+  }
+
+  .rt-sgh-left {
+    font-size: 0.78rem !important;
+    gap: 8px !important;
+  }
+
+  .rt-sgh-count {
+    font-size: 0.65rem !important;
+    padding: 2px 7px !important;
+  }
+
+  .rt-tree-leaf {
+    padding: 10px 10px !important;
+    font-size: 0.78rem !important;
+    border-radius: 8px !important;
+  }
+
+  .rt-tree-leaf-name {
+    font-size: 0.78rem !important;
+  }
+
+  .rt-tree-badge {
+    font-size: 0.62rem !important;
+    padding: 3px 7px !important;
+  }
+
+  /* Mobile Full-width Table Area when active */
+  .rt-table-area {
+    width: 100% !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    border-radius: 12px !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  .rt-table-header {
+    padding: 10px 12px !important;
+  }
+
+  .rt-table-header-top {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+  }
+
+  .rt-table-title {
+    font-size: 0.86rem !important;
+    font-weight: 800 !important;
+    line-height: 1.25 !important;
+  }
+
+  .rt-table-subtitle {
+    font-size: 0.7rem !important;
+    color: #64748b !important;
+  }
+
+  .rt-mobile-change-report-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    padding: 5px 10px !important;
+    border-radius: 6px !important;
+    border: 1px solid #c7d2fe !important;
+    background: #eef2ff !important;
+    color: #4338ca !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+  }
+
+  .rt-table-scroll {
+    flex: 1 !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .rt-data-table {
+    min-width: 660px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .rt-data-table th {
+    padding: 8px 10px !important;
+    font-size: 0.65rem !important;
+  }
+
+  .rt-data-table td {
+    padding: 10px 10px !important;
+    font-size: 0.78rem !important;
+  }
+
+  /* Sticky Job Order Column on Mobile */
+  .rt-data-table th:first-child {
+    position: sticky !important;
+    left: 0 !important;
+    background: #f8fafc !important;
+    z-index: 12 !important;
+    box-shadow: 2px 0 6px rgba(0,0,0,0.06) !important;
+  }
+  .rt-col-job {
+    position: sticky !important;
+    left: 0 !important;
+    background: #ffffff !important;
+    z-index: 2 !important;
+    box-shadow: 2px 0 6px rgba(0,0,0,0.06) !important;
+  }
+  tr:hover .rt-col-job {
+    background: #f8fafc !important;
+  }
+  tr.rt-row-overdue .rt-col-job,
+  tr.rt-row-today-planned .rt-col-job {
+    background: #fffbeb !important;
+  }
+
+  .rt-btn-icon-only {
+    width: 34px !important;
+    height: 34px !important;
+    padding: 0 !important;
+  }
+
+  /* ── Mobile Modals Redesign ── */
+  /* 1. ReportViewerModal */
+  .rt-modal-backdrop {
+    padding: 0 !important;
+    align-items: flex-end !important;
+  }
+
+  .rt-modal-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 94vh !important;
+    max-height: 94vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    margin: 0 !important;
+  }
+
+  .rt-modal-header {
+    padding: 12px 16px !important;
+  }
+
+  .rt-modal-title {
+    font-size: 0.92rem !important;
+  }
+
+  .rt-modal-subtitle {
+    font-size: 0.7rem !important;
+  }
+
+  .rt-modal-mobile-tabs {
+    display: flex !important;
+    width: 100% !important;
+    background: #f1f5f9 !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    padding: 2px 4px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .rt-modal-mobile-tab {
+    flex: 1 !important;
+    padding: 8px 12px !important;
+    text-align: center !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    color: #64748b !important;
+    border: none !important;
+    background: transparent !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+  }
+
+  .rt-modal-mobile-tab.active {
+    background: #ffffff !important;
+    color: #4f46e5 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
+  }
+
+  .rt-modal-body {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  .rt-modal-pane {
+    flex: 1 !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    border-right: none !important;
+  }
+
+  .rt-modal-pane.rt-mobile-pane-hidden {
+    display: none !important;
+  }
+
+  .rt-thread-composer-wrap {
+    padding: 8px 12px 14px 12px !important;
+  }
+
+  .rt-thread-messages-list {
+    padding: 12px 14px !important;
+    gap: 12px !important;
+  }
+
+  .rpt-bubble {
+    max-width: 90% !important;
+    padding: 10px 14px !important;
+    font-size: 0.82rem !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .rt-mention-picker {
+    min-width: 200px !important;
+    max-width: calc(100vw - 32px) !important;
+    left: -40px !important;
+  }
+
+  .rt-panel-header {
+    display: none !important; /* Managed by mobile tabs */
+  }
+
+  /* 2. ManualUploadModal Mobile Bottom Sheet */
+  .mu-overlay {
+    padding: 0 !important;
+    align-items: flex-end !important;
+  }
+
+  .mu-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 92vh !important;
+    margin: 0 !important;
+  }
+
+  .mu-head {
+    padding: 14px 16px !important;
+  }
+
+  .mu-head-icon {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .mu-title {
+    font-size: 0.92rem !important;
+  }
+
+  .mu-subtitle {
+    font-size: 0.7rem !important;
+  }
+
+  .mu-body {
+    padding: 14px 16px !important;
+    gap: 12px !important;
+  }
+
+  .mu-field > label {
+    font-size: 0.68rem !important;
+    margin-bottom: 5px !important;
+  }
+
+  .mu-select-trigger {
+    padding: 8px 10px !important;
+    font-size: 0.8rem !important;
+    border-radius: 8px !important;
+  }
+
+  .mu-chips {
+    gap: 5px !important;
+  }
+
+  .mu-chip {
+    padding: 5px 10px !important;
+    font-size: 0.72rem !important;
+  }
+
+  .mu-date-wrap input {
+    padding: 8px 0 !important;
+    font-size: 0.82rem !important;
+  }
+
+  .mu-drop {
+    padding: 16px 10px !important;
+    border-radius: 10px !important;
+  }
+
+  .mu-drop-name {
+    font-size: 0.8rem !important;
+  }
+
+  .mu-drop-sub {
+    font-size: 0.7rem !important;
+  }
+
+  .mu-foot {
+    padding: 10px 16px !important;
+    gap: 8px !important;
+  }
+
+  .mu-btn {
+    flex: 1 !important;
+    justify-content: center !important;
+    padding: 9px 12px !important;
+    font-size: 0.82rem !important;
+    border-radius: 8px !important;
+  }
+}
+
+/* ==========================================================================
+   5. ULTRA-COMPACT MOBILE (<= 360px)
+   ========================================================================== */
+@media (max-width: 360px) {
+  .rt-control-bar {
+    padding: 8px 8px 4px 8px !important;
+    gap: 6px !important;
+  }
+
+  .rt-page-heading {
+    font-size: 0.95rem !important;
+  }
+
+  .rt-vessel-select-wrap {
+    height: 30px !important;
+    padding: 0 6px !important;
+    max-width: 50% !important;
+  }
+
+  .rt-vessel-select-value {
+    font-size: 0.72rem !important;
+    max-width: 90px !important;
+  }
+
+  .mu-trigger-btn,
+  .bdl-trigger-btn {
+    height: 32px !important;
+    padding: 4px 6px !important;
+    font-size: 0.7rem !important;
+  }
+
+  .rt-search-box {
+    height: 32px !important;
+  }
+
+  .rt-search-box input {
+    font-size: 0.75rem !important;
+  }
+
+  .rt-mobile-tabs {
+    width: calc(100% - 16px) !important;
+    margin: 2px 8px 4px 8px !important;
+  }
+
+  .rt-mobile-tab {
+    padding: 6px 6px !important;
+    font-size: 0.72rem !important;
+    gap: 4px !important;
+  }
+
+  .rt-main-content {
+    padding: 0 8px 8px 8px !important;
+  }
+
+  .rt-freq-sidebar {
+    padding: 8px !important;
+  }
+
+  .rt-sgh-left {
+    font-size: 0.72rem !important;
+  }
+
+  .rt-tree-leaf {
+    padding: 8px 8px !important;
+    font-size: 0.72rem !important;
+  }
+
+  .rt-table-title {
+    font-size: 0.8rem !important;
+  }
+
+  .rt-mobile-change-report-btn {
+    padding: 3px 8px !important;
+    font-size: 0.68rem !important;
+  }
+
+  .rt-thread-messages-list {
+    padding: 10px !important;
+  }
+
+  .rt-mention-picker {
+    left: -30px !important;
+    max-width: calc(100vw - 20px) !important;
+  }
+}

@@ -8,6 +8,7 @@ import VesselThreadPanel from "../../components/VesselThreadPanel";
 import ReportViewerModal from "../../components/ReportViewerModal";
 import { FileText, MessageSquare, Search, X, WifiOff, ChevronRight, Paperclip, AlertTriangle, CalendarClock } from "lucide-react";
 import "../../styles/Reports.css";
+import "../../styles/DashboardPageResponsive.css";
 import { compareReportNames, normalizeReportName } from "../../reportOrder";
 import { fmtDate } from "@/utils/dateUtils";
 
@@ -40,6 +41,7 @@ export default function VesselReportsPage() {
   const [selectedFreq, setSelectedFreq] = useState('');
   const [search, setSearch] = useState("");
   const [sidebarSearch, setSidebarSearch] = useState("");
+  const [mobileTab, setMobileTab] = useState("reports"); // 'reports' | 'records'
   const [tooltipData, setTooltipData] = useState({ visible: false, text: '', x: 0, y: 0 });
 
   const handleTooltipEnter = useCallback((e, text) => {
@@ -236,9 +238,29 @@ export default function VesselReportsPage() {
           </div>
         </div>
 
+        {/* ── Mobile View Toggle Tabs ── */}
+        <div className="rt-mobile-tabs">
+          <button
+            type="button"
+            className={`rt-mobile-tab ${mobileTab === 'reports' ? 'active' : ''}`}
+            onClick={() => setMobileTab('reports')}
+          >
+            <FileText size={14} />
+            <span>Reports Catalog</span>
+          </button>
+          <button
+            type="button"
+            className={`rt-mobile-tab ${mobileTab === 'records' ? 'active' : ''}`}
+            onClick={() => setMobileTab('records')}
+          >
+            <Search size={14} />
+            <span>Records {selectedReportName ? `(${tableData.length})` : ''}</span>
+          </button>
+        </div>
+
         <div className="rt-main-content">
           {/* Card Accordion Sidebar */}
-          <div className="rt-freq-sidebar" style={{ paddingTop: 0 }}>
+          <div className={`rt-freq-sidebar ${mobileTab === 'records' ? 'rt-mobile-hidden' : ''}`} style={{ paddingTop: 0 }}>
           
           {/* Sidebar Search */}
           <div style={{ 
@@ -294,7 +316,7 @@ export default function VesselReportsPage() {
                             <div 
                               key={name} 
                               className={`rt-tree-leaf ${isActive ? 'active' : ''}`}
-                              onClick={() => { setSelectedReportName(name); setSelectedFreq(freq.id); }}
+                              onClick={() => { setSelectedReportName(name); setSelectedFreq(freq.id); setMobileTab('records'); }}
                               onMouseEnter={(e) => handleTooltipEnter(e, name)}
                               onMouseLeave={handleTooltipLeave}
                             >
@@ -314,11 +336,24 @@ export default function VesselReportsPage() {
           </div>
 
           {/* DATA TABLE AREA */}
-          <div className="rt-table-area">
+          <div className={`rt-table-area ${mobileTab === 'reports' ? 'rt-mobile-hidden' : ''}`}>
             {selectedReportName && (
               <div className="rt-table-header">
-                <div className="rt-table-title">{selectedReportName}</div>
-                <div className="rt-table-subtitle">Job History • {tableData.length} records found</div>
+                <div className="rt-table-header-top">
+                  <div>
+                    <div className="rt-table-title">{selectedReportName}</div>
+                    <div className="rt-table-subtitle">Job History • {tableData.length} records found</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="rt-mobile-change-report-btn"
+                    onClick={() => setMobileTab('reports')}
+                    title="Choose a different report"
+                  >
+                    <FileText size={12} />
+                    Change Report
+                  </button>
+                </div>
               </div>
             )}
 

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import '../../styles/Reports.css';
 import '../../styles/OverviewPage.css';
+import '../../styles/OverviewPageResponsive.css';
 import { compareReportNames, normalizeReportName } from '../../reportOrder';
 import { fmtDateShort, fmtDate } from '@/utils/dateUtils';
 

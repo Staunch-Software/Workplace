@@ -1,0 +1,1897 @@
+/* ==========================================================================
+   OverviewPageResponsive.css
+   Responsive Styles for Fleet & Vessel Report Overview (Mobile 320px to 4K 3840px+)
+   ========================================================================== */
+
+/* ── Base Enhancements & Fixes ── */
+.ovw-root {
+  box-sizing: border-box;
+}
+
+.ovw-tabs-row {
+  scrollbar-width: thin;
+}
+
+/* Ensure report text doesn't overflow container */
+.ovw-td-report .ovw-report-name {
+  word-break: break-word;
+}
+
+/* Base Donut Progress Alignment & Scaling Fix */
+.ovw-vcircle {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+.ovw-vcircle svg {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  transform: rotate(-90deg) !important;
+}
+
+.ovw-vc-num {
+  position: absolute !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  line-height: 1 !important;
+  font-weight: 800 !important;
+  user-select: none !important;
+  pointer-events: none !important;
+}
+
+.ovw-ob-donut {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+.ovw-ob-donut svg {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  transform: rotate(-90deg) !important;
+}
+
+.ovw-ob-pct {
+  position: absolute !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  line-height: 1 !important;
+  font-weight: 800 !important;
+  user-select: none !important;
+  pointer-events: none !important;
+}
+
+/* ==========================================================================
+   1. 4K & ULTRA-WIDE SCREENS (min-width: 2560px to 3840px+)
+   ========================================================================== */
+@media (min-width: 2560px) {
+  .ovw-root {
+    --ovw-col-report-w: 360px !important;
+    --ovw-cell-week-w: 120px !important;
+    --ovw-cell-std-w: 210px !important;
+    --ovw-row-h: 84px !important;
+    --ovw-thead-h1: 66px !important;
+    --ovw-thead-h2: 46px !important;
+  }
+
+  /* Header scaling */
+  .ovw-page-header {
+    padding: 36px 48px 20px !important;
+    gap: 32px !important;
+  }
+
+  .ovw-header-left {
+    gap: 22px !important;
+  }
+
+  .ovw-header-icon-badge {
+    width: 60px !important;
+    height: 60px !important;
+    border-radius: 18px !important;
+  }
+
+  .ovw-header-icon-badge svg {
+    width: 30px !important;
+    height: 30px !important;
+  }
+
+  .ovw-page-title {
+    font-size: 32px !important;
+    letter-spacing: -0.02em !important;
+  }
+
+  .ovw-page-subtitle {
+    font-size: 16px !important;
+    margin-top: 5px !important;
+  }
+
+  /* Overall Completed Donut Button */
+  .ovw-overall-btn {
+    padding: 12px 24px !important;
+    border-radius: 18px !important;
+    gap: 16px !important;
+  }
+
+  .ovw-ob-donut {
+    width: 52px !important;
+    height: 52px !important;
+  }
+
+  .ovw-ob-donut svg {
+    width: 52px !important;
+    height: 52px !important;
+  }
+
+  .ovw-ob-pct {
+    font-size: 15px !important;
+  }
+
+  .ovw-ob-title {
+    font-size: 15.5px !important;
+  }
+
+  .ovw-ob-sub {
+    font-size: 13px !important;
+  }
+
+  .ovw-ob-chev {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  /* Download Reports Button */
+  .bdl-trigger-btn {
+    padding: 14px 28px !important;
+    font-size: 16px !important;
+    border-radius: 14px !important;
+    gap: 12px !important;
+  }
+
+  .bdl-trigger-btn svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  /* Frequency Tabs */
+  .ovw-tabs-row {
+    padding: 0 48px 20px !important;
+  }
+
+  .ovw-freq-tabs {
+    padding: 6px !important;
+    gap: 6px !important;
+    border-radius: 18px !important;
+  }
+
+  .ovw-freq-tab {
+    padding: 12px 26px !important;
+    font-size: 15.5px !important;
+    border-radius: 12px !important;
+  }
+
+  /* Control Bar */
+  .ovw-control-bar {
+    padding: 0 48px 20px !important;
+    gap: 24px !important;
+  }
+
+  .ovw-control-left {
+    gap: 16px !important;
+  }
+
+  .ovw-year-chip,
+  .ovw-year-chip--btn {
+    font-size: 16px !important;
+    padding: 10px 22px !important;
+    border-radius: 14px !important;
+    height: 46px !important;
+  }
+
+  .ovw-compact-select {
+    font-size: 15.5px !important;
+    padding: 10px 22px !important;
+    border-radius: 14px !important;
+    height: 46px !important;
+  }
+
+  .ovw-compact-select svg {
+    width: 17px !important;
+    height: 17px !important;
+  }
+
+  .ovw-daily-nav-group {
+    gap: 10px !important;
+  }
+
+  .ovw-nav-arrow-btn {
+    width: 44px !important;
+    height: 46px !important;
+    border-radius: 12px !important;
+  }
+
+  .ovw-nav-arrow-btn svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .ovw-reset-latest-btn {
+    height: 46px !important;
+    padding: 0 18px !important;
+    font-size: 14.5px !important;
+    border-radius: 12px !important;
+  }
+
+  .ovw-stat-strip {
+    gap: 12px !important;
+  }
+
+  .ovw-stat-pill {
+    font-size: 15px !important;
+    padding: 9px 20px !important;
+    border-radius: 14px !important;
+    height: 44px !important;
+  }
+
+  .ovw-stat-dot {
+    width: 10px !important;
+    height: 10px !important;
+  }
+
+  .ovw-control-right {
+    gap: 16px !important;
+  }
+
+  .ovw-legend-pill {
+    font-size: 14.5px !important;
+    padding: 8px 18px !important;
+    border-radius: 14px !important;
+    gap: 10px !important;
+    height: 44px !important;
+  }
+
+  .ovw-legend-swatch {
+    width: 14px !important;
+    height: 14px !important;
+    border-radius: 5px !important;
+  }
+
+  .ovw-search-box {
+    height: 46px !important;
+    min-width: 320px !important;
+    border-radius: 14px !important;
+    padding: 0 18px !important;
+  }
+
+  .ovw-search-box input {
+    font-size: 15.5px !important;
+  }
+
+  .ovw-search-box svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  /* Table Card & Content */
+  .ovw-card {
+    margin: 0 48px 36px !important;
+    border-radius: 22px !important;
+  }
+
+  .ovw-th-report {
+    font-size: 16px !important;
+    padding: 0 24px !important;
+  }
+
+  .ovw-th-vessel {
+    padding: 12px 16px !important;
+  }
+
+  .ovw-vessel-name {
+    font-size: 17px !important;
+  }
+
+  .ovw-vessel-imo {
+    font-size: 13px !important;
+    padding: 3px 12px !important;
+  }
+
+  .ovw-vcircle {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .ovw-vcircle svg {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .ovw-vc-num {
+    font-size: 12px !important;
+    font-weight: 800 !important;
+  }
+
+  .ovw-current-week-dot {
+    width: 7px !important;
+    height: 7px !important;
+    margin-left: 6px !important;
+  }
+
+  .ovw-th-week {
+    font-size: 14.5px !important;
+  }
+
+  .ovw-td-report {
+    padding: 0 24px !important;
+  }
+
+  .ovw-report-name {
+    font-size: 16px !important;
+  }
+
+  .ovw-report-sub {
+    font-size: 13px !important;
+  }
+
+  .ovw-chip-has {
+    padding: 9px 18px !important;
+    font-size: 14.5px !important;
+    border-radius: 12px !important;
+    gap: 10px !important;
+  }
+
+  .ovw-chip-has-icon svg {
+    width: 17px !important;
+    height: 17px !important;
+  }
+
+  .ovw-chip-empty {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  .ovw-chip-na {
+    font-size: 14px !important;
+    padding: 6px 14px !important;
+  }
+
+  /* Missing reports modal on 4K */
+  .ovw-mm {
+    max-width: 1200px !important;
+    border-radius: 28px !important;
+  }
+
+  .ovw-mm-head {
+    padding: 28px 36px 24px !important;
+  }
+
+  .ovw-mm-title {
+    font-size: 26px !important;
+  }
+
+  .ovw-mm-stats {
+    gap: 16px !important;
+    margin-top: 22px !important;
+  }
+
+  .ovw-mm-stat {
+    padding: 14px 18px !important;
+    border-radius: 16px !important;
+  }
+
+  .ovw-mm-stat b {
+    font-size: 22px !important;
+  }
+
+  .ovw-mm-stat span {
+    font-size: 13.5px !important;
+  }
+
+  .ovw-mm-chips {
+    padding: 16px 36px 18px !important;
+    gap: 12px !important;
+  }
+
+  .ovw-mm-chip {
+    font-size: 15px !important;
+    padding: 8px 18px !important;
+  }
+
+  .ovw-mm-body {
+    padding: 24px 36px 32px !important;
+    gap: 24px !important;
+  }
+
+  .ovw-mm-vessel-name {
+    font-size: 17px !important;
+  }
+
+  .ovw-mm-report-name {
+    font-size: 15px !important;
+  }
+
+  .ovw-mm-date {
+    font-size: 13.5px !important;
+    padding: 5px 14px !important;
+  }
+
+  /* Bulk download modal on 4K */
+  .bdl-modal {
+    max-width: 1200px !important;
+    border-radius: 24px !important;
+  }
+
+  .bdl-header {
+    padding: 24px 36px !important;
+  }
+
+  .bdl-title {
+    font-size: 1.45rem !important;
+  }
+
+  .bdl-subtitle {
+    font-size: 1rem !important;
+  }
+
+  .bdl-panel-header {
+    padding: 18px 28px !important;
+  }
+
+  .bdl-vessel-card {
+    padding: 14px 18px !important;
+    font-size: 15px !important;
+  }
+
+  .bdl-report-item {
+    padding: 14px 18px !important;
+    font-size: 15px !important;
+  }
+
+  .bdl-footer {
+    padding: 20px 36px !important;
+  }
+
+  .bdl-btn-download,
+  .bdl-btn-cancel {
+    padding: 12px 28px !important;
+    font-size: 15.5px !important;
+    border-radius: 12px !important;
+  }
+}
+
+/* ==========================================================================
+   2. 2K & HIGH-RESOLUTION DESKTOPS (min-width: 1920px and max-width: 2559px)
+   ========================================================================== */
+@media (min-width: 1920px) and (max-width: 2559px) {
+  .ovw-root {
+    --ovw-col-report-w: 290px !important;
+    --ovw-row-h: 74px !important;
+  }
+
+  .ovw-page-header {
+    padding: 30px 38px 16px;
+  }
+
+  .ovw-tabs-row {
+    padding: 0 38px 16px;
+  }
+
+  .ovw-control-bar {
+    padding: 0 38px 16px;
+  }
+
+  .ovw-card {
+    margin: 0 38px 28px;
+  }
+
+  .ovw-page-title {
+    font-size: 25px;
+  }
+}
+
+/* ==========================================================================
+   3. MEDIUM SCREENS & LAPTOPS (max-width: 1280px)
+   ========================================================================== */
+@media (max-width: 1280px) {
+  .ovw-page-header {
+    padding: 22px 24px 14px;
+    gap: 16px;
+  }
+
+  .ovw-tabs-row {
+    padding: 0 24px 14px;
+  }
+
+  .ovw-control-bar {
+    padding: 0 24px 14px;
+  }
+
+  .ovw-card {
+    margin: 0 24px 24px;
+  }
+}
+
+/* ==========================================================================
+   4. TABLET SCREENS (701px to 1024px)
+   ========================================================================== */
+@media (max-width: 1024px) and (min-width: 701px) {
+  .ovw-root {
+    --ovw-col-report-w: 170px !important;
+    --ovw-row-h: 62px;
+  }
+
+  .ovw-page-header {
+    padding: 16px 20px 12px !important;
+    gap: 14px !important;
+  }
+
+  .ovw-page-title {
+    font-size: 20px !important;
+  }
+
+  .ovw-page-subtitle {
+    font-size: 12px !important;
+  }
+
+  .ovw-tabs-row {
+    padding: 0 20px 10px !important;
+    justify-content: flex-start !important;
+  }
+
+  .ovw-control-bar {
+    padding: 0 20px 12px !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .ovw-control-left {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  .ovw-stat-strip {
+    display: inline-flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 6px !important;
+  }
+
+  .ovw-control-right {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    justify-content: space-between !important;
+  }
+
+  .ovw-search-box {
+    flex: 1 1 200px !important;
+    height: 34px !important;
+    max-height: 34px !important;
+  }
+
+  .ovw-card {
+    margin: 0 16px 16px !important;
+  }
+
+  .ovw-vcircle {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .ovw-vcircle svg {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .ovw-vc-num {
+    font-size: 9px !important;
+    font-weight: 800 !important;
+  }
+
+  /* Centered Modals on Tablet (not squashed bottom-sheets) */
+  .ovw-mm-overlay,
+  .bdl-backdrop {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 20px !important;
+  }
+
+  .ovw-mm {
+    width: 100% !important;
+    max-width: 680px !important;
+    max-height: 85vh !important;
+    border-radius: 20px !important;
+  }
+
+  .ovw-mm-stats {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .bdl-modal {
+    width: 100% !important;
+    max-width: 740px !important;
+    max-height: 85vh !important;
+    border-radius: 20px !important;
+  }
+
+  .bdl-body {
+    display: flex !important;
+    flex-direction: row !important;
+    height: 480px !important;
+    max-height: calc(85vh - 130px) !important;
+  }
+
+  .bdl-panel-vessel {
+    width: 44% !important;
+    border-right: 1px solid #f1f5f9 !important;
+    border-bottom: none !important;
+    max-height: none !important;
+  }
+
+  .bdl-panel-reports {
+    flex: 1 !important;
+  }
+
+  .bdl-vessel-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+}
+
+/* ==========================================================================
+   5. MOBILE SCREENS (max-width: 700px)
+   Ultra-sleek, compact, high-density mobile interface
+   ========================================================================== */
+@media (max-width: 700px) {
+  .ovw-root {
+    --ovw-col-report-w: 125px !important;
+    --ovw-row-h: 52px !important;
+    --ovw-thead-h1: 42px !important;
+    --ovw-thead-h2: 26px !important;
+  }
+
+  /* Keep scroll region flexible and contain outer overflow */
+  .ovw-scroll-region {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    background: var(--ovw-bg) !important;
+  }
+
+  /* ── Header: Compact single view ── */
+  .ovw-page-header {
+    padding: 10px 12px 6px !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .ovw-header-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  .ovw-header-icon-badge {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .ovw-header-icon-badge svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  .ovw-header-text {
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+
+  .ovw-page-title {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.01em !important;
+    line-height: 1.2 !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .ovw-page-subtitle {
+    display: none !important; /* Hide long subtitle to avoid mobile screen bloat */
+  }
+
+  /* Quick Actions: Side-by-side single row */
+  .ovw-header-right-actions {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
+  }
+
+  .ovw-overall-btn {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    max-height: 36px !important;
+    padding: 0 8px !important;
+    border-radius: 8px !important;
+    gap: 6px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .ovw-ob-donut {
+    width: 26px !important;
+    height: 26px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .ovw-ob-donut svg {
+    width: 26px !important;
+    height: 26px !important;
+  }
+
+  .ovw-ob-pct {
+    font-size: 8.5px !important;
+    font-weight: 800 !important;
+  }
+
+  .ovw-ob-text {
+    flex: 1 !important;
+    min-width: 0 !important;
+    text-align: left !important;
+    line-height: 1.15 !important;
+  }
+
+  .ovw-ob-title {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: block !important;
+  }
+
+  .ovw-ob-sub {
+    font-size: 8.5px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: block !important;
+    opacity: 0.8 !important;
+  }
+
+  .ovw-ob-chev {
+    width: 12px !important;
+    height: 12px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .bdl-trigger-btn {
+    flex: 0 0 auto !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    max-height: 36px !important;
+    padding: 0 10px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    white-space: nowrap !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
+  }
+
+  .bdl-trigger-btn svg {
+    width: 13px !important;
+    height: 13px !important;
+  }
+
+  /* ── Frequency Tabs: Compact horizontal scroll ── */
+  .ovw-tabs-row {
+    padding: 0 12px 6px !important;
+    margin: 0 !important;
+    display: flex !important;
+    justify-content: flex-start !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    flex-shrink: 0 !important;
+  }
+
+  .ovw-tabs-row::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .ovw-freq-tabs {
+    display: inline-flex !important;
+    flex-wrap: nowrap !important;
+    width: auto !important;
+    min-width: max-content !important;
+    padding: 2px !important;
+    gap: 2px !important;
+    border-radius: 999px !important;
+    background: #ffffff !important;
+    border: 1px solid var(--ovw-border) !important;
+    box-shadow: var(--ovw-shadow-sm) !important;
+    height: 30px !important;
+    box-sizing: border-box !important;
+  }
+
+  .ovw-freq-tab {
+    padding: 4px 10px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+    border-radius: 999px !important;
+    height: 24px !important;
+    line-height: 16px !important;
+    border: none !important;
+  }
+
+  /* ── Control Bar: Multi-tier Clean Stack (No Truncation) ── */
+  .ovw-control-bar {
+    padding: 0 12px 6px !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Control Top Section: Date Pickers + Full-width Stat Strip */
+  .ovw-control-left {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 6px !important;
+  }
+
+  .ovw-year-chip,
+  .ovw-year-chip--btn {
+    height: 28px !important;
+    min-height: 28px !important;
+    padding: 0 10px !important;
+    font-size: 11px !important;
+    border-radius: 999px !important;
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+
+  .ovw-compact-select {
+    height: 28px !important;
+    min-height: 28px !important;
+    min-width: 110px !important;
+    max-width: 160px !important;
+    padding: 0 10px !important;
+    font-size: 11px !important;
+    border-radius: 6px !important;
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+
+  .ovw-compact-select svg {
+    width: 11px !important;
+    height: 11px !important;
+  }
+
+  .ovw-daily-nav-group {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .ovw-nav-arrow-btn {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 5px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .ovw-nav-arrow-btn svg {
+    width: 11px !important;
+    height: 11px !important;
+  }
+
+  .ovw-reset-latest-btn {
+    height: 28px !important;
+    padding: 0 8px !important;
+    font-size: 10px !important;
+    border-radius: 5px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Stat Strip: Full-width line so numbers and vessel counts are never cut off */
+  .ovw-stat-strip {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 5px !important;
+    margin-top: 1px !important;
+  }
+
+  .ovw-stat-pill {
+    height: 22px !important;
+    min-height: 22px !important;
+    padding: 0 7px !important;
+    font-size: 10px !important;
+    border-radius: 999px !important;
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+
+  .ovw-stat-dot {
+    width: 5px !important;
+    height: 5px !important;
+  }
+
+  /* Control Bottom Section: Search Box + Legend Pills in a single responsive tier */
+  .ovw-control-right {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 4px !important;
+    margin-top: 0 !important;
+  }
+
+  /* Search Box: Reset flex-basis so it is strictly 28px tall */
+  .ovw-search-box {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding: 0 8px !important;
+    border-radius: 6px !important;
+    box-sizing: border-box !important;
+    order: 1 !important;
+    background: #ffffff !important;
+    border: 1px solid var(--ovw-border) !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .ovw-search-box input {
+    font-size: 11px !important;
+    height: 100% !important;
+  }
+
+  .ovw-search-box svg {
+    width: 12px !important;
+    height: 12px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Legend Pills: Clean horizontal row on mobile */
+  .ovw-legend-pill {
+    order: 2 !important;
+    flex: 0 0 auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    height: 18px !important;
+    min-height: 18px !important;
+    padding: 0 6px !important;
+    font-size: 9px !important;
+    border-radius: 999px !important;
+    gap: 4px !important;
+    white-space: nowrap !important;
+    box-shadow: none !important;
+    border: 1px solid var(--ovw-border) !important;
+    background: #ffffff !important;
+  }
+
+  .ovw-legend-swatch {
+    width: 7px !important;
+    height: 7px !important;
+    border-radius: 2px !important;
+  }
+
+  /* ── Table Card: Full-Height Flex Container ── */
+  .ovw-card {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 8px 8px !important;
+    border-radius: 10px !important;
+    border: 1px solid var(--ovw-border) !important;
+    box-shadow: var(--ovw-shadow-sm) !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+  }
+
+  .ovw-table-scroll {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Sticky First Column Header & Body */
+  .ovw-th-report {
+    font-size: 11px !important;
+    padding: 0 6px !important;
+  }
+
+  .ovw-th-vessel {
+    padding: 4px 3px !important;
+  }
+
+  .ovw-vessel-name {
+    font-size: 10.5px !important;
+    line-height: 1.15 !important;
+  }
+
+  .ovw-vessel-imo {
+    font-size: 8.5px !important;
+    padding: 0 3px !important;
+  }
+
+  .ovw-vcircle {
+    width: 26px !important;
+    height: 26px !important;
+  }
+
+  .ovw-vcircle svg {
+    width: 26px !important;
+    height: 26px !important;
+  }
+
+  .ovw-vc-num {
+    font-size: 8px !important;
+    font-weight: 800 !important;
+  }
+
+  .ovw-th-week {
+    font-size: 9.5px !important;
+    height: 24px !important;
+  }
+
+  .ovw-td-report {
+    padding: 4px 6px !important;
+  }
+
+  .ovw-report-name {
+    font-size: 10.5px !important;
+    line-height: 1.25 !important;
+    max-width: 110px !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+  }
+
+  .ovw-report-sub {
+    font-size: 8.5px !important;
+  }
+
+  /* Table Cell Chips */
+  .ovw-chip-has {
+    padding: 2px 5px !important;
+    font-size: 9.5px !important;
+    border-radius: 5px !important;
+    gap: 3px !important;
+  }
+
+  .ovw-chip-has-icon svg {
+    width: 10px !important;
+    height: 10px !important;
+  }
+
+  .ovw-chip-has-date {
+    font-size: 9px !important;
+  }
+
+  .ovw-chip-empty {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .ovw-chip-na {
+    font-size: 9px !important;
+    padding: 1px 4px !important;
+  }
+
+  /* ── Overall Completed Modal on Mobile (Full-Bleed Bottom Sheet) ── */
+  .ovw-mm-overlay {
+    display: flex !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    background: rgba(15, 23, 42, 0.6) !important;
+    backdrop-filter: blur(4px) !important;
+  }
+
+  .ovw-mm {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 88vh !important;
+    max-height: 88vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25) !important;
+    background: #ffffff !important;
+  }
+
+  /* Compact Sleek Purple Header */
+  .ovw-mm-head {
+    padding: 10px 14px 8px !important;
+    flex-shrink: 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+  }
+
+  .ovw-mm-head-top {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    position: relative !important;
+    z-index: 1 !important;
+  }
+
+  .ovw-mm-head-icon {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.2) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+  }
+
+  .ovw-mm-head-icon svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  .ovw-mm-head-text {
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+
+  .ovw-mm-eyebrow {
+    font-size: 8.5px !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    opacity: 0.85 !important;
+    font-weight: 700 !important;
+  }
+
+  .ovw-mm-title {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    margin: 0 !important;
+    line-height: 1.2 !important;
+    color: #ffffff !important;
+  }
+
+  .ovw-mm-close {
+    width: 26px !important;
+    height: 26px !important;
+    border-radius: 6px !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    border: none !important;
+    color: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+  }
+
+  .ovw-mm-close svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  /* Ultra-compact 4-stat pill row */
+  .ovw-mm-stats {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 4px !important;
+    margin-top: 8px !important;
+    position: relative !important;
+    z-index: 1 !important;
+  }
+
+  .ovw-mm-stat {
+    padding: 4px 6px !important;
+    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.16) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 0px !important;
+    min-width: 0 !important;
+  }
+
+  .ovw-mm-stat b {
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    line-height: 1.15 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+    color: #ffffff !important;
+  }
+
+  .ovw-mm-stat span {
+    font-size: 7.5px !important;
+    opacity: 0.9 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+    color: #ffffff !important;
+  }
+
+  .ovw-mm-progress {
+    height: 3px !important;
+    margin-top: 6px !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.22) !important;
+  }
+
+  /* Horizontal Vessel Chips */
+  .ovw-mm-chips {
+    padding: 6px 12px !important;
+    gap: 5px !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    flex-shrink: 0 !important;
+    scrollbar-width: none !important;
+    background: #f8fafc !important;
+    border-bottom: 1px solid var(--ovw-border) !important;
+  }
+
+  .ovw-mm-chips::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .ovw-mm-chip {
+    padding: 3px 8px !important;
+    font-size: 10px !important;
+    height: 24px !important;
+    flex-shrink: 0 !important;
+    border-radius: 999px !important;
+    white-space: nowrap !important;
+    border: 1px solid var(--ovw-border) !important;
+  }
+
+  .ovw-mm-chip span {
+    font-size: 9px !important;
+    padding: 0 4px !important;
+  }
+
+  /* Modal Body: Spacious scroll list */
+  .ovw-mm-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding: 8px 10px 24px !important;
+    gap: 8px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    background: #f8fafc !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .ovw-mm-vessel {
+    border-radius: 12px !important;
+    border: 1px solid var(--ovw-border) !important;
+    background: #ffffff !important;
+    overflow: hidden !important;
+    flex-shrink: 0 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  }
+
+  .ovw-mm-vessel-head {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 2 !important;
+    background: #ffffff !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 6px 10px !important;
+    border-bottom: 1px solid var(--ovw-border) !important;
+    gap: 6px !important;
+  }
+
+  .ovw-mm-vessel-id {
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
+  }
+
+  .ovw-mm-vessel-name {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    color: var(--ovw-text-primary) !important;
+  }
+
+  .ovw-mm-vessel-imo {
+    font-size: 8px !important;
+    padding: 1px 4px !important;
+    border-radius: 4px !important;
+    white-space: nowrap !important;
+  }
+
+  .ovw-mm-vessel-pct {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    width: auto !important;
+    flex: 0 0 auto !important;
+  }
+
+  .ovw-mm-vbar {
+    width: 44px !important;
+    max-width: 44px !important;
+    height: 4px !important;
+    display: block !important;
+    border-radius: 999px !important;
+    background: #e2e8f0 !important;
+  }
+
+  .ovw-mm-vessel-pct b {
+    font-size: 10px !important;
+    font-weight: 800 !important;
+  }
+
+  .ovw-mm-vessel-pct em {
+    font-size: 8.5px !important;
+  }
+
+  .ovw-mm-report {
+    padding: 6px 10px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3px !important;
+  }
+
+  .ovw-mm-report:last-child {
+    border-bottom: none !important;
+  }
+
+  .ovw-mm-report-name {
+    font-size: 10.5px !important;
+    font-weight: 600 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    line-height: 1.25 !important;
+  }
+
+  .ovw-mm-report-dot {
+    width: 5px !important;
+    height: 5px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .ovw-mm-report-name em {
+    font-size: 8.5px !important;
+    margin-left: auto !important;
+    padding: 1px 5px !important;
+    border-radius: 999px !important;
+    background: #fee2e2 !important;
+    color: #dc2626 !important;
+    white-space: nowrap !important;
+  }
+
+  .ovw-mm-dates {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 3px !important;
+    padding-left: 10px !important;
+  }
+
+  .ovw-mm-date {
+    font-size: 9px !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+  }
+
+  .ovw-mm-more {
+    font-size: 9px !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+  }
+
+  /* ── Bulk Download Modal on Mobile (Full-Bleed Bottom Sheet) ── */
+  .bdl-backdrop {
+    display: flex !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    background: rgba(15, 23, 42, 0.6) !important;
+    backdrop-filter: blur(4px) !important;
+  }
+
+  .bdl-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 88vh !important;
+    max-height: 88vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25) !important;
+  }
+
+  /* Compact Header */
+  .bdl-header {
+    padding: 10px 14px 8px !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: #ffffff !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+  }
+
+  .bdl-header-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+
+  .bdl-header-icon {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .bdl-header-icon svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  .bdl-title {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    margin: 0 !important;
+  }
+
+  .bdl-subtitle {
+    font-size: 9.5px !important;
+    color: #64748b !important;
+    margin: 0 !important;
+  }
+
+  .bdl-close {
+    width: 26px !important;
+    height: 26px !important;
+    border-radius: 6px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .bdl-close svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  /* Compact Stepper */
+  .bdl-stepper {
+    padding: 6px 14px !important;
+    gap: 4px !important;
+    flex-shrink: 0 !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    background: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .bdl-step-pill {
+    padding: 2px 6px !important;
+    font-size: 10px !important;
+    gap: 5px !important;
+  }
+
+  .bdl-step-num {
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 9px !important;
+  }
+
+  .bdl-step-connector {
+    width: 24px !important;
+    height: 1.5px !important;
+  }
+
+  /* Wizard Body */
+  .bdl-body,
+  .bdl-body-wizard {
+    padding: 8px 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    background: #f8fafc !important;
+  }
+
+  .bdl-step-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    width: 100% !important;
+  }
+
+  .bdl-search-wrap,
+  .bdl-search-lg {
+    height: 32px !important;
+    min-height: 32px !important;
+    max-height: 32px !important;
+    padding: 0 10px !important;
+    border-radius: 8px !important;
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .bdl-search-wrap input,
+  .bdl-search-lg input {
+    font-size: 11px !important;
+    height: 100% !important;
+    padding: 0 !important;
+  }
+
+  /* Step 1: Vessel Grid (Responsive 2-Column Compact Grid) */
+  .bdl-vessel-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding: 2px 2px 14px !important;
+    -webkit-overflow-scrolling: touch !important;
+    align-content: start !important;
+  }
+
+  .bdl-vessel-card {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 8px 24px 8px 8px !important;
+    border-radius: 10px !important;
+    border: 1.5px solid #e2e8f0 !important;
+    background: #ffffff !important;
+    min-height: 48px !important;
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+  }
+
+  .bdl-vessel-card-icon {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 8px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .bdl-vessel-card-icon svg {
+    width: 15px !important;
+    height: 15px !important;
+  }
+
+  .bdl-vessel-card-text {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    min-width: 0 !important;
+    flex: 1 !important;
+  }
+
+  .bdl-vessel-card-name {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: block !important;
+    line-height: 1.2 !important;
+  }
+
+  .bdl-vessel-card-imo {
+    font-size: 8px !important;
+    padding: 1px 4px !important;
+    border-radius: 3px !important;
+    width: fit-content !important;
+  }
+
+  .bdl-vessel-card-check {
+    top: 5px !important;
+    right: 5px !important;
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  .bdl-vessel-card-check svg {
+    width: 9px !important;
+    height: 9px !important;
+  }
+
+  /* Step 2 Toolbar & Filters */
+  .bdl-step2-toolbar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+    padding: 2px 0 !important;
+  }
+
+  .bdl-back-link {
+    font-size: 10.5px !important;
+    padding: 3px 6px !important;
+    gap: 3px !important;
+  }
+
+  .bdl-vessel-chip {
+    font-size: 10.5px !important;
+    padding: 2px 8px !important;
+    border-radius: 6px !important;
+    gap: 4px !important;
+  }
+
+  .bdl-filter-bar {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .bdl-freq-tabs {
+    display: flex !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    gap: 3px !important;
+    padding: 2px 0 !important;
+    height: 26px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .bdl-freq-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .bdl-freq-tab {
+    padding: 2px 8px !important;
+    font-size: 10px !important;
+    height: 22px !important;
+    flex-shrink: 0 !important;
+    border-radius: 999px !important;
+    white-space: nowrap !important;
+  }
+
+  .bdl-date-input-wrap {
+    height: 26px !important;
+    padding: 0 6px !important;
+    font-size: 10px !important;
+    border-radius: 6px !important;
+  }
+
+  .bdl-date-input {
+    font-size: 10px !important;
+  }
+
+  .bdl-select-all {
+    padding: 4px 6px !important;
+    font-size: 10.5px !important;
+    height: 26px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .bdl-list,
+  .bdl-list-reports {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding: 2px 0 14px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .bdl-report-item {
+    padding: 6px 8px !important;
+    min-height: 38px !important;
+    border-radius: 8px !important;
+    gap: 6px !important;
+    font-size: 11px !important;
+  }
+
+  .bdl-report-name {
+    font-size: 10.5px !important;
+    line-height: 1.25 !important;
+  }
+
+  .bdl-report-meta {
+    font-size: 8.5px !important;
+    padding: 1px 5px !important;
+  }
+
+  /* Footer */
+  .bdl-footer {
+    padding: 8px 12px 14px !important;
+    flex-shrink: 0 !important;
+    background: #ffffff !important;
+    border-top: 1px solid #e2e8f0 !important;
+  }
+
+  .bdl-footer-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .bdl-footer-summary {
+    font-size: 10.5px !important;
+    font-weight: 600 !important;
+    flex: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .bdl-footer-actions {
+    display: flex !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .bdl-btn-cancel,
+  .bdl-btn-download {
+    height: 32px !important;
+    padding: 0 10px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    border-radius: 6px !important;
+  }
+
+  /* Report preview modal */
+  .ovw-preview-modal {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    border-radius: 0 !important;
+  }
+
+  .rt-modal-body {
+    flex-direction: column !important;
+  }
+
+  .rt-pane-pdf {
+    flex: 1 1 55% !important;
+    min-height: 0 !important;
+  }
+
+  .rt-pane-chat {
+    flex: 1 1 45% !important;
+    min-height: 0 !important;
+  }
+}
+
+/* ==========================================================================
+   6. ULTRA-COMPACT / NARROW MOBILE PHONES (max-width: 360px)
+   ========================================================================== */
+@media (max-width: 360px) {
+  .ovw-root {
+    --ovw-col-report-w: 105px !important;
+  }
+
+  .ovw-page-title {
+    font-size: 13.5px !important;
+  }
+
+  .ovw-header-icon-badge {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .ovw-header-icon-badge svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  .ovw-report-name {
+    font-size: 9.5px !important;
+    max-width: 90px !important;
+  }
+
+  .ovw-stat-pill,
+  .ovw-legend-pill {
+    font-size: 8.5px !important;
+    padding: 0 5px !important;
+    height: 20px !important;
+  }
+
+  /* Keep compact 2-column grid for vessel cards */
+  .bdl-vessel-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 4px !important;
+  }
+
+  .bdl-footer-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+  }
+
+  .bdl-footer-actions {
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+}

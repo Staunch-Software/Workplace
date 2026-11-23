@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { X, Maximize2, Columns } from 'lucide-react';
+import { X, Maximize2, Columns, Paperclip, MessageSquare } from 'lucide-react';
 import AttachmentsPanel from './AttachmentsPanel';
 import ThreadPanel from './ThreadPanel';
 import VesselThreadPanel from './VesselThreadPanel';
 import '../styles/Reports.css';
+import '../styles/DashboardPageResponsive.css';
 
 export default function ReportViewerModal({ report, role, onClose, focusPane }) {
   // When opened from a mention notification (focusPane="thread"), collapse
@@ -11,6 +12,7 @@ export default function ReportViewerModal({ report, role, onClose, focusPane }) 
   // instead of landing on the default document view.
   const [isPdfCollapsed, setIsPdfCollapsed] = useState(focusPane === 'thread');
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
+  const [mobileModalTab, setMobileModalTab] = useState(focusPane === 'thread' ? 'chat' : 'doc');
 
   if (!report) return null;
 
@@ -33,9 +35,29 @@ export default function ReportViewerModal({ report, role, onClose, focusPane }) 
           </div>
         </div>
 
+        {/* Mobile View Toggle between Document and Thread */}
+        <div className="rt-modal-mobile-tabs">
+          <button 
+            type="button" 
+            className={`rt-modal-mobile-tab ${mobileModalTab === 'doc' ? 'active' : ''}`}
+            onClick={() => setMobileModalTab('doc')}
+          >
+            <Paperclip size={13} />
+            <span>Document</span>
+          </button>
+          <button 
+            type="button" 
+            className={`rt-modal-mobile-tab ${mobileModalTab === 'chat' ? 'active' : ''}`}
+            onClick={() => setMobileModalTab('chat')}
+          >
+            <MessageSquare size={13} />
+            <span>Thread</span>
+          </button>
+        </div>
+
         <div className="rt-modal-body">
           {/* LEFT: Attachments */}
-          <div className={`rt-modal-pane rt-pane-pdf ${isPdfCollapsed ? 'collapsed' : ''}`}>
+          <div className={`rt-modal-pane rt-pane-pdf ${isPdfCollapsed ? 'collapsed' : ''} ${mobileModalTab === 'chat' ? 'rt-mobile-pane-hidden' : ''}`}>
             <AttachmentsPanel 
               reportId={report.id}
               reportName={report.report_name}
@@ -52,7 +74,7 @@ export default function ReportViewerModal({ report, role, onClose, focusPane }) 
           </div>
 
           {/* RIGHT: Thread */}
-          <div className={`rt-modal-pane rt-pane-chat ${isChatCollapsed ? 'collapsed' : ''}`}>
+          <div className={`rt-modal-pane rt-pane-chat ${isChatCollapsed ? 'collapsed' : ''} ${mobileModalTab === 'doc' ? 'rt-mobile-pane-hidden' : ''}`}>
             {role === 'VESSEL' ? (
               <VesselThreadPanel 
                 reportId={report.id} 

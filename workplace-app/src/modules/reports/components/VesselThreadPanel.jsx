@@ -227,7 +227,7 @@ export default function VesselThreadPanel({ reportId, reportName, reportMeta, is
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', background: '#fff' }} ref={scrollRef}>
+      <div className="rt-thread-messages-list" style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', background: '#fff' }} ref={scrollRef}>
         {isLoading && (
           <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Loading messages...</div>
         )}
@@ -243,14 +243,16 @@ export default function VesselThreadPanel({ reportId, reportName, reportMeta, is
               <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, marginBottom: '4px', padding: '0 4px' }}>
                 {t.author_name} · {fmtDateTime(t.created_at)}
               </span>
-              <div style={{
+              <div className="rpt-bubble" style={{
                 maxWidth: '85%', padding: '12px 16px', borderRadius: '12px', fontSize: '0.85rem', lineHeight: 1.5,
                 backgroundColor: isMine ? '#1e293b' : '#f8fafc',
                 color: isMine ? '#ffffff' : '#334155',
                 border: isMine ? 'none' : '1px solid #e2e8f0',
                 borderBottomRightRadius: isMine ? '4px' : '12px',
                 borderBottomLeftRadius: isMine ? '12px' : '4px',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                wordBreak: 'break-word',
+                overflowWrap: 'break-word'
               }}>
                 {(t.body || '').split(mentionRegex).map((part, i) =>
                   part.startsWith('@') ? 
@@ -270,7 +272,7 @@ export default function VesselThreadPanel({ reportId, reportName, reportMeta, is
         })}
       </div>
 
-      <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', background: '#fff' }}>
+      <div className="rt-thread-composer-wrap" style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', background: '#fff' }}>
         
         {selectedFile && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#f1f5f9', borderRadius: '8px', marginBottom: '8px', border: '1px solid #e2e8f0' }}>
@@ -326,7 +328,7 @@ export default function VesselThreadPanel({ reportId, reportName, reportMeta, is
           <div style={{ position: 'relative', flex: 1 }}>
             
             {showMentions && (
-              <div style={{ 
+              <div className="rt-mention-picker" style={{ 
                 position: 'absolute', 
                 bottom: '100%', 
                 left: '0', 
@@ -397,10 +399,10 @@ export default function VesselThreadPanel({ reportId, reportName, reportMeta, is
                   padding: '7px 0', border: 'none',
                   fontSize: '0.875rem', resize: 'none', outline: 'none',
                   background: 'transparent', color: 'transparent', caretColor: '#0f172a',
-                  lineHeight: 1.5, transition: 'all 0.2s', fontFamily: 'inherit', overflowY: 'auto',
+                  lineHeight: 1.4, transition: 'all 0.2s', fontFamily: 'inherit', overflowY: 'auto',
                   margin: 0, boxSizing: 'border-box'
                 }}
-                placeholder={draft ? "" : "Type a message (use @ to mention)..."}
+                placeholder={draft ? "" : "Type a message (@ to mention)..."}
                 value={draft}
                 onChange={handleTextChange}
                 onKeyDown={handleKeyDown}

@@ -1,0 +1,413 @@
+/* ================================================================
+   ReportsNavbarResponsive.css
+   Responsive Styles for Report Tracker Navbar: Mobile (320px) to 4K (3840px)
+   ================================================================ */
+
+/* ── Base Structural Layout (Desktop-first flex ordering) ── */
+.rpt-nav-top-row {
+  display: contents;
+}
+
+.rpt-nav-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  order: 1;
+}
+
+.rpt-nav-links {
+  margin-left: 20px;
+  order: 2;
+}
+
+.rpt-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+  flex-shrink: 0;
+  order: 3;
+}
+
+/* ── 4K & Ultra-Wide Screens (min-width: 2560px to 3840px+) ── */
+@media (min-width: 2560px) {
+  .rpt-navbar {
+    height: 90px;
+    padding: 0 40px;
+    gap: 24px;
+  }
+  .rpt-nav-home-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+  }
+  .rpt-dots-grid {
+    grid-template-columns: repeat(3, 7px);
+    gap: 3px;
+  }
+  .rpt-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+  }
+  .rpt-dots-arrow {
+    width: 44px;
+    height: 44px;
+    font-size: 1.6rem;
+    border-radius: 10px;
+  }
+  .rpt-nav-divider {
+    height: 38px;
+  }
+  .rpt-nav-brand {
+    gap: 16px;
+  }
+  .rpt-nav-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 13px;
+  }
+  .rpt-nav-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+  .rpt-nav-title {
+    font-size: 1.4rem;
+  }
+  .rpt-nav-title-tag {
+    font-size: 0.78rem;
+    letter-spacing: 0.14em;
+  }
+  .rpt-nav-links {
+    margin-left: 32px;
+    padding: 5px;
+    border-radius: 14px;
+    gap: 6px;
+  }
+  .rpt-nav-link {
+    padding: 10px 20px;
+    font-size: 1.05rem;
+    border-radius: 9px;
+    gap: 9px;
+  }
+  .rpt-nav-link svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+  .rpt-profile-pill {
+    padding: 8px 18px 8px 8px;
+    gap: 14px;
+  }
+  .rpt-avatar {
+    width: 44px;
+    height: 44px;
+    font-size: 1rem;
+  }
+  .rpt-profile-name {
+    font-size: 1.05rem;
+  }
+  .rpt-profile-role {
+    font-size: 0.8rem;
+  }
+  .rpt-profile-chevron svg,
+  .rpt-profile-chevron {
+    width: 16px;
+    height: 16px;
+  }
+  .rpt-profile-dropdown {
+    width: 300px;
+    border-radius: 18px;
+  }
+  .rpt-dropdown-user {
+    padding: 18px 18px 16px;
+    gap: 14px;
+  }
+  .rpt-dropdown-avatar {
+    width: 46px;
+    height: 46px;
+    font-size: 1rem;
+  }
+  .rpt-dropdown-user-name {
+    font-size: 1.05rem;
+  }
+  .rpt-dropdown-user-role {
+    font-size: 0.82rem;
+  }
+  .rpt-dropdown-item {
+    padding: 14px 18px;
+    font-size: 1.02rem;
+    gap: 12px;
+  }
+  .rpt-dropdown-item svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* ── 2K & QHD Screens (min-width: 1921px and max-width: 2559px) ── */
+@media (min-width: 1921px) and (max-width: 2559px) {
+  .rpt-navbar {
+    height: 72px;
+    padding: 0 32px;
+    gap: 20px;
+  }
+  .rpt-nav-home-btn {
+    width: 38px;
+    height: 38px;
+  }
+  .rpt-dots-arrow {
+    width: 38px;
+    height: 38px;
+    font-size: 1.4rem;
+  }
+  .rpt-nav-icon {
+    width: 42px;
+    height: 42px;
+  }
+  .rpt-nav-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+  .rpt-nav-title {
+    font-size: 1.18rem;
+  }
+  .rpt-nav-title-tag {
+    font-size: 0.7rem;
+  }
+  .rpt-nav-links {
+    margin-left: 24px;
+  }
+  .rpt-nav-link {
+    padding: 8px 16px;
+    font-size: 0.92rem;
+  }
+  .rpt-avatar {
+    width: 38px;
+    height: 38px;
+    font-size: 0.88rem;
+  }
+  .rpt-profile-name {
+    font-size: 0.92rem;
+  }
+  .rpt-profile-role {
+    font-size: 0.72rem;
+  }
+}
+
+/* ── Tablets & Medium Screens (max-width: 1024px) ── */
+@media (max-width: 1024px) {
+  .rpt-navbar {
+    padding: 0 16px;
+    gap: 12px;
+  }
+  .rpt-nav-links {
+    margin-left: 10px;
+    gap: 1px;
+    padding: 2px;
+  }
+  .rpt-nav-link {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    gap: 5px;
+  }
+  .rpt-profile-pill {
+    padding: 4px 10px 4px 4px;
+    gap: 8px;
+  }
+  .rpt-profile-name {
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* ── Mobile Layout (max-width: 768px): Clean Two-Row App Header ── */
+@media (max-width: 768px) {
+  .rpt-navbar {
+    height: auto !important;
+    padding: 10px 14px 10px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    background: #ffffff !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+  }
+
+  .rpt-nav-top-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .rpt-nav-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+    flex: 1 !important;
+  }
+
+  .rpt-nav-home-btn {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .rpt-nav-divider {
+    height: 20px !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .rpt-nav-brand {
+    gap: 8px !important;
+    min-width: 0 !important;
+  }
+
+  .rpt-nav-icon {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 8px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .rpt-nav-icon svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  .rpt-nav-title {
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .rpt-nav-title-tag {
+    font-size: 0.6rem !important;
+    color: #64748b !important;
+    white-space: nowrap !important;
+  }
+
+  .rpt-nav-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex-shrink: 0 !important;
+    margin-left: auto !important;
+  }
+
+  .rpt-profile-pill {
+    padding: 3px 6px 3px 3px !important;
+    gap: 4px !important;
+    border-radius: 999px !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+
+  .rpt-avatar {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 0.72rem !important;
+  }
+
+  .rpt-profile-info {
+    display: none !important;
+  }
+
+  .rpt-profile-chevron {
+    width: 12px !important;
+    height: 12px !important;
+  }
+
+  /* ── Row 2: Full-width Segmented Nav Links ── */
+  .rpt-nav-links {
+    width: 100% !important;
+    margin: 0 !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    background: #f1f5f9 !important;
+    border: 1px solid #e2e8f0 !important;
+    padding: 3px !important;
+    border-radius: 9px !important;
+    gap: 4px !important;
+  }
+
+  .rpt-nav-link {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    padding: 7px 4px !important;
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
+    border-radius: 7px !important;
+    white-space: nowrap !important;
+    color: #475569 !important;
+  }
+
+  .rpt-nav-link svg {
+    width: 14px !important;
+    height: 14px !important;
+    opacity: 0.75 !important;
+  }
+
+  .rpt-nav-link-text {
+    display: inline !important;
+  }
+
+  .rpt-nav-link.active {
+    background: #ffffff !important;
+    color: #4f46e5 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+  }
+
+  .rpt-nav-link.active svg {
+    opacity: 1 !important;
+    color: #4f46e5 !important;
+  }
+}
+
+/* ── Ultra-Compact Mobiles (max-width: 360px) ── */
+@media (max-width: 360px) {
+  .rpt-navbar {
+    padding: 8px 10px 8px !important;
+    gap: 6px !important;
+  }
+
+  .rpt-nav-divider {
+    display: none !important;
+  }
+
+  .rpt-nav-title {
+    font-size: 0.88rem !important;
+  }
+
+  .rpt-nav-title-tag {
+    display: none !important;
+  }
+
+  .rpt-nav-home-btn {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .rpt-avatar {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .rpt-nav-link {
+    font-size: 0.72rem !important;
+    padding: 6px 2px !important;
+    gap: 4px !important;
+  }
+}
