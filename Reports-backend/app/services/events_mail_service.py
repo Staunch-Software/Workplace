@@ -47,6 +47,19 @@ def _fmt_time(ts: str) -> str:
     return m.group(1) if m else ""
 
 
+def _cell(ev: dict, c: dict) -> str:
+    """Value of one spec row for one event: the first candidate column that has a value."""
+    for k in c.get("candidates") or [c["db_column"]]:
+        if k == "@date_utc":
+            t = _fmt_time(ev["_ts"])
+            return date_type.fromisoformat(ev["_ts"][:10]).strftime("%d %b %Y") + (f" {t}" if t else "")
+        if k == "@date_local":
+            return date_type.fromisoformat(ev["_ts"][:10]).strftime("%d %b %Y")
+        if ev.get(k) not in (None, ""):
+            return _fmt_value(ev[k])
+    return "-"
+
+
 def _log_number(ev: dict) -> str:
     for k in ("log_number", "voyage_no", "emissionx_voyage_no"):
         v = ev.get(k)
@@ -116,7 +129,7 @@ def render_events_html(columns: list, vessel: dict, n_events: int) -> str:
                 unit = f' <span style="font-weight:400;color:#94a3b8;font-size:10px;">{e(c["unit"])}</span>' if c.get("unit") else ""
                 out.append(f'<td style="{td}text-align:left;font-weight:600;color:#1e293b;background:{zebra};">{e(c["display_name"])}{unit}</td>')
                 for ev in rows:
-                    val = _fmt_value(ev.get(c["db_column"]))
+                    val = _cell(ev, c)
                     out.append(f'<td style="{td}background:{zebra};{"color:#cbd5e1;" if val == "-" else ""}">{e(val)}</td>')
                 out.append("</tr>")
     out.append("</table></td></tr>")

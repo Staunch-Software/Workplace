@@ -248,11 +248,16 @@ async def build_logbook(db, source, limit, offset, end_date, allowed, columns_ov
     by_col = {k: v for k, v in by_col.items() if k in table_cols}
 
     if columns_override is not None:
-        columns = [c for c in columns_override if c["db_column"] in table_cols]
-        used = {c["db_column"] for c in columns} | ({"log_number", "log_type", "event_type", "emissionx_voyage_no"} & table_cols)
+        # Each entry may list "candidates": the first one with a value in an event is shown (vessels fill
+        # different columns). Names starting with "@" are computed by the caller and never fetched.
+        def present(c):
+            return [x for x in c.get("candidates") or [c["db_column"]] if x in table_cols]
+
+        columns = [c for c in columns_override if present(c) or c["db_column"].startswith("@")]
+        used = {x for c in columns for x in present(c)} | ({"log_number", "log_type", "event_type", "emissionx_voyage_no"} & table_cols)
         result = await _logbook_tail(db, source, table, date_col, columns, used, limit, offset,
                                      target_end_date, start_date, allowed)
-        result["missing_columns"] = [c["db_column"] for c in columns_override if c["db_column"] not in table_cols]
+        result["missing_columns"] = [c["db_column"] for c in columns_override if c not in columns]
         return result
 
     # Column order saved by the reference user in Vessel_Performance

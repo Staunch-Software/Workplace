@@ -15,12 +15,13 @@ ROWS = [
     ("Header", "Log Info", "Leg Number", "emissionx_voyage_no", ""),
     ("Header", "Log Info", "Log Number", "log_number", ""),
     ("Header", "Log Info", "Log Type / Sub Log Type", "log_type", ""),
-    ("Header", "Log Info", "Date (Local)", "VoyageMeta_date_local_operational_LF", ""),
-    ("Header", "Log Info", "Date (UTC)", "VoyageMeta_date_utc_operational_LF", ""),
+    ("Header", "Log Info", "Date (Local)", "@date_local", ""),
+    ("Header", "Log Info", "Date (UTC)", "@date_utc", ""),
     ("Header", "Log Info", "Loading Condition", "loading_condition", ""),
     ("Header", "Log Info", "Duration", "VoyageMeta_log_durationh_operational_LF", "hr"),
     ("Header", "Log Info", "Departure Port (Last Leg)", "VoyageMeta_departure_port_last_leg_operational_LF", ""),
-    ("Header", "Log Info", "Arrival Port (Current Leg)", "VoyageMeta_arrival_port_current_leg_operational_LF", ""),
+    ("Header", "Log Info", "Arrival Port (Current Leg)",
+     ("VoyageMeta_arrival_port_current_leg_operational_LF", "VoyageMeta_to_port_operational_LF"), ""),
     # ---- Position ----
     ("Position", "Distance", "Calculated Speed Over Ground (Avg.)", "Vessel_SOGcal_avg_operational_LF", "kn"),
     ("Position", "Distance", "Calculated Speed Through Water (Avg.)", "Vessel_STWcal_avg_operational_LF", "kn"),
@@ -43,8 +44,11 @@ ROWS = [
     ("Weather", "Environment", "Air Temperature (Inst.)", "Weather_Tair_operational_LF", "°C"),
     ("Weather", "Environment", "Air Pressure (Inst.)", "Weather_pair_operational_LF", "mbar"),
     # ---- Consumption: fuel oil split by consumer ----
-    ("Consumption", "Fuel Oil by Consumer", "ME Calculated Mass Consumption", "ME_FO_mFOCcalME_avg_operational_LF", "kg"),
-    ("Consumption", "Fuel Oil by Consumer", "AE Calculated Mass Consumption", "AE_FO_mFOCcalAE_avg_operational_LF", "kg"),
+    ("Consumption", "Fuel Oil by Consumer", "ME Calculated Mass Consumption",
+     ("ME_FO_mFOCcalME_avg_operational_LF", "ME_FO_mFOCME_dCnt_operational_LF"), "kg"),
+    ("Consumption", "Fuel Oil by Consumer", "AE Calculated Mass Consumption",
+     ("AE_FO_mFOCcalAE_avg_operational_LF", "AE_FO_mFOCAE_dCnt_operational_LF"), "kg"),
+    ("Consumption", "Fuel Oil by Consumer", "Boiler Mass Consumption (Tot.)", "AuxBoiler_mFOCBL_dCnt_operational_LF", "MT"),
     ("Consumption", "Fuel Oil by Consumer", "Composite Boiler Mass Consumption", "CompositeBoiler_mFOCComBL_dCnt_operational_LF", "MT"),
     ("Consumption", "Cylinder Oil", "ME Cylinder Oil Quantity Consumed", "ME_Lub_VCOCME_dCnt_operational_LF", "L"),
     *[("Consumption", "Other Lube Items", f"{ae} System Oil Quantity Consumed", f"AE_SysOil_SOConsAE_{n}_operational_LF", "Ltr")
@@ -55,7 +59,8 @@ ROWS = [
     ("Consumption", "Fresh Water", "ROB", "VoyageMeta_section3_rob_operational_LF", "MT"),
     # ---- Operations ----
     ("Operations", "Main Engine", "ME Running Hours (Tot.)", "ME_RHME_dCnt_operational_LF", "hr"),
-    ("Operations", "Main Engine", "ME Estimated Power", "ME_PeffestME_avg_operational_LF", "kW"),
+    ("Operations", "Main Engine", "ME Estimated Power",
+     ("ME_PeffestME_avg_operational_LF", "ME_PeffcalME_avg_operational_LF"), "kW"),
     ("Operations", "Main Engine", "ME Energy Produced (Tot.)", "ME_DESME_dCnt_operational_LF", "kWh"),
     # aux engines split per generator: all of AE1, then AE2, then AE3
     *[("Operations", f"Auxiliary Engine {n}", label, f"{col}_{n}_operational_LF", unit)
@@ -78,8 +83,14 @@ ROWS = [
     ("Performance (KPI)", "Efficiency", "Real Slip", "VoyageMeta_real_slip_operational_LF", "%"),
 ]
 
-# Columns for events.build_logbook(columns_override=...). The Tab/Section are kept for the layout.
+# Columns for events.build_logbook(columns_override=...). A row's column may be a tuple of alternatives:
+# the first one with a value in an event is shown. Names starting with "@" are computed by the mail.
+def _candidates(col):
+    return [col] if isinstance(col, str) else list(col)
+
+
 COLUMNS = [
-    {"db_column": col, "display_name": label, "unit": unit, "tab": tab, "section": section}
+    {"db_column": _candidates(col)[0], "candidates": _candidates(col), "display_name": label,
+     "unit": unit, "tab": tab, "section": section}
     for tab, section, label, col, unit in ROWS
 ]
