@@ -237,6 +237,34 @@ async def _release(db, imo: str, event_id: str):
     await db.commit()
 
 
+# "raw:Section/Key" candidates of the spec: values the expanded table does not carry, read from the raw report
+RAW_KEYS = sorted({k for c in MAIL_COLUMNS for k in c["candidates"] if k.startswith("raw:")})
+
+
+async def _fill_raw(db, events: list, cache: dict):
+    """Add the RAW_KEYS values to each event (looked up by its raw_log_id = raw_mariapps_logs.id). A failure
+    only leaves those rows empty; the mail still goes out."""
+    if not RAW_KEYS:
+        return
+    need = sorted({int(ev["raw_log_id"]) for ev in events if ev.get("raw_log_id") and int(ev["raw_log_id"]) not in cache})
+    if need:
+        try:
+            sel = ", ".join(f"raw_json #>> CAST(:p{i} AS text[]) AS v{i}" for i in range(len(RAW_KEYS)))
+            params = {f"p{i}": k[4:].split("/", 1) for i, k in enumerate(RAW_KEYS)}
+            res = await db.execute(text(f"SELECT id, {sel} FROM raw_mariapps_logs WHERE id = ANY(:ids)"),
+                                   {**params, "ids": need})
+            for row in res.fetchall():
+                cache[row[0]] = {k: row[1 + i] for i, k in enumerate(RAW_KEYS)}
+        except Exception as e:
+            logger.warning(f"[EVENTS-MAIL] Could not read the raw report values: {e}")
+            await db.rollback()
+        for i in need:
+            cache.setdefault(i, {})
+    for ev in events:
+        if ev.get("raw_log_id"):
+            ev.update(cache.get(int(ev["raw_log_id"]), {}))
+
+
 async def send_new_event_mails(test_to: str = "", dry_run: bool = False, force: bool = False,
                                end_date: date_type | None = None, only_imo: str = "") -> dict:
     """Send one mail for every logbook report that has not been mailed yet, oldest first, each showing the
@@ -270,6 +298,7 @@ async def send_new_event_mails(test_to: str = "", dry_run: bool = False, force: 
         if data.get("missing_columns"):
             logger.warning(f"[EVENTS-MAIL] Columns not in the logbook table, skipped: {', '.join(data['missing_columns'])}")
         by_imo = {v["imo"]: [r for r in v["rows"] if not r.get("_missing")] for v in data["vessels"]}
+        raw_cache: dict = {}
 
         for imo, info in vessels.items():
             real = by_imo.get(imo)
@@ -291,6 +320,7 @@ async def send_new_event_mails(test_to: str = "", dry_run: bool = False, force: 
             for i in todo:  # oldest first
                 ev = real[i]
                 rows = list(reversed(real[max(0, i - n + 1):i + 1]))  # latest first
+                await _fill_raw(perf_db, rows, raw_cache)
                 day = date_type.fromisoformat(ev["_ts"][:10]).strftime("%d %b %Y")
                 subject = (f"{'[TEST] ' if test_to else ''}{info['name']} - {_log_number(ev)} - "
                            f"{_report_type(ev)} - {day}")

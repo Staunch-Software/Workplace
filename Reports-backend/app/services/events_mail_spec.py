@@ -26,9 +26,12 @@ ROWS = [
     ("Position", "Distance", "Calculated Speed Over Ground (Avg.)", "Vessel_SOGcal_avg_operational_LF", "kn"),
     ("Position", "Distance", "Calculated Speed Through Water (Avg.)", "Vessel_STWcal_avg_operational_LF", "kn"),
     ("Position", "Loading Condition", "Cargo Onboard", "Vessel_Cargo_onboard_operational_LF", "MT"),
-    ("Position", "Time", "ETA (LT)", "VoyageMeta_eta_estimated_time_of_arrival_lt_operational_LF", ""),
-    ("Position", "Time", "ETB (LT)", "VoyageMeta_etb_estimated_time_of_berthing_lt_operational_LF", ""),
-    ("Position", "Time", "ETS (LT)", "VoyageMeta_ets_estimated_time_of_sailing_lt_operational_LF", ""),
+    ("Position", "Time", "ETA (LT)",
+     ("VoyageMeta_eta_estimated_time_of_arrival_lt_operational_LF", "raw:Position_Data/ETA (Estimated Time of Arrival) (LT)"), ""),
+    ("Position", "Time", "ETB (LT)",
+     ("VoyageMeta_etb_estimated_time_of_berthing_lt_operational_LF", "raw:Position_Data/ETB (Estimated Time of Berthing) (LT)"), ""),
+    ("Position", "Time", "ETS (LT)",
+     ("VoyageMeta_ets_estimated_time_of_sailing_lt_operational_LF", "raw:Position_Data/ETS (Estimated Time of Sailing) (LT)"), ""),
     # ---- Weather ----
     ("Weather", "Draft & Condition", "Fore Draught", "Vessel_Tf_avg_operational_LF", "m"),
     ("Weather", "Draft & Condition", "Aft Draught", "Vessel_Ta_avg_operational_LF", "m"),
@@ -38,7 +41,8 @@ ROWS = [
     ("Weather", "Speed", "Speed Through Water (Inst.)", "Vessel_STW_operational_LF", "kn"),
     ("Weather", "Wind & Current", "True Wind Speed at Anemometer (Inst.)", "Weather_Uwit_operational_LF", "kn"),
     ("Weather", "Sea State", "Wave Height (Inst.)", "Weather_Hwv_operational_LF", "m"),
-    ("Weather", "Sea State", "Swell Height (Avg.)", "Weather_Hsl_avg_operational_LF", "m"),
+    ("Weather", "Sea State", "Swell Height (Avg.)",
+     ("Weather_Hsl_avg_operational_LF", "raw:Performance_Data/Swell Height"), "m"),
     ("Weather", "Sea State", "Swell Height (Inst.)", "Weather_Hsl_operational_LF", "m"),
     ("Weather", "Environment", "Sea Water Temperature (Inst.)", "Weather_Tsw_operational_LF", "°C"),
     ("Weather", "Environment", "Air Temperature (Inst.)", "Weather_Tair_operational_LF", "°C"),
@@ -50,13 +54,18 @@ ROWS = [
      ("AE_FO_mFOCcalAE_avg_operational_LF", "AE_FO_mFOCAE_dCnt_operational_LF"), "kg"),
     ("Consumption", "Fuel Oil by Consumer", "Boiler Mass Consumption (Tot.)", "AuxBoiler_mFOCBL_dCnt_operational_LF", "MT"),
     ("Consumption", "Fuel Oil by Consumer", "Composite Boiler Mass Consumption", "CompositeBoiler_mFOCComBL_dCnt_operational_LF", "MT"),
-    ("Consumption", "Cylinder Oil", "ME Cylinder Oil Quantity Consumed", "ME_Lub_VCOCME_dCnt_operational_LF", "L"),
-    *[("Consumption", "Other Lube Items", f"{ae} System Oil Quantity Consumed", f"AE_SysOil_SOConsAE_{n}_operational_LF", "Ltr")
-      for ae, n in _AE],
-    ("Consumption", "Fresh Water", "Consumed", "Vessel_mfwC_dCnt_operational_LF", "MT"),
-    ("Consumption", "Fresh Water", "Produced", "Vessel_mfwP_dCnt_operational_LF", "MT"),
-    ("Consumption", "Fresh Water", "Received", "Vessel_mfwR_dCnt_operational_LF", "MT"),
-    ("Consumption", "Fresh Water", "ROB", "VoyageMeta_section3_rob_operational_LF", "MT"),
+    ("Consumption", "Cylinder Oil", "ME Cylinder Oil Quantity Consumed",
+     ("ME_Lub_VCOCME_dCnt_operational_LF",
+      "raw:Consumption_Data/Lubricant ROB::ME CYLINDER OIL-LS::Consumed (L)",
+      "raw:Consumption_Data/Lubricant ROB::ME CYLINDER OIL::Consumed (L)"), "L"),
+    ("Consumption", "Other Lube Items", "ME System Oil Quantity Consumed",
+     "raw:Consumption_Data/Lubricant ROB::ME SYSTEM OIL::Consumed (L)", "L"),
+    ("Consumption", "Other Lube Items", "AE System Oil Quantity Consumed",
+     "raw:Consumption_Data/Lubricant ROB::AUX ENG. SYSTEM OIL::Consumed (L)", "L"),
+    ("Consumption", "Fresh Water", "Consumed", ("Vessel_mfwC_dCnt_operational_LF", "raw:Consumption_Data/Section3::Consumed"), "MT"),
+    ("Consumption", "Fresh Water", "Produced", ("Vessel_mfwP_dCnt_operational_LF", "raw:Consumption_Data/Section3::Produced"), "MT"),
+    ("Consumption", "Fresh Water", "Received", ("Vessel_mfwR_dCnt_operational_LF", "raw:Consumption_Data/Section3::Received"), "MT"),
+    ("Consumption", "Fresh Water", "ROB", ("VoyageMeta_section3_rob_operational_LF", "raw:Consumption_Data/Section3::ROB"), "MT"),
     # ---- Operations ----
     ("Operations", "Main Engine", "ME Running Hours (Tot.)", "ME_RHME_dCnt_operational_LF", "hr"),
     ("Operations", "Main Engine", "ME Estimated Power",
@@ -75,16 +84,20 @@ ROWS = [
     ("Machinery", "Engine Room", "ER Ambient Air Temperature (Inst.)", "Vessel_TambairER_operational_LF", "°C"),
     ("Machinery", "ME General Data", "ME Shaft Power (Inst.)", "ME_PSME_operational_LF", "kW"),
     ("Machinery", "ME General Data", "ME Speed (Inst.)", "ME_NME_operational_LF", "RPM"),
-    ("Machinery", "ME General Data", "ME Specific Cylinder Oil Consumption (Set)", "ME_Lub_SCOCME_set_operational_LF", "g/kWh"),
-    ("Machinery", "ME General Data", "ME Fuel Index (Inst.)", "ME_FPIME_operational_LF", ""),
+    ("Machinery", "ME General Data", "ME Specific Cylinder Oil Consumption (Set)",
+     ("ME_Lub_SCOCME_set_operational_LF", "raw:Machinery_Data/ME Specific Cylinder Oil Consumption (Set)"), "g/kWh"),
+    ("Machinery", "ME General Data", "ME Fuel Index (Inst.)",
+     ("ME_FPIME_operational_LF", "raw:Machinery_Data/ME Fuel Index (Inst.)"), ""),
     # ---- Performance (KPI) ----
-    ("Performance (KPI)", "Efficiency", "Calculated SCOC", "VoyageMeta_calculated_scoc_operational_LF", ""),
+    ("Performance (KPI)", "Efficiency", "Calculated SCOC",
+     ("VoyageMeta_calculated_scoc_operational_LF", "raw:KPI_Data/Calculated SCOC"), ""),
     ("Performance (KPI)", "Efficiency", "Apparent Slip", "VoyageMeta_apparent_slip_operational_LF", "%"),
     ("Performance (KPI)", "Efficiency", "Real Slip", "VoyageMeta_real_slip_operational_LF", "%"),
 ]
 
 # Columns for events.build_logbook(columns_override=...). A row's column may be a tuple of alternatives:
-# the first one with a value in an event is shown. Names starting with "@" are computed by the mail.
+# the first one with a value in an event is shown. "@..." names are computed by the mail; "raw:Section/Key" reads
+# that key from the raw MariApps report (raw_mariapps_logs.raw_json), for items the expanded table does not carry.
 def _candidates(col):
     return [col] if isinstance(col, str) else list(col)
 

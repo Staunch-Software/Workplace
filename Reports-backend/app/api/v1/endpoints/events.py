@@ -253,8 +253,12 @@ async def build_logbook(db, source, limit, offset, end_date, allowed, columns_ov
         def present(c):
             return [x for x in c.get("candidates") or [c["db_column"]] if x in table_cols]
 
-        columns = [c for c in columns_override if present(c) or c["db_column"].startswith("@")]
-        used = {x for c in columns for x in present(c)} | ({"log_number", "log_type", "event_type", "emissionx_voyage_no"} & table_cols)
+        def computed(c):  # "@..." (computed) and "raw:..." (read from the raw report by the caller)
+            return any(x.startswith(("@", "raw:")) for x in c.get("candidates") or [c["db_column"]])
+
+        columns = [c for c in columns_override if present(c) or computed(c)]
+        used = {x for c in columns for x in present(c)} | (
+            {"log_number", "log_type", "event_type", "emissionx_voyage_no", "raw_log_id"} & table_cols)
         result = await _logbook_tail(db, source, table, date_col, columns, used, limit, offset,
                                      target_end_date, start_date, allowed)
         result["missing_columns"] = [c["db_column"] for c in columns_override if c not in columns]
