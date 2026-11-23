@@ -11,11 +11,13 @@ import '../../styles/EventsMailPage.css';
 
 const errorText = (err, fallback) => err?.response?.data?.detail || fallback;
 
-function VesselRow({ vessel, onChanged }) {
+// One list (To or CC) of a vessel: chips with remove buttons plus an add box.
+function RecipientGroup({ vessel, kind, label, onChanged }) {
   const [email, setEmail] = useState('');
+  const list = vessel.recipients.filter((r) => (r.kind || 'to') === kind);
 
   const add = useMutation({
-    mutationFn: () => reportsApi.addMailRecipient(vessel.imo, email.trim()),
+    mutationFn: () => reportsApi.addMailRecipient(vessel.imo, email.trim(), kind),
     onSuccess: () => { setEmail(''); onChanged(); },
     onError: (err) => toast.error(errorText(err, 'Could not add the address.')),
   });
@@ -24,6 +26,44 @@ function VesselRow({ vessel, onChanged }) {
     onSuccess: onChanged,
     onError: (err) => toast.error(errorText(err, 'Could not remove the address.')),
   });
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (email.trim() && !add.isPending) add.mutate();
+  };
+
+  return (
+    <div className="emr-group">
+      <div className="emr-group-label">{label}</div>
+      <div className="emr-chips">
+        {list.map((r) => (
+          <span key={r.id} className={`emr-chip emr-chip--${kind}`}>
+            {r.email}
+            <button type="button" title="Remove" onClick={() => remove.mutate(r.id)} disabled={remove.isPending}>
+              <X size={12} />
+            </button>
+          </span>
+        ))}
+        {list.length === 0 && (
+          <span className="emr-none">{kind === 'to' ? 'No To address, no mail is sent' : 'No CC'}</span>
+        )}
+      </div>
+      <form className="emr-add" onSubmit={submit}>
+        <input
+          type="email"
+          placeholder={`${label} address`}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <button type="submit" className="rcfg-btn rcfg-btn--ghost" disabled={!email.trim() || add.isPending}>
+          <Plus size={13} /> Add
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function VesselRow({ vessel, onChanged }) {
   const toggle = useMutation({
     mutationFn: (enabled) => reportsApi.setMailVesselEnabled(vessel.imo, enabled),
     onSuccess: onChanged,
@@ -35,11 +75,6 @@ function VesselRow({ vessel, onChanged }) {
     onError: (err) => toast.error(errorText(err, 'Test mail failed.')),
   });
 
-  const submit = (e) => {
-    e.preventDefault();
-    if (email.trim() && !add.isPending) add.mutate();
-  };
-
   return (
     <tr className={vessel.enabled ? '' : 'emr-off'}>
       <td className="emr-vessel">
@@ -47,28 +82,8 @@ function VesselRow({ vessel, onChanged }) {
         <div className="emr-vessel-imo">IMO {vessel.imo}</div>
       </td>
       <td>
-        <div className="emr-chips">
-          {vessel.recipients.map((r) => (
-            <span key={r.id} className="emr-chip">
-              {r.email}
-              <button type="button" title="Remove" onClick={() => remove.mutate(r.id)} disabled={remove.isPending}>
-                <X size={12} />
-              </button>
-            </span>
-          ))}
-          {vessel.recipients.length === 0 && <span className="emr-none">No recipients, no mail is sent</span>}
-        </div>
-        <form className="emr-add" onSubmit={submit}>
-          <input
-            type="email"
-            placeholder="name@company.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <button type="submit" className="rcfg-btn rcfg-btn--ghost" disabled={!email.trim() || add.isPending}>
-            <Plus size={13} /> Add
-          </button>
-        </form>
+        <RecipientGroup vessel={vessel} kind="to" label="To" onChanged={onChanged} />
+        <RecipientGroup vessel={vessel} kind="cc" label="CC" onChanged={onChanged} />
       </td>
       <td className="emr-last">
         {vessel.last_mailed ? new Date(vessel.last_mailed).toLocaleString() : 'Not yet'}
@@ -153,8 +168,8 @@ export default function EventsMailPage() {
           </table>
         )}
         <p className="emr-note">
-          Changes apply at the next check (every 15 minutes). A vessel with no recipients, or with its switch off, is
-          skipped. When a vessel is first switched on, its existing reports are not mailed, only new ones.
+          Changes apply at the next check (every 15 minutes). A vessel needs at least one To address, and its
+          switch on, to be mailed; CC addresses get a copy. When a vessel is first switched on, its existing reports are not mailed, only new ones.
         </p>
       </div>
     </div>

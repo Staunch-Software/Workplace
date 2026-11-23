@@ -20,6 +20,7 @@ _EMAIL = re.compile(r"^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$")
 class RecipientIn(BaseModel):
     vessel_imo: str
     email: str
+    kind: str = "to"   # "to" | "cc"
 
 
 class EnabledIn(BaseModel):
@@ -43,7 +44,7 @@ async def list_recipients(db: AsyncSession = Depends(get_db),
     )).fetchall()
     emails: dict = {}
     for r in (await db.execute(select(EventsMailRecipient).order_by(EventsMailRecipient.email))).scalars():
-        emails.setdefault(r.vessel_imo, []).append({"id": str(r.id), "email": r.email})
+        emails.setdefault(r.vessel_imo, []).append({"id": str(r.id), "email": r.email, "kind": r.kind or "to"})
     off = {r.vessel_imo for r in (await db.execute(select(EventsMailVessel))).scalars() if not r.enabled}
     last = {r[0]: r[1] for r in (await db.execute(
         text("SELECT imo, max(sent_at) FROM events_mail_sent GROUP BY imo"))).fetchall()}
@@ -58,6 +59,9 @@ async def add_recipient(body: RecipientIn, db: AsyncSession = Depends(get_db),
                         control_db: AsyncSession = Depends(get_control_db),
                         current_user=Depends(require_admin)):
     email = body.email.strip().lower()
+    kind = body.kind.strip().lower()
+    if kind not in ("to", "cc"):
+        raise HTTPException(status_code=422, detail="Kind must be 'to' or 'cc'.")
     if not _EMAIL.match(email):
         raise HTTPException(status_code=422, detail="Enter a valid email address.")
     if not await _vessel_name(control_db, body.vessel_imo):
@@ -65,11 +69,11 @@ async def add_recipient(body: RecipientIn, db: AsyncSession = Depends(get_db),
     dup = (await db.execute(select(EventsMailRecipient).where(
         EventsMailRecipient.vessel_imo == body.vessel_imo, EventsMailRecipient.email == email))).scalars().first()
     if dup:
-        raise HTTPException(status_code=409, detail="This address is already on the list.")
-    row = EventsMailRecipient(vessel_imo=body.vessel_imo, email=email)
+        raise HTTPException(status_code=409, detail=f"This address is already on the list (as {(dup.kind or 'to').upper()}).")
+    row = EventsMailRecipient(vessel_imo=body.vessel_imo, email=email, kind=kind)
     db.add(row)
     await db.commit()
-    return {"id": str(row.id), "email": row.email}
+    return {"id": str(row.id), "email": row.email, "kind": row.kind}
 
 
 @router.delete("/recipients/{recipient_id}")

@@ -58,8 +58,8 @@ export const reportsApi = {
   // Event mails: who receives each vessel's new-report mail (ADMIN)
   listMailRecipients: () =>
     shoreClient.get('/events-mail/recipients').then((r) => r.data),
-  addMailRecipient: (vessel_imo, email) =>
-    shoreClient.post('/events-mail/recipients', { vessel_imo, email }).then((r) => r.data),
+  addMailRecipient: (vessel_imo, email, kind = 'to') =>
+    shoreClient.post('/events-mail/recipients', { vessel_imo, email, kind }).then((r) => r.data),
   deleteMailRecipient: (id) =>
     shoreClient.delete(`/events-mail/recipients/${id}`).then((r) => r.data),
   setMailVesselEnabled: (imo, enabled) =>

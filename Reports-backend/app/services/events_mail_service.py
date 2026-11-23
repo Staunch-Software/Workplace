@@ -106,7 +106,7 @@ def render_events_html(columns: list, vessel: dict, n_events: int) -> str:
     return "".join(out)
 
 
-async def _graph_send(to: list, subject: str, body_html: str) -> bool:
+async def _graph_send(to: list, subject: str, body_html: str, cc: list | None = None) -> bool:
     s = settings
     if not all([s.AZURE_TENANT_ID, s.AZURE_CLIENT_ID, s.AZURE_CLIENT_SECRET, s.MAIL_FROM]):
         logger.error("[EVENTS-MAIL] Graph mail settings are missing; not sending.")
@@ -124,7 +124,8 @@ async def _graph_send(to: list, subject: str, body_html: str) -> bool:
             f"https://graph.microsoft.com/v1.0/users/{s.MAIL_FROM}/sendMail",
             headers={"Authorization": f"Bearer {tok.json()['access_token']}"},
             json={"message": {"subject": subject, "body": {"contentType": "HTML", "content": body_html},
-                              "toRecipients": [{"emailAddress": {"address": a}} for a in to]},
+                              "toRecipients": [{"emailAddress": {"address": a}} for a in to],
+                              "ccRecipients": [{"emailAddress": {"address": a}} for a in (cc or [])]},
                   "saveToSentItems": "false"},
         )
     if res.status_code not in (200, 202):
@@ -143,6 +144,7 @@ async def _ensure_tables(db):
     async with engine.begin() as conn:
         await conn.run_sync(lambda c: Base.metadata.create_all(
             c, tables=[EventsMailRecipient.__table__, EventsMailVessel.__table__, EventsMailSent.__table__]))
+        await conn.execute(text("ALTER TABLE events_mail_recipient ADD COLUMN IF NOT EXISTS kind VARCHAR(2) NOT NULL DEFAULT 'to'"))
     empty = (await db.execute(text("SELECT count(*) FROM events_mail_recipient"))).scalar() == 0
     if empty and settings.EVENTS_MAIL_OWNERS.strip():
         try:
@@ -163,10 +165,12 @@ async def _vessel_targets(db, control_db, only_imo: str = "") -> dict:
     vessels = (await control_db.execute(
         text("SELECT imo, name FROM vessels WHERE is_active IS NOT FALSE ORDER BY name"))).fetchall()
     emails: dict = {}
-    for imo, email in (await db.execute(text("SELECT vessel_imo, email FROM events_mail_recipient ORDER BY email"))).fetchall():
-        emails.setdefault(imo, []).append(email)
+    cc: dict = {}
+    for imo, email, kind in (await db.execute(text(
+            "SELECT vessel_imo, email, kind FROM events_mail_recipient ORDER BY email"))).fetchall():
+        (cc if kind == "cc" else emails).setdefault(imo, []).append(email)
     off = {r[0] for r in (await db.execute(text("SELECT vessel_imo FROM events_mail_vessel WHERE enabled = false"))).fetchall()}
-    return {imo: {"name": name, "emails": emails.get(imo, []), "enabled": imo not in off}
+    return {imo: {"name": name, "emails": emails.get(imo, []), "cc": cc.get(imo, []), "enabled": imo not in off}
             for imo, name in vessels if not only_imo or imo == only_imo}
 
 
@@ -222,7 +226,7 @@ async def send_new_event_mails(test_to: str = "", dry_run: bool = False, force: 
         vessels = await _vessel_targets(state_db, control_db, only_imo)
         if test_to:  # test: any vessel, only the test address receives it
             for v in vessels.values():
-                v["emails"] = _emails(test_to)
+                v["emails"], v["cc"] = _emails(test_to), []
         else:
             vessels = {k: v for k, v in vessels.items() if v["emails"] and v["enabled"]}
         if not vessels:
@@ -259,9 +263,10 @@ async def send_new_event_mails(test_to: str = "", dry_run: bool = False, force: 
                 previews.append((subject, body))
                 if dry_run:
                     continue
-                if await _graph_send(info["emails"], subject, body):
+                if await _graph_send(info["emails"], subject, body, info["cc"]):
                     sent += 1
-                    logger.info(f"[EVENTS-MAIL] Sent '{subject}' to {', '.join(info['emails'])}.")
+                    logger.info(f"[EVENTS-MAIL] Sent '{subject}' to {', '.join(info['emails'])}"
+                                + (f", cc {', '.join(info['cc'])}." if info["cc"] else "."))
                 elif track:
                     await _release(state_db, imo, _event_id(ev))  # retry on the next check
     return {"sent": sent, "mails": len(previews), "previews": previews}

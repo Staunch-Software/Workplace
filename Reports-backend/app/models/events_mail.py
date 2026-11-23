@@ -15,6 +15,7 @@ class EventsMailRecipient(Base):
     id         = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     vessel_imo = Column(String(20),  nullable=False, index=True)
     email      = Column(String(255), nullable=False)   # stored lower-case
+    kind       = Column(String(2), nullable=False, default="to", server_default="to")   # "to" | "cc"
     created_at = Column(DateTime,    default=datetime.utcnow)
 
 

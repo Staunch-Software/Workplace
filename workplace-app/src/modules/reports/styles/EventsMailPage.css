@@ -12,6 +12,10 @@
 .emr-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 6px 3px 10px; border-radius: 999px; background: #e8f6ef; color: #00704a; font-size: 12px; }
 .emr-chip button { display: inline-flex; border: 0; background: transparent; color: inherit; cursor: pointer; padding: 2px; border-radius: 50%; }
 .emr-chip button:hover { background: rgba(0, 144, 76, .18); }
+.emr-group + .emr-group { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #e2e8f0; }
+.emr-group-label { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #94a3b8; margin-bottom: 5px; }
+.emr-chip--cc { background: #fff3ee; color: #b8431a; }
+.emr-chip--cc button:hover { background: rgba(241, 90, 41, .18); }
 .emr-none { font-size: 12px; color: #94a3b8; }
 .emr-add { display: flex; gap: 6px; }
 .emr-add input { flex: 1; min-width: 160px; max-width: 280px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }

@@ -1,4 +1,5 @@
 # app/core/database.py
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 from app.core.config import settings
@@ -42,5 +43,7 @@ async def init_models():
         from app.models.events_mail import EventsMailRecipient, EventsMailVessel, EventsMailSent  # noqa: F401
         from app.models.sync import SyncQueue, SyncState, SyncConflict  # ensures sync tables are created  # noqa: F401
         await conn.run_sync(Base.metadata.create_all)
+        # create_all never adds a column to an existing table
+        await conn.execute(text("ALTER TABLE events_mail_recipient ADD COLUMN IF NOT EXISTS kind VARCHAR(2) NOT NULL DEFAULT 'to'"))
         print("Report Tracker DB tables created.")
 
