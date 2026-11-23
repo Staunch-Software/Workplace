@@ -205,8 +205,12 @@ async def get_logbook(
     return await build_logbook(db, source, limit, offset, end_date, allowed)
 
 
-async def build_logbook(db, source, limit, offset, end_date, allowed):
-    """Columns + last `limit` events per vessel for `source` (shared by the endpoint and the daily mail)."""
+async def build_logbook(db, source, limit, offset, end_date, allowed, columns_override=None):
+    """Columns + last `limit` events per vessel for `source` (shared by the endpoint and the event mail).
+
+    `columns_override` is a fixed list of {"db_column", ...} dicts (the event mail's sheet layout). Its
+    columns come back as given, minus any the table lacks (listed in "missing_columns"), and the Log Info /
+    Performance / Emission grouping from the column metadata is skipped."""
     table, date_col = _SOURCES[source]
     target_end_date = end_date or date_type.today()
     start_date = target_end_date - timedelta(days=_LOOKBACK_DAYS)
@@ -242,6 +246,14 @@ async def build_logbook(db, source, limit, offset, end_date, allowed):
         {"t": table},
     )).fetchall()}
     by_col = {k: v for k, v in by_col.items() if k in table_cols}
+
+    if columns_override is not None:
+        columns = [c for c in columns_override if c["db_column"] in table_cols]
+        used = {c["db_column"] for c in columns} | ({"log_number", "log_type", "event_type", "emissionx_voyage_no"} & table_cols)
+        result = await _logbook_tail(db, source, table, date_col, columns, used, limit, offset,
+                                     target_end_date, start_date, allowed)
+        result["missing_columns"] = [c["db_column"] for c in columns_override if c["db_column"] not in table_cols]
+        return result
 
     # Column order saved by the reference user in Vessel_Performance
     # (user_column_preferences: {visible: [...], order?: [...]}). Used only to
@@ -400,6 +412,13 @@ async def build_logbook(db, source, limit, offset, end_date, allowed):
     for r in emis_cols:
         add_emis(r["db_column"])
 
+    return await _logbook_tail(db, source, table, date_col, columns, used, limit, offset,
+                               target_end_date, start_date, allowed)
+
+
+async def _logbook_tail(db, source, table, date_col, columns, used, limit, offset,
+                        target_end_date, start_date, allowed):
+    """Fetch the rows for `used` columns (with the WNI backup for TUFMAX/POLAR) and build the timeline."""
     vessels = await _fetch_rows(db, table, date_col, used, start_date, target_end_date, allowed, _TIME_LINK[source])
     latest = await _latest_date(db, table, date_col, allowed)
     via_backup = []
