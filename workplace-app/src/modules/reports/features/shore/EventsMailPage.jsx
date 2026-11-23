@@ -1,5 +1,5 @@
 // src/modules/reports/features/shore/EventsMailPage.jsx
-// Admin page: who receives each vessel's "new logbook report" mail.
+// Admin page: who receives each vessel's "new logbook report" mail (To and CC).
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -35,28 +35,27 @@ function RecipientGroup({ vessel, kind, label, onChanged }) {
   return (
     <div className="emr-group">
       <div className="emr-group-label">{label}</div>
-      <div className="emr-chips">
-        {list.map((r) => (
-          <span key={r.id} className={`emr-chip emr-chip--${kind}`}>
-            {r.email}
-            <button type="button" title="Remove" onClick={() => remove.mutate(r.id)} disabled={remove.isPending}>
-              <X size={12} />
-            </button>
-          </span>
-        ))}
-        {list.length === 0 && (
-          <span className="emr-none">{kind === 'to' ? 'No To address, no mail is sent' : 'No CC'}</span>
-        )}
-      </div>
+      {list.length > 0 && (
+        <div className="emr-chips">
+          {list.map((r) => (
+            <span key={r.id} className={`emr-chip emr-chip--${kind}`} title={r.email}>
+              <span className="emr-chip-text">{r.email}</span>
+              <button type="button" title="Remove" onClick={() => remove.mutate(r.id)} disabled={remove.isPending}>
+                <X size={11} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
       <form className="emr-add" onSubmit={submit}>
         <input
           type="email"
-          placeholder={`${label} address`}
+          placeholder={kind === 'to' && list.length === 0 ? 'Add To address (required)' : `Add ${label} address`}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <button type="submit" className="rcfg-btn rcfg-btn--ghost" disabled={!email.trim() || add.isPending}>
-          <Plus size={13} /> Add
+        <button type="submit" className="emr-icon-btn" title="Add" disabled={!email.trim() || add.isPending}>
+          <Plus size={14} />
         </button>
       </form>
     </div>
@@ -80,15 +79,19 @@ function VesselRow({ vessel, onChanged }) {
       <td className="emr-vessel">
         <div className="emr-vessel-name">{vessel.name}</div>
         <div className="emr-vessel-imo">IMO {vessel.imo}</div>
+        <div className="emr-last">
+          {vessel.last_mailed
+            ? `Last mailed ${new Date(vessel.last_mailed).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}`
+            : 'Not mailed yet'}
+        </div>
       </td>
       <td>
-        <RecipientGroup vessel={vessel} kind="to" label="To" onChanged={onChanged} />
-        <RecipientGroup vessel={vessel} kind="cc" label="CC" onChanged={onChanged} />
+        <div className="emr-groups">
+          <RecipientGroup vessel={vessel} kind="to" label="To" onChanged={onChanged} />
+          <RecipientGroup vessel={vessel} kind="cc" label="CC" onChanged={onChanged} />
+        </div>
       </td>
-      <td className="emr-last">
-        {vessel.last_mailed ? new Date(vessel.last_mailed).toLocaleString() : 'Not yet'}
-      </td>
-      <td>
+      <td className="emr-actions">
         <label className="emr-switch" title={vessel.enabled ? 'Mails are on' : 'Mails are off'}>
           <input
             type="checkbox"
@@ -98,16 +101,14 @@ function VesselRow({ vessel, onChanged }) {
           />
           <span />
         </label>
-      </td>
-      <td>
         <button
           type="button"
-          className="rcfg-btn rcfg-btn--ghost"
+          className="emr-btn"
           onClick={() => test.mutate()}
           disabled={test.isPending}
           title="Sends this vessel's latest report to your own email only"
         >
-          <Send size={13} /> {test.isPending ? 'Sending...' : 'Send test'}
+          <Send size={12} /> {test.isPending ? 'Sending...' : 'Test'}
         </button>
       </td>
     </tr>
@@ -127,7 +128,7 @@ export default function EventsMailPage() {
 
   return (
     <div className="rcfg-root">
-      <div className="rcfg-header">
+      <div className="rcfg-header emr-header">
         <div className="rcfg-header-left">
           <button className="rcfg-back-btn" onClick={() => navigate(-1)}>
             <ArrowLeft size={16} /> Back
@@ -157,9 +158,7 @@ export default function EventsMailPage() {
               <tr>
                 <th>Vessel</th>
                 <th>Recipients</th>
-                <th>Last mailed</th>
-                <th>Mails</th>
-                <th />
+                <th>Mail</th>
               </tr>
             </thead>
             <tbody>
@@ -169,7 +168,8 @@ export default function EventsMailPage() {
         )}
         <p className="emr-note">
           Changes apply at the next check (every 15 minutes). A vessel needs at least one To address, and its
-          switch on, to be mailed; CC addresses get a copy. When a vessel is first switched on, its existing reports are not mailed, only new ones.
+          switch on, to be mailed; CC addresses get a copy. A vessel's first check records its existing reports
+          without mailing them.
         </p>
       </div>
     </div>
