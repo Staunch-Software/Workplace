@@ -64,18 +64,17 @@ ROWS = [
     ("Weather", "Environment", "Air Pressure (Inst.)",
      ("Weather_pair_operational_LF", "raw:Performance_Data/Atmospheric Air Pressure (Inst., Abs)"), "mbar"),
     # ---- Consumption: fuel oil split by consumer. The raw report states these in MT. ----
-    # MariApps has both columns: "Mass Consumption" (reported) and "Calculated Mass Consumption" (flowmeter based,
-    # blank on vessels without one). Both are shown, per consumer.
+    # MariApps lists each consumer under Section0 (Main Engine, Aux Engine, Aux Boiler, Composite Boiler ...). The
+    # report also has a "Calculated Mass Consumption" column, but it was empty in every report checked (254 reports,
+    # 14 vessels) and the analysis table has no value for it either, so only the reported mass is shown.
     ("Consumption", "Fuel Oil by Consumer", "ME Mass Consumption",
      ("raw:Consumption_Data/Section0::Main Engine::Mass Consumption (MT)", "ME_FO_mFOCME_dCnt_operational_LF"), "MT"),
-    ("Consumption", "Fuel Oil by Consumer", "ME Calculated Mass Consumption",
-     ("raw:Consumption_Data/Section0::Main Engine::Calculated Mass Consumption (MT)", "ME_FO_mFOCcalME_avg_operational_LF"), "MT"),
     ("Consumption", "Fuel Oil by Consumer", "AE Mass Consumption",
      ("raw:Consumption_Data/Section0::Aux Engine::Mass Consumption (MT)", "AE_FO_mFOCAE_dCnt_operational_LF"), "MT"),
-    ("Consumption", "Fuel Oil by Consumer", "AE Calculated Mass Consumption",
-     ("raw:Consumption_Data/Section0::Aux Engine::Calculated Mass Consumption (MT)", "AE_FO_mFOCcalAE_avg_operational_LF"), "MT"),
-    ("Consumption", "Fuel Oil by Consumer", "Boiler Mass Consumption (Tot.)", "AuxBoiler_mFOCBL_dCnt_operational_LF", "MT"),
-    ("Consumption", "Fuel Oil by Consumer", "Composite Boiler Mass Consumption", "CompositeBoiler_mFOCComBL_dCnt_operational_LF", "MT"),
+    ("Consumption", "Fuel Oil by Consumer", "Aux Boiler Mass Consumption",
+     ("raw:Consumption_Data/Section0::Aux Boiler::Mass Consumption (MT)", "AuxBoiler_mFOCBL_dCnt_operational_LF"), "MT"),
+    ("Consumption", "Fuel Oil by Consumer", "Composite Boiler Mass Consumption",
+     ("raw:Consumption_Data/Section0::Composite Boiler::Mass Consumption (MT)", "CompositeBoiler_mFOCComBL_dCnt_operational_LF"), "MT"),
     ("Consumption", "Cylinder Oil", "ME Cylinder Oil Quantity Consumed",
      ("ME_Lub_VCOCME_dCnt_operational_LF",
       "raw:Consumption_Data/Lubricant ROB::ME CYLINDER OIL-LS::Consumed (L)",
