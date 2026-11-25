@@ -109,7 +109,7 @@ class Settings(BaseSettings):
     # Daily "last N events" mail to vessel owners (see app/services/events_mail_service.py).
     EVENTS_MAIL_ENABLED: bool = False
     EVENTS_MAIL_POLL_MINUTES: int = 15  # how often to check for a new logbook event
-    EVENTS_MAIL_EVENTS: int = 7        # events per vessel
+    EVENTS_MAIL_EVENTS: int = 4        # events per vessel
     # While set, EVERY mail goes only to these address(es) (comma separated) with a [TEST] subject.
     EVENTS_MAIL_TEST_TO: str = ""
     # Recipients are managed in the UI (Report Config > Event mails). This old JSON list is read ONCE, only

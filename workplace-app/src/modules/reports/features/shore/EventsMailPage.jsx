@@ -344,7 +344,7 @@ export default function EventsMailPage() {
           </div>
 
           <div className="rcfg-header-sub emr-header-sub">
-            Each vessel's recipients get a mail with its last 7 logbook events whenever a new report arrives (auto-syncs every 15 min)
+            Each vessel's recipients get a mail with its last 4 logbook events whenever a new report arrives (auto-syncs every 15 min)
           </div>
         </div>
       </div>
