@@ -44,6 +44,7 @@ RULE_LABELS = {
     "cargo_blank": "Cargo onboard not filled in on a laden report",
     "me_hours_blank": "ME running hours not filled in on a sea report",
     "position_blank": "Latitude / longitude not filled in on a Noon at sea report",
+    "position_jump": "Position is far from the previous report compared with the distance steamed",
 }
 
 # One line under each heading telling the vessel what to do about it.
@@ -55,6 +56,7 @@ RULE_ACTIONS = {
     "cargo_blank": "Enter the cargo onboard figure, or correct the loading condition if the ship is now in ballast.",
     "me_hours_blank": "Enter the ME running hours for this report.",
     "position_blank": "Enter the noon position (latitude and longitude).",
+    "position_jump": "Check the latitude and longitude, including the N/S and E/W letters, on this report and the previous one.",
 }
 
 # Accent color per rule — same red/amber/green dot convention already used
@@ -74,6 +76,7 @@ RULE_ACCENT = {
     "cargo_blank": "#d4a02a",
     "me_hours_blank": "#d4a02a",
     "position_blank": "#d4a02a",
+    "position_jump": "#e05050",
 }
 
 # Lands the recipient straight on the MariApps Log Approval grid so they don't

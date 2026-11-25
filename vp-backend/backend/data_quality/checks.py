@@ -15,6 +15,8 @@
 # Pure read-only query functions — no DB writes, no email. The daily job
 # (daily_job.py) owns the open/resolved state machine and notifications.
 # ===========================================================================
+import math
+
 from sqlalchemy import text
 
 from ..cp.cp_compliance_v2 import _is_steaming, _is_sea_passage_event
@@ -213,6 +215,80 @@ def check_position_blank(db, vessel_imo, report_date):
                          OR NULLIF(TRIM(x."VoyageMeta_longitude_operational_LF"::text), '') IS NULL)""")
 
 
+_EARTH_NM = 3440.065
+
+
+def _signed(deg, minutes, hemisphere, plus, minus):
+    """Decimal degrees from degree / minute / hemisphere letter, or None when any is unusable."""
+    try:
+        v = float(deg) + float(minutes or 0) / 60.0
+    except (TypeError, ValueError):
+        return None
+    h = (hemisphere or "").strip().upper()[:1]
+    return v if h == plus else (-v if h == minus else None)
+
+
+def _great_circle_nm(a, b):
+    p1, p2 = math.radians(a[0]), math.radians(b[0])
+    x = math.sin((p2 - p1) / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(math.radians(b[1] - a[1]) / 2) ** 2
+    return 2 * _EARTH_NM * math.asin(min(1.0, math.sqrt(x)))
+
+
+def position_jump(prev_pos, cur_pos, reported_nm):
+    """C02: True when two consecutive positions are far apart compared with the distance the
+    report says was steamed (> 50 nm and > 1.3 x reported + 20 nm)."""
+    d = _great_circle_nm(prev_pos, cur_pos)
+    return d > 50 and d > 1.3 * (reported_nm or 0.0) + 20
+
+
+_POSITION_SQL = """
+    SELECT l.id, x.log_number, r.log_date_utc, r.lat_degree::text AS la, r.lat_minutes::text AS lam, r.lat_direction AS lad,
+           r.lon_degree::text AS lo, r.lon_minutes::text AS lom, r.lon_direction AS lod, r.distance_og::text AS dist
+    FROM {src}
+"""
+
+
+def check_position_jump(db, vessel_imo, report_date):
+    """C02 (MariApps only): the position differs from the vessel's previous report by far more
+    than the distance steamed (a wrong hemisphere, a swapped latitude / longitude or a mistyped
+    degree). Each report is compared with the immediately preceding one, 1-48 h earlier; a pair
+    with a blank hemisphere is skipped (that is M15's job)."""
+    cur_rows = db.execute(text(_POSITION_SQL.format(src="""expanded_mariapps_data x
+        JOIN mariapps_reports_data r ON r.raw_report_id = x.raw_log_id
+        JOIN raw_mariapps_logs l ON l.id = x.raw_log_id
+        WHERE x.vessel_imo = :imo AND x.log_date = :d AND COALESCE(l.is_duplicate, false) = false
+          AND r.log_date_utc IS NOT NULL""")), {"imo": vessel_imo, "d": report_date}).mappings().all()
+    bad = []
+    for c in cur_rows:
+        cur = (_signed(c["la"], c["lam"], c["lad"], "N", "S"), _signed(c["lo"], c["lom"], c["lod"], "E", "W"))
+        if None in cur:
+            continue
+        p = db.execute(text("""
+            SELECT r.lat_degree::text AS la, r.lat_minutes::text AS lam, r.lat_direction AS lad,
+                   r.lon_degree::text AS lo, r.lon_minutes::text AS lom, r.lon_direction AS lod,
+                   EXTRACT(EPOCH FROM (c.log_date_utc - r.log_date_utc)) / 3600.0 AS gap_h
+            FROM mariapps_reports_data r
+            JOIN raw_mariapps_logs l ON l.id = r.raw_report_id
+            JOIN mariapps_reports_data c ON c.raw_report_id = :cid
+            WHERE l.vessel_imo = :imo AND COALESCE(l.is_duplicate, false) = false
+              AND r.log_date_utc < c.log_date_utc
+            ORDER BY r.log_date_utc DESC LIMIT 1"""), {"imo": vessel_imo, "cid": c["id"]}).mappings().first()
+        if not p or not (1 <= (p["gap_h"] or 0) <= 48):
+            continue
+        prev = (_signed(p["la"], p["lam"], p["lad"], "N", "S"), _signed(p["lo"], p["lom"], p["lod"], "E", "W"))
+        if None in prev:
+            continue
+        try:
+            rep = float(c["dist"])
+        except (TypeError, ValueError):
+            rep = 0.0
+        if position_jump(prev, cur, rep):
+            bad.append(c["log_number"])
+    if not bad:
+        return None
+    return {"count": len(bad), "logs": sorted({b for b in bad if b})}
+
+
 def run_checks_for_date(db, vessel_imo, report_date):
     """Returns {(source_id, rule_key): detail_dict} for every rule that found
     a gap on this vessel/date — empty dict if everything's clean."""
@@ -249,6 +325,7 @@ def run_checks_for_date(db, vessel_imo, report_date):
     for key in ("missing_fuel", "distance_no_me_consumption"):
         covered |= set((findings.get(("mari_apps", key)) or {}).get("logs", []))
     for rule_key, fn, skip_covered in (
+            ("position_jump", check_position_jump, False),
             ("loading_cargo_mismatch", check_loading_cargo_mismatch, False),
             ("zero_total_fuel", check_zero_total_fuel, True),
             ("cargo_blank", check_cargo_blank, False),

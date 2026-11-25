@@ -49,6 +49,7 @@ _RULE_LABELS = {
     "cargo_blank": "Cargo Onboard Blank (Laden)",
     "me_hours_blank": "ME Running Hours Blank",
     "position_blank": "Position Blank",
+    "position_jump": "Position Jump",
 }
 
 
