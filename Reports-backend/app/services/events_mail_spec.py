@@ -91,17 +91,21 @@ ROWS = [
     ("Operations", "Main Engine", "ME Running Hours (Tot.)",
      ("ME_RHME_dCnt_operational_LF", _OP + "ME Running hours - Value"), "hr"),
     ("Operations", "Main Engine", "ME Estimated Power",
-     ("ME_PeffestME_avg_operational_LF", "ME_PeffcalME_avg_operational_LF", _OP + "ME Calculated Effective Power (Avg.) - Value"), "kW"),
+     (_OP + "Estimated Power - Value", "ME_PeffestME_avg_operational_LF", "ME_PeffcalME_avg_operational_LF",
+      _OP + "ME Calculated Effective Power (Avg.) - Value"), "kW"),
     ("Operations", "Main Engine", "ME Energy Produced (Tot.)",
      ("ME_DESME_dCnt_operational_LF", _OP + "Energy Produced - Value"), "kWh"),
-    # aux engines split per generator: all of AE1, then AE2, then AE3
-    *[("Operations", f"Auxiliary Engine {n}", label, (f"{col}_{n}_operational_LF", *extra, _OP + raw.format(n=n)), unit)
+    # aux engines split per generator: all of AE1, then AE2, then AE3 ({n} is the engine number)
+    *[("Operations", f"Auxiliary Engine {n}", label, tuple(c.format(n=n) for c in cands), unit)
       for ae, n in _AE
-      for label, col, extra, raw, unit in (
-          (f"{ae} Electric Energy Produced (Tot.)", "AE_DEelAE_dCnt", (), "AE Electric Energy Produced (Tot.) - No {n}", "kWh"),
-          (f"{ae} Running Hours (Tot.)", "AE_RHAE_dCnt", (), "AE Running Hours (Tot.) - No {n}", "hr"),
-          (f"{ae} Electric Power (Avg.)", "AE_PelAE_avg", (f"AE_PelcalAE_avg_{n}_operational_LF",),
-           "AE Calculated Electric Power (Avg.) - No {n}", "kW"),
+      for label, cands, unit in (
+          (f"{ae} Electric Energy Produced (Tot.)",
+           ("AE_DEelAE_dCnt_{n}_operational_LF", _OP + "AE Electric Energy Produced (Tot.) - No {n}"), "kWh"),
+          (f"{ae} Running Hours (Tot.)",
+           ("AE_RHAE_dCnt_{n}_operational_LF", _OP + "AE Running Hours (Tot.) - No {n}"), "hr"),
+          (f"{ae} Electric Power (Avg.)",
+           ("AE_PelAE_avg_{n}_operational_LF", _OP + "AE Electric Power (Avg.) - No {n}",
+            "AE_PelcalAE_avg_{n}_operational_LF", _OP + "AE Calculated Electric Power (Avg.) - No {n}"), "kW"),
       )],
     ("Operations", "Other Equipment", "FWG Total Running Hours (Cnt.)",
      ("FWG_RHFWG_Cnt_operational_LF", _OP + "FWG Total Running Hours (Cnt.)"), "hr"),
