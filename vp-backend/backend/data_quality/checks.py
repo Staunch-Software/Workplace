@@ -369,6 +369,15 @@ def check_distance_duration_mismatch(db, vessel_imo, report_date):
         AND (({_DIST_EXPR} > 0 AND {dur} = 0) OR ({dur} > 0 AND {_DIST_EXPR} / {dur} > 20))""")
 
 
+def check_distance_duration_blank(db, vessel_imo, report_date):
+    """M08 (MariApps only): distance or log duration not filled in at all. Read from the
+    expanded columns (the mapped distance column also goes blank for a distance of 0). Reports
+    already raised by the distance-vs-duration check are left out."""
+    return _mariapps_rows(db, vessel_imo, report_date, """
+        (NULLIF(TRIM(x."Vessel_DOG_dCnt_operational_LF"::text), '') IS NULL
+         OR NULLIF(TRIM(x."VoyageMeta_log_durationh_operational_LF"::text), '') IS NULL)""")
+
+
 def run_checks_for_date(db, vessel_imo, report_date):
     """Returns {(source_id, rule_key): detail_dict} for every rule that found
     a gap on this vessel/date — empty dict if everything's clean."""
@@ -413,6 +422,7 @@ def run_checks_for_date(db, vessel_imo, report_date):
             ("position_blank", check_position_blank, False),
             ("engine_total_blank", check_engine_total_blank, True),
             ("distance_duration_mismatch", check_distance_duration_mismatch, False),
+            ("distance_duration_blank", check_distance_duration_blank, True),
             ("rob_drop", check_rob_drop, False)):
         found = fn(db, vessel_imo, report_date)
         if not found:
@@ -420,7 +430,7 @@ def run_checks_for_date(db, vessel_imo, report_date):
         logs = [lg for lg in found["logs"] if not (skip_covered and lg in covered)]
         if logs:
             findings[("mari_apps", rule_key)] = {"count": len(logs), "logs": logs}
-            if rule_key == "zero_total_fuel":
+            if rule_key in ("zero_total_fuel", "distance_duration_mismatch"):
                 covered |= set(logs)
 
     return findings

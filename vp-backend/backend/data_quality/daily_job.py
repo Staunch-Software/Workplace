@@ -48,6 +48,7 @@ RULE_LABELS = {
     "engine_total_blank": "ME / AE fuel total not filled in although the engine ran",
     "distance_duration_mismatch": "Distance steamed does not fit the log duration (no duration, or over 20 knots)",
     "rob_drop": "Fuel ROB fell between reports by more than was consumed",
+    "distance_duration_blank": "Distance or log duration not filled in",
 }
 
 # One line under each heading telling the vessel what to do about it.
@@ -63,6 +64,7 @@ RULE_ACTIONS = {
     "engine_total_blank": "Enter the ME / AE fuel consumption total on this report (0 only if the engine was stopped).",
     "distance_duration_mismatch": "Check the distance and the log duration (steaming time) on this report.",
     "rob_drop": "Check the fuel ROB on this report and the previous one, or record the bunker transfer or correction.",
+    "distance_duration_blank": "Enter the distance and the log duration (steaming time) for this report.",
 }
 
 # Accent color per rule — same red/amber/green dot convention already used
@@ -86,6 +88,7 @@ RULE_ACCENT = {
     "engine_total_blank": "#d4a02a",
     "distance_duration_mismatch": "#d4a02a",
     "rob_drop": "#e05050",
+    "distance_duration_blank": "#d4a02a",
 }
 
 # Lands the recipient straight on the MariApps Log Approval grid so they don't

@@ -53,6 +53,7 @@ _RULE_LABELS = {
     "engine_total_blank": "Engine Fuel Total Blank",
     "distance_duration_mismatch": "Distance vs Duration",
     "rob_drop": "ROB Drop Between Reports",
+    "distance_duration_blank": "Distance / Duration Blank",
 }
 
 
