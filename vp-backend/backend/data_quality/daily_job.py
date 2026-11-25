@@ -52,7 +52,7 @@ RULE_ACTIONS = {
     "port_noon_with_distance": "Check the report type (should it be a Noon at sea?) or correct the distance.",
     "loading_cargo_mismatch": "Check the loading condition and the cargo onboard figure on this report.",
     "zero_total_fuel": "Enter the fuel consumption for this report (the auxiliary engine always burns fuel).",
-    "cargo_blank": "Enter the cargo onboard figure for this report.",
+    "cargo_blank": "Enter the cargo onboard figure, or correct the loading condition if the ship is now in ballast.",
     "me_hours_blank": "Enter the ME running hours for this report.",
     "position_blank": "Enter the noon position (latitude and longitude).",
 }
