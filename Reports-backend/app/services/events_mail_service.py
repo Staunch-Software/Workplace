@@ -223,6 +223,11 @@ async def _ensure_tables(db):
             logger.error(f"[EVENTS-MAIL] Could not import EVENTS_MAIL_OWNERS: {e}")
 
 
+# Vessels that do not report through MariApps (AMNS TUFMAX sends Excel/email noon reports), so this mail would
+# be almost empty for them. They are never mailed.
+NOT_ON_MARIAPPS = {"9486295"}
+
+
 async def _vessel_targets(db, control_db, only_imo: str = "") -> dict:
     """{imo: {"name", "emails"}} for the vessels to check: active vessels that are switched on and have at
     least one recipient (the recipient list is edited on the Report Config > Event mails page)."""
@@ -235,7 +240,8 @@ async def _vessel_targets(db, control_db, only_imo: str = "") -> dict:
         (cc if kind == "cc" else emails).setdefault(imo, []).append(email)
     off = {r[0] for r in (await db.execute(text("SELECT vessel_imo FROM events_mail_vessel WHERE enabled = false"))).fetchall()}
     return {imo: {"name": name, "emails": emails.get(imo, []), "cc": cc.get(imo, []), "enabled": imo not in off}
-            for imo, name in vessels if not only_imo or imo == only_imo}
+            for imo, name in vessels
+            if imo not in NOT_ON_MARIAPPS and (not only_imo or imo == only_imo)}
 
 
 def _event_id(ev: dict) -> str:
