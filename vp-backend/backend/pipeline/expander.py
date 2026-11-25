@@ -644,6 +644,64 @@ def _apply_stw_fallback(data_rec: dict) -> dict:
     return data_rec
 
 
+def _num_text(v):
+    """The value as stripped text if it parses as a number, else None (blank / ' ' / text)."""
+    if v is None:
+        return None
+    t = str(v).strip().replace(",", "")
+    try:
+        float(t)
+    except ValueError:
+        return None
+    return str(v).strip()
+
+
+_ME_HOURS_ENGINE_KEYS = [f"op_me_running_hours_no_{n}" for n in range(1, 11)]
+
+
+def _mariapps_gap_fields(data_rec: dict, flat: dict, table_cols=None) -> dict:
+    """Columns the direct source-key mapping leaves blank although the raw MariApps report
+    carries the value under another key (found 2026-11-25 by audit_blank_source.py).
+    Returns ONLY the fields to fill, never overwrites a value already mapped:
+      - Cargo Onboard: the export's "Cargo On Board (MT or m3)" is mapped to the TEU column,
+        so the cargo column stayed blank on those reports.
+      - ME Running Hours: when the export has no "ME Running hours - Value", it is the sum
+        of the per-engine "ME Running hours - No 1..10" entries.
+      - Latitude / Longitude degrees (and minutes): the Excel export drops a 0 degree
+        (a position on the equator / Greenwich meridian), but the Position tab carries it.
+    """
+    def blank(col):
+        return (table_cols is None or col in table_cols) and not str(data_rec.get(col) or "").strip()
+
+    out = {}
+    if blank("Vessel_Cargo_onboard_operational_LF"):
+        v = _num_text(flat.get("cargo_on_board_mt_or_m")) or _num_text(flat.get("cargo_on_board"))
+        if v is not None:
+            out["Vessel_Cargo_onboard_operational_LF"] = v
+    if blank("ME_RHME_dCnt_operational_LF"):
+        vals = [_num_text(flat.get(k)) for k in _ME_HOURS_ENGINE_KEYS]
+        vals = [float(v.replace(",", "")) for v in vals if v is not None]
+        if vals:
+            out["ME_RHME_dCnt_operational_LF"] = f"{sum(vals):g}"
+    for deg_col, min_col, p_deg, p_min in (
+            ("VoyageMeta_latitude_operational_LF", "VoyageMeta_latitude_lat_minutes_operational_LF",
+             "pos_latitude_degree", "pos_latitude_minutes"),
+            ("VoyageMeta_longitude_operational_LF", "VoyageMeta_longitude_lon_minutes_operational_LF",
+             "pos_longitude_degree", "pos_longitude_minutes")):
+        if blank(deg_col):
+            d = _num_text(flat.get(p_deg))
+            if d is not None:
+                out[deg_col] = d
+                if blank(min_col) and _num_text(flat.get(p_min)) is not None:
+                    out[min_col] = _num_text(flat.get(p_min))
+    return out
+
+
+def _apply_mariapps_gap_fallbacks(data_rec: dict, flat: dict, table_cols=None) -> dict:
+    data_rec.update(_mariapps_gap_fields(data_rec, flat, table_cols))
+    return data_rec
+
+
 def _observed_speed_kn(data_rec):
     """STW first, falling back to SOG — same preference cp_compliance_v2 uses
     for its own nearest-warranted-speed match."""
@@ -2220,7 +2278,7 @@ def backfill_mariapps(engine, batch_size: int = 50):
             for (rid, vessel_imo, log_date, log_type, log_number, raw_json) in rows:
                 try:
                     flat     = flatten_mariapps(raw_json or {})
-                    data_rec = _apply_stw_fallback(_map_flat_to_newcols(flat, MARIAPPS_TO_NEWCOL, table_cols))
+                    data_rec = _apply_mariapps_gap_fallbacks(_apply_stw_fallback(_map_flat_to_newcols(flat, MARIAPPS_TO_NEWCOL, table_cols)), flat, table_cols)
 
                     # Determine loading_condition from source data
                     lc = flat.get("loading_condition") or flat.get("op_loading_condition") or None
@@ -2379,7 +2437,7 @@ def write_expanded_mariapps(conn, raw_log_id, vessel_imo, log_date,
     try:
         table_cols = _get_table_cols(conn, "expanded_mariapps_data")
         flat       = flatten_mariapps(raw_json or {})
-        data_rec   = _apply_stw_fallback(_map_flat_to_newcols(flat, MARIAPPS_TO_NEWCOL, table_cols))
+        data_rec = _apply_mariapps_gap_fallbacks(_apply_stw_fallback(_map_flat_to_newcols(flat, MARIAPPS_TO_NEWCOL, table_cols)), flat, table_cols)
         lc = flat.get("loading_condition") or flat.get("op_loading_condition") or None
         instruction = _cp_remarks_instruction(raw_json, lc)
         instruction = resolve_cp_instruction(
