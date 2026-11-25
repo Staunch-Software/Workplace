@@ -1,7 +1,9 @@
 # app/services/events_mail_spec.py
-# Rows of the event mail, in the order of the MariApps event-report sheet: (Tab, Section, Parameter, db column, unit).
-# A column that does not exist in expanded_mariapps_data is skipped (events.build_logbook reports it as missing),
-# so a wrong name here drops that row instead of breaking the mail.
+# Rows of the event mail, in the order of the MariApps event-report sheet: (Tab, Section, Parameter, column(s), unit).
+# A row's column can be a tuple of alternatives; the first one with a value in an event is shown:
+#   "name"            a column of expanded_mariapps_data (a name the table lacks is skipped, never an error)
+#   "raw:Section/Key" a key of the raw MariApps report (raw_mariapps_logs.raw_json), for items the table lacks
+#   "@name"           computed by the mail
 # To add, remove or reorder a row, edit this list only.
 
 _AE = (
@@ -10,22 +12,28 @@ _AE = (
     ("AE3", "3"),
 )
 
+_OP = "raw:Operation_Data/"
+
 ROWS = [
     # ---- Header ----
-    ("Header", "Log Info", "Leg Number", "emissionx_voyage_no", ""),
-    ("Header", "Log Info", "Log Number", "log_number", ""),
-    ("Header", "Log Info", "Log Type / Sub Log Type", "log_type", ""),
+    ("Header", "Log Info", "Leg Number", ("emissionx_voyage_no", "raw:Excel_Data/Leg Number"), ""),
+    ("Header", "Log Info", "Log Number", ("log_number", "raw:Excel_Data/Log Number"), ""),
+    ("Header", "Log Info", "Log Type / Sub Log Type", ("log_type", "raw:Excel_Data/Log Type"), ""),
     ("Header", "Log Info", "Date (Local)", ("raw:Excel_Data/Log Date", "@date_local"), ""),
     ("Header", "Log Info", "Date (UTC)", ("raw:Excel_Data/Log Date (UTC)", "@date_utc"), ""),
-    ("Header", "Log Info", "Loading Condition", "loading_condition", ""),
-    ("Header", "Log Info", "Duration", "VoyageMeta_log_durationh_operational_LF", "hr"),
+    ("Header", "Log Info", "Loading Condition", ("loading_condition", "raw:Excel_Data/Loading Condition"), ""),
+    ("Header", "Log Info", "Duration", ("VoyageMeta_log_durationh_operational_LF", "raw:Excel_Data/Log Duration(h)"), "hr"),
+    # the raw report has no departure port; a blank one is filled from the same leg (see events_mail_service)
     ("Header", "Log Info", "Departure Port (Last Leg)", "VoyageMeta_departure_port_last_leg_operational_LF", ""),
     ("Header", "Log Info", "Arrival Port (Current Leg)",
-     ("VoyageMeta_arrival_port_current_leg_operational_LF", "VoyageMeta_to_port_operational_LF"), ""),
+     ("VoyageMeta_arrival_port_current_leg_operational_LF", "VoyageMeta_to_port_operational_LF", "raw:Excel_Data/To Port"), ""),
     # ---- Position ----
-    ("Position", "Distance", "Calculated Speed Over Ground (Avg.)", "Vessel_SOGcal_avg_operational_LF", "kn"),
-    ("Position", "Distance", "Calculated Speed Through Water (Avg.)", "Vessel_STWcal_avg_operational_LF", "kn"),
-    ("Position", "Loading Condition", "Cargo Onboard", "Vessel_Cargo_onboard_operational_LF", "MT"),
+    ("Position", "Distance", "Calculated Speed Over Ground (Avg.)",
+     ("Vessel_SOGcal_avg_operational_LF", "raw:Position_Data/Calculated Speed Over Ground (Avg.)"), "kn"),
+    ("Position", "Distance", "Calculated Speed Through Water (Avg.)",
+     ("Vessel_STWcal_avg_operational_LF", "raw:Position_Data/Calculated Speed Through Water (Avg.)"), "kn"),
+    ("Position", "Loading Condition", "Cargo Onboard",
+     ("Vessel_Cargo_onboard_operational_LF", "raw:Position_Data/Cargo Onboard"), "MT"),
     ("Position", "Time", "ETA (LT)",
      ("VoyageMeta_eta_estimated_time_of_arrival_lt_operational_LF", "raw:Position_Data/ETA (Estimated Time of Arrival) (LT)"), ""),
     ("Position", "Time", "ETB (LT)",
@@ -33,25 +41,39 @@ ROWS = [
     ("Position", "Time", "ETS (LT)",
      ("VoyageMeta_ets_estimated_time_of_sailing_lt_operational_LF", "raw:Position_Data/ETS (Estimated Time of Sailing) (LT)"), ""),
     # ---- Weather ----
-    ("Weather", "Draft & Condition", "Fore Draught", "Vessel_Tf_avg_operational_LF", "m"),
-    ("Weather", "Draft & Condition", "Aft Draught", "Vessel_Ta_avg_operational_LF", "m"),
-    ("Weather", "Draft & Condition", "Displacement", "Vessel_DISP_avg_operational_LF", "MT"),
-    ("Weather", "Draft & Condition", "Total Ballast Onboard (Avg.)", "Vessel_BallastTot_operational_LF", "MT"),
-    ("Weather", "Speed", "Speed Over Ground (Inst.)", "Vessel_SOG_operational_LF", "kn"),
-    ("Weather", "Speed", "Speed Through Water (Inst.)", "Vessel_STW_operational_LF", "kn"),
-    ("Weather", "Wind & Current", "True Wind Speed at Anemometer (Inst.)", "Weather_Uwit_operational_LF", "kn"),
-    ("Weather", "Sea State", "Wave Height (Inst.)", "Weather_Hwv_operational_LF", "m"),
+    ("Weather", "Draft & Condition", "Fore Draught", ("Vessel_Tf_avg_operational_LF", "raw:Performance_Data/Fore Draught"), "m"),
+    ("Weather", "Draft & Condition", "Aft Draught", ("Vessel_Ta_avg_operational_LF", "raw:Performance_Data/Aft Draught"), "m"),
+    ("Weather", "Draft & Condition", "Displacement", ("Vessel_DISP_avg_operational_LF", "raw:Performance_Data/Displacement"), "MT"),
+    ("Weather", "Draft & Condition", "Total Ballast Onboard (Avg.)",
+     ("Vessel_BallastTot_operational_LF", "raw:Performance_Data/Total Ballast Onboard (Avg.)"), "MT"),
+    ("Weather", "Speed", "Speed Over Ground (Inst.)",
+     ("Vessel_SOG_operational_LF", "raw:Performance_Data/Speed Over Ground (Inst.)"), "kn"),
+    ("Weather", "Speed", "Speed Through Water (Inst.)",
+     ("Vessel_STW_operational_LF", "raw:Performance_Data/Speed Through Water (Inst.)"), "kn"),
+    ("Weather", "Wind & Current", "True Wind Speed at Anemometer (Inst.)",
+     ("Weather_Uwit_operational_LF", "raw:Performance_Data/True Wind Speed at Anemometer (Inst.)"), "kn"),
+    ("Weather", "Sea State", "Wave Height (Inst.)", ("Weather_Hwv_operational_LF", "raw:Performance_Data/Wave Height (Inst.)"), "m"),
     ("Weather", "Sea State", "Swell Height (Avg.)",
      ("Weather_Hsl_avg_operational_LF", "raw:Performance_Data/Swell Height"), "m"),
-    ("Weather", "Sea State", "Swell Height (Inst.)", "Weather_Hsl_operational_LF", "m"),
-    ("Weather", "Environment", "Sea Water Temperature (Inst.)", "Weather_Tsw_operational_LF", "°C"),
-    ("Weather", "Environment", "Air Temperature (Inst.)", "Weather_Tair_operational_LF", "°C"),
-    ("Weather", "Environment", "Air Pressure (Inst.)", "Weather_pair_operational_LF", "mbar"),
-    # ---- Consumption: fuel oil split by consumer ----
+    ("Weather", "Sea State", "Swell Height (Inst.)",
+     ("Weather_Hsl_operational_LF", "raw:Performance_Data/Swell Height (Inst.)"), "m"),
+    ("Weather", "Environment", "Sea Water Temperature (Inst.)",
+     ("Weather_Tsw_operational_LF", "raw:Performance_Data/Sea Water Temperature (Inst.)"), "°C"),
+    ("Weather", "Environment", "Air Temperature (Inst.)",
+     ("Weather_Tair_operational_LF", "raw:Performance_Data/Atmospheric Air Temperature (Inst.)"), "°C"),
+    ("Weather", "Environment", "Air Pressure (Inst.)",
+     ("Weather_pair_operational_LF", "raw:Performance_Data/Atmospheric Air Pressure (Inst., Abs)"), "mbar"),
+    # ---- Consumption: fuel oil split by consumer. The raw report states these in MT. ----
+    # MariApps has both columns: "Mass Consumption" (reported) and "Calculated Mass Consumption" (flowmeter based,
+    # blank on vessels without one). Both are shown, per consumer.
+    ("Consumption", "Fuel Oil by Consumer", "ME Mass Consumption",
+     ("raw:Consumption_Data/Section0::Main Engine::Mass Consumption (MT)", "ME_FO_mFOCME_dCnt_operational_LF"), "MT"),
     ("Consumption", "Fuel Oil by Consumer", "ME Calculated Mass Consumption",
-     ("ME_FO_mFOCcalME_avg_operational_LF", "ME_FO_mFOCME_dCnt_operational_LF"), "kg"),
+     ("raw:Consumption_Data/Section0::Main Engine::Calculated Mass Consumption (MT)", "ME_FO_mFOCcalME_avg_operational_LF"), "MT"),
+    ("Consumption", "Fuel Oil by Consumer", "AE Mass Consumption",
+     ("raw:Consumption_Data/Section0::Aux Engine::Mass Consumption (MT)", "AE_FO_mFOCAE_dCnt_operational_LF"), "MT"),
     ("Consumption", "Fuel Oil by Consumer", "AE Calculated Mass Consumption",
-     ("AE_FO_mFOCcalAE_avg_operational_LF", "AE_FO_mFOCAE_dCnt_operational_LF"), "kg"),
+     ("raw:Consumption_Data/Section0::Aux Engine::Calculated Mass Consumption (MT)", "AE_FO_mFOCcalAE_avg_operational_LF"), "MT"),
     ("Consumption", "Fuel Oil by Consumer", "Boiler Mass Consumption (Tot.)", "AuxBoiler_mFOCBL_dCnt_operational_LF", "MT"),
     ("Consumption", "Fuel Oil by Consumer", "Composite Boiler Mass Consumption", "CompositeBoiler_mFOCComBL_dCnt_operational_LF", "MT"),
     ("Consumption", "Cylinder Oil", "ME Cylinder Oil Quantity Consumed",
@@ -67,37 +89,46 @@ ROWS = [
     ("Consumption", "Fresh Water", "Received", ("Vessel_mfwR_dCnt_operational_LF", "raw:Consumption_Data/Section3::Received"), "MT"),
     ("Consumption", "Fresh Water", "ROB", ("VoyageMeta_section3_rob_operational_LF", "raw:Consumption_Data/Section3::ROB"), "MT"),
     # ---- Operations ----
-    ("Operations", "Main Engine", "ME Running Hours (Tot.)", "ME_RHME_dCnt_operational_LF", "hr"),
+    ("Operations", "Main Engine", "ME Running Hours (Tot.)",
+     ("ME_RHME_dCnt_operational_LF", _OP + "ME Running hours - Value"), "hr"),
     ("Operations", "Main Engine", "ME Estimated Power",
-     ("ME_PeffestME_avg_operational_LF", "ME_PeffcalME_avg_operational_LF"), "kW"),
-    ("Operations", "Main Engine", "ME Energy Produced (Tot.)", "ME_DESME_dCnt_operational_LF", "kWh"),
+     ("ME_PeffestME_avg_operational_LF", "ME_PeffcalME_avg_operational_LF", _OP + "ME Calculated Effective Power (Avg.) - Value"), "kW"),
+    ("Operations", "Main Engine", "ME Energy Produced (Tot.)",
+     ("ME_DESME_dCnt_operational_LF", _OP + "Energy Produced - Value"), "kWh"),
     # aux engines split per generator: all of AE1, then AE2, then AE3
-    *[("Operations", f"Auxiliary Engine {n}", label, f"{col}_{n}_operational_LF", unit)
+    *[("Operations", f"Auxiliary Engine {n}", label, (f"{col}_{n}_operational_LF", *extra, _OP + raw.format(n=n)), unit)
       for ae, n in _AE
-      for label, col, unit in (
-          (f"{ae} Electric Energy Produced (Tot.)", "AE_DEelAE_dCnt", "kWh"),
-          (f"{ae} Running Hours (Tot.)", "AE_RHAE_dCnt", "hr"),
-          (f"{ae} Electric Power (Avg.)", "AE_PelAE_avg", "kW"),
+      for label, col, extra, raw, unit in (
+          (f"{ae} Electric Energy Produced (Tot.)", "AE_DEelAE_dCnt", (), "AE Electric Energy Produced (Tot.) - No {n}", "kWh"),
+          (f"{ae} Running Hours (Tot.)", "AE_RHAE_dCnt", (), "AE Running Hours (Tot.) - No {n}", "hr"),
+          (f"{ae} Electric Power (Avg.)", "AE_PelAE_avg", (f"AE_PelcalAE_avg_{n}_operational_LF",),
+           "AE Calculated Electric Power (Avg.) - No {n}", "kW"),
       )],
-    ("Operations", "Other Equipment", "FWG Total Running Hours (Cnt.)", "FWG_RHFWG_Cnt_operational_LF", "hr"),
+    ("Operations", "Other Equipment", "FWG Total Running Hours (Cnt.)",
+     ("FWG_RHFWG_Cnt_operational_LF", _OP + "FWG Total Running Hours (Cnt.)"), "hr"),
     # ---- Machinery ----
-    ("Machinery", "Engine Room", "ER Ambient Air Temperature (Inst.)", "Vessel_TambairER_operational_LF", "°C"),
-    ("Machinery", "ME General Data", "ME Shaft Power (Inst.)", "ME_PSME_operational_LF", "kW"),
-    ("Machinery", "ME General Data", "ME Speed (Inst.)", "ME_NME_operational_LF", "RPM"),
+    ("Machinery", "Engine Room", "ER Ambient Air Temperature (Inst.)",
+     ("Vessel_TambairER_operational_LF", "raw:Machinery_Data/ER Ambient Air Temperature (Inst.)"), "°C"),
+    ("Machinery", "ME General Data", "ME Shaft Power (Inst.)",
+     ("ME_PSME_operational_LF", "raw:Machinery_Data/ME Shaft Power (Inst.)"), "kW"),
+    ("Machinery", "ME General Data", "ME Speed (Inst.)",
+     ("ME_NME_operational_LF", "raw:Machinery_Data/ME Speed (Inst.)"), "RPM"),
     ("Machinery", "ME General Data", "ME Specific Cylinder Oil Consumption (Set)",
      ("ME_Lub_SCOCME_set_operational_LF", "raw:Machinery_Data/ME Specific Cylinder Oil Consumption (Set)"), "g/kWh"),
     ("Machinery", "ME General Data", "ME Fuel Index (Inst.)",
      ("ME_FPIME_operational_LF", "raw:Machinery_Data/ME Fuel Index (Inst.)"), ""),
     # ---- Performance (KPI) ----
+    ("Performance (KPI)", "Efficiency", "ME ISO SFOC", "raw:KPI_Data/ME ISO SFOC", "g/kWh"),
     ("Performance (KPI)", "Efficiency", "Calculated SCOC",
      ("VoyageMeta_calculated_scoc_operational_LF", "raw:KPI_Data/Calculated SCOC"), ""),
-    ("Performance (KPI)", "Efficiency", "Apparent Slip", "VoyageMeta_apparent_slip_operational_LF", "%"),
-    ("Performance (KPI)", "Efficiency", "Real Slip", "VoyageMeta_real_slip_operational_LF", "%"),
+    ("Performance (KPI)", "Efficiency", "Apparent Slip",
+     ("VoyageMeta_apparent_slip_operational_LF", "raw:KPI_Data/Apparent Slip"), "%"),
+    ("Performance (KPI)", "Efficiency", "Real Slip",
+     ("VoyageMeta_real_slip_operational_LF", "raw:KPI_Data/Real Slip"), "%"),
+    ("Performance (KPI)", "Efficiency", "AE Utilisation", "raw:KPI_Data/AE Utilisation", "%"),
 ]
 
-# Columns for events.build_logbook(columns_override=...). A row's column may be a tuple of alternatives:
-# the first one with a value in an event is shown. "@..." names are computed by the mail; "raw:Section/Key" reads
-# that key from the raw MariApps report (raw_mariapps_logs.raw_json), for items the expanded table does not carry.
+# Columns for events.build_logbook(columns_override=...); each keeps its list of alternatives.
 def _candidates(col):
     return [col] if isinstance(col, str) else list(col)
 
