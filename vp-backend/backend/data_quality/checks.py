@@ -194,8 +194,11 @@ def check_zero_total_fuel(db, vessel_imo, report_date):
 
 
 def check_cargo_blank(db, vessel_imo, report_date):
-    """M09 (MariApps only): Cargo Onboard not filled in (a ballast ship should enter 0)."""
-    return _mariapps_rows(db, vessel_imo, report_date, _X_CARGO_BLANK)
+    """M09 (MariApps only): Cargo Onboard not filled in. A report in Ballast is left out -
+    a blank there simply means no cargo, and chasing the vessel to type 0 is noise. A
+    blank on a Laden report (or one with no loading condition) is a real gap."""
+    return _mariapps_rows(db, vessel_imo, report_date, f"""
+        {_X_CARGO_BLANK} AND UPPER(TRIM(COALESCE(x.loading_condition, ''))) <> 'BALLAST'""")
 
 
 def check_me_hours_blank(db, vessel_imo, report_date):

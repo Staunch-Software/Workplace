@@ -46,7 +46,7 @@ _RULE_LABELS = {
     "port_noon_with_distance": "Noon at Port With Distance",
     "loading_cargo_mismatch": "Loading Condition vs Cargo",
     "zero_total_fuel": "No Fuel Recorded",
-    "cargo_blank": "Cargo Onboard Blank",
+    "cargo_blank": "Cargo Onboard Blank (Laden)",
     "me_hours_blank": "ME Running Hours Blank",
     "position_blank": "Position Blank",
 }

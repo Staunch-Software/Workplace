@@ -41,7 +41,7 @@ RULE_LABELS = {
     "port_noon_with_distance": "'Noon at port' report carries steamed distance",
     "loading_cargo_mismatch": "Loading condition and cargo disagree (Laden with no cargo / Ballast with cargo)",
     "zero_total_fuel": "No fuel consumption recorded on a report with duration",
-    "cargo_blank": "Cargo onboard not filled in",
+    "cargo_blank": "Cargo onboard not filled in on a laden report",
     "me_hours_blank": "ME running hours not filled in on a sea report",
     "position_blank": "Latitude / longitude not filled in on a Noon at sea report",
 }
@@ -52,7 +52,7 @@ RULE_ACTIONS = {
     "port_noon_with_distance": "Check the report type (should it be a Noon at sea?) or correct the distance.",
     "loading_cargo_mismatch": "Check the loading condition and the cargo onboard figure on this report.",
     "zero_total_fuel": "Enter the fuel consumption for this report (the auxiliary engine always burns fuel).",
-    "cargo_blank": "Enter the cargo onboard (0 if the ship is in ballast).",
+    "cargo_blank": "Enter the cargo onboard figure for this report.",
     "me_hours_blank": "Enter the ME running hours for this report.",
     "position_blank": "Enter the noon position (latitude and longitude).",
 }
