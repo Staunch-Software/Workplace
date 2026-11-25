@@ -237,11 +237,14 @@ export default function EventsGrid({ vessels, search, setSearch }) {
           </div>
         ) : (
           <div className={`ovw-table-scroll${isPlaceholderData ? ' ev-loading' : ''}`}>
-            <table className="ovw-table ev-grid" style={{ width: `${280 + totalCols * 112}px` }}>
+            <table
+              className="ovw-table ev-grid"
+              style={{ width: `calc(var(--ev-col-label-w, 280px) + ${totalCols} * var(--ev-col-val-w, 112px))` }}
+            >
               <colgroup>
-                <col style={{ width: 280, minWidth: 280, maxWidth: 280 }} />
+                <col className="ev-col-label" />
                 {Array.from({ length: totalCols }, (_, i) => (
-                  <col key={i} style={{ width: 112, minWidth: 112, maxWidth: 112 }} />
+                  <col key={i} className="ev-col-val" />
                 ))}
               </colgroup>
               <thead>

@@ -38,9 +38,27 @@
   color: #94a3b8; background: none; padding: 0;
 }
 
+/* Responsive sizing variables for Events Logbook Grid */
+.ev-grid {
+  --ev-col-label-w: 280px;
+  --ev-col-val-w: 112px;
+  --ev-thead-h1: 60px;
+  --ev-thead-h2: 46px;
+}
+.ev-grid col.ev-col-label {
+  width: var(--ev-col-label-w);
+  min-width: var(--ev-col-label-w);
+  max-width: var(--ev-col-label-w);
+}
+.ev-grid col.ev-col-val {
+  width: var(--ev-col-val-w);
+  min-width: var(--ev-col-val-w);
+  max-width: var(--ev-col-val-w);
+}
+
 /* compact, single-line rows */
 .ovw-ev-row .ovw-td-report { white-space: nowrap; overflow: visible; }
-.ovw-ev-row .ovw-report-name { max-width: 190px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.ovw-ev-row .ovw-report-name { max-width: calc(var(--ev-col-label-w) - 56px); overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
 .ovw-ev-row .ovw-td-report, .ovw-ev-row .ovw-td-cell { height: 42px; padding-top: 0; padding-bottom: 0; }
 .ovw-ev-row .ovw-report-name { display: inline-block; font-size: 12.5px; line-height: 1.3; }
 .ev-unit { display: inline; font-size: 10.5px; }
@@ -51,8 +69,8 @@
 .ovw-ev-cell:focus, .ovw-ev-cell:focus-visible { outline: none; }
 
 /* header: explicit, non-overlapping sticky offsets so no body row hides behind it */
-.ev-grid thead tr:first-child th { top: 0; height: 60px; }
-.ev-grid thead tr:nth-child(2) th { top: 60px; height: 38px; }
+.ev-grid thead tr:first-child th { top: 0; height: var(--ev-thead-h1); }
+.ev-grid thead tr:nth-child(2) th { top: var(--ev-thead-h1); height: var(--ev-thead-h2); }
 .ev-grid .ovw-th-vessel-inner { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .ev-grid .ovw-th-vessel { border-left: 1px solid #e2e6ef; border-right: none; }
 .ev-grid .ovw-vessel-name { font-size: 13px; font-weight: 700; }
@@ -65,7 +83,7 @@
 /* every header cell sticky, so `top` offsets never shift the highlighted day */
 .ev-grid thead th { position: sticky; z-index: 3; }
 .ev-grid thead th.ovw-th-report { z-index: 6; left: 0; }
-.ev-grid thead th.ovw-th-week-current { position: sticky; top: 60px; }
+.ev-grid thead th.ovw-th-week-current { position: sticky; top: var(--ev-thead-h1); }
 
 /* same sticky-column shadow as the other tabs (never clipped) */
 .ev-grid .ovw-sticky-col { overflow: visible; }
@@ -144,7 +162,7 @@
 .ev-grid .ovw-ev-row { user-select: none; }
 
 /* days with no noon report for a vessel */
-.ev-grid thead tr:nth-child(2) th { height: 46px; }
+.ev-grid thead tr:nth-child(2) th { height: var(--ev-thead-h2); }
 .ev-missing-tag {
   display: block; margin-top: 2px; font-size: 9px; font-weight: 700; letter-spacing: .06em;
   text-transform: uppercase; color: #dc2626;
@@ -155,3 +173,165 @@
 
 /* while the next/previous days are loading */
 .ovw-table-scroll.ev-loading { opacity: .55; transition: opacity .15s; pointer-events: none; }
+
+/* ==========================================================================
+   Events Grid Responsive Media Queries (320px Mobile to 4K 3840px+)
+   ========================================================================== */
+@media (min-width: 2560px) {
+  .ev-grid {
+    --ev-col-label-w: 390px;
+    --ev-col-val-w: 138px;
+    --ev-thead-h1: 78px;
+    --ev-thead-h2: 56px;
+  }
+  .ovw-ev-row .ovw-td-report,
+  .ovw-ev-row .ovw-td-cell {
+    height: 56px !important;
+  }
+  .ovw-ev-row .ovw-td-report {
+    padding-left: 26px !important;
+  }
+  .ovw-ev-row .ovw-report-name {
+    font-size: 16px !important;
+    max-width: calc(var(--ev-col-label-w) - 48px) !important;
+  }
+  .ev-unit {
+    font-size: 13px !important;
+  }
+  .ovw-ev-cell,
+  .ev-pill {
+    font-size: 15.5px !important;
+  }
+  .ev-grid .ovw-ev-section td {
+    height: 50px !important;
+  }
+  .ev-grid .ovw-ev-section-label {
+    font-size: 14px !important;
+    padding-left: 26px !important;
+  }
+  .ev-grid .ovw-ev-section-label em {
+    font-size: 13.5px !important;
+  }
+  .ev-grid .ovw-vessel-name {
+    font-size: 16px !important;
+  }
+  .ev-grid .ovw-th-week {
+    font-size: 13.5px !important;
+  }
+  .ev-missing-tag {
+    font-size: 11px !important;
+  }
+}
+
+@media (max-width: 1024px) and (min-width: 701px) {
+  .ev-grid {
+    --ev-col-label-w: 205px;
+    --ev-col-val-w: 98px;
+    --ev-thead-h1: 56px;
+    --ev-thead-h2: 42px;
+  }
+  .ovw-ev-row .ovw-td-report {
+    padding-left: 14px !important;
+  }
+  .ovw-ev-row .ovw-report-name {
+    font-size: 12px !important;
+    max-width: calc(var(--ev-col-label-w) - 44px) !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .ev-grid {
+    --ev-col-label-w: 138px;
+    --ev-col-val-w: 84px;
+    --ev-thead-h1: 50px;
+    --ev-thead-h2: 34px;
+  }
+  .ev-grid thead th.ovw-th-report {
+    font-size: 10.5px !important;
+    padding: 0 8px !important;
+  }
+  .ev-grid .ovw-th-vessel {
+    padding: 4px 4px !important;
+  }
+  .ev-grid .ovw-th-vessel-inner {
+    gap: 1px !important;
+  }
+  .ev-grid .ovw-vessel-name {
+    font-size: 10.5px !important;
+    line-height: 1.15 !important;
+    max-width: calc(var(--ev-col-val-w) * 2.5) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .ev-grid .ovw-vessel-imo {
+    font-size: 8.5px !important;
+    padding: 1px 5px !important;
+  }
+  .ev-via {
+    display: none !important;
+  }
+  .ev-grid .ovw-th-week {
+    font-size: 9.5px !important;
+    line-height: 1.1 !important;
+    padding: 2px 3px !important;
+  }
+  .ev-missing-tag {
+    font-size: 7.5px !important;
+    margin-top: 1px !important;
+  }
+  .ev-grid .ovw-ev-section td {
+    height: 30px !important;
+  }
+  .ev-grid .ovw-ev-section-label {
+    padding-left: 10px !important;
+    font-size: 9.5px !important;
+  }
+  .ev-grid .ovw-ev-section-label em {
+    font-size: 9px !important;
+    margin-left: 5px !important;
+  }
+  .ovw-ev-row .ovw-td-report {
+    padding: 4px 6px 4px 10px !important;
+    white-space: normal !important;
+    height: auto !important;
+    min-height: 38px !important;
+  }
+  .ovw-ev-row .ovw-td-cell {
+    height: auto !important;
+    min-height: 38px !important;
+    font-size: 11px !important;
+  }
+  .ovw-ev-row .ovw-report-name {
+    display: inline !important;
+    max-width: none !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+    word-break: break-word !important;
+  }
+  .ev-unit {
+    font-size: 9px !important;
+    margin-left: 4px !important;
+  }
+  .ev-pill {
+    font-size: 10.5px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .ev-grid {
+    --ev-col-label-w: 118px;
+    --ev-col-val-w: 76px;
+    --ev-thead-h1: 46px;
+    --ev-thead-h2: 32px;
+  }
+  .ovw-ev-row .ovw-td-report {
+    padding: 4px 5px 4px 8px !important;
+  }
+  .ovw-ev-row .ovw-report-name {
+    font-size: 10px !important;
+  }
+}

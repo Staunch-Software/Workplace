@@ -11,6 +11,7 @@ import {
   Clock, RefreshCcw, Settings, Zap, ChevronDown, Mail
 } from 'lucide-react';
 import '../../styles/ReportConfigPage.css';
+import '../../styles/ReportConfigPageResponsive.css';
 import { compareReportNames } from '../../reportOrder';
 
 const EMPTY_FORM = { vessel_name: '', vessel_imo: '', report_name: '', department: 'DECK', frequency: 'MONTHLY' };
@@ -61,6 +62,7 @@ export default function ReportConfigPage() {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [selectedVesselImo, setSelectedVesselImo] = useState(null);
+  const [mobileTab, setMobileTab] = useState('vessels'); // 'vessels' | 'targets'
 
   // ── Data ──
   const { data: configs = [], isLoading: configLoading, refetch } = useQuery({
@@ -196,7 +198,7 @@ export default function ReportConfigPage() {
           </div>
         </div>
 
-        <div className="rcfg-header-actions" style={{ display: 'flex', gap: '8px' }}>
+        <div className="rcfg-header-actions">
           <button 
             className="rcfg-btn rcfg-btn--primary" 
             onClick={handleAssignAll} 
@@ -214,11 +216,31 @@ export default function ReportConfigPage() {
         </div>
       </div>
 
+      {/* ── Mobile Segmented Toggle (Vessels | Configured Reports) ── */}
+      <div className="rcfg-mobile-tabs">
+        <button
+          type="button"
+          className={`rcfg-mobile-tab ${mobileTab === 'vessels' ? 'active' : ''}`}
+          onClick={() => setMobileTab('vessels')}
+        >
+          <Ship size={14} />
+          <span>Vessels ({vesselGroups.length})</span>
+        </button>
+        <button
+          type="button"
+          className={`rcfg-mobile-tab ${mobileTab === 'targets' ? 'active' : ''}`}
+          onClick={() => setMobileTab('targets')}
+        >
+          <Settings size={14} />
+          <span>{activeVessel ? `${activeVessel.name} (${activeVessel.configs.length})` : 'Reports'}</span>
+        </button>
+      </div>
+
       {/* ── Main Layout (Sidebar + Content) ── */}
       <div className="rcfg-layout">
         
         {/* Sidebar */}
-        <div className="rcfg-sidebar">
+        <div className={`rcfg-sidebar ${mobileTab === 'targets' ? 'rcfg-mobile-hidden' : ''}`}>
           {loading && !vesselGroups.length ? (
             <div className="rcfg-loading"><span className="rcfg-spinner" /><span>Loading vessels...</span></div>
           ) : vesselGroups.length === 0 ? (
@@ -236,7 +258,7 @@ export default function ReportConfigPage() {
                 <div 
                   key={vessel.imo} 
                   className={`rcfg-vessel-card ${isActive ? 'active' : ''}`}
-                  onClick={() => setSelectedVesselImo(vessel.imo)}
+                  onClick={() => { setSelectedVesselImo(vessel.imo); setMobileTab('targets'); }}
                 >
                   <div className="rcfg-vessel-card-header">
                     <div className="rcfg-vessel-icon">
@@ -264,7 +286,7 @@ export default function ReportConfigPage() {
         </div>
 
         {/* Content Area */}
-        <div className="rcfg-content">
+        <div className={`rcfg-content ${mobileTab === 'vessels' ? 'rcfg-mobile-hidden' : ''}`}>
           {loading && !activeVessel ? (
             <div className="rcfg-loading"><span className="rcfg-spinner" /><span>Loading configs...</span></div>
           ) : !activeVessel ? (
@@ -280,7 +302,7 @@ export default function ReportConfigPage() {
                   <div className="rcfg-content-title">{activeVessel.name} — Configured Reports</div>
                   <div className="rcfg-content-subtitle">{activeVessel.configs.length} total report targets for this vessel</div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div className="rcfg-content-actions">
                   <button 
                     className="rcfg-btn rcfg-btn--primary" 
                     onClick={() => registerMutation.mutate({ vessel_imo: activeVessel.imo, vessel_name: activeVessel.name })}

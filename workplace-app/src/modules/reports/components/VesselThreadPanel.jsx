@@ -29,11 +29,14 @@ const ThreadAttachmentLink = ({ reportId, threadId, attachment, isMine }) => {
         padding: '6px 10px', background: isMine ? 'rgba(255,255,255,0.1)' : '#fff',
         border: isMine ? '1px solid rgba(255,255,255,0.2)' : '1px solid #e2e8f0', 
         borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
-        opacity: downloading ? 0.7 : 1, marginTop: '4px'
+        opacity: downloading ? 0.7 : 1, marginTop: '4px',
+        maxWidth: '100%', boxSizing: 'border-box'
       }}
     >
-      {downloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-      <span style={{ textDecoration: 'underline' }}>{attachment.file_name}</span>
+      <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center' }}>
+        {downloading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+      </span>
+      <span style={{ textDecoration: 'underline', wordBreak: 'break-word', overflowWrap: 'anywhere', minWidth: 0 }}>{attachment.file_name}</span>
     </div>
   );
 };
@@ -150,12 +153,6 @@ export default function VesselThreadPanel({ reportId, reportName, reportMeta, is
       handleSend();
     }
   }
-
-  const handleScroll = (e) => {
-    if (highlightRef.current) {
-      highlightRef.current.scrollTop = e.target.scrollTop;
-    }
-  };
 
   const handleTextChange = (e) => {
     const text = e.target.value;
@@ -290,17 +287,67 @@ export default function VesselThreadPanel({ reportId, reportName, reportMeta, is
           </div>
         )}
 
-        <div style={{ 
+        <div className="rt-thread-composer-pill" style={{ 
+          position: 'relative',
           display: 'flex', 
-          alignItems: 'center', 
+          alignItems: 'flex-end', 
           gap: '8px', 
           background: '#f8fafc', 
           padding: '8px 12px', 
-          borderRadius: '24px', 
+          borderRadius: '22px', 
           border: '1px solid #e2e8f0',
           boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
         }}>
           
+          {showMentions && (
+            <div className="rt-mention-picker" style={{ 
+              position: 'absolute', 
+              bottom: 'calc(100% + 8px)', 
+              left: '0', 
+              right: 'auto',
+              width: 'min(320px, 100%)',
+              maxWidth: '100%',
+              background: 'white', 
+              border: '1px solid #e2e8f0', 
+              borderRadius: '12px', 
+              boxShadow: '0 4px 20px rgba(0,0,0,0.1)', 
+              maxHeight: '200px', 
+              overflowY: 'auto', 
+              zIndex: 1000
+            }}>
+              {mentionList.map(u => (
+                <div 
+                  key={u.id} 
+                  onClick={() => selectMention(u)} 
+                  style={{ 
+                    padding: '10px 14px', 
+                    cursor: 'pointer', 
+                    fontSize: '13px', 
+                    borderBottom: '1px solid #f1f5f9',
+                    transition: 'background 0.2s',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                >
+                  <span style={{ fontWeight: 500, color: '#0f172a', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.full_name}</span>
+                  {u.role === 'ADMIN' && (
+                    <span style={{ fontSize: '10px', padding: '2px 8px', background: '#fef3c7', color: '#b45309', borderRadius: '12px', fontWeight: '700', flexShrink: 0 }}>ADMIN</span>
+                  )}
+                  {u.role === 'SHORE' && (
+                    <span style={{ fontSize: '10px', padding: '2px 8px', background: '#e0e7ff', color: '#4f46e5', borderRadius: '12px', fontWeight: '700', flexShrink: 0 }}>SHORE</span>
+                  )}
+                  {u.role === 'VESSEL' && (
+                    <span style={{ fontSize: '10px', padding: '2px 8px', background: '#d1fae5', color: '#065f46', borderRadius: '12px', fontWeight: '700', flexShrink: 0 }}>VESSEL</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -325,91 +372,49 @@ export default function VesselThreadPanel({ reportId, reportName, reportMeta, is
             <Paperclip size={20} />
           </button>
 
-          <div style={{ position: 'relative', flex: 1 }}>
-            
-            {showMentions && (
-              <div className="rt-mention-picker" style={{ 
-                position: 'absolute', 
-                bottom: '100%', 
-                left: '0', 
-                background: 'white', 
-                border: '1px solid #e2e8f0', 
-                borderRadius: '12px', 
-                boxShadow: '0 4px 20px rgba(0,0,0,0.1)', 
-                maxHeight: '200px', 
-                overflowY: 'auto', 
-                zIndex: 1000, 
-                minWidth: '240px',
-                marginBottom: '12px'
-              }}>
-                {mentionList.map(u => (
-                  <div 
-                    key={u.id} 
-                    onClick={() => selectMention(u)} 
-                    style={{ 
-                      padding: '12px 16px', 
-                      cursor: 'pointer', 
-                      fontSize: '13px', 
-                      borderBottom: '1px solid #f1f5f9',
-                      transition: 'background 0.2s',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
-                  >
-                    <span style={{ fontWeight: 500, color: '#0f172a' }}>{u.full_name}</span>
-                    {u.role === 'ADMIN' && (
-                      <span style={{ fontSize: '10px', padding: '2px 8px', background: '#fef3c7', color: '#b45309', borderRadius: '12px', fontWeight: '700' }}>ADMIN</span>
-                    )}
-                    {u.role === 'SHORE' && (
-                      <span style={{ fontSize: '10px', padding: '2px 8px', background: '#e0e7ff', color: '#4f46e5', borderRadius: '12px', fontWeight: '700' }}>SHORE</span>
-                    )}
-                    {u.role === 'VESSEL' && (
-                      <span style={{ fontSize: '10px', padding: '2px 8px', background: '#d1fae5', color: '#065f46', borderRadius: '12px', fontWeight: '700' }}>VESSEL</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div style={{ position: 'relative', width: '100%', height: '36px' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'grid', width: '100%', minHeight: '36px', maxHeight: '108px', overflowY: 'auto' }}>
               <div
                 ref={highlightRef}
+                aria-hidden="true"
                 style={{
-                  position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-                  padding: '7px 0', border: 'none',
-                  fontSize: '0.875rem', lineHeight: 1.5, fontFamily: 'inherit',
-                  whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowY: 'auto',
+                  gridArea: '1 / 1',
+                  padding: '8px 0', border: 'none',
+                  fontSize: '0.875rem', lineHeight: '20px', fontFamily: 'inherit',
+                  whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere',
                   pointerEvents: 'none', background: 'transparent', color: '#0f172a',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box', minHeight: '36px'
                 }}
               >
-                {draft.split(mentionRegex).map((part, i) =>
-                  part.startsWith('@') ? <span key={i} style={{ color: '#3b82f6' }}>{part}</span> : part
+                {draft ? (
+                  <>
+                    {draft.split(mentionRegex).map((part, i) =>
+                      part.startsWith('@') ? <span key={i} style={{ color: '#3b82f6' }}>{part}</span> : part
+                    )}
+                    <span>{'\u200b'}</span>
+                  </>
+                ) : (
+                  <span style={{ color: 'transparent' }}>Message (@ to mention)...</span>
                 )}
-                <span>&nbsp;</span>
               </div>
               <textarea
                 rows={1}
                 style={{
-                  position: 'relative', width: '100%', height: '36px',
-                  padding: '7px 0', border: 'none',
+                  gridArea: '1 / 1',
+                  width: '100%', height: '100%', minHeight: '36px',
+                  padding: '8px 0', border: 'none',
                   fontSize: '0.875rem', resize: 'none', outline: 'none',
                   background: 'transparent', color: 'transparent', caretColor: '#0f172a',
-                  lineHeight: 1.4, transition: 'all 0.2s', fontFamily: 'inherit', overflowY: 'auto',
+                  lineHeight: '20px', fontFamily: 'inherit', overflow: 'hidden',
+                  whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere',
                   margin: 0, boxSizing: 'border-box'
                 }}
-                placeholder={draft ? "" : "Type a message (@ to mention)..."}
+                placeholder={draft ? "" : "Message (@ to mention)..."}
                 value={draft}
                 onChange={handleTextChange}
                 onKeyDown={handleKeyDown}
-                onScroll={handleScroll}
               />
             </div>
-            
           </div>
           
           <button

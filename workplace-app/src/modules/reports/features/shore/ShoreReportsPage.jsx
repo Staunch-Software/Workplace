@@ -70,6 +70,7 @@ export default function ShoreReportsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const handleTooltipEnter = useCallback((e, text) => {
+    if (window.innerWidth <= 700) return;
     const rect = e.currentTarget.getBoundingClientRect();
     setTooltipData({
       visible: true,

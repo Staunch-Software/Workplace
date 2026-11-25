@@ -137,14 +137,9 @@ export default function NotificationBell() {
       {/* ── Dropdown panel ── */}
       {open && (
         <div
+          className="rt-notif-panel"
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 10px)',
-            right: 0,
-            width: '360px',
-            maxHeight: '520px',
             background: '#fff',
-            borderRadius: '16px',
             boxShadow: '0 20px 60px rgba(0,0,0,0.14), 0 4px 16px rgba(0,0,0,0.08)',
             border: '1px solid #e2e8f0',
             overflow: 'hidden',
@@ -156,11 +151,12 @@ export default function NotificationBell() {
         >
           {/* Header */}
           <div
+            className="rt-notif-panel-head"
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '16px 20px',
+              gap: '8px',
               borderBottom: '1px solid #f1f5f9',
               background: '#fafafa',
             }}
@@ -265,8 +261,44 @@ export default function NotificationBell() {
         </div>
       )}
 
-      {/* ── Keyframe animations ── */}
+      {/* ── Keyframe animations & responsive panel styles ── */}
       <style>{`
+        .rt-notif-panel {
+          position: absolute;
+          top: calc(100% + 10px);
+          right: 0;
+          width: 360px;
+          max-height: 520px;
+          border-radius: 16px;
+        }
+        .rt-notif-panel-head {
+          padding: 16px 20px;
+        }
+        @media (max-width: 540px) {
+          .rt-notif-panel {
+            position: fixed;
+            top: 56px;
+            left: 8px;
+            right: 8px;
+            width: auto;
+            max-width: calc(100vw - 16px);
+            max-height: calc(100vh - 76px);
+            border-radius: 14px;
+          }
+          .rt-notif-panel-head {
+            padding: 12px 14px;
+          }
+        }
+        @media (min-width: 2560px) {
+          .rt-notif-panel {
+            width: 440px;
+            max-height: 680px;
+            border-radius: 20px;
+          }
+          .rt-notif-panel-head {
+            padding: 20px 24px;
+          }
+        }
         @keyframes bell-shake {
           0%, 85%, 100% { transform: rotate(0); }
           87% { transform: rotate(-12deg); }

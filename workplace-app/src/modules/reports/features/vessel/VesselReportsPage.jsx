@@ -45,6 +45,7 @@ export default function VesselReportsPage() {
   const [tooltipData, setTooltipData] = useState({ visible: false, text: '', x: 0, y: 0 });
 
   const handleTooltipEnter = useCallback((e, text) => {
+    if (window.innerWidth <= 700) return;
     const rect = e.currentTarget.getBoundingClientRect();
     setTooltipData({
       visible: true,
