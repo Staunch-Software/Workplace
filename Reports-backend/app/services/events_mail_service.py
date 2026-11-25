@@ -26,6 +26,9 @@ SOURCE = "mari_apps"
 _TAB_COLOR = {"Performance (KPI)": ("#F15A29", "#fff3ee")}
 _TAB_DEFAULT = ("#00904C", "#e8f6ef")
 _NUM = re.compile(r"^-?\d+(\.\d+)?$")
+_DT = re.compile(r"^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(:\d{2})?$")  # 2026-11-24 07:00:00
+_UTC_KEY = "raw:Excel_Data/Log Date (UTC)"   # the report's own UTC date/time (vessel clock is local)
+_DEPARTURE = "VoyageMeta_departure_port_last_leg_operational_LF"
 
 
 def _fmt_value(v):
@@ -55,9 +58,37 @@ def _cell(ev: dict, c: dict) -> str:
             return date_type.fromisoformat(ev["_ts"][:10]).strftime("%d %b %Y") + (f" {t}" if t else "")
         if k == "@date_local":
             return date_type.fromisoformat(ev["_ts"][:10]).strftime("%d %b %Y")
-        if ev.get(k) not in (None, ""):
-            return _fmt_value(ev[k])
+        v = ev.get(k)
+        if v is not None and str(v).strip() != "":
+            m = _DT.match(str(v).strip())
+            if m:  # a date and time from the raw report
+                return date_type.fromisoformat(m.group(1)).strftime("%d %b %Y") + f" {m.group(2)}"
+            return _fmt_value(v)
     return "-"
+
+
+def _header_time(ev: dict):
+    """(date, time, is_utc) for an event's column header. The report's own UTC time when we have it; otherwise
+    the logbook time, which is the vessel's local time, so it is shown without a UTC label."""
+    m = _DT.match(str(ev.get(_UTC_KEY) or "").strip())
+    if m:
+        return m.group(1), m.group(2), True
+    return ev["_ts"][:10], _fmt_time(ev["_ts"]), False
+
+
+def _carry_departure_port(events: list):
+    """The departure port of the last leg is the same for every report of a leg, but MariApps only fills it on
+    some of them. Fill the gaps from the nearest report of the same leg that has it."""
+    for i, ev in enumerate(events):
+        if str(ev.get(_DEPARTURE) or "").strip():
+            continue
+        leg = ev.get("emissionx_voyage_no")
+        if not leg:
+            continue
+        best = min((j for j, o in enumerate(events) if j != i and o.get("emissionx_voyage_no") == leg
+                    and str(o.get(_DEPARTURE) or "").strip()), key=lambda j: abs(j - i), default=None)
+        if best is not None:
+            ev[_DEPARTURE] = events[best][_DEPARTURE]
 
 
 def _log_number(ev: dict) -> str:
@@ -94,12 +125,12 @@ def render_events_html(columns: list, vessel: dict, n_events: int) -> str:
            '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e2e8f0;border-radius:8px;border-collapse:separate;overflow:hidden;">',
            f'<tr><th style="{th}text-align:left;min-width:100px;">Section</th><th style="{th}text-align:left;min-width:190px;">Parameter</th>']
     for i, ev in enumerate(rows):
-        ts = ev["_ts"]
-        t = _fmt_time(ts)
+        day, t, is_utc = _header_time(ev)
         tag = ('<div style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;color:#F15A29;">Latest</div>'
                if i == 0 else "")
-        out.append(f'<th style="{th}">{e(_fmt_day(ts))}'
-                   + (f'<div style="font-weight:400;font-size:10px;color:#00904C;">{t} UTC</div>' if t else "") + tag + "</th>")
+        out.append(f'<th style="{th}">{e(_fmt_day(day))}'
+                   + (f'<div style="font-weight:400;font-size:10px;color:#00904C;">{t}{" UTC" if is_utc else ""}</div>' if t else "")
+                   + tag + "</th>")
     out.append("</tr>")
 
     # tab -> section -> parameters, in sheet order
@@ -298,6 +329,8 @@ async def send_new_event_mails(test_to: str = "", dry_run: bool = False, force: 
         if data.get("missing_columns"):
             logger.warning(f"[EVENTS-MAIL] Columns not in the logbook table, skipped: {', '.join(data['missing_columns'])}")
         by_imo = {v["imo"]: [r for r in v["rows"] if not r.get("_missing")] for v in data["vessels"]}
+        for evs in by_imo.values():
+            _carry_departure_port(evs)
         raw_cache: dict = {}
 
         for imo, info in vessels.items():
