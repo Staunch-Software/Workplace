@@ -45,6 +45,9 @@ RULE_LABELS = {
     "me_hours_blank": "ME running hours not filled in on a sea report",
     "position_blank": "Latitude / longitude not filled in on a Noon at sea report",
     "position_jump": "Position is far from the previous report compared with the distance steamed",
+    "engine_total_blank": "ME / AE fuel total not filled in although the engine ran",
+    "distance_duration_mismatch": "Distance steamed does not fit the log duration (no duration, or over 20 knots)",
+    "rob_drop": "Fuel ROB fell between reports by more than was consumed",
 }
 
 # One line under each heading telling the vessel what to do about it.
@@ -57,6 +60,9 @@ RULE_ACTIONS = {
     "me_hours_blank": "Enter the ME running hours for this report.",
     "position_blank": "Enter the noon position (latitude and longitude).",
     "position_jump": "Check the latitude and longitude, including the N/S and E/W letters, on this report and the previous one.",
+    "engine_total_blank": "Enter the ME / AE fuel consumption total on this report (0 only if the engine was stopped).",
+    "distance_duration_mismatch": "Check the distance and the log duration (steaming time) on this report.",
+    "rob_drop": "Check the fuel ROB on this report and the previous one, or record the bunker transfer or correction.",
 }
 
 # Accent color per rule — same red/amber/green dot convention already used
@@ -77,6 +83,9 @@ RULE_ACCENT = {
     "me_hours_blank": "#d4a02a",
     "position_blank": "#d4a02a",
     "position_jump": "#e05050",
+    "engine_total_blank": "#d4a02a",
+    "distance_duration_mismatch": "#d4a02a",
+    "rob_drop": "#e05050",
 }
 
 # Lands the recipient straight on the MariApps Log Approval grid so they don't

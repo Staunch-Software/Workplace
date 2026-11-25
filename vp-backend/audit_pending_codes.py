@@ -123,6 +123,7 @@ def e09():
     prev = {}
     for imo, ln, ts, cons in rows:
         if not isinstance(cons, dict):
+            prev[imo] = (ts, {})
             continue
         per = defaultdict(dict)
         for k, v in cons.items():
@@ -130,6 +131,7 @@ def e09():
             if m and _isnum(v):
                 per[m.group(1)][m.group(2)] = float(str(v).replace(",", ""))
         if not per:
+            prev[imo] = (ts, {})          # a report without any ROB table still counts as the adjacent one
             continue
         n_reports += 1
         for g, d in per.items():
@@ -139,20 +141,22 @@ def e09():
                 if lost > 1:
                     within[(imo, g)] += 1
                     ex_w.append((lost, names.get(imo, imo), ln, g, d))
-            pv = prev.get((imo, g))
-            if pv is not None and "ROB Before" in d:
+            # compare with the IMMEDIATELY preceding report only: a report in between that
+            # carries no table for this grade may have consumed it (a false drop otherwise)
+            pv = prev.get(imo)
+            if pv is not None and g in pv[1] and "ROB Before" in d and "ROB After" in pv[1][g]:
                 gap = (ts - pv[0]).total_seconds() / 3600.0
-                if 0 < gap <= 48 and pv[1] - d["ROB Before"] > 1:
+                after = pv[1][g]["ROB After"]
+                if 0 < gap <= 48 and after - d["ROB Before"] > 1:
                     between[(imo, g)] += 1
-                    ex_b.append((pv[1] - d["ROB Before"], names.get(imo, imo), ln, g, pv[1], d["ROB Before"]))
-            if "ROB After" in d:
-                prev[(imo, g)] = (ts, d["ROB After"])
+                    ex_b.append((after - d["ROB Before"], names.get(imo, imo), ln, g, after, d["ROB Before"]))
+        prev[imo] = (ts, per)
     print(f"  reports carrying a per-grade fuel ROB table: {n_reports}   grades seen: "
           + ", ".join(f"{g} {c}" for g, c in grades.most_common(6)))
     for label, cnt, ex, fmt in (
             ("Within one report: ROB Before - ROB After - Consumed > 1 t (fuel left the tank without being consumed)",
              within, ex_w, lambda e: f"{e[1]} {e[2]} {e[3]}: before {e[4]['ROB Before']:.1f}, after {e[4]['ROB After']:.1f}, consumed {e[4]['Consumed']:.1f} -> {e[0]:.1f} t unaccounted"),
-            ("Between consecutive reports (<= 48 h): previous ROB After - this ROB Before > 1 t (stock fell between reports)",
+            ("Between ADJACENT reports (<= 48 h): previous ROB After - this ROB Before > 1 t (stock fell between reports)",
              between, ex_b, lambda e: f"{e[1]} {e[2]} {e[3]}: previous after {e[4]:.1f}, this before {e[5]:.1f} -> {e[0]:.1f} t lost")):
         print(f"\n  {label}: {sum(cnt.values())}")
         if cnt:

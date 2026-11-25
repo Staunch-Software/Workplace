@@ -50,6 +50,9 @@ _RULE_LABELS = {
     "me_hours_blank": "ME Running Hours Blank",
     "position_blank": "Position Blank",
     "position_jump": "Position Jump",
+    "engine_total_blank": "Engine Fuel Total Blank",
+    "distance_duration_mismatch": "Distance vs Duration",
+    "rob_drop": "ROB Drop Between Reports",
 }
 
 

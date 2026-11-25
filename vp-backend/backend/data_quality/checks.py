@@ -16,6 +16,7 @@
 # (daily_job.py) owns the open/resolved state machine and notifications.
 # ===========================================================================
 import math
+import re
 
 from sqlalchemy import text
 
@@ -289,6 +290,85 @@ def check_position_jump(db, vessel_imo, report_date):
     return {"count": len(bad), "logs": sorted({b for b in bad if b})}
 
 
+_ROB_KEY = re.compile(r"^Fuel ROB::(.+)::(ROB Before|ROB After) \(MT\)$")
+_ROB_TOLERANCE_T = 1.0
+
+
+def _rob_table(consumption):
+    """{grade: {'ROB Before': t, 'ROB After': t}} from a report's Consumption_Data."""
+    out = {}
+    for k, v in (consumption or {}).items():
+        m = _ROB_KEY.match(str(k))
+        if not m:
+            continue
+        try:
+            out.setdefault(m.group(1), {})[m.group(2)] = float(str(v).replace(",", ""))
+        except ValueError:
+            continue
+    return out
+
+
+def rob_drops(prev_consumption, cur_consumption, tolerance=_ROB_TOLERANCE_T):
+    """E09: [(grade, tonnes)] where the previous report's ROB After is more than `tolerance`
+    above this report's ROB Before - stock that left the tanks between two reports."""
+    prev, cur = _rob_table(prev_consumption), _rob_table(cur_consumption)
+    drops = []
+    for grade, d in cur.items():
+        p = prev.get(grade)
+        if p and "ROB After" in p and "ROB Before" in d and p["ROB After"] - d["ROB Before"] > tolerance:
+            drops.append((grade, round(p["ROB After"] - d["ROB Before"], 1)))
+    return drops
+
+
+def check_rob_drop(db, vessel_imo, report_date):
+    """E09 (MariApps only): the fuel ROB at the start of this report is lower than the ROB at
+    the end of the vessel's previous report (up to 48 h earlier) by more than 1 t for a grade,
+    i.e. fuel disappeared between reports without being consumed in either."""
+    cur_rows = db.execute(text("""
+        SELECT l.id, x.log_number, r.log_date_utc, l.raw_json->'Consumption_Data' AS cons
+        FROM expanded_mariapps_data x
+        JOIN mariapps_reports_data r ON r.raw_report_id = x.raw_log_id
+        JOIN raw_mariapps_logs l ON l.id = x.raw_log_id
+        WHERE x.vessel_imo = :imo AND x.log_date = :d AND COALESCE(l.is_duplicate, false) = false
+          AND r.log_date_utc IS NOT NULL"""), {"imo": vessel_imo, "d": report_date}).mappings().all()
+    bad = []
+    for c in cur_rows:
+        p = db.execute(text("""
+            SELECT l.raw_json->'Consumption_Data' AS cons,
+                   EXTRACT(EPOCH FROM (c.log_date_utc - r.log_date_utc)) / 3600.0 AS gap_h
+            FROM mariapps_reports_data r
+            JOIN raw_mariapps_logs l ON l.id = r.raw_report_id
+            JOIN mariapps_reports_data c ON c.raw_report_id = :cid
+            WHERE l.vessel_imo = :imo AND COALESCE(l.is_duplicate, false) = false
+              AND r.log_date_utc < c.log_date_utc
+            ORDER BY r.log_date_utc DESC LIMIT 1"""), {"imo": vessel_imo, "cid": c["id"]}).mappings().first()
+        if p and 0 < (p["gap_h"] or 0) <= 48 and rob_drops(p["cons"], c["cons"]):
+            bad.append(c["log_number"])
+    if not bad:
+        return None
+    return {"count": len(bad), "logs": sorted({b for b in bad if b})}
+
+
+def check_engine_total_blank(db, vessel_imo, report_date):
+    """M05 / M06 (MariApps only): the fuel total of an engine that had to run is blank - the
+    main engine when the ship moved (> 5 nm) or its hours are above 0, the auxiliary engine
+    always. A blank ME total on an idle ship stands for 0 and is not flagged."""
+    me_blank = "NULLIF(TRIM(r.me_total_cons::text), '') IS NULL"
+    ae_blank = "NULLIF(TRIM(r.ae_total_cons::text), '') IS NULL"
+    return _mariapps_rows(db, vessel_imo, report_date, f"""
+        ({ae_blank} OR ({me_blank} AND ({_DIST_EXPR} > {_MIN_DISTANCE_NM} OR {_ME_HOURS_EXPR} > 0)))""")
+
+
+def check_distance_duration_mismatch(db, vessel_imo, report_date):
+    """C03, narrowed (MariApps only): distance steamed but a log duration of 0 / blank, or an
+    implied speed (distance / duration) above 20 kn. The wider 'SOG differs by 1 kn' test is
+    ordinary variation and is not used. Noon-at-port reports are E11's."""
+    dur = _numexpr("r.log_duration::text")
+    return _mariapps_rows(db, vessel_imo, report_date, f"""
+        UPPER(TRIM(COALESCE(x.log_type, ''))) NOT LIKE 'NOON AT PORT%'
+        AND (({_DIST_EXPR} > 0 AND {dur} = 0) OR ({dur} > 0 AND {_DIST_EXPR} / {dur} > 20))""")
+
+
 def run_checks_for_date(db, vessel_imo, report_date):
     """Returns {(source_id, rule_key): detail_dict} for every rule that found
     a gap on this vessel/date — empty dict if everything's clean."""
@@ -330,12 +410,17 @@ def run_checks_for_date(db, vessel_imo, report_date):
             ("zero_total_fuel", check_zero_total_fuel, True),
             ("cargo_blank", check_cargo_blank, False),
             ("me_hours_blank", check_me_hours_blank, True),
-            ("position_blank", check_position_blank, False)):
+            ("position_blank", check_position_blank, False),
+            ("engine_total_blank", check_engine_total_blank, True),
+            ("distance_duration_mismatch", check_distance_duration_mismatch, False),
+            ("rob_drop", check_rob_drop, False)):
         found = fn(db, vessel_imo, report_date)
         if not found:
             continue
         logs = [lg for lg in found["logs"] if not (skip_covered and lg in covered)]
         if logs:
             findings[("mari_apps", rule_key)] = {"count": len(logs), "logs": logs}
+            if rule_key == "zero_total_fuel":
+                covered |= set(logs)
 
     return findings
