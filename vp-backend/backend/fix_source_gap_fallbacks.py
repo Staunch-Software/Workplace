@@ -7,6 +7,7 @@
 #   - ME Running Hours    (no "ME Running hours - Value": use the per-engine entries)
 #   - Latitude / Longitude degrees (a 0 degree is dropped by the Excel export; the
 #     Position tab has it)
+#   - Composite boiler fuel total (Consumption tab has no entry; the Excel key holds it)
 # The rules live in expander._mariapps_gap_fields (also used by every new ingestion).
 # This command applies them to the rows already stored: it fills a column ONLY where it
 # is blank today, never overwrites a value, never touches raw_json. Idempotent.
@@ -30,6 +31,7 @@ log = logging.getLogger(__name__)
 BATCH = 200
 LABEL = {"Vessel_Cargo_onboard_operational_LF": "Cargo Onboard",
          "ME_RHME_dCnt_operational_LF": "ME Running Hours",
+         "CompositeBoiler_mFOCComBL_dCnt_operational_LF": "Composite boiler fuel total",
          "VoyageMeta_latitude_operational_LF": "Latitude degrees",
          "VoyageMeta_latitude_lat_minutes_operational_LF": "Latitude minutes",
          "VoyageMeta_longitude_operational_LF": "Longitude degrees",

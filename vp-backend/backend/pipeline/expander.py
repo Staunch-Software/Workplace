@@ -669,6 +669,10 @@ def _mariapps_gap_fields(data_rec: dict, flat: dict, table_cols=None) -> dict:
         of the per-engine "ME Running hours - No 1..10" entries.
       - Latitude / Longitude degrees (and minutes): the Excel export drops a 0 degree
         (a position on the equator / Greenwich meridian), but the Position tab carries it.
+      - Composite boiler fuel total: normally read from the Consumption tab; when that tab
+        has no composite-boiler entry the Excel export's "Composite Boiler Consumption (MT)
+        - ComBL Total Cons" holds it (that key is mapped to the composite-boiler RUNNING
+        HOURS column, not to this one - see audit notes 2026-11-25).
     """
     def blank(col):
         return (table_cols is None or col in table_cols) and not str(data_rec.get(col) or "").strip()
@@ -683,6 +687,10 @@ def _mariapps_gap_fields(data_rec: dict, flat: dict, table_cols=None) -> dict:
         vals = [float(v.replace(",", "")) for v in vals if v is not None]
         if vals:
             out["ME_RHME_dCnt_operational_LF"] = f"{sum(vals):g}"
+    if blank("CompositeBoiler_mFOCComBL_dCnt_operational_LF"):
+        v = _num_text(flat.get("composite_boiler_consumption_mt_combl_total_cons"))
+        if v is not None:
+            out["CompositeBoiler_mFOCComBL_dCnt_operational_LF"] = v
     for deg_col, min_col, p_deg, p_min in (
             ("VoyageMeta_latitude_operational_LF", "VoyageMeta_latitude_lat_minutes_operational_LF",
              "pos_latitude_degree", "pos_latitude_minutes"),
