@@ -164,6 +164,52 @@ def check_port_noon_with_distance(db, vessel_imo, report_date):
         AND UPPER(TRIM(COALESCE(x.log_type, ''))) LIKE 'NOON AT PORT%'""")
 
 
+_NOT_PORT = "UPPER(TRIM(COALESCE(x.log_type, ''))) NOT IN ('NOON AT PORT', 'ARRIVAL REPORT', 'DEPARTURE REPORT')"
+_SEA_NOON = "(UPPER(TRIM(COALESCE(x.log_type, ''))) LIKE 'NOON AT SEA%' OR UPPER(TRIM(COALESCE(x.log_type, ''))) = 'NOON')"
+_X_CARGO = _numexpr('x."Vessel_Cargo_onboard_operational_LF"::text')
+_X_CARGO_BLANK = "NULLIF(TRIM(x.\"Vessel_Cargo_onboard_operational_LF\"::text), '') IS NULL"
+_X_ME_HOURS_BLANK = "NULLIF(TRIM(x.\"ME_RHME_dCnt_operational_LF\"::text), '') IS NULL"
+_X_DURATION = _numexpr('x."VoyageMeta_log_durationh_operational_LF"::text')
+_X_GRAND_TOTAL = _numexpr("x.emissionx_grand_total_mt::text")
+# A ballast passage can legitimately carry a little cargo residue / slops.
+_BALLAST_CARGO_MIN_T = 100
+
+
+def check_loading_cargo_mismatch(db, vessel_imo, report_date):
+    """E10 (MariApps only): 'Laden' with a cargo figure of exactly 0, or 'Ballast' with
+    more than 100 t of cargo. A blank cargo is M09, not this. Port-type reports are
+    excluded (cargo is legitimately changing there)."""
+    return _mariapps_rows(db, vessel_imo, report_date, f"""
+        {_NOT_PORT} AND (
+          (UPPER(TRIM(COALESCE(x.loading_condition, ''))) = 'LADEN'
+             AND NOT ({_X_CARGO_BLANK}) AND {_X_CARGO} = 0)
+          OR (UPPER(TRIM(COALESCE(x.loading_condition, ''))) = 'BALLAST' AND {_X_CARGO} > {_BALLAST_CARGO_MIN_T}))""")
+
+
+def check_zero_total_fuel(db, vessel_imo, report_date):
+    """E07 (MariApps only): no fuel at all on a report covering 2 h or more - the auxiliary
+    engine alone must burn something."""
+    return _mariapps_rows(db, vessel_imo, report_date, f"""
+        {_X_DURATION} >= 2 AND {_X_GRAND_TOTAL} = 0""")
+
+
+def check_cargo_blank(db, vessel_imo, report_date):
+    """M09 (MariApps only): Cargo Onboard not filled in (a ballast ship should enter 0)."""
+    return _mariapps_rows(db, vessel_imo, report_date, _X_CARGO_BLANK)
+
+
+def check_me_hours_blank(db, vessel_imo, report_date):
+    """M11 (MariApps only): ME running hours blank on a sea-type report."""
+    return _mariapps_rows(db, vessel_imo, report_date, f"{_X_ME_HOURS_BLANK} AND {_NOT_PORT}")
+
+
+def check_position_blank(db, vessel_imo, report_date):
+    """M15 (MariApps only): latitude or longitude blank on a Noon at sea report."""
+    return _mariapps_rows(db, vessel_imo, report_date, f"""
+        {_SEA_NOON} AND (NULLIF(TRIM(x."VoyageMeta_latitude_operational_LF"::text), '') IS NULL
+                         OR NULLIF(TRIM(x."VoyageMeta_longitude_operational_LF"::text), '') IS NULL)""")
+
+
 def run_checks_for_date(db, vessel_imo, report_date):
     """Returns {(source_id, rule_key): detail_dict} for every rule that found
     a gap on this vessel/date — empty dict if everything's clean."""
@@ -193,5 +239,23 @@ def run_checks_for_date(db, vessel_imo, report_date):
     e11 = check_port_noon_with_distance(db, vessel_imo, report_date)
     if e11:
         findings[("mari_apps", "port_noon_with_distance")] = e11
+
+    # Same report, same problem, one finding: a log already raised as zero fuel / no ME
+    # consumption is left out of the fuel and ME-hours checks below.
+    covered = set()
+    for key in ("missing_fuel", "distance_no_me_consumption"):
+        covered |= set((findings.get(("mari_apps", key)) or {}).get("logs", []))
+    for rule_key, fn, skip_covered in (
+            ("loading_cargo_mismatch", check_loading_cargo_mismatch, False),
+            ("zero_total_fuel", check_zero_total_fuel, True),
+            ("cargo_blank", check_cargo_blank, False),
+            ("me_hours_blank", check_me_hours_blank, True),
+            ("position_blank", check_position_blank, False)):
+        found = fn(db, vessel_imo, report_date)
+        if not found:
+            continue
+        logs = [lg for lg in found["logs"] if not (skip_covered and lg in covered)]
+        if logs:
+            findings[("mari_apps", rule_key)] = {"count": len(logs), "logs": logs}
 
     return findings

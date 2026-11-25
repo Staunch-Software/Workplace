@@ -44,6 +44,11 @@ _RULE_LABELS = {
     "missing_fuel": "Zero Fuel on Steaming Day",
     "distance_no_me_consumption": "Distance Without ME Consumption",
     "port_noon_with_distance": "Noon at Port With Distance",
+    "loading_cargo_mismatch": "Loading Condition vs Cargo",
+    "zero_total_fuel": "No Fuel Recorded",
+    "cargo_blank": "Cargo Onboard Blank",
+    "me_hours_blank": "ME Running Hours Blank",
+    "position_blank": "Position Blank",
 }
 
 

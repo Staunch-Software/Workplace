@@ -39,12 +39,22 @@ RULE_LABELS = {
     "missing_fuel": "Zero fuel logged across every grade on a real steaming day",
     "distance_no_me_consumption": "Distance steamed but no ME fuel and no ME running hours",
     "port_noon_with_distance": "'Noon at port' report carries steamed distance",
+    "loading_cargo_mismatch": "Loading condition and cargo disagree (Laden with no cargo / Ballast with cargo)",
+    "zero_total_fuel": "No fuel consumption recorded on a report with duration",
+    "cargo_blank": "Cargo onboard not filled in",
+    "me_hours_blank": "ME running hours not filled in on a sea report",
+    "position_blank": "Latitude / longitude not filled in on a Noon at sea report",
 }
 
 # One line under each heading telling the vessel what to do about it.
 RULE_ACTIONS = {
     "distance_no_me_consumption": "Enter the ME fuel consumption and ME running hours for this report.",
     "port_noon_with_distance": "Check the report type (should it be a Noon at sea?) or correct the distance.",
+    "loading_cargo_mismatch": "Check the loading condition and the cargo onboard figure on this report.",
+    "zero_total_fuel": "Enter the fuel consumption for this report (the auxiliary engine always burns fuel).",
+    "cargo_blank": "Enter the cargo onboard (0 if the ship is in ballast).",
+    "me_hours_blank": "Enter the ME running hours for this report.",
+    "position_blank": "Enter the noon position (latitude and longitude).",
 }
 
 # Accent color per rule — same red/amber/green dot convention already used
@@ -59,6 +69,11 @@ RULE_ACCENT = {
     "missing_fuel": "#e05050",
     "distance_no_me_consumption": "#e05050",
     "port_noon_with_distance": "#d4a02a",
+    "loading_cargo_mismatch": "#e05050",
+    "zero_total_fuel": "#e05050",
+    "cargo_blank": "#d4a02a",
+    "me_hours_blank": "#d4a02a",
+    "position_blank": "#d4a02a",
 }
 
 # Lands the recipient straight on the MariApps Log Approval grid so they don't
